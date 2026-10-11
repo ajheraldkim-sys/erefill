@@ -104,7 +104,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // 4. Location Guard (Required for authenticated users accessing station/delivery features)
     // Administrators do not require client GPS location tracking.
-    if (userProvider.user?.role == 'admin') {
+    final role = userProvider.user?.role;
+    if (role == 'admin' || role == 'super_admin' || role == 'administrator') {
       return _buildAuthenticatedContent(context, userProvider);
     }
 
@@ -233,14 +234,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // --- SMART PROFILE ONBOARDING GUARD ---
     // Riders and Admins bypass customer location onboarding.
-    if (user.role != 'rider' && user.role != 'admin' && (user.town == null || user.town!.isEmpty)) {
+    final isAdmin = user.role == 'admin' || user.role == 'super_admin' || user.role == 'administrator';
+    if (user.role != 'rider' && !isAdmin && (user.town == null || user.town!.isEmpty)) {
       return const OnboardingScreen();
     }
 
     if (user.role == 'owner') return OwnerDashboard(key: ValueKey('owner_${user.id}'));
     if (user.role == 'customer') return CustomerHome(key: ValueKey('customer_${user.id}'));
     if (user.role == 'rider') return RiderDashboard(key: ValueKey('rider_${user.id}'));
-    if (user.role == 'admin') return AdminDashboardScreen(key: ValueKey('admin_${user.id}'));
+    if (isAdmin) return AdminDashboardScreen(key: ValueKey('admin_${user.id}'));
 
     return Scaffold(
       body: Center(

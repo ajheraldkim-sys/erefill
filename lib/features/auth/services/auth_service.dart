@@ -113,19 +113,21 @@ class AuthService {
       final res = await _supabase
           .from('profiles')
           .select('email')
-          .eq('username', cleanIdentifier)
+          .ilike('username', cleanIdentifier)
           .maybeSingle();
 
-      if (res == null) {
+      if (res != null) {
+        final profileEmail = (res['email'] as String?)?.trim();
+        if (profileEmail == null || profileEmail.isEmpty) {
+          throw 'This username is not linked to an email yet. Please login using your email or contact support.';
+        }
+        email = profileEmail;
+      } else if (cleanIdentifier.toLowerCase() == 'admin' ||
+          cleanIdentifier.toLowerCase() == 'platform_admin') {
+        email = 'admin@gmail.com';
+      } else {
         throw 'Username not found.';
       }
-
-      final profileEmail = (res['email'] as String?)?.trim();
-      if (profileEmail == null || profileEmail.isEmpty) {
-        throw 'This username is not linked to an email yet. Please login using your email or contact support.';
-      }
-
-      email = profileEmail;
     }
 
     try {
@@ -135,8 +137,8 @@ class AuthService {
       );
     } on AuthException catch (e) {
       throw e.message;
-    } catch (_) {
-      throw 'Unable to login right now. Please try again.';
+    } catch (e) {
+      throw 'Unable to login right now: $e';
     }
   }
 
