@@ -89,8 +89,8 @@ void main() {
       expect(AppUi.radiusControl, 8.0);
       expect(AppUi.radiusCard, 12.0);
       expect(AppUi.cardElevation, 0.0);
-      expect(AppUi.borderLight, const Color(0xFFE4E4E7));
-      expect(AppUi.borderDark, const Color(0xFF27272A));
+      expect(AppUi.borderLight, const Color(0xFFF1F4F5));
+      expect(AppUi.borderDark, const Color(0xFF243237));
     });
 
     testWidgets('NavigationBar with NavigationDestination resolves MaterialLocalizations successfully', (tester) async {

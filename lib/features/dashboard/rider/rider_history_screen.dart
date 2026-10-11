@@ -657,24 +657,35 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: AppUi.textMuted),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 16, color: AppUi.textMuted),
+          ),
           const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              color: AppUi.textSecondaryOf(context),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppUi.textSecondaryOf(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              color: AppUi.textPrimaryOf(context),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: AppUi.textPrimaryOf(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
