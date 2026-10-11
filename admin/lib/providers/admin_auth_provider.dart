@@ -15,7 +15,7 @@ class AdminAuthProvider extends ChangeNotifier {
   bool _isAdmin = false;
   Map<String, dynamic>? _profile;
   StreamSubscription<AuthState>? _authSub;
-  int _refreshGeneration = 0;
+  Future<void>? _ongoingRefresh;
 
   bool get loading => _loading;
   bool get isAuthenticated => _client.auth.currentSession != null;
@@ -43,7 +43,22 @@ class AdminAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _refresh() async {
-    final generation = ++_refreshGeneration;
+    if (_ongoingRefresh != null) {
+      await _ongoingRefresh;
+      return;
+    }
+    final future = _doRefresh();
+    _ongoingRefresh = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_ongoingRefresh, future)) {
+        _ongoingRefresh = null;
+      }
+    }
+  }
+
+  Future<void> _doRefresh() async {
     final session = _client.auth.currentSession;
     final userId = session?.user.id;
     _loading = true;
@@ -51,7 +66,6 @@ class AdminAuthProvider extends ChangeNotifier {
 
     try {
       if (session == null) {
-        if (generation != _refreshGeneration) return;
         _profile = null;
         _isAdmin = false;
         return;
@@ -63,11 +77,13 @@ class AdminAuthProvider extends ChangeNotifier {
           .eq('id', session.user.id)
           .maybeSingle();
 
-      if (!_isCurrentRefresh(generation, userId)) return;
+      if (_client.auth.currentSession?.user.id != userId) return;
       final loadedProfile =
           profile == null ? null : Map<String, dynamic>.from(profile);
       final profileRole = loadedProfile?['role']?.toString().toLowerCase() ?? '';
-      final hasAdminRole = profileRole == 'admin';
+      final hasAdminRole = profileRole == 'admin' ||
+          profileRole == 'super_admin' ||
+          profileRole == 'administrator';
 
       if (!hasAdminRole) {
         _profile = loadedProfile;
@@ -78,31 +94,26 @@ class AdminAuthProvider extends ChangeNotifier {
       // Verify RPC if available, but do not falsely lock out verified admins if RPC is not present
       try {
         final rpcCheck = await _api.isAdmin();
-        if (!_isCurrentRefresh(generation, userId)) return;
+        if (_client.auth.currentSession?.user.id != userId) return;
         _profile = loadedProfile;
         _isAdmin = rpcCheck || hasAdminRole;
       } catch (e) {
-        if (!_isCurrentRefresh(generation, userId)) return;
+        if (_client.auth.currentSession?.user.id != userId) return;
         debugPrint('is_admin RPC check skipped (falling back to database role): $e');
         _profile = loadedProfile;
         _isAdmin = hasAdminRole;
       }
     } catch (e) {
-      if (!_isCurrentRefresh(generation, userId)) return;
+      if (_client.auth.currentSession?.user.id != userId) return;
       debugPrint('Admin auth refresh failed: $e');
       _profile = null;
       _isAdmin = false;
     } finally {
-      if (_isCurrentRefresh(generation, userId)) {
+      if (_client.auth.currentSession?.user.id == userId) {
         _loading = false;
         notifyListeners();
       }
     }
-  }
-
-  bool _isCurrentRefresh(int generation, String? userId) {
-    return generation == _refreshGeneration &&
-        _client.auth.currentSession?.user.id == userId;
   }
 
   Future<void> signIn(String identifier, String password) async {
@@ -115,11 +126,14 @@ class AdminAuthProvider extends ChangeNotifier {
         final res = await _client
             .from('profiles')
             .select('email')
-            .eq('username', email)
+            .ilike('username', email)
             .maybeSingle();
         final profileEmail = res?['email']?.toString().trim();
         if (profileEmail != null && profileEmail.isNotEmpty) {
           email = profileEmail;
+        } else if (email.toLowerCase() == 'admin' ||
+            email.toLowerCase() == 'platform_admin') {
+          email = 'admin@gmail.com';
         }
       }
 
@@ -139,7 +153,6 @@ class AdminAuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    _refreshGeneration++;
     await _client.auth.signOut();
     _profile = null;
     _isAdmin = false;
@@ -149,7 +162,6 @@ class AdminAuthProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _refreshGeneration++;
     _authSub?.cancel();
     super.dispose();
   }
