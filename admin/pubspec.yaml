@@ -1,0 +1,33 @@
+name: erefill_admin
+description: eRefill desktop admin — system moderation and oversight.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.11.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  erefill:
+    path: ../
+  supabase_flutter: ^2.8.0
+  provider: ^6.1.2
+  fl_chart: ^0.70.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  intl: ^0.20.2
+  google_fonts: ^6.2.1
+  shadcn_flutter: ^0.0.55
+  shadcn_flutter_material: ^0.0.54
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#fff" stroke="#111" stroke-width="1"/>
+    </marker>
+    <style>
+      .line { stroke: #111; stroke-width: 1.5; fill: none; }
+      .dash { stroke: #111; stroke-width: 1.4; stroke-dasharray: 7 6; fill: none; }
+      .oval { stroke: #111; stroke-width: 1.5; fill: #fff; }
+      .label { font: 18px Arial, Helvetica, sans-serif; fill: #111; }
+      .small { font: italic 15px Arial, Helvetica, sans-serif; fill: #111; }
+      .actor { font: italic 18px Arial, Helvetica, sans-serif; fill: #111; }
+      .title { font: 20px Arial, Helvetica, sans-serif; fill: #111; }
+    </style>
+  </defs>
+
+  <rect x="170" y="10" width="860" height="850" class="line"/>
+  <text x="600" y="38" text-anchor="middle" class="title">Implementation of an E-Refill Mobile Ordering Application</text>
+  <text x="600" y="62" text-anchor="middle" class="title">for a Water Refilling Station</text>
+
+  <!-- Customer actor -->
+  <circle cx="60" cy="340" r="19" class="line"/>
+  <line x1="60" y1="359" x2="60" y2="430" class="line"/>
+  <line x1="20" y1="385" x2="100" y2="385" class="line"/>
+  <line x1="60" y1="430" x2="25" y2="500" class="line"/>
+  <line x1="60" y1="430" x2="95" y2="500" class="line"/>
+  <text x="60" y="520" text-anchor="middle" class="actor">Customer</text>
+
+  <!-- Station owner actor -->
+  <circle cx="1110" cy="240" r="19" class="line"/>
+  <line x1="1110" y1="259" x2="1110" y2="330" class="line"/>
+  <line x1="1070" y1="285" x2="1150" y2="285" class="line"/>
+  <line x1="1110" y1="330" x2="1075" y2="400" class="line"/>
+  <line x1="1110" y1="330" x2="1145" y2="400" class="line"/>
+  <text x="1110" y="420" text-anchor="middle" class="actor">Station Owner</text>
+
+  <!-- Rider actor -->
+  <circle cx="1110" cy="650" r="19" class="line"/>
+  <line x1="1110" y1="669" x2="1110" y2="740" class="line"/>
+  <line x1="1070" y1="695" x2="1150" y2="695" class="line"/>
+  <line x1="1110" y1="740" x2="1075" y2="810" class="line"/>
+  <line x1="1110" y1="740" x2="1145" y2="810" class="line"/>
+  <text x="1110" y="830" text-anchor="middle" class="actor">Rider</text>
+
+  <!-- Customer use cases -->
+  <ellipse cx="290" cy="270" rx="90" ry="42" class="oval"/>
+  <text x="290" y="264" text-anchor="middle" class="small">Browse</text>
+  <text x="290" y="283" text-anchor="middle" class="small">stations</text>
+
+  <ellipse cx="290" cy="365" rx="90" ry="42" class="oval"/>
+  <text x="290" y="359" text-anchor="middle" class="small">View water</text>
+  <text x="290" y="378" text-anchor="middle" class="small">products</text>
+
+  <ellipse cx="290" cy="465" rx="90" ry="42" class="oval"/>
+  <text x="290" y="459" text-anchor="middle" class="small">Make refill</text>
+  <text x="290" y="478" text-anchor="middle" class="small">order</text>
+
+  <ellipse cx="290" cy="565" rx="90" ry="42" class="oval"/>
+  <text x="290" y="559" text-anchor="middle" class="small">Edit</text>
+  <text x="290" y="578" text-anchor="middle" class="small">order</text>
+
+  <ellipse cx="290" cy="665" rx="90" ry="42" class="oval"/>
+  <text x="290" y="659" text-anchor="middle" class="small">Proceed to</text>
+  <text x="290" y="678" text-anchor="middle" class="small">checkout</text>
+
+  <ellipse cx="520" cy="465" rx="95" ry="42" class="oval"/>
+  <text x="520" y="449" text-anchor="middle" class="small">Input quantity</text>
+  <text x="520" y="468" text-anchor="middle" class="small">and container</text>
+  <text x="520" y="487" text-anchor="middle" class="small">size</text>
+
+  <ellipse cx="520" cy="565" rx="95" ry="42" class="oval"/>
+  <text x="520" y="559" text-anchor="middle" class="small">Remove</text>
+  <text x="520" y="578" text-anchor="middle" class="small">item</text>
+
+  <ellipse cx="520" cy="665" rx="95" ry="42" class="oval"/>
+  <text x="520" y="649" text-anchor="middle" class="small">View</text>
+  <text x="520" y="668" text-anchor="middle" class="small">summarized</text>
+  <text x="520" y="687" text-anchor="middle" class="small">order</text>
+
+  <ellipse cx="520" cy="760" rx="95" ry="42" class="oval"/>
+  <text x="520" y="754" text-anchor="middle" class="small">Select payment</text>
+  <text x="520" y="773" text-anchor="middle" class="small">method</text>
+
+  <ellipse cx="730" cy="760" rx="95" ry="42" class="oval"/>
+  <text x="730" y="754" text-anchor="middle" class="small">Track order</text>
+  <text x="730" y="773" text-anchor="middle" class="small">status</text>
+
+  <!-- Owner use cases -->
+  <ellipse cx="710" cy="140" rx="95" ry="42" class="oval"/>
+  <text x="710" y="134" text-anchor="middle" class="small">Add/Edit</text>
+  <text x="710" y="153" text-anchor="middle" class="small">water product</text>
+
+  <ellipse cx="900" cy="190" rx="95" ry="42" class="oval"/>
+  <text x="900" y="184" text-anchor="middle" class="small">Manage</text>
+  <text x="900" y="203" text-anchor="middle" class="small">products</text>
+
+  <ellipse cx="900" cy="305" rx="95" ry="42" class="oval"/>
+  <text x="900" y="299" text-anchor="middle" class="small">View and</text>
+  <text x="900" y="318" text-anchor="middle" class="small">manage orders</text>
+
+  <ellipse cx="710" cy="305" rx="95" ry="42" class="oval"/>
+  <text x="710" y="299" text-anchor="middle" class="small">Update order</text>
+  <text x="710" y="318" text-anchor="middle" class="small">status</text>
+
+  <ellipse cx="710" cy="405" rx="95" ry="42" class="oval"/>
+  <text x="710" y="399" text-anchor="middle" class="small">Assign</text>
+  <text x="710" y="418" text-anchor="middle" class="small">rider</text>
+
+  <!-- Rider use cases -->
+  <ellipse cx="900" cy="620" rx="95" ry="42" class="oval"/>
+  <text x="900" y="614" text-anchor="middle" class="small">View delivery</text>
+  <text x="900" y="633" text-anchor="middle" class="small">details</text>
+
+  <ellipse cx="900" cy="725" rx="95" ry="42" class="oval"/>
+  <text x="900" y="719" text-anchor="middle" class="small">Scan/confirm</text>
+  <text x="900" y="738" text-anchor="middle" class="small">delivery code</text>
+
+  <ellipse cx="710" cy="670" rx="95" ry="42" class="oval"/>
+  <text x="710" y="664" text-anchor="middle" class="small">Complete</text>
+  <text x="710" y="683" text-anchor="middle" class="small">delivery</text>
+
+  <!-- Associations -->
+  <line x1="100" y1="385" x2="205" y2="270" class="line"/>
+  <line x1="100" y1="385" x2="200" y2="365" class="line"/>
+  <line x1="100" y1="385" x2="200" y2="465" class="line"/>
+  <line x1="100" y1="385" x2="205" y2="565" class="line"/>
+  <line x1="100" y1="385" x2="205" y2="665" class="line"/>
+
+  <line x1="1070" y1="285" x2="985" y2="190" class="line"/>
+  <line x1="1070" y1="285" x2="995" y2="305" class="line"/>
+
+  <line x1="1070" y1="695" x2="990" y2="620" class="line"/>
+  <line x1="1070" y1="695" x2="990" y2="725" class="line"/>
+
+  <!-- Include and extend relationships -->
+  <line x1="375" y1="465" x2="425" y2="465" class="dash" marker-end="url(#arrow)"/>
+  <text x="400" y="446" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="425" y1="565" x2="375" y2="565" class="dash" marker-end="url(#arrow)"/>
+  <text x="400" y="546" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+
+  <line x1="375" y1="665" x2="425" y2="665" class="dash" marker-end="url(#arrow)"/>
+  <text x="400" y="646" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="365" y1="690" x2="435" y2="740" class="dash" marker-end="url(#arrow)"/>
+  <text x="395" y="725" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="378" y1="685" x2="645" y2="745" class="dash" marker-end="url(#arrow)"/>
+  <text x="565" y="727" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="800" y1="151" x2="814" y2="156" class="dash"/>
+  <line x1="814" y1="156" x2="819" y2="194" class="dash"/>
+  <line x1="819" y1="194" x2="806" y2="195" class="dash" marker-end="url(#arrow)"/>
+  <text x="815" y="132" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="806" y1="305" x2="805" y2="305" class="dash" marker-end="url(#arrow)"/>
+  <text x="805" y="285" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="798" y1="390" x2="815" y2="336" class="dash" marker-end="url(#arrow)"/>
+  <text x="805" y="370" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="805" y1="690" x2="785" y2="680" class="dash" marker-end="url(#arrow)"/>
+  <text x="805" y="715" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="895" y1="683" x2="895" y2="662" class="dash" marker-end="url(#arrow)"/>
+  <text x="832" y="678" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+</svg>
