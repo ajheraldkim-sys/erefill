@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:erefill/core/theme/app_fonts.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
 import 'package:erefill/core/services/notification_service.dart';
+import 'package:erefill/features/chat/models/system_notification.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -73,6 +74,34 @@ void main() {
     test('NotificationService singleton initializes without throwing', () {
       final service = NotificationService.instance;
       expect(service, isNotNull);
+    });
+
+    test('NotificationService activeChatRoomId properly tracks and clears room', () {
+      final service = NotificationService.instance;
+      expect(service.activeChatRoomId, isNull);
+
+      service.activeChatRoomId = 'test-room-123';
+      expect(service.activeChatRoomId, equals('test-room-123'));
+
+      service.activeChatRoomId = null;
+      expect(service.activeChatRoomId, isNull);
+    });
+
+    test('NotificationType maps newMessage and orderCancelled correctly', () {
+      expect(NotificationType.newMessage.value, equals('new_message'));
+      expect(NotificationType.newMessage.displayName, equals('Message'));
+      expect(NotificationType.fromString('new_message'), equals(NotificationType.newMessage));
+
+      expect(NotificationType.orderCancelled.value, equals('order_cancelled'));
+      expect(NotificationType.orderCancelled.displayName, equals('Cancelled'));
+      expect(NotificationType.fromString('order_cancelled'), equals(NotificationType.orderCancelled));
+    });
+
+    test('NotificationPriority values and defaults map correctly', () {
+      expect(NotificationPriority.urgent.value, equals('urgent'));
+      expect(NotificationPriority.high.value, equals('high'));
+      expect(NotificationPriority.fromString('urgent'), equals(NotificationPriority.urgent));
+      expect(NotificationPriority.fromString('unknown_val'), equals(NotificationPriority.normal));
     });
   });
 }

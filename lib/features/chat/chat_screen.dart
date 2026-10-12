@@ -13,6 +13,7 @@ import 'models/chat_room.dart';
 import 'models/quick_reply.dart';
 import 'services/chat_service.dart';
 import 'utils/chat_identity_resolver.dart';
+import '../../core/services/notification_service.dart';
 
 /// Enhanced ChatScreen with room-based architecture
 /// Supports all roles: Customer, Rider, Owner
@@ -61,6 +62,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     if (widget.roomId != null) {
+      NotificationService.instance.activeChatRoomId = widget.roomId;
       _messagesStream = _chatService
           .getMessagesForRoom(widget.roomId!)
           .asBroadcastStream();
@@ -71,6 +73,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    if (widget.roomId != null &&
+        NotificationService.instance.activeChatRoomId == widget.roomId) {
+      NotificationService.instance.activeChatRoomId = null;
+    }
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

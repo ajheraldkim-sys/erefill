@@ -788,6 +788,31 @@ class ChatService {
     return response as int? ?? 0;
   }
 
+  /// Send system notification to a specific user (saved to system_notifications table)
+  Future<void> sendSystemNotification({
+    required String userId,
+    required String title,
+    required String content,
+    NotificationType type = NotificationType.systemAlert,
+    NotificationPriority priority = NotificationPriority.high,
+    String? actionUrl,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    try {
+      await _supabase.from('system_notifications').insert({
+        'user_id': userId,
+        'title': title,
+        'content': content,
+        'type': type.value,
+        'priority': priority.value,
+        'action_url': actionUrl,
+        'metadata': metadata,
+      });
+    } catch (e) {
+      debugPrint('Failed to insert system notification: $e');
+    }
+  }
+
   // ==================== HELPER METHODS ====================
 
   Future<List<ChatParticipant>> _getParticipants(String roomId) async {

@@ -23,6 +23,11 @@ class NotificationService {
   OverlayEntry? _activeInAppOverlay;
   Timer? _inAppDismissTimer;
 
+  /// The chat room ID currently active in the foreground, if any.
+  /// When set, notifications for this chat room are suppressed so the user
+  /// is not disturbed with banners while actively messaging in the room.
+  String? activeChatRoomId;
+
   static const String _channelId = 'erefill_alerts';
   static const String _channelName = 'eRefill Notifications';
   static const String _channelDesc =
@@ -33,9 +38,9 @@ class NotificationService {
     if (_isInitialized) return;
 
     try {
-      // 1. Android settings
+      // 1. Android settings - matches brand launcher icon
       const androidSettings = AndroidInitializationSettings(
-        '@mipmap/ic_launcher',
+        '@mipmap/launcher_icon',
       );
 
       // 2. iOS settings
@@ -55,12 +60,24 @@ class NotificationService {
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
 
-      // Request runtime permissions on Android 13+
+      // Register high-priority notification channel & request permissions on Android
       if (!kIsWeb && Platform.isAndroid) {
         final androidImpl = _localNotifs
             .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin
             >();
+
+        const alertChannel = AndroidNotificationChannel(
+          _channelId,
+          _channelName,
+          description: _channelDesc,
+          importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+          showBadge: true,
+        );
+        await androidImpl?.createNotificationChannel(alertChannel);
+
         final permissionGranted = await androidImpl
             ?.requestNotificationsPermission();
         if (permissionGranted == false) {
@@ -68,6 +85,15 @@ class NotificationService {
             'Notification permission is disabled; system notifications will not appear.',
           );
         }
+      }
+
+      // Handle cold start app launch via system notification tap
+      final launchDetails = await _localNotifs.getNotificationAppLaunchDetails();
+      if (launchDetails?.didNotificationLaunchApp == true &&
+          launchDetails?.notificationResponse != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _onNotificationTapped(launchDetails!.notificationResponse!);
+        });
       }
 
       _isInitialized = true;
@@ -89,10 +115,17 @@ class NotificationService {
 
       if (data is Map) {
         final orderId = data['order_id']?.toString();
+        final roomId = data['room_id']?.toString() ??
+            data['chat_room_id']?.toString();
         final route = data['route']?.toString();
 
         if (orderId != null && orderId.isNotEmpty) {
           context.push(AppRoutes.orderById(orderId));
+          return;
+        }
+
+        if (roomId != null && roomId.isNotEmpty) {
+          context.push('${AppRoutes.chat}?roomId=$roomId');
           return;
         }
 
@@ -121,7 +154,10 @@ class NotificationService {
     }
 
     try {
-      final notifId = id ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final notifId = id ??
+          (payload != null
+              ? payload.hashCode.abs() % 2147483647
+              : DateTime.now().millisecondsSinceEpoch ~/ 1000);
 
       final androidPriority = switch (priority) {
         NotificationPriority.urgent => Priority.max,
@@ -144,9 +180,11 @@ class NotificationService {
         importance: androidImportance,
         priority: androidPriority,
         showWhen: true,
-        icon: '@mipmap/ic_launcher',
+        icon: '@mipmap/launcher_icon',
         enableVibration: true,
         playSound: true,
+        channelShowBadge: true,
+        category: AndroidNotificationCategory.status,
       );
 
       const darwinDetails = DarwinNotificationDetails(
@@ -211,8 +249,22 @@ class NotificationService {
                 final data = jsonDecode(payload);
                 if (data is Map) {
                   final orderId = data['order_id']?.toString();
+                  final roomId = data['room_id']?.toString() ??
+                      data['chat_room_id']?.toString();
+                  final route = data['route']?.toString();
+
                   if (orderId != null && orderId.isNotEmpty) {
                     context.push(AppRoutes.orderById(orderId));
+                    return;
+                  }
+
+                  if (roomId != null && roomId.isNotEmpty) {
+                    context.push('${AppRoutes.chat}?roomId=$roomId');
+                    return;
+                  }
+
+                  if (route != null && route.isNotEmpty) {
+                    context.push(route);
                     return;
                   }
                 }

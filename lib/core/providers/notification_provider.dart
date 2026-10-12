@@ -99,18 +99,31 @@ class NotificationProvider extends ChangeNotifier {
             for (final notification in incoming) {
               if (!_knownIds.contains(notification.id) &&
                   !notification.isRead) {
+                final roomId = notification.metadata['room_id']?.toString() ??
+                    notification.metadata['chat_room_id']?.toString();
+
+                // If user is actively typing or reading in this chat room, suppress alert banner
+                final isActiveChat =
+                    notification.type == NotificationType.newMessage &&
+                        roomId != null &&
+                        NotificationService.instance.activeChatRoomId == roomId;
+
                 final payloadJson = jsonEncode({
                   'notification_id': notification.id,
                   'order_id': notification.metadata['order_id'],
+                  'room_id': roomId,
                   'route': notification.actionUrl,
                 });
-                await NotificationService.instance.show(
-                  title: notification.title,
-                  body: notification.content,
-                  type: notification.type,
-                  priority: notification.priority,
-                  payload: payloadJson,
-                );
+
+                if (!isActiveChat) {
+                  await NotificationService.instance.show(
+                    title: notification.title,
+                    body: notification.content,
+                    type: notification.type,
+                    priority: notification.priority,
+                    payload: payloadJson,
+                  );
+                }
               }
             }
           }
@@ -153,11 +166,13 @@ class NotificationProvider extends ChangeNotifier {
     NotificationType type = NotificationType.systemAlert,
     NotificationPriority priority = NotificationPriority.high,
     String? orderId,
+    String? roomId,
     String? route,
     VoidCallback? onTap,
   }) async {
     final payload = <String, dynamic>{};
     if (orderId != null) payload['order_id'] = orderId;
+    if (roomId != null) payload['room_id'] = roomId;
     if (route != null) payload['route'] = route;
     final payloadJson = jsonEncode(payload);
 

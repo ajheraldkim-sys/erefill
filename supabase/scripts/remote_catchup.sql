@@ -501,6 +501,15 @@ DO $$ BEGIN
       USING (user_id = auth.uid())
       WITH CHECK (user_id = auth.uid());
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'system_notifications' AND policyname = 'system_notifications_auth_insert'
+  ) THEN
+    CREATE POLICY "system_notifications_auth_insert"
+      ON public.system_notifications FOR INSERT
+      TO authenticated
+      WITH CHECK (true);
+  END IF;
 END $$;
 
 -- Customer saved payment methods
@@ -833,6 +842,86 @@ CREATE TRIGGER trg_guard_system_message_spoofing
 BEFORE INSERT ON public.messages
 FOR EACH ROW EXECUTE FUNCTION public.guard_system_message_spoofing();
 
+-- ── Chat Message Notification Trigger ──
+-- Automatically notifies all other chat room participants via system_notifications table
+CREATE OR REPLACE FUNCTION public.notify_chat_message()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_sender_name text;
+  v_part record;
+  v_body text;
+BEGIN
+  -- Do not notify on deleted or blank messages
+  IF NEW.deleted_at IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Resolve sender name
+  IF NEW.sender_id IS NOT NULL THEN
+    SELECT coalesce(nullif(trim(full_name), ''), nullif(trim(username), ''), 'Someone')
+    INTO v_sender_name
+    FROM public.profiles
+    WHERE id = NEW.sender_id;
+    IF v_sender_name IS NULL THEN
+      v_sender_name := 'New Message';
+    END IF;
+  ELSE
+    v_sender_name := 'eRefill System';
+  END IF;
+
+  -- Preview content based on type
+  IF NEW.message_type = 'image' THEN
+    v_body := '📷 Photo message';
+  ELSIF NEW.message_type = 'quick_reply' THEN
+    v_body := coalesce(NEW.content, 'Quick response');
+  ELSE
+    v_body := coalesce(NEW.content, 'New message');
+  END IF;
+
+  -- Insert push notification for each other participant in this chat room
+  FOR v_part IN
+    SELECT user_id FROM public.chat_participants
+    WHERE room_id = NEW.room_id
+      AND user_id IS NOT NULL
+      AND user_id <> coalesce(NEW.sender_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  LOOP
+    INSERT INTO public.system_notifications (
+      user_id,
+      type,
+      priority,
+      title,
+      content,
+      action_url,
+      metadata
+    ) VALUES (
+      v_part.user_id,
+      'new_message',
+      'high',
+      v_sender_name,
+      v_body,
+      '/chat?roomId=' || NEW.room_id::text,
+      jsonb_build_object(
+        'room_id', NEW.room_id,
+        'sender_id', NEW.sender_id,
+        'sender_name', v_sender_name
+      )
+    );
+  END LOOP;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notify_chat_message ON public.messages;
+CREATE TRIGGER trg_notify_chat_message
+AFTER INSERT ON public.messages
+FOR EACH ROW
+EXECUTE FUNCTION public.notify_chat_message();
+
 -- ── Order Creation: Atomic order insertion with server-verified line item pricing ──
 CREATE OR REPLACE FUNCTION public.create_order_atomic(
   p_order_data jsonb,
@@ -1103,6 +1192,32 @@ BEGIN
       'Your rider picked up your refill and is heading to your address.',
       jsonb_build_object('order_id', p_order_id, 'status', 'out_for_delivery')
     );
+  ELSIF p_new_status = 'delivered' THEN
+    INSERT INTO public.system_notifications (
+      user_id, type, priority, title, content, metadata
+    ) VALUES (
+      v_order.customer_id, 'system_alert', 'high', 'Refill Delivered',
+      'Your water refill delivery has been completed. Thank you!',
+      jsonb_build_object('order_id', p_order_id, 'status', 'delivered')
+    );
+  ELSIF p_new_status = 'cancelled' THEN
+    IF auth.uid() = v_order.owner_id THEN
+      INSERT INTO public.system_notifications (
+        user_id, type, priority, title, content, metadata
+      ) VALUES (
+        v_order.customer_id, 'order_cancelled', 'urgent', 'Order Cancelled',
+        'Your refill order #' || upper(substr(p_order_id::text, 1, 8)) || ' was cancelled by the station.',
+        jsonb_build_object('order_id', p_order_id, 'status', 'cancelled')
+      );
+    ELSE
+      INSERT INTO public.system_notifications (
+        user_id, type, priority, title, content, metadata
+      ) VALUES (
+        v_order.owner_id, 'order_cancelled', 'high', 'Order Cancelled by Customer',
+        coalesce(v_order.customer_name, 'Customer') || ' cancelled refill order #' || upper(substr(p_order_id::text, 1, 8)) || '.',
+        jsonb_build_object('order_id', p_order_id, 'status', 'cancelled')
+      );
+    END IF;
   END IF;
 
   RETURN jsonb_build_object('success', true, 'message', 'Order status updated successfully');
