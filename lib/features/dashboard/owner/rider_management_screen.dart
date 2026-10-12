@@ -12,6 +12,254 @@ import 'package:erefill/core/utils/friendly_errors.dart';
 class RiderManagementScreen extends StatefulWidget {
   const RiderManagementScreen({super.key});
 
+  static Future<bool?> showUnlinkRiderDialog(
+    BuildContext context,
+    Map<String, dynamic> rider, {
+    VoidCallback? onUnlinked,
+  }) async {
+    final riderId = rider['id']?.toString() ?? '';
+    final riderName = rider['full_name']?.toString() ?? 'this rider';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppUi.surfaceOf(context),
+        shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.person_remove_rounded,
+                color: Color(0xFFEF4444),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Unlink Rider',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to remove $riderName from your station? They will no longer receive or deliver refill orders for your station.',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppUi.textSecondaryOf(context),
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Unlink Rider'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return false;
+
+    try {
+      await SafeSupabase.unlinkRider(riderId: riderId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$riderName has been unlinked from your station.'),
+            backgroundColor: AppUi.bluePrimary,
+          ),
+        );
+      }
+      onUnlinked?.call();
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              FriendlyErrors.message(
+                e,
+                fallback: 'Could not unlink rider. Please try again.',
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  static Future<bool?> showToggleStatusDialog(
+    BuildContext context,
+    Map<String, dynamic> rider, {
+    VoidCallback? onStatusChanged,
+  }) async {
+    final riderId = rider['id']?.toString() ?? '';
+    final riderName = rider['full_name']?.toString() ?? 'this rider';
+    final isSuspended = rider['is_suspended'] == true;
+    final willSuspend = !isSuspended;
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppUi.surfaceOf(context),
+        shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (willSuspend ? Colors.orange : const Color(0xFF10B981))
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                willSuspend ? Icons.block_rounded : Icons.check_circle_rounded,
+                color: willSuspend ? Colors.orange : const Color(0xFF10B981),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                willSuspend ? 'Suspend Rider' : 'Activate Rider',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              willSuspend
+                  ? 'Suspending $riderName will prevent them from accepting new deliveries until reactivated.'
+                  : 'Reactivate $riderName so they can resume accepting delivery assignments?',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppUi.textSecondaryOf(context),
+                height: 1.4,
+              ),
+            ),
+            if (willSuspend) ...[
+              const SizedBox(height: 14),
+              TextField(
+                controller: reasonController,
+                decoration: InputDecoration(
+                  labelText: 'Reason for suspension (optional)',
+                  hintText: 'e.g. Temporary leave, policy review',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: willSuspend
+                  ? Colors.orange
+                  : const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(willSuspend ? 'Suspend' : 'Activate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return false;
+
+    try {
+      await SafeSupabase.setRiderStatus(
+        riderId: riderId,
+        isSuspended: willSuspend,
+        reason: reasonController.text.trim().isEmpty
+            ? null
+            : reasonController.text.trim(),
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$riderName is now ${willSuspend ? "suspended" : "active"}.',
+            ),
+            backgroundColor: willSuspend
+                ? Colors.orange
+                : const Color(0xFF10B981),
+          ),
+        );
+      }
+      onStatusChanged?.call();
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              FriendlyErrors.message(
+                e,
+                fallback: 'Could not update rider status. Please try again.',
+              ),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  static Future<bool?> showEditRiderCredentialsDialog(
+    BuildContext context,
+    Map<String, dynamic> rider, {
+    VoidCallback? onUpdated,
+  }) {
+    return _RiderManagementScreenState.showEditRiderCredentialsDialog(
+      context,
+      rider,
+      onUpdated: onUpdated,
+    );
+  }
+
   @override
   State<RiderManagementScreen> createState() => _RiderManagementScreenState();
 }
@@ -125,7 +373,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                   riderId: rider['id'].toString(),
                                   riderName:
                                       rider['full_name']?.toString() ??
-                                          'Rider Profile',
+                                      'Rider Profile',
                                 );
                               },
                               borderRadius: AppUi.pillRadius,
@@ -160,7 +408,9 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                             style: TextStyle(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 16,
-                                              color: AppUi.textPrimaryOf(context),
+                                              color: AppUi.textPrimaryOf(
+                                                context,
+                                              ),
                                             ),
                                           ),
                                           const SizedBox(height: 2),
@@ -184,15 +434,28 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                             vertical: 5,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: const Color(
-                                              0xFF10B981,
-                                            ).withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
+                                            color:
+                                                (rider['is_suspended'] == true
+                                                        ? const Color(
+                                                            0xFFEF4444,
+                                                          )
+                                                        : const Color(
+                                                            0xFF10B981,
+                                                          ))
+                                                    .withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
-                                          child: const Text(
-                                            'Active',
+                                          child: Text(
+                                            rider['is_suspended'] == true
+                                                ? 'Suspended'
+                                                : 'Active',
                                             style: TextStyle(
-                                              color: Color(0xFF10B981),
+                                              color:
+                                                  rider['is_suspended'] == true
+                                                  ? const Color(0xFFEF4444)
+                                                  : const Color(0xFF10B981),
                                               fontSize: 10,
                                               fontWeight: FontWeight.w900,
                                               letterSpacing: 0.5,
@@ -200,20 +463,100 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 4),
-                                        IconButton(
-                                          visualDensity: VisualDensity.compact,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(
-                                            minWidth: 32,
-                                            minHeight: 32,
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(
+                                            Icons.more_vert_rounded,
+                                            size: 20,
+                                            color: AppUi.textMuted,
                                           ),
-                                          icon: const Icon(Icons.edit_outlined, size: 20),
-                                          color: AppUi.bluePrimary,
-                                          tooltip: 'Edit Credentials',
-                                          onPressed: () {
+                                          tooltip: 'Rider Actions',
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: AppUi.cardRadius,
+                                          ),
+                                          onSelected: (val) {
                                             HapticFeedback.lightImpact();
-                                            _showEditRiderDialog(rider);
+                                            if (val == 'edit') {
+                                              _showEditRiderDialog(rider);
+                                            } else if (val == 'status') {
+                                              RiderManagementScreen.showToggleStatusDialog(
+                                                context,
+                                                rider,
+                                                onStatusChanged:
+                                                    _fetchRidersDirect,
+                                              );
+                                            } else if (val == 'unlink') {
+                                              RiderManagementScreen.showUnlinkRiderDialog(
+                                                context,
+                                                rider,
+                                                onUnlinked: _fetchRidersDirect,
+                                              );
+                                            }
                                           },
+                                          itemBuilder: (ctx) => [
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.edit_outlined,
+                                                    size: 18,
+                                                    color: AppUi.bluePrimary,
+                                                  ),
+                                                  SizedBox(width: 10),
+                                                  Text('Edit Credentials'),
+                                                ],
+                                              ),
+                                            ),
+                                            PopupMenuItem(
+                                              value: 'status',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    rider['is_suspended'] ==
+                                                            true
+                                                        ? Icons
+                                                              .check_circle_outline
+                                                        : Icons.block_outlined,
+                                                    size: 18,
+                                                    color:
+                                                        rider['is_suspended'] ==
+                                                            true
+                                                        ? const Color(
+                                                            0xFF10B981,
+                                                          )
+                                                        : Colors.orange,
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Text(
+                                                    rider['is_suspended'] ==
+                                                            true
+                                                        ? 'Activate Rider'
+                                                        : 'Suspend Rider',
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            PopupMenuItem(
+                                              value: 'unlink',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons
+                                                        .person_remove_outlined,
+                                                    size: 18,
+                                                    color: Color(0xFFEF4444),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Text(
+                                                    'Unlink from Station',
+                                                    style: TextStyle(
+                                                      color: Color(0xFFEF4444),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -242,13 +585,39 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
   }
 
   void _showEditRiderDialog(Map<String, dynamic> rider) {
+    showEditRiderCredentialsDialog(
+      context,
+      rider,
+      onUpdated: _fetchRidersDirect,
+    );
+  }
+
+  static Future<bool?> showEditRiderCredentialsDialog(
+    BuildContext context,
+    Map<String, dynamic> rider, {
+    VoidCallback? onUpdated,
+  }) async {
+    final supabase = Supabase.instance.client;
     final riderId = rider['id']?.toString() ?? '';
-    final firstNameController = TextEditingController(
-      text: rider['first_name']?.toString() ?? '',
-    );
-    final lastNameController = TextEditingController(
-      text: rider['last_name']?.toString() ?? '',
-    );
+
+    // Fallback name parsing for existing rows where first_name and last_name are null
+    String initialFirst = rider['first_name']?.toString() ?? '';
+    String initialLast = rider['last_name']?.toString() ?? '';
+    if (initialFirst.isEmpty && initialLast.isEmpty) {
+      final rawFullName = rider['full_name']?.toString().trim() ?? '';
+      if (rawFullName.isNotEmpty) {
+        final parts = rawFullName.split(RegExp(r'\s+'));
+        if (parts.length == 1) {
+          initialFirst = parts.first;
+        } else if (parts.length >= 2) {
+          initialFirst = parts.first;
+          initialLast = parts.sublist(1).join(' ');
+        }
+      }
+    }
+
+    final firstNameController = TextEditingController(text: initialFirst);
+    final lastNameController = TextEditingController(text: initialLast);
     final miController = TextEditingController(
       text: rider['mi']?.toString() ?? '',
     );
@@ -265,7 +634,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
     final passwordController = TextEditingController();
     bool isSaving = false;
 
-    showModalBottomSheet(
+    return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -358,10 +727,22 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                         label: 'Suffix',
                         value: selectedSuffix,
                         icon: Icons.star_border_rounded,
-                        items: const ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'],
+                        items: const [
+                          'None',
+                          'Jr.',
+                          'Sr.',
+                          'II',
+                          'III',
+                          'IV',
+                          'V',
+                        ],
                         compact: true,
                         onChanged: (v) {
-                          setSheetState(() => selectedSuffix = (v == 'None' || v == null) ? null : v);
+                          setSheetState(
+                            () => selectedSuffix = (v == 'None' || v == null)
+                                ? null
+                                : v,
+                          );
                         },
                       ),
                     ),
@@ -402,66 +783,132 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                 AppFormSubmitButton(
                   label: isSaving ? "Saving changes..." : "Save Credentials",
                   icon: Icons.check_circle_outline_rounded,
-                  onPressed: isSaving ? () {} : () async {
-                    final fname = firstNameController.text.trim();
-                    final lname = lastNameController.text.trim();
-                    final mi = miController.text.trim();
-                    final phone = phoneController.text.trim();
-                    final vehicle = vehicleController.text.trim();
-                    final license = licenseController.text.trim();
-                    final newPass = passwordController.text.trim();
+                  onPressed: isSaving
+                      ? () {}
+                      : () async {
+                          final fname = firstNameController.text.trim();
+                          final lname = lastNameController.text.trim();
+                          final mi = miController.text.trim();
+                          final phone = phoneController.text.trim();
+                          final vehicle = vehicleController.text.trim();
+                          final license = licenseController.text.trim();
+                          final newPass = passwordController.text.trim();
 
-                    if (fname.isEmpty || lname.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('First name and last name are required.')),
-                      );
-                      return;
-                    }
-                    if (newPass.isNotEmpty && newPass.length < 6) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Password must be at least 6 characters.')),
-                      );
-                      return;
-                    }
+                          if (fname.isEmpty || lname.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'First name and last name are required.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          if (newPass.isNotEmpty && newPass.length < 6) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Password must be at least 6 characters.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
 
-                    setSheetState(() => isSaving = true);
-                    try {
-                      await supabase.rpc('owner_update_rider_credentials', params: {
-                        'p_rider_id': riderId,
-                        'p_first_name': fname,
-                        'p_last_name': lname,
-                        'p_mi': mi.isEmpty ? null : mi,
-                        'p_suffix': selectedSuffix,
-                        'p_phone': phone.isEmpty ? null : phone,
-                        'p_vehicle_type': vehicle.isEmpty ? null : vehicle,
-                        'p_license_number': license.isEmpty ? null : license,
-                        'p_password': newPass.isEmpty ? null : newPass,
-                      });
+                          setSheetState(() => isSaving = true);
+                          try {
+                            try {
+                              await supabase.rpc(
+                                'owner_update_rider_credentials',
+                                params: {
+                                  'p_rider_id': riderId,
+                                  'p_first_name': fname,
+                                  'p_last_name': lname,
+                                  'p_mi': mi.isEmpty ? null : mi,
+                                  'p_suffix': selectedSuffix,
+                                  'p_phone': phone.isEmpty ? null : phone,
+                                  'p_vehicle_type': vehicle.isEmpty
+                                      ? null
+                                      : vehicle,
+                                  'p_license_number': license.isEmpty
+                                      ? null
+                                      : license,
+                                  'p_password': newPass.isEmpty
+                                      ? null
+                                      : newPass,
+                                },
+                              );
+                            } catch (rpcErr) {
+                              debugPrint(
+                                'RPC update failed, checking fallback: $rpcErr',
+                              );
+                              // Fallback: direct profiles update for profile details if owner owns the rider
+                              final ownerId = SafeSupabase.currentUserId;
+                              final composedName =
+                                  [fname, mi, lname, selectedSuffix ?? '']
+                                      .where((s) => s.trim().isNotEmpty)
+                                      .join(' ')
+                                      .trim();
 
-                      if (sheetContext.mounted && Navigator.of(sheetContext).canPop()) {
-                        Navigator.of(sheetContext).pop();
-                      }
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Rider credentials updated successfully.'),
-                            backgroundColor: AppUi.successFg,
-                          ),
-                        );
-                        _fetchRidersDirect();
-                      }
-                    } catch (e) {
-                      setSheetState(() => isSaving = false);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Update failed: $e'),
-                            backgroundColor: AppUi.error,
-                          ),
-                        );
-                      }
-                    }
-                  },
+                              await supabase
+                                  .from('profiles')
+                                  .update({
+                                    'first_name': fname,
+                                    'last_name': lname,
+                                    'mi': mi.isEmpty ? null : mi,
+                                    'suffix': selectedSuffix,
+                                    'full_name': composedName,
+                                    'phone': phone.isEmpty ? null : phone,
+                                    'vehicle_type': vehicle.isEmpty
+                                        ? null
+                                        : vehicle,
+                                    'license_number': license.isEmpty
+                                        ? null
+                                        : license,
+                                    'updated_at': DateTime.now()
+                                        .toIso8601String(),
+                                  })
+                                  .eq('id', riderId)
+                                  .eq('owner_id', ownerId ?? '');
+
+                              if (newPass.isNotEmpty) {
+                                throw 'Profile updated, but password update requires database migration or admin rights: $rpcErr';
+                              }
+                            }
+
+                            if (sheetContext.mounted &&
+                                Navigator.of(sheetContext).canPop()) {
+                              Navigator.of(sheetContext).pop(true);
+                            }
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Rider credentials updated successfully.',
+                                  ),
+                                  backgroundColor: AppUi.successFg,
+                                ),
+                              );
+                              onUpdated?.call();
+                            }
+                          } catch (e) {
+                            setSheetState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    FriendlyErrors.message(
+                                      e,
+                                      fallback:
+                                          'Could not update rider credentials. Please try again.',
+                                    ),
+                                  ),
+                                  backgroundColor: AppUi.error,
+                                ),
+                              );
+                            }
+                          }
+                        },
                 ),
               ],
             ),
@@ -576,7 +1023,15 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                         value: selectedSuffix,
                         icon: Icons.star_border_rounded,
                         compact: true,
-                        items: const ['None', 'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'],
+                        items: const [
+                          'None',
+                          'Jr.',
+                          'Sr.',
+                          'II',
+                          'III',
+                          'IV',
+                          'V',
+                        ],
                         onChanged: (v) => setSheetState(
                           () => selectedSuffix = v == 'None' ? null : v,
                         ),
@@ -665,13 +1120,16 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
 
-      final rpcResult = await supabase.rpc('create_rider_account', params: {
-        'p_email': email.trim(),
-        'p_password': pass.trim(),
-        'p_username': user.trim(),
-        'p_full_name': composedName,
-        'p_owner_id': ownerUser.id,
-      });
+      final rpcResult = await supabase.rpc(
+        'create_rider_account',
+        params: {
+          'p_email': email.trim(),
+          'p_password': pass.trim(),
+          'p_username': user.trim(),
+          'p_full_name': composedName,
+          'p_owner_id': ownerUser.id,
+        },
+      );
 
       if (rpcResult != null) {
         final resStr = rpcResult.toString().trim();
@@ -697,12 +1155,9 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
         e,
         fallback: 'Could not create rider account. Please try again.',
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
     }
   }
 

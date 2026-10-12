@@ -199,9 +199,63 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendImage() async {
     if (_sending || widget.roomId == null) return;
 
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Send Photo',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE0F2FE),
+                  child: Icon(Icons.camera_alt_rounded, color: AppUi.bluePrimary),
+                ),
+                title: const Text('Take a Photo', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Use camera to capture image'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFF1F5F9),
+                  child: Icon(Icons.photo_library_rounded, color: AppUi.bluePrimary),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Select an existing photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 50,
+      source: source,
+      imageQuality: 65,
+      maxWidth: 1400,
     );
     if (image == null) return;
 

@@ -193,6 +193,73 @@ class SafeSupabase {
     }
   }
 
+  /// Safely unlinks a rider from the station using RPC or direct fallback
+  static Future<Map<String, dynamic>> unlinkRider({
+    required String riderId,
+  }) async {
+    try {
+      final response = await _client.rpc(
+        'owner_unlink_rider',
+        params: {'p_rider_id': riderId},
+      );
+      if (response is Map) {
+        final map = Map<String, dynamic>.from(response);
+        if (map['success'] == true) return map;
+      }
+    } catch (e) {
+      debugPrint('owner_unlink_rider RPC fallback triggered: $e');
+    }
+
+    try {
+      await _client.from('profiles').update({
+        'owner_id': null,
+        'station_id': null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', riderId);
+      return {'success': true, 'fallback': true};
+    } catch (fallbackError) {
+      debugPrint('Direct rider unlink failed: $fallbackError');
+      rethrow;
+    }
+  }
+
+  /// Safely suspends or activates a rider using RPC or direct fallback
+  static Future<Map<String, dynamic>> setRiderStatus({
+    required String riderId,
+    required bool isSuspended,
+    String? reason,
+  }) async {
+    try {
+      final response = await _client.rpc(
+        'owner_set_rider_status',
+        params: {
+          'p_rider_id': riderId,
+          'p_is_suspended': isSuspended,
+          'p_reason': reason,
+        },
+      );
+      if (response is Map) {
+        final map = Map<String, dynamic>.from(response);
+        if (map['success'] == true) return map;
+      }
+    } catch (e) {
+      debugPrint('owner_set_rider_status RPC fallback triggered: $e');
+    }
+
+    try {
+      await _client.from('profiles').update({
+        'is_suspended': isSuspended,
+        'suspended_at': isSuspended ? DateTime.now().toIso8601String() : null,
+        'suspended_reason': isSuspended ? (reason ?? 'Suspended by station owner') : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', riderId);
+      return {'success': true, 'fallback': true};
+    } catch (fallbackError) {
+      debugPrint('Direct rider status update failed: $fallbackError');
+      rethrow;
+    }
+  }
+
   /// Safe stream with error handling
   static Stream<List<Map<String, dynamic>>> stream(
     String table, {

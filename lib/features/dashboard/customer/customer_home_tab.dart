@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
+import '../../../models/cart_model.dart';
+import '../../../core/utils/order_product_helpers.dart';
 import '../../../core/utils/station_query_helpers.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/user_provider.dart';
@@ -43,6 +45,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   Map<String, dynamic>? _activeOrder;
   Map<String, dynamic>? _quickOrderStation;
   Map<String, dynamic>? _lastCompletedOrder;
+  bool _isProcessingQuickOrder = false;
   bool _quickStationIsLastOrder = false;
   bool _isLoading = true;
   int _homeBannerIndex = 0;
@@ -104,7 +107,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   /// municipality and must never override the town selected at registration.
   String? _municipalityName(dynamic value) {
     final town = value?.toString().trim();
-    if (town == null || town.isEmpty || town.toLowerCase() == 'cantilan & madrid') {
+    if (town == null ||
+        town.isEmpty ||
+        town.toLowerCase() == 'cantilan & madrid') {
       return null;
     }
     return town;
@@ -130,58 +135,59 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
     try {
       final initialUser = mounted ? context.read<UserProvider>().user : null;
-      final cachedFirstName = initialUser?.firstName ?? initialUser?.fullName?.split(' ').first;
+      final cachedFirstName =
+          initialUser?.firstName ?? initialUser?.fullName?.split(' ').first;
       final cachedTown = _municipalityName(initialUser?.town);
 
       // Parallelize primary queries
       final batchResults = await Future.wait<dynamic>([
         _safeHomeQuery(
           supabase
-            .from('profiles')
-            .select('full_name, first_name, town, barangay')
-            .eq('id', user.id)
-            .maybeSingle(),
+              .from('profiles')
+              .select('full_name, first_name, town, barangay')
+              .eq('id', user.id)
+              .maybeSingle(),
           'profile',
         ),
         _safeHomeQuery(
-          supabase
-            .from('owner_settings')
-            .select('owner_id, price_per_gallon'),
+          supabase.from('owner_settings').select('owner_id, price_per_gallon'),
           'station pricing',
         ),
         _safeHomeQuery(
           supabase
-            .from('profiles')
-            .select(StationQueryHelpers.ownerStationFields)
-            .eq('role', 'owner'),
+              .from('profiles')
+              .select(StationQueryHelpers.ownerStationFields)
+              .eq('role', 'owner'),
           'stations',
         ),
         _safeHomeQuery(
           supabase
-            .from('orders')
-            .select('*, profiles:owner_id(station_name)')
-            .eq('customer_id', user.id)
-            .not('status', 'in', '("delivered","cancelled")')
-            .order('created_at', ascending: false)
-            .limit(1),
+              .from('orders')
+              .select('*, profiles:owner_id(station_name)')
+              .eq('customer_id', user.id)
+              .not('status', 'in', '("delivered","cancelled")')
+              .order('created_at', ascending: false)
+              .limit(1),
           'active orders',
         ),
         _safeHomeQuery(
           supabase
-            .from('favorites')
-            .select('station_id')
-            .eq('user_id', user.id),
+              .from('favorites')
+              .select('station_id')
+              .eq('user_id', user.id),
           'favorites',
         ),
         // 5: last completed order for Quick Reorder
         _safeHomeQuery(
           supabase
-            .from('orders')
-            .select('id, owner_id, station_name, total_amount, order_items, created_at, status')
-            .eq('customer_id', user.id)
-            .eq('status', 'delivered')
-            .order('created_at', ascending: false)
-            .limit(1),
+              .from('orders')
+              .select(
+                'id, owner_id, station_name, total_amount, order_items(*), created_at, status',
+              )
+              .eq('customer_id', user.id)
+              .eq('status', 'delivered')
+              .order('created_at', ascending: false)
+              .limit(1),
           'completed orders',
         ),
       ]);
@@ -190,7 +196,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final firstNameRaw = profile?['first_name']?.toString().trim();
       final firstName = (firstNameRaw != null && firstNameRaw.isNotEmpty)
           ? firstNameRaw
-          : (profile?['full_name']?.toString().split(' ').first ?? cachedFirstName ?? 'there');
+          : (profile?['full_name']?.toString().split(' ').first ??
+                cachedFirstName ??
+                'there');
       final town = _municipalityName(profile?['town']) ?? cachedTown;
 
       final ownerPrices = StationPriceHelpers.mapFromSettingsRows(
@@ -201,9 +209,16 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       List<Map<String, dynamic>> stations = [];
       if (town != null && town.trim().isNotEmpty) {
         final townKey = town.trim().toLowerCase();
-        final inTown = List<Map<String, dynamic>>.from(ownerRows).where(
-          (s) => (s['town'] ?? s['municipality'] ?? '').toString().trim().toLowerCase() == townKey,
-        ).toList();
+        final inTown = List<Map<String, dynamic>>.from(ownerRows)
+            .where(
+              (s) =>
+                  (s['town'] ?? s['municipality'] ?? '')
+                      .toString()
+                      .trim()
+                      .toLowerCase() ==
+                  townKey,
+            )
+            .toList();
 
         if (inTown.isNotEmpty) {
           stations = StationQueryHelpers.withAvailabilityAll(inTown)
@@ -220,25 +235,39 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
       // If no station matched the exact municipality string, show active stations serving the area so home is never empty
       if (stations.isEmpty && ownerRows.isNotEmpty) {
-        stations = StationQueryHelpers.withAvailabilityAll(
-              List<Map<String, dynamic>>.from(ownerRows),
-            )
-            .map(
-              (s) => StationPriceHelpers.withResolvedPrice(
-                Map<String, dynamic>.from(s),
-                ownerPrices: ownerPrices,
-              ),
-            )
-            .take(6)
-            .toList();
+        stations =
+            StationQueryHelpers.withAvailabilityAll(
+                  List<Map<String, dynamic>>.from(ownerRows),
+                )
+                .map(
+                  (s) => StationPriceHelpers.withResolvedPrice(
+                    Map<String, dynamic>.from(s),
+                    ownerPrices: ownerPrices,
+                  ),
+                )
+                .take(6)
+                .toList();
       }
 
       // Map favorites from batch
       final favRows = batchResults[4] as List? ?? const [];
-      final favIds = favRows.map((f) => f['station_id']?.toString()).whereType<String>().toSet();
-      final favorites = StationQueryHelpers.withAvailabilityAll(
-        List<Map<String, dynamic>>.from(ownerRows).where((s) => favIds.contains(s['id']?.toString())),
-      ).map((s) => StationPriceHelpers.withResolvedPrice(Map<String, dynamic>.from(s), ownerPrices: ownerPrices)).toList();
+      final favIds = favRows
+          .map((f) => f['station_id']?.toString())
+          .whereType<String>()
+          .toSet();
+      final favorites =
+          StationQueryHelpers.withAvailabilityAll(
+                List<Map<String, dynamic>>.from(
+                  ownerRows,
+                ).where((s) => favIds.contains(s['id']?.toString())),
+              )
+              .map(
+                (s) => StationPriceHelpers.withResolvedPrice(
+                  Map<String, dynamic>.from(s),
+                  ownerPrices: ownerPrices,
+                ),
+              )
+              .toList();
 
       final prefetchIds = {
         ...stations.map((s) => s['id']?.toString()),
@@ -261,10 +290,14 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           // Find station profile for the last order's owner
           final matchingStation = List<Map<String, dynamic>>.from(ownerRows)
               .where((s) => s['id']?.toString() == lastOwnerId)
-              .map((s) => StationPriceHelpers.withResolvedPrice(
-                    StationQueryHelpers.withAvailability(Map<String, dynamic>.from(s)),
-                    ownerPrices: ownerPrices,
-                  ))
+              .map(
+                (s) => StationPriceHelpers.withResolvedPrice(
+                  StationQueryHelpers.withAvailability(
+                    Map<String, dynamic>.from(s),
+                  ),
+                  ownerPrices: ownerPrices,
+                ),
+              )
               .firstOrNull;
           if (matchingStation != null) {
             quickStation = matchingStation;
@@ -538,7 +571,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         colors = const [Color(0xFF12A99A), Color(0xFF087F8C)];
         onTap = _quickOrderStation == null
             ? () => _openStations(context)
-            : () => context.openStationDetails(_quickOrderStation!);
+            : () => _handleQuickOrder(
+                _quickOrderStation!,
+                order: _lastCompletedOrder,
+              );
         break;
       case 2:
         final count = _favoriteStations.length;
@@ -750,14 +786,144 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     );
   }
 
+  Future<void> _handleQuickOrder(
+    Map<String, dynamic> station, {
+    Map<String, dynamic>? order,
+  }) async {
+    if (_isProcessingQuickOrder) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      AuthDialogs.showSignInRequired(context);
+      return;
+    }
+
+    final availability = station['station_availability']?.toString() ??
+        ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
+    if (availability != 'open') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            availability == 'busy'
+                ? 'Station is busy and not accepting new orders.'
+                : availability == 'maintenance'
+                    ? 'Station is under maintenance right now.'
+                    : 'Station is currently closed.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() => _isProcessingQuickOrder = true);
+
+    try {
+      final cart = Provider.of<CartProvider>(context, listen: false);
+      final stationId = station['id']?.toString() ??
+          station['owner_id']?.toString() ??
+          '';
+      final stationName = station['station_name']?.toString() ??
+          station['full_name']?.toString() ??
+          'Water Station';
+
+      cart.clearCart();
+      cart.setStation(stationId, stationName);
+
+      bool itemsPopulated = false;
+
+      // 1. Populate from previous order items if available
+      List<dynamic> items = (order?['order_items'] as List?) ?? const [];
+      if (items.isEmpty && order?['id'] != null) {
+        try {
+          final fetched = await supabase
+              .from('order_items')
+              .select('*')
+              .eq('order_id', order!['id']);
+          items = fetched as List<dynamic>;
+        } catch (_) {}
+      }
+
+      final validItems = items
+          .whereType<Map<String, dynamic>>()
+          .where((raw) => OrderProductHelpers.isValidProductId(raw['product_id']))
+          .toList();
+
+      if (validItems.isNotEmpty) {
+        for (final raw in validItems) {
+          final productId = raw['product_id'].toString();
+          final productName =
+              (raw['product_name'] ?? 'Purified Water Refill').toString();
+          final price =
+              ((raw['price_at_purchase'] as num?) ?? 25.0).toDouble();
+          final qty = ((raw['quantity'] as num?) ?? 1).toInt();
+
+          cart.addItem(productId, productName, price);
+          if (qty > 1) {
+            cart.updateQuantity(productId, qty);
+          }
+        }
+        itemsPopulated = true;
+      }
+
+      // 2. Fallback: if no past items or new station quick order, fetch primary product
+      if (!itemsPopulated) {
+        Map<String, dynamic>? defaultProduct;
+        try {
+          final prods = await supabase
+              .from('products')
+              .select('*')
+              .eq('owner_id', stationId)
+              .eq('is_available', true)
+              .order('price', ascending: true)
+              .limit(1);
+          if (prods.isNotEmpty) {
+            defaultProduct = prods.first;
+          }
+        } catch (_) {}
+
+        final prodId = defaultProduct?['id']?.toString() ??
+            'default_${stationId}_purified';
+        final prodName = defaultProduct?['name']?.toString() ??
+            station['primary_water_type']?.toString() ??
+            'Purified Water Refill';
+        final price = (defaultProduct?['price'] as num?)?.toDouble() ??
+            (station['price_per_gallon'] as num?)?.toDouble() ??
+            25.0;
+
+        cart.addItem(prodId, prodName, price);
+        cart.updateQuantity(prodId, 1);
+      }
+
+      if (!mounted) return;
+      context.openCheckout({
+        'id': stationId,
+        'station_name': stationName,
+        'is_open': true,
+      });
+    } catch (e) {
+      debugPrint('Quick order error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not start quick order: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessingQuickOrder = false);
+    }
+  }
+
   Widget _buildQuickReorderCard(BuildContext context) {
-    final order = _lastCompletedOrder!;
+    final order = _lastCompletedOrder;
     final station = _quickOrderStation!;
-    final stationName = station['station_name']?.toString().trim().isNotEmpty == true
+    final stationName =
+        station['station_name']?.toString().trim().isNotEmpty == true
         ? station['station_name'].toString()
         : station['full_name']?.toString() ?? 'Water Station';
-    final totalAmount = (order['total_amount'] as num?)?.toDouble();
-    final itemsList = order['order_items'] as List? ?? const [];
+    final totalAmount = (order?['total_amount'] as num?)?.toDouble();
+    final itemsList = order?['order_items'] as List? ?? const [];
     final itemCount = itemsList.length;
     final itemSummary = itemCount > 0
         ? '$itemCount item${itemCount == 1 ? '' : 's'}'
@@ -768,7 +934,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => context.openStationDetails(station),
+        onTap: () => _handleQuickOrder(station, order: order),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -807,14 +973,17 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(99),
                       ),
-                      child: const Text(
-                        '⚡ QUICK REORDER',
-                        style: TextStyle(
+                      child: Text(
+                        order != null ? '⚡ QUICK REORDER' : '⚡ QUICK REFILL',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 8.5,
                           fontWeight: FontWeight.w900,
@@ -824,7 +993,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      'Order again from $stationName',
+                      order != null
+                          ? 'Order again from $stationName'
+                          : 'Quick refill from $stationName',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -851,30 +1022,51 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _handleQuickOrder(station, order: order),
                   borderRadius: BorderRadius.circular(99),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Reorder',
-                      style: TextStyle(
-                        color: Color(0xFF087F8C),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
                     ),
-                    SizedBox(width: 3),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Color(0xFF087F8C),
-                      size: 14,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(99),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isProcessingQuickOrder)
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF087F8C),
+                            ),
+                          )
+                        else ...[
+                          const Text(
+                            'Quick Order',
+                            style: TextStyle(
+                              color: Color(0xFF087F8C),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.bolt_rounded,
+                            color: Color(0xFF087F8C),
+                            size: 16,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -901,9 +1093,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                 location: _userMunicipality.isNotEmpty
                     ? _userMunicipality
                     : (_municipalityName(
-                          context.watch<UserProvider>().user?.town,
-                        ) ??
-                        'Set your municipality'),
+                            context.watch<UserProvider>().user?.town,
+                          ) ??
+                          'Set your municipality'),
                 notificationCount: notifCount,
                 onNotificationTap: () => _showNotifications(context),
                 onFavoritesTap: () => _showFavorites(context),
@@ -931,7 +1123,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       delegate: SliverChildListDelegate([
                         _buildHomeBanner(context),
                         AppUi.vGapMd,
-                        if (_activeOrder == null && _lastCompletedOrder != null && _quickOrderStation != null) ...[
+                        if (_activeOrder == null &&
+                            _quickOrderStation != null) ...[
                           _buildQuickReorderCard(context),
                           AppUi.vGapMd,
                         ] else if (_activeOrder == null) ...[
@@ -1006,9 +1199,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         ),
                       ),
                     ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 24),
-                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
                 ],
               ),
             ),
@@ -1343,7 +1534,6 @@ class _SheetEmptyState extends StatelessWidget {
     );
   }
 }
-
 
 class _StationThumb extends StatelessWidget {
   const _StationThumb();

@@ -566,6 +566,43 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
             }
           }
 
+          // Compute real 7-day daily trends from database orders
+          final List<double> revenueTrend7Days = List.filled(7, 0.0);
+          final List<double> ordersTrend7Days = List.filled(7, 0.0);
+          final List<double> deliveredTrend7Days = List.filled(7, 0.0);
+          final List<double> pendingTrend7Days = List.filled(7, 0.0);
+
+          // Calculate start of each of the last 7 calendar days (0 = 6 days ago, 6 = today)
+          final todayMidnight = DateTime(now.year, now.month, now.day);
+          final sevenDaysAgo = todayMidnight.subtract(const Duration(days: 6));
+
+          for (var o in data) {
+            final rawCreated = o['created_at']?.toString();
+            final dt = rawCreated != null
+                ? DateTime.tryParse(rawCreated)?.toLocal()
+                : null;
+            if (dt == null) continue;
+
+            final orderDayMidnight = DateTime(dt.year, dt.month, dt.day);
+            final dayOffset = orderDayMidnight.difference(sevenDaysAgo).inDays;
+
+            if (dayOffset >= 0 && dayOffset < 7) {
+              final amount = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+              final status = o['status']?.toString();
+
+              ordersTrend7Days[dayOffset] += 1;
+              if (status != 'cancelled') {
+                revenueTrend7Days[dayOffset] += amount;
+              }
+              if (status == 'delivered') {
+                deliveredTrend7Days[dayOffset] += 1;
+              }
+              if (status == 'pending') {
+                pendingTrend7Days[dayOffset] += 1;
+              }
+            }
+          }
+
           if (mounted) {
             setState(() {
               _stats = {
@@ -580,6 +617,10 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                 'delivered': deliveredTodayCount,
                 'weeklyRevenue': todayRevenue,
                 'weeklyOrders': todayOrdersCount,
+                'revenueTrend': revenueTrend7Days,
+                'ordersTrend': ordersTrend7Days,
+                'pendingTrend': pendingTrend7Days,
+                'deliveredTrend': deliveredTrend7Days,
               };
               _recentOrders = enrichedRecent;
             });
@@ -1009,15 +1050,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     icon: Icons.payments_outlined,
                                     color: AppUi.bluePrimary,
                                     delta: '+12%',
-                                    trend: [
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0) * 0.65,
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0) * 0.72,
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0) * 0.58,
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0) * 0.84,
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0) * 0.79,
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0) * 0.92,
-                                      ((_stats['revenueToday'] as num?)?.toDouble() ?? 0),
-                                    ],
+                                    trend: (_stats['revenueTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1028,15 +1061,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     icon: Icons.water_drop_outlined,
                                     color: const Color(0xFFF59E0B),
                                     delta: '+8%',
-                                    trend: [
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0) * 0.5,
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0) * 0.7,
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0) * 0.6,
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0) * 0.8,
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0) * 0.75,
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0) * 0.9,
-                                      ((_stats['ordersToday'] as num?)?.toDouble() ?? 0),
-                                    ],
+                                    trend: (_stats['ordersTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
                                   ),
                                 ),
                               ],
@@ -1052,14 +1077,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     color: AppUi.accentCyan,
                                     onTap: widget.onViewOrders,
                                     delta: (_stats['pending'] ?? 0) > 0 ? 'Active' : 'Clear',
-                                    trend: [
-                                      ((_stats['pending'] as num?)?.toDouble() ?? 0) * 0.8,
-                                      ((_stats['pending'] as num?)?.toDouble() ?? 0) * 1.1,
-                                      ((_stats['pending'] as num?)?.toDouble() ?? 0) * 0.9,
-                                      ((_stats['pending'] as num?)?.toDouble() ?? 0) * 1.2,
-                                      ((_stats['pending'] as num?)?.toDouble() ?? 0) * 0.7,
-                                      ((_stats['pending'] as num?)?.toDouble() ?? 0),
-                                    ],
+                                    trend: (_stats['pendingTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1070,15 +1088,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     icon: Icons.check_circle_outline_rounded,
                                     color: AppUi.accentGreen,
                                     delta: '+15%',
-                                    trend: [
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0) * 0.3,
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0) * 0.5,
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0) * 0.65,
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0) * 0.8,
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0) * 0.85,
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0) * 0.95,
-                                      ((_stats['delivered'] as num?)?.toDouble() ?? 0),
-                                    ],
+                                    trend: (_stats['deliveredTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
                                   ),
                                 ),
                               ],

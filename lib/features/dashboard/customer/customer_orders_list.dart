@@ -13,6 +13,7 @@ import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/utils/order_product_helpers.dart';
 import '../../../core/services/offline_order_sync_service.dart';
 import 'package:flutter/services.dart';
+import 'review_modal.dart';
 
 class CustomerOrdersList extends StatefulWidget {
   final VoidCallback? onNavigateToStations;
@@ -29,6 +30,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
   RealtimeChannel? _ordersChannel;
   final Map<String, RealtimeChannel> _riderChannels = {};
   final Map<String, LatLng> _riderLocations = {};
+  final Map<String, int> _reviewedOrderRatings = {};
   int _activeSegment = 0;
 
   @override
@@ -117,6 +119,22 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
           .select('*, profiles:owner_id(station_name), order_items(*)')
           .eq('customer_id', userId)
           .order('created_at', ascending: false);
+
+      try {
+        final reviewRows = await supabase
+            .from('reviews')
+            .select('order_id, rating')
+            .eq('customer_id', userId);
+        _reviewedOrderRatings.clear();
+        for (final r in (reviewRows as List? ?? const [])) {
+          if (r is Map && r['order_id'] != null) {
+            _reviewedOrderRatings[r['order_id'].toString()] =
+                (r['rating'] as num?)?.toInt() ?? 5;
+          }
+        }
+      } catch (reviewErr) {
+        debugPrint('Error loading customer reviews: $reviewErr');
+      }
 
       final onlineOrders = List<Map<String, dynamic>>.from(rows);
       final offlineOrders =
@@ -473,7 +491,106 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
                   ),
                 ],
               ),
-              if (status != 'cancelled') ...[
+              if (status == 'delivered') ...[
+                const SizedBox(height: 12),
+                Builder(
+                  builder: (context) {
+                    final orderIdStr = order['id']?.toString() ?? '';
+                    final reviewedRating = _reviewedOrderRatings[orderIdStr];
+
+                    if (reviewedRating != null) {
+                      return Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  size: 16,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Rated $reviewedRating★',
+                                  style: const TextStyle(
+                                    color: Colors.amber,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _handleBuyAgain(order);
+                              },
+                              icon: const Icon(Icons.replay_rounded, size: 16),
+                              label: const Text('Reorder refill'),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              ReviewModal.show(
+                                context: context,
+                                orderId: orderIdStr,
+                                stationId:
+                                    (order['owner_id'] ?? '').toString(),
+                                stationName: stationName,
+                                onReviewSubmitted: _fetchOrders,
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.star_rounded,
+                              size: 16,
+                              color: Colors.amber,
+                            ),
+                            label: const Text('Rate refill'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.amber.shade800,
+                              side: BorderSide(color: Colors.amber.shade300),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              _handleBuyAgain(order);
+                            },
+                            icon: const Icon(Icons.replay_rounded, size: 16),
+                            label: const Text('Reorder'),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ] else if (status != 'cancelled') ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,

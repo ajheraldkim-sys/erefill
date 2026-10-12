@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/app_header.dart';
 import 'package:erefill/widgets/app_widgets.dart';
+import 'rider_management_screen.dart';
 
 class RiderPerformanceScreen extends StatefulWidget {
   final String riderId;
@@ -22,6 +24,7 @@ class RiderPerformanceScreen extends StatefulWidget {
 class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
   final supabase = Supabase.instance.client;
   bool _isLoading = true;
+  Map<String, dynamic>? _riderProfile;
   Map<String, dynamic> _performance = {
     'totalDeliveries': 0,
     'monthlyDeliveries': 0,
@@ -40,7 +43,14 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
 
   Future<void> _loadPerformanceData() async {
     try {
-      // Get all completed deliveries for this rider
+      // 1. Fetch rider's authoritative profile record
+      final profileData = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', widget.riderId)
+          .maybeSingle();
+
+      // 2. Get all completed deliveries for this rider
       final now = DateTime.now();
       final monthStart = DateTime(now.year, now.month, 1).toIso8601String();
 
@@ -77,6 +87,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
 
       if (mounted) {
         setState(() {
+          _riderProfile = profileData != null ? Map<String, dynamic>.from(profileData) : null;
           _performance = {
             'totalDeliveries': totalDeliveries,
             'monthlyDeliveries': monthlyCount,
@@ -144,11 +155,117 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
     final onTimeRate =
         (_performance['onTimeRate'] as num?)?.toDouble() ?? 0;
 
+    final p = _riderProfile ?? {};
+    final displayName = p['full_name']?.toString() ?? widget.riderName;
+    final username = p['username']?.toString() ?? 'username';
+    final phone = p['phone']?.toString();
+    final vehicle = p['vehicle_type']?.toString();
+    final license = p['license_number']?.toString();
+    final email = p['email']?.toString();
+    final isOnline = p['is_online'] == true;
+    final isSuspended = p['is_suspended'] == true;
+    final registeredDate = _formatDate(p['created_at']?.toString());
+
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
       appBar: AppTopBar(
-        title: widget.riderName,
+        title: displayName,
         subtitle: 'Rider intelligence',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 20),
+            color: AppUi.bluePrimary,
+            tooltip: 'Edit Rider Information',
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              final riderMap = _riderProfile ?? {
+                'id': widget.riderId,
+                'full_name': widget.riderName,
+              };
+              RiderManagementScreen.showEditRiderCredentialsDialog(
+                context,
+                riderMap,
+                onUpdated: _loadPerformanceData,
+              );
+            },
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              size: 20,
+              color: AppUi.textMuted,
+            ),
+            tooltip: 'Rider Actions',
+            shape: RoundedRectangleBorder(
+              borderRadius: AppUi.cardRadius,
+            ),
+            onSelected: (val) {
+              HapticFeedback.lightImpact();
+              final riderMap = _riderProfile ?? {
+                'id': widget.riderId,
+                'full_name': widget.riderName,
+                'is_suspended': isSuspended,
+              };
+              if (val == 'status') {
+                RiderManagementScreen.showToggleStatusDialog(
+                  context,
+                  riderMap,
+                  onStatusChanged: _loadPerformanceData,
+                );
+              } else if (val == 'unlink') {
+                RiderManagementScreen.showUnlinkRiderDialog(
+                  context,
+                  riderMap,
+                  onUnlinked: () {
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                );
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'status',
+                child: Row(
+                  children: [
+                    Icon(
+                      isSuspended
+                          ? Icons.check_circle_outline
+                          : Icons.block_outlined,
+                      size: 18,
+                      color: isSuspended
+                          ? const Color(0xFF10B981)
+                          : Colors.orange,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      isSuspended ? 'Activate Rider' : 'Suspend Rider',
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'unlink',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.person_remove_outlined,
+                      size: 18,
+                      color: Color(0xFFEF4444),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Unlink from Station',
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: _isLoading
           ? const LoadingState(message: 'Loading rider performance...')
@@ -157,6 +274,103 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Rider Profile Information Card
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: AppUi.cardPaddingLoose,
+                    decoration: BoxDecoration(
+                      color: AppUi.surfaceOf(context),
+                      borderRadius: AppUi.cardRadius,
+                      border: Border.all(color: AppUi.borderOf(context)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppUi.bluePrimary.withValues(alpha: 0.1),
+                                borderRadius: AppUi.cardRadius,
+                              ),
+                              child: const Icon(
+                                Icons.two_wheeler_rounded,
+                                color: AppUi.bluePrimary,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 18,
+                                      color: AppUi.textPrimaryOf(context),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '@$username',
+                                    style: const TextStyle(
+                                      color: AppUi.textMuted,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: (isSuspended
+                                        ? const Color(0xFFEF4444)
+                                        : const Color(0xFF10B981))
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isSuspended ? 'SUSPENDED' : (isOnline ? 'ONLINE' : 'ACTIVE'),
+                                style: TextStyle(
+                                  color: isSuspended
+                                      ? const Color(0xFFEF4444)
+                                      : const Color(0xFF10B981),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(height: 1),
+                        const SizedBox(height: 14),
+                        // Profile fields grid
+                        _detailRow(Icons.email_outlined, 'Email', email ?? 'Not specified'),
+                        const SizedBox(height: 8),
+                        _detailRow(Icons.phone_outlined, 'Phone', phone ?? 'Not specified'),
+                        const SizedBox(height: 8),
+                        _detailRow(Icons.two_wheeler_outlined, 'Vehicle', vehicle ?? 'Motorcycle / Standard'),
+                        const SizedBox(height: 8),
+                        _detailRow(Icons.badge_outlined, 'License', license ?? 'Not specified'),
+                        const SizedBox(height: 8),
+                        _detailRow(Icons.calendar_today_outlined, 'Registered', registeredDate),
+                      ],
+                    ),
+                  ),
+
                   // Performance Header Card
                   Container(
                     width: double.infinity,
@@ -452,5 +666,33 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
 
     final local = dt.toLocal();
     return '${local.day}/${local.month}/${local.year}';
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppUi.bluePrimary),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 13,
+            color: AppUi.textMuted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppUi.textPrimaryOf(context),
+              fontWeight: FontWeight.w800,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }

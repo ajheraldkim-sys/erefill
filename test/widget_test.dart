@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/features/dashboard/customer/widgets/payment_status_banner.dart';
+import 'package:erefill/features/dashboard/rider/services/offline_delivery_queue_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -106,5 +107,55 @@ void main() {
     );
 
     expect(find.text('Pending'), findsOneWidget);
+  });
+
+  test('Rider name splitting correctly populates first and last name from composite full_name', () {
+    const singleName = 'Kim';
+    final partsSingle = singleName.split(RegExp(r'\s+'));
+    expect(partsSingle.first, 'Kim');
+
+    const compositeName = 'Kim Aspillaga';
+    final parts = compositeName.split(RegExp(r'\s+'));
+    expect(parts.first, 'Kim');
+    expect(parts.sublist(1).join(' '), 'Aspillaga');
+
+    const multiPartName = 'Maria Clara De Los Santos';
+    final multiParts = multiPartName.split(RegExp(r'\s+'));
+    expect(multiParts.first, 'Maria');
+    expect(multiParts.sublist(1).join(' '), 'Clara De Los Santos');
+  });
+
+  test('QueuedDelivery model serializes to json and reconstructs correctly', () {
+    final now = DateTime.now();
+    final delivery = QueuedDelivery(
+      orderId: 'order-uuid-123',
+      status: 'delivered',
+      latitude: 9.3245,
+      longitude: 125.9812,
+      localPhotoPath: '/tmp/proof.jpg',
+      localSignaturePath: '/tmp/sig.png',
+      deliveryNote: 'Handed to customer front door',
+      emptyGallonsReturned: 3,
+      createdAt: now,
+    );
+
+    final json = delivery.toJson();
+    expect(json['orderId'], 'order-uuid-123');
+    expect(json['status'], 'delivered');
+    expect(json['latitude'], 9.3245);
+    expect(json['longitude'], 125.9812);
+    expect(json['localPhotoPath'], '/tmp/proof.jpg');
+    expect(json['localSignaturePath'], '/tmp/sig.png');
+    expect(json['deliveryNote'], 'Handed to customer front door');
+    expect(json['emptyGallonsReturned'], 3);
+    expect(json['retryCount'], 0);
+
+    final restored = QueuedDelivery.fromJson(json);
+    expect(restored.orderId, 'order-uuid-123');
+    expect(restored.status, 'delivered');
+    expect(restored.latitude, 9.3245);
+    expect(restored.longitude, 125.9812);
+    expect(restored.deliveryNote, 'Handed to customer front door');
+    expect(restored.emptyGallonsReturned, 3);
   });
 }

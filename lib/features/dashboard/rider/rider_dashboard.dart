@@ -34,6 +34,7 @@ import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
 import 'services/location_service.dart';
 import 'services/order_cache_service.dart';
+import 'services/offline_delivery_queue_service.dart';
 
 import 'rider_history_screen.dart';
 export 'rider_history_screen.dart';
@@ -82,6 +83,8 @@ class _RiderDashboardState extends State<RiderDashboard> {
   final supabase = Supabase.instance.client;
   final _locationService = LocationService();
   final _orderCache = OrderCacheService();
+  int _pendingOfflineCount = 0;
+  bool _isSyncingOffline = false;
   RealtimeChannel? _ordersChannel;
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
@@ -209,7 +212,39 @@ class _RiderDashboardState extends State<RiderDashboard> {
     }
   }
 
+  Future<void> _checkOfflineQueue() async {
+    try {
+      final pending = await OfflineDeliveryQueueService()
+          .getPendingDeliveries();
+      if (mounted) {
+        setState(() => _pendingOfflineCount = pending.length);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _syncOfflineQueue() async {
+    if (_isSyncingOffline) return;
+    setState(() => _isSyncingOffline = true);
+    try {
+      final synced = await OfflineDeliveryQueueService()
+          .syncPendingDeliveries();
+      await _checkOfflineQueue();
+      if (synced > 0) {
+        await _loadRiderData();
+        if (mounted) {
+          _showSuccess('Synced $synced offline deliveries successfully!');
+        }
+      }
+    } catch (e) {
+      debugPrint('Sync offline error: $e');
+    } finally {
+      if (mounted) setState(() => _isSyncingOffline = false);
+    }
+  }
+
   Future<void> _loadRiderData() async {
+    unawaited(_syncOfflineQueue());
+
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) {
       if (mounted) setState(() => _isLoading = false);
@@ -252,7 +287,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
       ]);
 
       profileResult = results[0] as Map<String, dynamic>? ?? _profile;
-      activeResult = List<Map<String, dynamic>>.from(results[1] as List? ?? const []);
+      activeResult = List<Map<String, dynamic>>.from(
+        results[1] as List? ?? const [],
+      );
       final deliveredData = results[2] as List? ?? const [];
       completedCount = deliveredData.length;
       earningsTotal = deliveredData.fold<double>(0, (sum, o) {
@@ -452,8 +489,20 @@ class _RiderDashboardState extends State<RiderDashboard> {
         _showSuccess('Status updated to ${newStatus.replaceAll('_', ' ')}');
       }
     } catch (e) {
-      await _loadRiderData(); // Revert on failure
-      if (mounted) _showError('Failed: $e');
+      try {
+        await OfflineDeliveryQueueService().enqueueDelivery(
+          QueuedDelivery(orderId: orderId, status: newStatus),
+        );
+        await _checkOfflineQueue();
+        if (mounted) {
+          _showSuccess(
+            'Status updated offline. Will sync automatically when online.',
+          );
+        }
+      } catch (_) {
+        await _loadRiderData(); // Revert on failure
+        if (mounted) _showError('Failed: $e');
+      }
     }
   }
 
@@ -494,7 +543,8 @@ class _RiderDashboardState extends State<RiderDashboard> {
       suggestedEmptyGallons: suggestedEmpty,
     );
     if (!mounted) return;
-    final completion = completionSheetResult ??
+    final completion =
+        completionSheetResult ??
         DeliveryCompletionDetails(emptyGallonsReturned: suggestedEmpty);
 
     // 3. Show non-dismissible progress indicator during upload and verification
@@ -583,7 +633,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
           serverConfirmed = true;
         }
       } catch (rpcErr) {
-        debugPrint('confirm_delivery_safely RPC unavailable, applying direct transition: $rpcErr');
+        debugPrint(
+          'confirm_delivery_safely RPC unavailable, applying direct transition: $rpcErr',
+        );
       }
 
       if (!serverConfirmed) {
@@ -593,14 +645,18 @@ class _RiderDashboardState extends State<RiderDashboard> {
         );
         if (transitionResult['success'] != true) {
           throw StateError(
-            transitionResult['message']?.toString() ?? 'Delivery completion was rejected.',
+            transitionResult['message']?.toString() ??
+                'Delivery completion was rejected.',
           );
         }
         try {
-          await supabase.from('orders').update({
-            'delivery_note': completion.deliveryNote,
-            'empty_gallons_returned': completion.emptyGallonsReturned,
-          }).eq('id', orderId);
+          await supabase
+              .from('orders')
+              .update({
+                'delivery_note': completion.deliveryNote,
+                'empty_gallons_returned': completion.emptyGallonsReturned,
+              })
+              .eq('id', orderId);
         } catch (_) {}
       }
 
@@ -623,7 +679,28 @@ class _RiderDashboardState extends State<RiderDashboard> {
         Navigator.of(context, rootNavigator: true).pop();
         progressShown = false;
       }
-      if (mounted) _showError('Could not complete delivery: $e');
+      try {
+        await OfflineDeliveryQueueService().enqueueDelivery(
+          QueuedDelivery(
+            orderId: orderId,
+            status: 'delivered',
+            localPhotoPath: image.path,
+            deliveryNote: completion.deliveryNote,
+            emptyGallonsReturned: completion.emptyGallonsReturned,
+          ),
+        );
+        setState(() {
+          _myActiveOrders.removeWhere((o) => o['id'] == orderId);
+        });
+        await _checkOfflineQueue();
+        if (mounted) {
+          _showSuccess(
+            'Saved offline! Delivery will sync automatically when online.',
+          );
+        }
+      } catch (_) {
+        if (mounted) _showError('Could not complete delivery: $e');
+      }
     } finally {
       await _loadRiderData();
     }
@@ -815,7 +892,10 @@ class _RiderDashboardState extends State<RiderDashboard> {
 
     final address = customer?['complete_address']?.toString() ?? '';
     final barangay = customer?['barangay']?.toString() ?? '';
-    final addressFallback = [address, barangay].where((s) => s.isNotEmpty).join(', ');
+    final addressFallback = [
+      address,
+      barangay,
+    ].where((s) => s.isNotEmpty).join(', ');
     final customerName = customer?['full_name']?.toString() ?? 'Customer';
 
     final success = await ExternalNavigationService.openNavigation(
@@ -992,25 +1072,83 @@ class _RiderDashboardState extends State<RiderDashboard> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: AppUi.pagePaddingLoose.copyWith(top: 12),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: _buildSmallStatTile(
-                              'Active tasks',
-                              '${activeOrders.length}',
-                              Icons.navigation_rounded,
-                              AppUi.bluePrimary,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildSmallStatTile(
+                                  'Active tasks',
+                                  '${activeOrders.length}',
+                                  Icons.navigation_rounded,
+                                  AppUi.bluePrimary,
+                                ),
+                              ),
+                              AppUi.hGapMd,
+                              Expanded(
+                                child: _buildSmallStatTile(
+                                  'Earnings',
+                                  '₱${_totalEarnings.toStringAsFixed(0)}',
+                                  Icons.payments_rounded,
+                                  const Color(0xFF10B981),
+                                ),
+                              ),
+                            ],
                           ),
-                          AppUi.hGapMd,
-                          Expanded(
-                            child: _buildSmallStatTile(
-                              'Earnings',
-                              '₱${_totalEarnings.toStringAsFixed(0)}',
-                              Icons.payments_rounded,
-                              const Color(0xFF10B981),
+                          if (_pendingOfflineCount > 0) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.15),
+                                borderRadius: AppUi.cardRadius,
+                                border: Border.all(
+                                  color: Colors.amber.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.cloud_off_rounded,
+                                    color: Colors.amber,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      '$_pendingOfflineCount ${_pendingOfflineCount == 1 ? "delivery" : "deliveries"} waiting to sync',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: _isSyncingOffline
+                                        ? null
+                                        : _syncOfflineQueue,
+                                    child: _isSyncingOffline
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Sync Now',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -1098,7 +1236,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(
-              alpha: Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04,
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.2
+                  : 0.04,
             ),
             blurRadius: 20,
             offset: const Offset(0, 8),
@@ -1116,7 +1256,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isOutForDelivery ? AppUi.blueSoft : AppUi.chipBgOf(context),
+                    color: isOutForDelivery
+                        ? AppUi.blueSoft
+                        : AppUi.chipBgOf(context),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1418,9 +1560,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppUi.bluePale.withValues(alpha: 0.35),
-      ),
+      decoration: BoxDecoration(color: AppUi.bluePale.withValues(alpha: 0.35)),
       child: Row(
         children: [
           for (int i = 0; i < steps.length; i++) ...[
@@ -1458,8 +1598,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
                           boxShadow: i == currentStep
                               ? [
                                   BoxShadow(
-                                    color: AppUi.bluePrimary
-                                        .withValues(alpha: 0.25),
+                                    color: AppUi.bluePrimary.withValues(
+                                      alpha: 0.25,
+                                    ),
                                     blurRadius: 6,
                                     spreadRadius: 1,
                                   ),
@@ -1493,8 +1634,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight:
-                          i == currentStep ? FontWeight.w800 : FontWeight.w600,
+                      fontWeight: i == currentStep
+                          ? FontWeight.w800
+                          : FontWeight.w600,
                       color: i <= currentStep
                           ? AppUi.bluePrimary
                           : AppUi.textMuted,
@@ -1853,20 +1995,22 @@ class _RiderDashboardState extends State<RiderDashboard> {
             text: 'Save Location',
             icon: Icons.save_outlined,
             isLoading: isSaving,
-            onPressed: isSaving ? null : () async {
-              setModalState(() => isSaving = true);
-              try {
-                final ok = await _saveRiderProfile();
-                if (ok && sheetContext.mounted) {
-                  final nav = Navigator.of(sheetContext);
-                  if (nav.canPop()) nav.pop();
-                }
-              } finally {
-                if (sheetContext.mounted) {
-                  setModalState(() => isSaving = false);
-                }
-              }
-            },
+            onPressed: isSaving
+                ? null
+                : () async {
+                    setModalState(() => isSaving = true);
+                    try {
+                      final ok = await _saveRiderProfile();
+                      if (ok && sheetContext.mounted) {
+                        final nav = Navigator.of(sheetContext);
+                        if (nav.canPop()) nav.pop();
+                      }
+                    } finally {
+                      if (sheetContext.mounted) {
+                        setModalState(() => isSaving = false);
+                      }
+                    }
+                  },
           ),
         ],
       );
@@ -1902,20 +2046,22 @@ class _RiderDashboardState extends State<RiderDashboard> {
             text: 'Save Vehicle Details',
             icon: Icons.save_outlined,
             isLoading: isSaving,
-            onPressed: isSaving ? null : () async {
-              setModalState(() => isSaving = true);
-              try {
-                final ok = await _saveRiderProfile();
-                if (ok && sheetContext.mounted) {
-                  final nav = Navigator.of(sheetContext);
-                  if (nav.canPop()) nav.pop();
-                }
-              } finally {
-                if (sheetContext.mounted) {
-                  setModalState(() => isSaving = false);
-                }
-              }
-            },
+            onPressed: isSaving
+                ? null
+                : () async {
+                    setModalState(() => isSaving = true);
+                    try {
+                      final ok = await _saveRiderProfile();
+                      if (ok && sheetContext.mounted) {
+                        final nav = Navigator.of(sheetContext);
+                        if (nav.canPop()) nav.pop();
+                      }
+                    } finally {
+                      if (sheetContext.mounted) {
+                        setModalState(() => isSaving = false);
+                      }
+                    }
+                  },
           ),
         ],
       );
@@ -1978,20 +2124,22 @@ class _RiderDashboardState extends State<RiderDashboard> {
           text: 'Save Personal Info',
           icon: Icons.save_outlined,
           isLoading: isSaving,
-          onPressed: isSaving ? null : () async {
-            setModalState(() => isSaving = true);
-            try {
-              final ok = await _saveRiderProfile();
-              if (ok && sheetContext.mounted) {
-                final nav = Navigator.of(sheetContext);
-                if (nav.canPop()) nav.pop();
-              }
-            } finally {
-              if (sheetContext.mounted) {
-                setModalState(() => isSaving = false);
-              }
-            }
-          },
+          onPressed: isSaving
+              ? null
+              : () async {
+                  setModalState(() => isSaving = true);
+                  try {
+                    final ok = await _saveRiderProfile();
+                    if (ok && sheetContext.mounted) {
+                      final nav = Navigator.of(sheetContext);
+                      if (nav.canPop()) nav.pop();
+                    }
+                  } finally {
+                    if (sheetContext.mounted) {
+                      setModalState(() => isSaving = false);
+                    }
+                  }
+                },
         ),
       ],
     );
@@ -2030,7 +2178,8 @@ class _RiderDashboardState extends State<RiderDashboard> {
                         if (!_profileIsComplete)
                           AccountCompletenessHint(
                             message: _profileCompletionMessage,
-                            onTap: () => _openEditProfileSheet(initialCategory: 0),
+                            onTap: () =>
+                                _openEditProfileSheet(initialCategory: 0),
                           ),
 
                         const AccountSectionLabel('Profile'),
@@ -2742,8 +2891,10 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
                 child: GestureDetector(
                   onHorizontalDragUpdate: (details) {
                     setState(() {
-                      _position = (_position + details.delta.dx)
-                          .clamp(0.0, maxSlide);
+                      _position = (_position + details.delta.dx).clamp(
+                        0.0,
+                        maxSlide,
+                      );
                     });
                   },
                   onHorizontalDragEnd: (details) {
