@@ -1,6 +1,6 @@
 {
-    "name": "erefill",
-    "short_name": "erefill",
+    "name": "eRefill",
+    "short_name": "eRefill",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#2196F3",
