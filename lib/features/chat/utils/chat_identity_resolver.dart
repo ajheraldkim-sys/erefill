@@ -291,3 +291,4 @@ class ChatIdentityResolver {
     return 'User';
   }
 }
+

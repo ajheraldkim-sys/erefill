@@ -474,6 +474,9 @@ class ChatService {
                 .map((row) => Map<String, dynamic>.from(row))
                 .toList(),
           );
+        })
+        .handleError((error) {
+          debugPrint('Chat messages stream offline error handled: $error');
         });
   }
 
@@ -526,7 +529,14 @@ class ChatService {
       return {...row, 'metadata': metadata};
     } catch (e) {
       debugPrint('Could not sign chat attachment URL: $e');
-      return row;
+      try {
+        metadata['image_url'] = _supabase.storage
+            .from('chat_attachments')
+            .getPublicUrl(imagePath);
+        return {...row, 'metadata': metadata};
+      } catch (_) {
+        return row;
+      }
     }
   }
 
@@ -600,13 +610,22 @@ class ChatService {
     // Upload to storage
     final path = 'chats/$roomId/$fileName';
     await _supabase.storage.from('chat_attachments').upload(path, file);
+
+    String? publicUrl;
+    try {
+      publicUrl = _supabase.storage.from('chat_attachments').getPublicUrl(path);
+    } catch (_) {}
+
     // Send message
     await _supabase.from('messages').insert({
       'room_id': roomId,
       'sender_id': senderId,
       'content': 'Photo',
       'message_type': MessageType.image.value,
-      'metadata': {'image_path': path},
+      'metadata': {
+        'image_path': path,
+        if (publicUrl != null && publicUrl.isNotEmpty) 'image_url': publicUrl,
+      },
     });
   }
 

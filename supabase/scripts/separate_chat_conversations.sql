@@ -669,3 +669,4 @@ GRANT ALL ON FUNCTION public.get_or_create_customer_rider_chat_room(uuid, uuid, 
 GRANT ALL ON FUNCTION public.get_or_create_customer_owner_chat_room(uuid, uuid, uuid, text, text) TO authenticated, service_role;
 GRANT ALL ON FUNCTION public.get_or_create_owner_rider_chat_room(uuid, uuid, uuid, text, text) TO authenticated, service_role;
 GRANT ALL ON FUNCTION public.get_my_chat_rooms() TO authenticated, service_role;
+

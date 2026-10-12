@@ -5,15 +5,32 @@ import '../../constants.dart';
 /// Section label above grouped account rows (iOS Settings style).
 class AccountSectionLabel extends StatelessWidget {
   final String label;
+  final TextAlign textAlign;
+  final AlignmentGeometry? alignment;
 
-  const AccountSectionLabel(this.label, {super.key});
+  const AccountSectionLabel(
+    this.label, {
+    super.key,
+    this.textAlign = TextAlign.start,
+    this.alignment,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final effectiveAlignment = alignment ??
+        (textAlign == TextAlign.right
+            ? Alignment.centerRight
+            : textAlign == TextAlign.center
+                ? Alignment.center
+                : Alignment.centerLeft);
+
+    return Container(
+      width: double.infinity,
+      alignment: effectiveAlignment,
       padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
       child: Text(
         label.toUpperCase(),
+        textAlign: textAlign,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,

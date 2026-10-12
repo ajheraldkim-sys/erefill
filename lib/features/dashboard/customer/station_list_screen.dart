@@ -21,6 +21,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/utils/station_orderability.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/widgets/app_cached_image.dart';
+import '../../../core/services/local_data_cache.dart';
 
 class StationListScreen extends StatefulWidget {
   const StationListScreen({super.key, this.initialFilter});
@@ -38,6 +39,7 @@ class _StationListScreenState extends State<StationListScreen> {
   RealtimeChannel? _pricingChannel;
   RealtimeChannel? _favoritesChannel;
   bool _isLoading = true;
+  List<Map<String, dynamic>> _cachedStations = [];
   String? _userTown;
   String _searchQuery = '';
   String _selectedFilter = 'All';
@@ -70,12 +72,31 @@ class _StationListScreenState extends State<StationListScreen> {
     if (widget.initialFilter != null && widget.initialFilter!.isNotEmpty) {
       _selectedFilter = widget.initialFilter!;
     }
+    _loadCachedStations();
     _loadUserPreferences();
     _loadStationPricing();
     _subscribeToStationPricing();
     _subscribeToFavorites();
     _determinePosition();
     _fetchFavorites();
+  }
+
+  Future<void> _loadCachedStations() async {
+    try {
+      final cached = await LocalDataCache.instance.get<List<dynamic>>(
+        'cached_owner_stations',
+      );
+      if (cached != null && cached.isNotEmpty && mounted) {
+        setState(() {
+          _cachedStations = cached
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading cached stations: $e');
+    }
   }
 
   void _subscribeToStationPricing() {
@@ -1032,7 +1053,7 @@ class _StationListScreenState extends State<StationListScreen> {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _stationsStream,
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
+        if (snapshot.hasError && _cachedStations.isEmpty) {
           return Scaffold(
             backgroundColor: AppUi.pageBgOf(context),
             body: Center(
@@ -1048,7 +1069,13 @@ class _StationListScreenState extends State<StationListScreen> {
           );
         }
 
-        final ownerRows = snapshot.data ?? [];
+        final ownerRows = (snapshot.data != null && snapshot.data!.isNotEmpty)
+            ? snapshot.data!
+            : _cachedStations;
+        if (snapshot.data != null && snapshot.data!.isNotEmpty) {
+          _cachedStations = snapshot.data!;
+          LocalDataCache.instance.set('cached_owner_stations', snapshot.data!);
+        }
         final scoped = _scopeByTown(ownerRows);
         final stations = _filterStations(scoped);
         if (stations.isNotEmpty) {

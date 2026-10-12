@@ -21,6 +21,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../models/cart_model.dart';
 import '../../chat/models/chat_room.dart';
 import '../../chat/services/chat_service.dart';
+import '../../subscriptions/services/subscription_service.dart';
 
 class StationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> station;
@@ -394,12 +395,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         stationName: stationName,
       );
 
-      if (mounted) Navigator.pop(context);
-
       if (mounted) {
         context.openChat(
           roomId: room.id,
-          roomTitle: 'Chat with $stationName',
+          roomTitle: stationName,
           roomType: ChatRoomType.customerSupport,
         );
       }
@@ -418,6 +417,430 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _scheduleAutoRefill() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      AuthDialogs.showSignInRequired(context);
+      return;
+    }
+
+    final ownerId = _stationData['id']?.toString();
+    if (ownerId == null || ownerId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Station details unavailable.')),
+      );
+      return;
+    }
+
+    final stationName = _stationData['station_name']?.toString() ??
+        _stationData['name']?.toString() ??
+        'Water Station';
+
+    String selectedWaterType = _selectedProduct?['water_type']?.toString() ??
+        _waterType ??
+        'Purified';
+    double selectedPrice = (_selectedProduct?['price'] as num?)?.toDouble() ??
+        _pricePerGallon ??
+        30.0;
+    int selectedQty = _quantity > 0 ? _quantity : 1;
+    String selectedFrequency = 'weekly';
+    String selectedTimeSlot = 'morning';
+
+    String defaultAddress = '';
+    try {
+      final prof = await _supabase
+          .from('profiles')
+          .select('complete_address')
+          .eq('id', user.id)
+          .maybeSingle();
+      defaultAddress = prof?['complete_address']?.toString() ?? '';
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    final addressController = TextEditingController(text: defaultAddress);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final estimatedPrice = selectedPrice * selectedQty;
+
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              top: 16,
+              left: 20,
+              right: 20,
+            ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppUi.bluePrimary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.autorenew_rounded,
+                              color: AppUi.bluePrimary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Schedule Auto-Refill',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                stationName,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppUi.textSecondaryOf(ctx),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+
+                  const Text(
+                    'Water Type',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ['Purified', 'Alkaline', 'Mineral', 'Distilled'].map((type) {
+                      final isSel = selectedWaterType.toLowerCase() == type.toLowerCase();
+                      return ChoiceChip(
+                        label: Text(type),
+                        selected: isSel,
+                        selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
+                        onSelected: (val) {
+                          if (val) setSheetState(() => selectedWaterType = type);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Bottles per Delivery',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            '₱${selectedPrice.toStringAsFixed(0)} / bottle',
+                            style: TextStyle(fontSize: 11, color: AppUi.textSecondaryOf(ctx)),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: selectedQty > 1
+                                ? () => setSheetState(() => selectedQty--)
+                                : null,
+                            icon: const Icon(Icons.remove_circle_outline_rounded),
+                          ),
+                          Text(
+                            '$selectedQty',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                          ),
+                          IconButton(
+                            onPressed: () => setSheetState(() => selectedQty++),
+                            icon: const Icon(Icons.add_circle_outline_rounded),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'Refill Routine Frequency',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedFrequency,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'every_3_days', child: Text('Every 3 Days')),
+                      DropdownMenuItem(value: 'twice_weekly', child: Text('Twice a Week (Every 4 Days)')),
+                      DropdownMenuItem(value: 'weekly', child: Text('Weekly Refill (Every 7 Days)')),
+                      DropdownMenuItem(value: 'bi_weekly', child: Text('Every 2 Weeks (14 Days)')),
+                      DropdownMenuItem(value: 'monthly', child: Text('Monthly Refill')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setSheetState(() => selectedFrequency = v);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'Preferred Delivery Time Slot',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      {'key': 'morning', 'label': 'Morning (8AM - 12PM)'},
+                      {'key': 'afternoon', 'label': 'Afternoon (1PM - 5PM)'},
+                      {'key': 'evening', 'label': 'Evening (5PM - 8PM)'},
+                    ].map((slot) {
+                      final isSel = selectedTimeSlot == slot['key'];
+                      return ChoiceChip(
+                        label: Text(slot['label']!),
+                        selected: isSel,
+                        selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
+                        onSelected: (val) {
+                          if (val) setSheetState(() => selectedTimeSlot = slot['key']!);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  const Text(
+                    'Delivery Address',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: addressController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter street, purok, or landmark',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppUi.blueSoft.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Estimated Total / Refill:',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        Text(
+                          '₱${estimatedPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: AppUi.bluePrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppUi.bluePrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final address = addressController.text.trim();
+                        if (address.isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('Please enter delivery address.')),
+                          );
+                          return;
+                        }
+
+                        Navigator.pop(sheetCtx);
+
+                        try {
+                          await SubscriptionService().createSubscription(
+                            customerId: user.id,
+                            stationId: ownerId,
+                            stationName: stationName,
+                            stationPhotoUrl: _stationData['avatar_url']?.toString(),
+                            quantity: selectedQty,
+                            waterType: selectedWaterType,
+                            estimatedPrice: estimatedPrice,
+                            frequency: selectedFrequency,
+                            preferredTimeSlot: selectedTimeSlot,
+                            deliveryAddress: address,
+                          );
+
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Auto-Refill scheduled with $stationName! View under Orders > Routine.',
+                                ),
+                                backgroundColor: const Color(0xFF10B981),
+                              ),
+                            );
+                          }
+                        } catch (err) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to schedule routine: $err')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text(
+                        'Confirm & Schedule Routine',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAutoRefillBanner() {
+    final stationName = _stationData['station_name']?.toString() ?? 'this station';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppUi.bluePrimary.withValues(alpha: 0.08),
+            AppUi.bluePrimary.withValues(alpha: 0.16),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppUi.bluePrimary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppUi.bluePrimary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.autorenew_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Automated Refill Routine',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Never run out of water. Set a recurring schedule with $stationName.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppUi.textSecondaryOf(context),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: _scheduleAutoRefill,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppUi.bluePrimary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Set Up',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Map<String, dynamic> get _displayProduct {
@@ -1285,7 +1708,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  // Quick Action Buttons Row (Call, Chat, Directions)
+                  // Quick Action Buttons Row (Call, Chat, Routine, Directions)
                   Row(
                     children: [
                       _buildQuickActionBtn(
@@ -1293,13 +1716,19 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                         label: 'Call',
                         onTap: _callStation,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       _buildQuickActionBtn(
                         icon: Icons.chat_bubble_outline_rounded,
                         label: 'Chat',
                         onTap: _chatWithStation,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
+                      _buildQuickActionBtn(
+                        icon: Icons.autorenew_rounded,
+                        label: 'Routine',
+                        onTap: _scheduleAutoRefill,
+                      ),
+                      const SizedBox(width: 8),
                       _buildQuickActionBtn(
                         icon: Icons.directions_outlined,
                         label: 'Directions',
@@ -1332,6 +1761,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 18),
+
+                  // Auto-Refill Routine Discovery Banner
+                  _buildAutoRefillBanner(),
                   const SizedBox(height: 24),
 
                   // Section Title: Refill Options

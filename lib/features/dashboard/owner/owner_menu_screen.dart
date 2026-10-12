@@ -1909,7 +1909,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                   : _openOwnerDetailsSheet,
                             ),
                           ],
-                          const AccountSectionLabel('Station identity'),
+                          const AccountSectionLabel(
+                            'Station identity',
+                            textAlign: TextAlign.right,
+                          ),
                           AccountGroup(
                             children: [
                               AccountNavTile(
@@ -1931,7 +1934,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             ],
                           ),
 
-                          const AccountSectionLabel('Pricing & delivery'),
+                          const AccountSectionLabel(
+                            'Pricing & delivery',
+                            textAlign: TextAlign.right,
+                          ),
                           AccountGroup(
                             children: [
                               AccountNavTile(
@@ -1956,7 +1962,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             ],
                           ),
 
-                          const AccountSectionLabel('Catalog & operations'),
+                          const AccountSectionLabel(
+                            'Catalog & operations',
+                            textAlign: TextAlign.right,
+                          ),
                           AccountGroup(
                             children: [
                               AccountNavTile(
@@ -1984,7 +1993,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             ],
                           ),
 
-                          const AccountSectionLabel('Preferences'),
+                          const AccountSectionLabel(
+                            'Preferences',
+                            textAlign: TextAlign.right,
+                          ),
                           AccountGroup(
                             children: [
                               AccountToggleTile(
@@ -2007,7 +2019,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             ],
                           ),
 
-                          const AccountSectionLabel('Security & account'),
+                          const AccountSectionLabel(
+                            'Security & account',
+                            textAlign: TextAlign.right,
+                          ),
                           AccountGroup(
                             children: [
                               AccountNavTile(

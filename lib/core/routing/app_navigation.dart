@@ -107,11 +107,11 @@ extension AppNavigation on BuildContext {
 
   void openCustomerSettings() => push(AppRoutes.customerSettings);
 
-  void openRiderPerformance({
+  Future<T?> openRiderPerformance<T>({
     required String riderId,
     required String riderName,
   }) {
-    push(
+    return push<T>(
       Uri(
         path: AppRoutes.riderPerformance,
         queryParameters: {'riderId': riderId, 'name': riderName},

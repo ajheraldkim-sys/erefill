@@ -32,9 +32,11 @@ import '../customer/checkout_rules.dart';
 import '../../chat/inbox_screen.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 import 'services/location_service.dart';
 import 'services/order_cache_service.dart';
 import 'services/offline_delivery_queue_service.dart';
+import '../../payouts/widgets/rider_payout_sheet.dart';
 
 import 'rider_history_screen.dart';
 export 'rider_history_screen.dart';
@@ -297,10 +299,39 @@ class _RiderDashboardState extends State<RiderDashboard> {
         return sum + fee;
       });
     } catch (e) {
-      debugPrint("Warning: Error loading rider data: $e");
+      debugPrint("Warning: Error loading rider data: $e. Checking offline caches...");
+      final cachedActive = await _orderCache.getCachedActiveOrders();
+      if (cachedActive.isNotEmpty) {
+        activeResult = cachedActive;
+      } else if (_myActiveOrders.isNotEmpty) {
+        activeResult = _myActiveOrders;
+      }
+      final cachedProfile = await LocalDataCache.instance.get<Map<String, dynamic>>(
+        'rider_profile_$myId',
+      );
+      if (cachedProfile != null) {
+        profileResult = cachedProfile;
+      }
     }
 
     if (!mounted) return;
+    if (profileResult != null) {
+      if ((profileResult['first_name'] == null ||
+              profileResult['first_name'].toString().trim().isEmpty) &&
+          (profileResult['last_name'] == null ||
+              profileResult['last_name'].toString().trim().isEmpty)) {
+        final raw = profileResult['full_name']?.toString().trim() ?? '';
+        if (raw.isNotEmpty) {
+          final parts = raw.split(RegExp(r'\s+'));
+          if (parts.length == 1) {
+            profileResult['first_name'] = parts.first;
+          } else if (parts.length >= 2) {
+            profileResult['first_name'] = parts.first;
+            profileResult['last_name'] = parts.sublist(1).join(' ');
+          }
+        }
+      }
+    }
     setState(() {
       if (profileResult != null) _profile = profileResult;
       _myActiveOrders = activeResult;
@@ -312,6 +343,11 @@ class _RiderDashboardState extends State<RiderDashboard> {
     // Cache updated data for offline/instant-load
     if (activeResult.isNotEmpty) {
       _orderCache.cacheActiveOrders(activeResult);
+    }
+    if (profileResult != null) {
+      unawaited(
+        LocalDataCache.instance.set('rider_profile_$myId', profileResult),
+      );
     }
   }
 
@@ -2409,77 +2445,11 @@ class _RiderDashboardState extends State<RiderDashboard> {
   }
 
   void _showEarningsStatement() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppUi.surfaceOf(context),
-          borderRadius: AppUi.radiusSheetTop,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Earnings Statement',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _earningsMetric(
-                    'Completed',
-                    '$_completedDeliveries',
-                    Icons.check_circle_rounded,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _earningsMetric(
-                    'Earnings',
-                    'PHP ${_totalEarnings.toStringAsFixed(2)}',
-                    Icons.account_balance_wallet_rounded,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'This summary is based on completed deliveries currently loaded for your rider account.',
-              style: TextStyle(color: AppUi.textSecondary, height: 1.4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _earningsMetric(String label, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppUi.flatCardDecorationOf(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppUi.bluePrimary),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppUi.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
+    RiderPayoutSheet.show(
+      context,
+      totalEarnings: _totalEarnings,
+      completedDeliveries: _completedDeliveries,
+      profile: _profile,
     );
   }
 

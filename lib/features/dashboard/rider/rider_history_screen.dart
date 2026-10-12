@@ -495,15 +495,11 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                           HapticFeedback.lightImpact();
                           final items = await _getOrderItems(order);
                           if (!context.mounted) return;
-                          await ReceiptService.printReceipt(
-                            context: context,
-                            order: order,
-                            items: items,
-                          );
+                          _showPrintOptionsSheet(context, order, items);
                         },
                         icon: const Icon(Icons.print_outlined, size: 20),
                         label: const Text(
-                          'Print Official Receipt',
+                          'Print Receipt (Standard or Thermal)',
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 15,
@@ -689,6 +685,103 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showPrintOptionsSheet(
+    BuildContext sheetContext,
+    Map<String, dynamic> order,
+    List<Map<String, dynamic>> items,
+  ) {
+    showModalBottomSheet<void>(
+      context: sheetContext,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Receipt Printing Options',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFEFF6FF),
+                child: Icon(Icons.receipt_long_rounded, color: AppUi.bluePrimary),
+              ),
+              title: const Text('Official Invoice (Standard / A4)',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text(
+                  'Full formatted receipt preview with BIR & station details',
+                  style: TextStyle(fontSize: 12)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await ReceiptService.printReceipt(
+                  context: sheetContext,
+                  order: order,
+                  items: items,
+                );
+              },
+            ),
+            const SizedBox(height: 6),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFDCFCE7),
+                child: Icon(Icons.print_rounded, color: Color(0xFF16A34A)),
+              ),
+              title: const Text('Thermal Mobile Printer (58mm)',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text(
+                  'Instant roll print for Bluetooth portable belt printers',
+                  style: TextStyle(fontSize: 12)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await ReceiptService.printThermalReceipt(
+                  context: sheetContext,
+                  order: order,
+                  items: items,
+                  is58mm: true,
+                );
+              },
+            ),
+            const SizedBox(height: 6),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFFEF3C7),
+                child: Icon(Icons.point_of_sale_rounded, color: Color(0xFFD97706)),
+              ),
+              title: const Text('Thermal Station Printer (80mm)',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text(
+                  'Wide roll format for station counter thermal printers',
+                  style: TextStyle(fontSize: 12)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await ReceiptService.printThermalReceipt(
+                  context: sheetContext,
+                  order: order,
+                  items: items,
+                  is58mm: false,
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

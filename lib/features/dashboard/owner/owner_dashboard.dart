@@ -22,6 +22,7 @@ import '../../chat/models/system_notification.dart';
 import 'owner_menu_screen.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/owner_inventory_service.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -431,6 +432,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
   @override
   void initState() {
     super.initState();
+    _loadCachedOverview();
     _setupOrdersListener();
     _loadInventorySnapshot();
     _periodicRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -438,6 +440,26 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
         _loadInventorySnapshot();
       }
     });
+  }
+
+  Future<void> _loadCachedOverview() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final cached = await LocalDataCache.instance.get<Map<String, dynamic>>(
+        'owner_overview_${user.id}',
+      );
+      if (cached != null && mounted) {
+        setState(() {
+          _stats = Map<String, dynamic>.from(cached['stats'] as Map? ?? {});
+          _recentOrders = List<dynamic>.from(
+            cached['recentOrders'] as List? ?? [],
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading cached owner overview: $e');
+    }
   }
 
   Future<void> _loadInventorySnapshot() async {
@@ -624,6 +646,12 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
               };
               _recentOrders = enrichedRecent;
             });
+            unawaited(
+              LocalDataCache.instance.set('owner_overview_${user.id}', {
+                'stats': _stats,
+                'recentOrders': enrichedRecent,
+              }),
+            );
           }
         }, onError: (Object error, StackTrace stackTrace) {
           debugPrint('Orders stream error: $error');

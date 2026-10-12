@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../../core/utils/safe_supabase.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +16,8 @@ import 'checkout_rules.dart';
 import 'widgets/payment_status_banner.dart';
 import '../../../core/utils/friendly_errors.dart';
 import '../../../core/services/payment_launch_service.dart';
+import '../../../core/services/local_data_cache.dart';
+import '../../../core/services/offline_order_sync_service.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? order;
@@ -44,6 +47,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     super.initState();
     if (widget.order != null) {
       _currentOrder = widget.order;
+      final id = _currentOrder?['id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        unawaited(LocalDataCache.instance.set('order_$id', _currentOrder));
+      }
       _bootstrapOrderData();
     } else if (widget.orderId != null) {
       _loadOrderById(widget.orderId!);
@@ -66,13 +73,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _currentOrder = order;
         _isLoadingOrder = false;
       });
+      unawaited(LocalDataCache.instance.set('order_$orderId', order));
       _bootstrapOrderData();
     } catch (e) {
-      debugPrint('Error loading order: $e');
+      debugPrint('Error loading order: $e. Checking offline caches...');
+      final cached = await LocalDataCache.instance.get<Map<String, dynamic>>(
+        'order_$orderId',
+      );
+      if (cached != null && mounted) {
+        setState(() {
+          _currentOrder = cached;
+          _isLoadingOrder = false;
+        });
+        _bootstrapOrderData();
+        return;
+      }
+      final offlineList = await OfflineOrderSyncService().getOfflineOrders();
+      final offlineMatches = offlineList.where((o) => o['id'] == orderId).toList();
+      if (offlineMatches.isNotEmpty && mounted) {
+        setState(() {
+          _currentOrder = offlineMatches.first;
+          _isLoadingOrder = false;
+        });
+        _bootstrapOrderData();
+        return;
+      }
       if (mounted) {
         setState(() {
           _isLoadingOrder = false;
-          _loadError = 'Could not load this order.';
+          _loadError = 'Could not load this order while offline.';
         });
       }
     }
@@ -100,6 +129,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error loading order items: $e');
+    }
+
+    if ((_orderItems == null || _orderItems!.isEmpty) &&
+        _currentOrder?['items'] != null) {
+      final raw = _currentOrder!['items'];
+      if (raw is List && raw.isNotEmpty && mounted) {
+        setState(() {
+          _orderItems = raw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        });
+      }
     }
   }
 

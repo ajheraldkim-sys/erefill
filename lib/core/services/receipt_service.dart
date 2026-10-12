@@ -1,3 +1,4 @@
+import 'dart:convert' show utf8;
 import 'dart:typed_data';
 import 'package:flutter/material.dart' show BuildContext, debugPrint;
 import 'package:pdf/pdf.dart';
@@ -498,5 +499,261 @@ class ReceiptService {
     } catch (e) {
       debugPrint('Error sharing receipt: $e');
     }
+  }
+
+  /// Generates a roll PDF tailored specifically for 58mm or 80mm mobile thermal printers
+  static Future<Uint8List> generateThermalReceiptPdf({
+    required Map<String, dynamic> order,
+    List<Map<String, dynamic>> items = const [],
+    Map<String, dynamic>? station,
+    bool is58mm = true,
+  }) async {
+    final pdf = pw.Document();
+    final pageFormat = is58mm ? PdfPageFormat.roll57 : PdfPageFormat.roll80;
+
+    final orderId = (order['id'] ?? '').toString();
+    final shortId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
+    final createdAt = _formatDate(order['created_at']);
+    final stationName = (station?['name'] ?? order['station_name'] ?? 'eRefill Station').toString();
+    final customerName = (order['customer_name'] ?? order['customer']?['full_name'] ?? 'Customer').toString();
+    final customerAddress = (order['customer_address'] ?? order['address'] ?? 'Delivery Address').toString();
+
+    final subtotal = (order['subtotal'] as num?)?.toDouble() ??
+        ((order['total_amount'] as num?)?.toDouble() ?? 0) - ((order['delivery_fee'] as num?)?.toDouble() ?? 0);
+    final deliveryFee = (order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+    final totalAmount = (order['total_amount'] as num?)?.toDouble() ?? (subtotal + deliveryFee);
+    final paymentMethod = (order['payment_method'] ?? 'COD').toString().toUpperCase();
+
+    final List<Map<String, dynamic>> resolvedItems = [];
+    if (items.isNotEmpty) {
+      resolvedItems.addAll(items);
+    } else if (order['order_items'] is List && (order['order_items'] as List).isNotEmpty) {
+      resolvedItems.addAll(List<Map<String, dynamic>>.from(order['order_items']));
+    } else {
+      resolvedItems.add({
+        'product_name': order['water_type'] ?? 'Water Refill',
+        'quantity': order['quantity'] ?? 1,
+        'total_price': subtotal > 0 ? subtotal : totalAmount,
+      });
+    }
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: pageFormat,
+        margin: const pw.EdgeInsets.all(6),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                stationName.toUpperCase(),
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+                textAlign: pw.TextAlign.center,
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text('OFFICIAL WATER REFILL RECEIPT', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('Order: #$shortId', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+              pw.Text(createdAt, style: const pw.TextStyle(fontSize: 7)),
+              pw.Text('--------------------------------', style: const pw.TextStyle(fontSize: 8)),
+              pw.Align(
+                alignment: pw.Alignment.centerLeft,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Cust: $customerName', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text('Addr: $customerAddress', style: const pw.TextStyle(fontSize: 7), maxLines: 2),
+                  ],
+                ),
+              ),
+              pw.Text('--------------------------------', style: const pw.TextStyle(fontSize: 8)),
+              // Line items
+              ...resolvedItems.map((it) {
+                final qty = it['quantity'] ?? 1;
+                final name = (it['product_name'] ?? 'Water').toString();
+                final price = ((it['total_price'] ?? it['price'] ?? 0) as num).toDouble();
+                return pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Text('$qty x $name', style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Text('P${price.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                );
+              }),
+              pw.Text('--------------------------------', style: const pw.TextStyle(fontSize: 8)),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Subtotal:', style: const pw.TextStyle(fontSize: 8)),
+                  pw.Text('P${subtotal.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Delivery Fee:', style: const pw.TextStyle(fontSize: 8)),
+                  pw.Text('P${deliveryFee.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
+                ],
+              ),
+              pw.SizedBox(height: 2),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('TOTAL DUE:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                  pw.Text('P${totalAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                ],
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text('Paid via: $paymentMethod', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('--------------------------------', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('Thank you for choosing eRefill!', style: const pw.TextStyle(fontSize: 8)),
+              pw.SizedBox(height: 10),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  /// Sends a thermal-formatted receipt directly to a connected thermal roll printer
+  static Future<void> printThermalReceipt({
+    BuildContext? context,
+    required Map<String, dynamic> order,
+    List<Map<String, dynamic>> items = const [],
+    Map<String, dynamic>? station,
+    bool is58mm = true,
+  }) async {
+    try {
+      final pdfBytes = await generateThermalReceiptPdf(
+        order: order,
+        items: items,
+        station: station,
+        is58mm: is58mm,
+      );
+
+      final orderId = (order['id'] ?? '').toString();
+      final shortId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfBytes,
+        name: 'eRefill_Thermal_$shortId.pdf',
+        format: is58mm ? PdfPageFormat.roll57 : PdfPageFormat.roll80,
+      );
+    } catch (e) {
+      debugPrint('Error printing thermal receipt: $e');
+    }
+  }
+
+  /// Generates raw ESC/POS byte sequence for Bluetooth / USB POS thermal printers
+  static Uint8List generateEscPosBytes({
+    required Map<String, dynamic> order,
+    List<Map<String, dynamic>> items = const [],
+    Map<String, dynamic>? station,
+    bool is58mm = true,
+  }) {
+    final buffer = <int>[];
+    final widthChars = is58mm ? 32 : 48;
+    final divider = '-' * widthChars;
+
+    // Helper closures
+    void writeBytes(List<int> bytes) => buffer.addAll(bytes);
+    void writeLine(String line) => buffer.addAll(utf8.encode('$line\n'));
+
+    // ESC @ (Initialize printer)
+    writeBytes([0x1B, 0x40]);
+
+    // ESC a 1 (Align Center)
+    writeBytes([0x1B, 0x61, 0x01]);
+
+    // ESC E 1 (Bold ON)
+    writeBytes([0x1B, 0x45, 0x01]);
+    final stationName = (station?['name'] ?? order['station_name'] ?? 'eRefill Station').toString();
+    writeLine(stationName.toUpperCase());
+
+    // ESC E 0 (Bold OFF)
+    writeBytes([0x1B, 0x45, 0x00]);
+    writeLine('OFFICIAL WATER REFILL RECEIPT');
+
+    final orderId = (order['id'] ?? '').toString();
+    final shortId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
+    writeLine('Order #$shortId');
+    writeLine(_formatDate(order['created_at']));
+    writeLine(divider);
+
+    // ESC a 0 (Align Left)
+    writeBytes([0x1B, 0x61, 0x00]);
+    final customerName = (order['customer_name'] ?? order['customer']?['full_name'] ?? 'Customer').toString();
+    final customerAddress = (order['customer_address'] ?? order['address'] ?? 'Delivery Address').toString();
+    writeLine('Customer: $customerName');
+    writeLine('Address: $customerAddress');
+    writeLine(divider);
+
+    // Line items
+    final subtotal = (order['subtotal'] as num?)?.toDouble() ??
+        ((order['total_amount'] as num?)?.toDouble() ?? 0) - ((order['delivery_fee'] as num?)?.toDouble() ?? 0);
+    final deliveryFee = (order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+    final totalAmount = (order['total_amount'] as num?)?.toDouble() ?? (subtotal + deliveryFee);
+
+    final List<Map<String, dynamic>> resolvedItems = [];
+    if (items.isNotEmpty) {
+      resolvedItems.addAll(items);
+    } else if (order['order_items'] is List && (order['order_items'] as List).isNotEmpty) {
+      resolvedItems.addAll(List<Map<String, dynamic>>.from(order['order_items']));
+    } else {
+      resolvedItems.add({
+        'product_name': order['water_type'] ?? 'Water Refill',
+        'quantity': order['quantity'] ?? 1,
+        'total_price': subtotal > 0 ? subtotal : totalAmount,
+      });
+    }
+
+    for (final it in resolvedItems) {
+      final qty = it['quantity'] ?? 1;
+      final name = (it['product_name'] ?? 'Refill').toString();
+      final price = ((it['total_price'] ?? 0) as num).toDouble();
+      final itemDesc = '$qty x $name';
+      final priceStr = 'P${price.toStringAsFixed(2)}';
+      final spaces = widthChars - itemDesc.length - priceStr.length;
+      if (spaces > 0) {
+        writeLine('$itemDesc${' ' * spaces}$priceStr');
+      } else {
+        writeLine(itemDesc);
+        writeLine('${' ' * (widthChars - priceStr.length)}$priceStr');
+      }
+    }
+
+    writeLine(divider);
+    // Subtotal & Delivery
+    final subStr = 'P${subtotal.toStringAsFixed(2)}';
+    writeLine('Subtotal:${' ' * (widthChars - 9 - subStr.length)}$subStr');
+
+    final delStr = 'P${deliveryFee.toStringAsFixed(2)}';
+    writeLine('Delivery:${' ' * (widthChars - 9 - delStr.length)}$delStr');
+
+    writeLine(divider);
+
+    // ESC E 1 (Bold ON)
+    writeBytes([0x1B, 0x45, 0x01]);
+    final totalStr = 'P${totalAmount.toStringAsFixed(2)}';
+    writeLine('TOTAL:${' ' * (widthChars - 6 - totalStr.length)}$totalStr');
+    writeBytes([0x1B, 0x45, 0x00]);
+
+    writeLine(divider);
+
+    // ESC a 1 (Align Center)
+    writeBytes([0x1B, 0x61, 0x01]);
+    writeLine('Thank you for choosing eRefill!');
+    writeLine('Stay Hydrated!');
+
+    // Line feeds
+    writeBytes([0x0A, 0x0A, 0x0A]);
+
+    // GS V 66 0 (Paper cut)
+    writeBytes([0x1D, 0x56, 0x42, 0x00]);
+
+    return Uint8List.fromList(buffer);
   }
 }

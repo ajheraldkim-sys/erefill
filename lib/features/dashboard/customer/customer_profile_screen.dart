@@ -15,6 +15,7 @@ import '../../../core/models/user_model.dart';
 import '../../../core/utils/profile_query_helpers.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import '../../../core/widgets/app_form_fields.dart';
+import '../../loyalty/widgets/loyalty_rewards_sheet.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
@@ -1782,6 +1783,23 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                   ? 'Manage or add delivery addresses'
                                   : _composedAddress,
                               onTap: _openSavedAddresses,
+                            ),
+                          ],
+                        ),
+                        const AccountSectionLabel('Rewards & Referrals'),
+                        AccountGroup(
+                          children: [
+                            AccountNavTile(
+                              icon: Icons.card_giftcard_rounded,
+                              title: 'Loyalty Rewards & Referral Program',
+                              subtitle:
+                                  'Earn points, claim discount vouchers, and invite friends',
+                              onTap: () {
+                                final uid = supabase.auth.currentUser?.id;
+                                if (uid != null) {
+                                  LoyaltyRewardsSheet.show(context, uid);
+                                }
+                              },
                             ),
                           ],
                         ),

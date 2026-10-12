@@ -172,4 +172,38 @@ class UserModel {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'username': username,
+      'full_name': fullName,
+      'first_name': firstName,
+      'last_name': lastName,
+      'mi': mi,
+      'suffix': suffix,
+      'phone': phone,
+      'town': town,
+      'barangay': barangay,
+      'purok': purok,
+      'zip_code': zipCode,
+      'avatar_url': avatarUrl,
+      'station_photo_url': stationPhotoUrl,
+      'station_name': stationName,
+      'vehicle_type': vehicleType,
+      'license_number': licenseNumber,
+      'role': role,
+      'average_rating': averageRating,
+      'landmark': landmark,
+      'complete_address': completeAddress,
+      'latitude': latitude,
+      'longitude': longitude,
+      'preferred_water_type': preferredWaterType,
+      'owner_id': ownerId,
+      'is_suspended': isSuspended,
+      'suspended_reason': suspendedReason,
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 }

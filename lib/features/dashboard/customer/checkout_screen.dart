@@ -19,6 +19,8 @@ import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/services/offline_order_sync_service.dart';
 import '../../../core/services/payment_launch_service.dart';
 import '../../../core/utils/friendly_errors.dart';
+import '../../loyalty/models/loyalty_model.dart';
+import '../../loyalty/services/loyalty_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Map<String, dynamic> station;
@@ -48,6 +50,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _checkingStationAvailability = false;
   int _availabilityRequestId = 0;
 
+  final LoyaltyService _loyaltyService = LoyaltyService();
+  List<LoyaltyRewardVoucher> _availableVouchers = [];
+  LoyaltyRewardVoucher? _appliedVoucher;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +73,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _loadStationSettings(),
       _loadPaymentMethods(),
       _loadPlatformFeeConfig(),
+      _loadLoyaltyVouchers(),
     ]);
     if (mounted) {
       setState(() {
@@ -102,11 +109,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       });
     } catch (e) {
-      debugPrint('Error loading payment methods: $e');
+      debugPrint('Error loading payment methods: $e. Defaulting to Cash on Delivery (COD).');
       if (!mounted) return;
+      final fallbackOptions = CheckoutRules.normalizePaymentOptions([
+        {'method': 'cod', 'available': true}
+      ]);
       setState(() {
-        _paymentMethods = [];
-        _paymentMethod = '';
+        _paymentMethods = fallbackOptions;
+        _paymentMethod = 'cod';
       });
     }
   }
@@ -154,6 +164,115 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final fee = (base * percent / 100) + fixed;
     if (fee <= 0) return 0;
     return double.parse(fee.toStringAsFixed(2));
+  }
+
+  Future<void> _loadLoyaltyVouchers() async {
+    final customerId = supabase.auth.currentUser?.id;
+    if (customerId == null) return;
+    try {
+      final vouchers = await _loyaltyService.getUserVouchers(customerId);
+      if (mounted) {
+        setState(() => _availableVouchers = vouchers);
+      }
+    } catch (e) {
+      debugPrint('Error loading customer reward vouchers: $e');
+    }
+  }
+
+  void _showSelectVoucherSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.local_offer_rounded, color: AppUi.bluePrimary, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Select Reward Voucher',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const Divider(height: 12),
+            if (_availableVouchers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No active vouchers available to claim.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _availableVouchers.length,
+                  itemBuilder: (context, idx) {
+                    final v = _availableVouchers[idx];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            color: Color(0xFF10B981),
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          v.title,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          v.description,
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        trailing: Text(
+                          v.isDeliveryDiscount
+                              ? 'Free Delivery'
+                              : '-\u20B1${v.discountAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                        onTap: () {
+                          setState(() => _appliedVoucher = v);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadCustomerLocation() async {
@@ -412,8 +531,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         widget.station['name']?.toString() ??
         'Water Station';
 
-    final totalAmount =
-        cart.totalAmount + _deliveryFee + _platformFeeFor(cart.totalAmount);
+    final voucherDiscount = _appliedVoucher != null
+        ? (_appliedVoucher!.isDeliveryDiscount
+            ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
+            : _appliedVoucher!.discountAmount)
+        : 0.0;
+
+    final totalAmount = (cart.totalAmount +
+            _deliveryFee +
+            _platformFeeFor(cart.totalAmount) -
+            voucherDiscount)
+        .clamp(0.0, double.infinity);
 
     final paymentMethod =
         CheckoutRules.isPaymentAvailable(_paymentMethod, _paymentMethods)
@@ -439,6 +567,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw StateError('Selected payment method is not available.');
       }
 
+      final notesText = _appliedVoucher != null
+          ? '${_notesController.text.trim()} [Voucher: ${_appliedVoucher!.code} -₱${voucherDiscount.toStringAsFixed(2)}]'.trim()
+          : _notesController.text.trim();
+
       final orderData = {
         'customer_id': customerId,
         'owner_id': widget.station['id'],
@@ -455,7 +587,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'total_amount': totalAmount,
         'payment_method': paymentMethod,
         'payment_proof_url': null,
-        'notes': _notesController.text.trim(),
+        'notes': notesText,
         'region_id': _customerProfile?['region_id'],
         'customer_latitude': customerLat,
         'customer_longitude': customerLng,
@@ -519,6 +651,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       cart.clearCart();
+      if (_appliedVoucher != null && customerId != null && customerId.isNotEmpty) {
+        _loyaltyService.markVoucherUsed(
+          voucherId: _appliedVoucher!.id,
+          userId: customerId,
+        );
+      }
+      if (customerId != null && customerId.isNotEmpty) {
+        _loyaltyService.earnPointsForOrder(
+          userId: customerId,
+          orderAmount: totalAmount,
+        );
+      }
+
       final orderRecord = await supabase
           .from('orders')
           .select()
@@ -538,6 +683,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           errStr.contains('clientexception');
 
       final selectedPayment = paymentMethod ?? 'cod';
+      if (CheckoutRules.isOnlinePayment(selectedPayment) && isOfflineLikely) {
+        if (mounted) {
+          _setCheckoutHint(
+            'Internet connection required for online payment. Please select Cash on Delivery (COD) to place this order offline.',
+          );
+        }
+        return;
+      }
       if (!CheckoutRules.isOnlinePayment(selectedPayment) && isOfflineLikely) {
         try {
           final userId = supabase.auth.currentUser?.id ?? '';
@@ -556,6 +709,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           );
 
           cart.clearCart();
+          if (_appliedVoucher != null && userId.isNotEmpty) {
+            _loyaltyService.markVoucherUsed(
+              voucherId: _appliedVoucher!.id,
+              userId: userId,
+            );
+          }
+          if (userId.isNotEmpty) {
+            _loyaltyService.earnPointsForOrder(
+              userId: userId,
+              orderAmount: totalAmount,
+            );
+          }
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -771,7 +936,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final platformFee = _platformFeeFor(cart.totalAmount);
-    final totalWithDelivery = cart.totalAmount + _deliveryFee + platformFee;
+    final voucherDiscount = _appliedVoucher != null
+        ? (_appliedVoucher!.isDeliveryDiscount
+            ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
+            : _appliedVoucher!.discountAmount)
+        : 0.0;
+    final totalWithDelivery = (cart.totalAmount +
+            _deliveryFee +
+            platformFee -
+            voucherDiscount)
+        .clamp(0.0, double.infinity);
     final textTheme = Theme.of(context).textTheme;
     final paymentOptions = _selectablePaymentMethods;
     final profileReady = CheckoutRules.isDeliveryProfileReady(_customerProfile);
@@ -1138,6 +1312,89 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             );
                           },
                         ),
+                      if (_appliedVoucher != null)
+                        _amountRow(
+                          'Reward Voucher (${_appliedVoucher!.title})',
+                          '-\u20B1${voucherDiscount.toStringAsFixed(2)}',
+                          muted: true,
+                          valueColor: const Color(0xFF10B981),
+                        ),
+                      // Voucher selection card
+                      Container(
+                        margin: const EdgeInsets.only(top: 6, bottom: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _appliedVoucher != null
+                              ? const Color(0xFF10B981).withValues(alpha: 0.08)
+                              : AppUi.surfaceOf(context),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _appliedVoucher != null
+                                ? const Color(0xFF10B981)
+                                : AppUi.borderOf(context),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.local_offer_outlined,
+                              size: 16,
+                              color: _appliedVoucher != null
+                                  ? const Color(0xFF10B981)
+                                  : AppUi.bluePrimary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _appliedVoucher != null
+                                    ? 'Applied: ${_appliedVoucher!.title}'
+                                    : (_availableVouchers.isEmpty
+                                        ? 'No reward vouchers available'
+                                        : '${_availableVouchers.length} reward voucher(s) available'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: _appliedVoucher != null
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: _appliedVoucher != null
+                                      ? const Color(0xFF10B981)
+                                      : null,
+                                ),
+                              ),
+                            ),
+                            if (_appliedVoucher != null)
+                              InkWell(
+                                onTap: () => setState(() => _appliedVoucher = null),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  child: Text(
+                                    'Remove',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.redAccent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (_availableVouchers.isNotEmpty)
+                              InkWell(
+                                onTap: _showSelectVoucherSheet,
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  child: Text(
+                                    'Apply',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppUi.bluePrimary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Divider(
@@ -1285,6 +1542,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     String value, {
     bool muted = false,
     bool bold = false,
+    Color? valueColor,
     VoidCallback? onInfo,
   }) {
     return Padding(
@@ -1321,7 +1579,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(
               fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
               fontSize: bold ? 16 : 13,
-              color: bold ? AppUi.bluePrimary : null,
+              color: valueColor ?? (bold ? AppUi.bluePrimary : null),
             ),
           ),
         ],

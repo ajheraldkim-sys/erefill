@@ -12,6 +12,8 @@ import 'add_order_dialog.dart';
 import '../customer/checkout_rules.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:uuid/uuid.dart';
+import 'package:erefill/core/services/offline_queue_service.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -421,6 +423,47 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       await _refreshOrders();
     } catch (e) {
       debugPrint('Error updating order status: $e');
+      final errStr = e.toString().toLowerCase();
+      final isOffline = errStr.contains('socket') ||
+          errStr.contains('network') ||
+          errStr.contains('timeout') ||
+          errStr.contains('connection') ||
+          errStr.contains('failed host lookup') ||
+          errStr.contains('clientexception');
+      if (isOffline) {
+        try {
+          await OfflineQueueService.queueAction(
+            OfflineAction(
+              id: const Uuid().v4(),
+              actionType: 'UPDATE_ORDER_STATUS',
+              payload: {
+                'order_id': orderId,
+                'new_status': newStatus,
+                if (cancelReason != null && cancelReason.isNotEmpty)
+                  'reason': cancelReason,
+              },
+            ),
+          );
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Status updated locally. Changes will sync once connected.',
+              ),
+              backgroundColor: const Color(0xFFF59E0B),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(12),
+            ),
+          );
+          return;
+        } catch (queueErr) {
+          debugPrint('Error queueing offline status transition: $queueErr');
+        }
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

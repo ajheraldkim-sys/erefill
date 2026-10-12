@@ -296,6 +296,64 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _showFullScreenImage(BuildContext context, String imageUrl, String tag) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.92),
+        pageBuilder: (context, _, _) {
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Stack(
+              children: [
+                Center(
+                  child: InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 4.0,
+                    child: Hero(
+                      tag: tag,
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          );
+                        },
+                        errorBuilder: (_, _, _) => const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_rounded, color: Colors.white70, size: 54),
+                            SizedBox(height: 12),
+                            Text('Unable to display image', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 12,
+                  right: 16,
+                  child: Material(
+                    color: Colors.black45,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildQuickReplyChip(String text, {bool isCustom = false}) {
     return InkWell(
       onTap: _sending
@@ -840,31 +898,88 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
-                    if (msg.isImage && msg.metadata['image_url'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            msg.metadata['image_url'],
-                            width: 220,
-                            fit: BoxFit.cover,
-                            cacheWidth: 440,
-                            filterQuality: FilterQuality.low,
-                            errorBuilder: (_, _, _) =>
-                                const Icon(Icons.broken_image_rounded),
-                          ),
+                    if (msg.isImage) ...[
+                      Builder(
+                        builder: (context) {
+                          String? imageUrl = msg.metadata['image_url']?.toString();
+                          if (imageUrl == null || imageUrl.isEmpty) {
+                            final imagePath = msg.metadata['image_path']?.toString();
+                            if (imagePath != null && imagePath.isNotEmpty) {
+                              try {
+                                imageUrl = Supabase.instance.client.storage
+                                    .from('chat_attachments')
+                                    .getPublicUrl(imagePath);
+                              } catch (_) {}
+                            }
+                          }
+
+                          if (imageUrl == null || imageUrl.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final heroTag = 'chat_img_${msg.id}';
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: GestureDetector(
+                              onTap: () => _showFullScreenImage(context, imageUrl!, heroTag),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Hero(
+                                  tag: heroTag,
+                                  child: Image.network(
+                                    imageUrl,
+                                    width: 220,
+                                    fit: BoxFit.cover,
+                                    cacheWidth: 440,
+                                    filterQuality: FilterQuality.low,
+                                    loadingBuilder: (context, child, progress) {
+                                      if (progress == null) return child;
+                                      return Container(
+                                        width: 220,
+                                        height: 140,
+                                        color: isMine
+                                            ? Colors.white12
+                                            : AppUi.borderOf(context),
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (_, _, _) => Container(
+                                      width: 220,
+                                      height: 120,
+                                      color: isMine
+                                          ? Colors.white12
+                                          : AppUi.borderOf(context),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.broken_image_rounded,
+                                          color: isMine ? Colors.white70 : AppUi.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (!msg.isImage || (msg.content.isNotEmpty && msg.content != 'Photo'))
+                      Text(
+                        msg.content,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isMine ? Colors.white : AppUi.textPrimaryOf(context),
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
                         ),
                       ),
-                    Text(
-                      msg.content,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isMine ? Colors.white : AppUi.textPrimaryOf(context),
-                        fontWeight: FontWeight.w500,
-                        height: 1.4,
-                      ),
-                    ),
                   ],
                 ),
               ),

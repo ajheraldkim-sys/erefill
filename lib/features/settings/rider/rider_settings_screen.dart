@@ -45,7 +45,7 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
     final preferences = await _service.load(userId);
     final profile = await Supabase.instance.client
         .from('profiles')
-        .select('first_name, last_name, vehicle_type, license_number')
+        .select('first_name, last_name, phone, vehicle_type, license_number')
         .eq('id', userId)
         .maybeSingle();
 
@@ -54,9 +54,12 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
         profile?['first_name']?.toString() ?? user?.firstName ?? '';
     _lastNameController.text =
         profile?['last_name']?.toString() ?? user?.lastName ?? '';
-    _phoneController.text = user?.phone ?? '';
-    _vehicleController.text = profile?['vehicle_type']?.toString() ?? '';
-    _licenseController.text = profile?['license_number']?.toString() ?? '';
+    _phoneController.text =
+        profile?['phone']?.toString() ?? user?.phone ?? '';
+    _vehicleController.text =
+        profile?['vehicle_type']?.toString() ?? user?.vehicleType ?? '';
+    _licenseController.text =
+        profile?['license_number']?.toString() ?? user?.licenseNumber ?? '';
     setState(() {
       _notifyAssignments = preferences['notifyAssignments'] as bool;
       _notifyOrderUpdates = preferences['notifyOrderUpdates'] as bool;
@@ -86,6 +89,10 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
         notifyAssignments: _notifyAssignments,
         notifyOrderUpdates: _notifyOrderUpdates,
       );
+      if (mounted) {
+        await context.read<UserProvider>().refreshProfile();
+        await _loadSettings();
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

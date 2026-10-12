@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../db_tables.dart';
 import '../utils/order_product_helpers.dart';
+import 'local_data_cache.dart';
 
 /// Bundle containing all station details needed for instant UI rendering.
 class CachedStationBundle {
@@ -30,6 +31,38 @@ class CachedStationBundle {
 
   bool get isExpired =>
       DateTime.now().difference(cachedAt) > const Duration(minutes: 5);
+
+  Map<String, dynamic> toJson() => {
+    'ownerId': ownerId,
+    'products': products,
+    'settingsData': settingsData,
+    'profileData': profileData,
+    'ratingCounts': ratingCounts,
+    'pricePerGallon': pricePerGallon,
+    'baseDeliveryFee': baseDeliveryFee,
+    'waterType': waterType,
+    'cachedAt': cachedAt.toIso8601String(),
+  };
+
+  factory CachedStationBundle.fromJson(Map<String, dynamic> json) =>
+      CachedStationBundle(
+        ownerId: json['ownerId']?.toString() ?? '',
+        products: (json['products'] as List? ?? const []).cast<dynamic>(),
+        settingsData: json['settingsData'] != null
+            ? Map<String, dynamic>.from(json['settingsData'] as Map)
+            : null,
+        profileData: json['profileData'] != null
+            ? Map<String, dynamic>.from(json['profileData'] as Map)
+            : null,
+        ratingCounts: (json['ratingCounts'] as List? ?? const [0, 0, 0, 0, 0])
+            .map((e) => (e as num).toInt())
+            .toList(),
+        pricePerGallon: (json['pricePerGallon'] as num?)?.toDouble(),
+        baseDeliveryFee: (json['baseDeliveryFee'] as num?)?.toDouble() ?? 25.0,
+        waterType: json['waterType']?.toString(),
+        cachedAt: DateTime.tryParse(json['cachedAt']?.toString() ?? '') ??
+            DateTime.now(),
+      );
 
   CachedStationBundle copyWith({
     List<dynamic>? products,
@@ -77,12 +110,16 @@ class StationDataCache {
   /// Store or update cached bundle manually.
   void set(String ownerId, CachedStationBundle bundle) {
     _cache[ownerId] = bundle;
+    unawaited(
+      LocalDataCache.instance.set('station_bundle_$ownerId', bundle.toJson()),
+    );
     _stationUpdatesController.add(ownerId);
   }
 
   /// Invalidate cache for a specific station.
   void invalidate(String ownerId) {
     _cache.remove(ownerId);
+    unawaited(LocalDataCache.instance.invalidate('station_bundle_$ownerId'));
   }
 
   /// Clear entire cache.
@@ -91,13 +128,31 @@ class StationDataCache {
     _inFlight.clear();
   }
 
+  Future<CachedStationBundle?> _loadFromDisk(String ownerId) async {
+    try {
+      final diskData = await LocalDataCache.instance.get<Map<String, dynamic>>(
+        'station_bundle_$ownerId',
+      );
+      if (diskData != null) {
+        final bundle = CachedStationBundle.fromJson(diskData);
+        _cache[ownerId] = bundle;
+        return bundle;
+      }
+    } catch (e) {
+      debugPrint('StationDataCache disk load error: $e');
+    }
+    return null;
+  }
+
   /// Fetch or retrieve station bundle with deduplicated concurrent requests
-  /// and parallelized queries.
+  /// and graceful offline fallback.
   Future<CachedStationBundle> getOrFetch(
     String ownerId, {
     bool forceRefresh = false,
   }) async {
-    final existing = _cache[ownerId];
+    var existing = _cache[ownerId];
+    existing ??= await _loadFromDisk(ownerId);
+
     if (!forceRefresh && existing != null && !existing.isExpired) {
       return existing;
     }
@@ -114,8 +169,21 @@ class StationDataCache {
     try {
       final bundle = await future;
       _cache[ownerId] = bundle;
+      unawaited(
+        LocalDataCache.instance.set('station_bundle_$ownerId', bundle.toJson()),
+      );
       _stationUpdatesController.add(ownerId);
       return bundle;
+    } catch (e) {
+      debugPrint(
+        'StationDataCache: Network fetch failed for $ownerId ($e), checking offline cache...',
+      );
+      final fallback = _cache[ownerId] ?? await _loadFromDisk(ownerId);
+      if (fallback != null) {
+        debugPrint('StationDataCache: Returning cached fallback for $ownerId');
+        return fallback;
+      }
+      rethrow;
     } finally {
       _inFlight.remove(ownerId);
     }
@@ -201,13 +269,14 @@ class StationDataCache {
       if (cached == null || cached.isExpired) {
         getOrFetch(id).catchError((e) {
           debugPrint('Prefetch failed for $id: $e');
-          return CachedStationBundle(
-            ownerId: id,
-            products: const [],
-            ratingCounts: List.filled(5, 0),
-            baseDeliveryFee: 25.0,
-            cachedAt: DateTime.now(),
-          );
+          return _cache[id] ??
+              CachedStationBundle(
+                ownerId: id,
+                products: const [],
+                ratingCounts: List.filled(5, 0),
+                baseDeliveryFee: 25.0,
+                cachedAt: DateTime.now(),
+              );
         });
       }
     }

@@ -158,10 +158,14 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
     final p = _riderProfile ?? {};
     final displayName = p['full_name']?.toString() ?? widget.riderName;
     final username = p['username']?.toString() ?? 'username';
-    final phone = p['phone']?.toString();
-    final vehicle = p['vehicle_type']?.toString();
-    final license = p['license_number']?.toString();
-    final email = p['email']?.toString();
+    final rawPhone = p['phone']?.toString().trim();
+    final phone = (rawPhone != null && rawPhone.isNotEmpty) ? rawPhone : null;
+    final rawVehicle = p['vehicle_type']?.toString().trim();
+    final vehicle = (rawVehicle != null && rawVehicle.isNotEmpty) ? rawVehicle : null;
+    final rawLicense = p['license_number']?.toString().trim();
+    final license = (rawLicense != null && rawLicense.isNotEmpty) ? rawLicense : null;
+    final rawEmail = p['email']?.toString().trim();
+    final email = (rawEmail != null && rawEmail.isNotEmpty) ? rawEmail : null;
     final isOnline = p['is_online'] == true;
     final isSuspended = p['is_suspended'] == true;
     final registeredDate = _formatDate(p['created_at']?.toString());
@@ -176,17 +180,20 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
             icon: const Icon(Icons.edit_outlined, size: 20),
             color: AppUi.bluePrimary,
             tooltip: 'Edit Rider Information',
-            onPressed: () {
+            onPressed: () async {
               HapticFeedback.lightImpact();
               final riderMap = _riderProfile ?? {
                 'id': widget.riderId,
                 'full_name': widget.riderName,
               };
-              RiderManagementScreen.showEditRiderCredentialsDialog(
+              final updated = await RiderManagementScreen.showEditRiderCredentialsDialog(
                 context,
                 riderMap,
                 onUpdated: _loadPerformanceData,
               );
+              if (updated == true && mounted) {
+                await _loadPerformanceData();
+              }
             },
           ),
           PopupMenuButton<String>(

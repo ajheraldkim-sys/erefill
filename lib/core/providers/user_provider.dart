@@ -4,9 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/models/user_model.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/profile_query_helpers.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 
 class UserProvider extends ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final LocalDataCache _cache = LocalDataCache.instance;
   UserModel? _user;
   bool _isLoading = true;
   StreamSubscription<AuthState>? _authSub;
@@ -21,6 +23,17 @@ class UserProvider extends ChangeNotifier {
 
   UserProvider() {
     _init();
+    final currentUserId = _supabase.auth.currentUser?.id;
+    if (currentUserId != null) {
+      _profileUserId = currentUserId;
+      _cache.get<Map<String, dynamic>>('user_profile_$currentUserId').then((cached) {
+        if (cached != null && _user == null && !_disposed) {
+          _user = UserModel.fromJson(cached);
+          _isLoading = false;
+          notifyListeners();
+        }
+      });
+    }
   }
 
   void _init() {
@@ -57,11 +70,20 @@ class UserProvider extends ChangeNotifier {
     final generation = ++_profileLoadGeneration;
     if (isNewUser) {
       _profileUserId = userId;
-      _user = null;
-      _isLoading = true;
       _profileSub?.cancel();
       _profileSub = null;
-      notifyListeners();
+
+      // Immediately attempt disk cache read so offline launch is instantaneous
+      final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
+      if (cached != null && !_disposed && generation == _profileLoadGeneration) {
+        _user = UserModel.fromJson(cached);
+        _isLoading = false;
+        notifyListeners();
+      } else {
+        _user = null;
+        _isLoading = true;
+        notifyListeners();
+      }
     }
 
     try {
@@ -76,6 +98,7 @@ class UserProvider extends ChangeNotifier {
         return;
       }
       _user = UserModel.fromJson(data);
+      await _cache.set('user_profile_$userId', data);
 
       _profileSub ??= SafeSupabase.listen(
         _supabase
@@ -83,23 +106,34 @@ class UserProvider extends ChangeNotifier {
             .stream(primaryKey: ['id'])
             .eq('id', userId),
         (data) {
-            if (data.isNotEmpty && _profileUserId == userId && !_disposed) {
-              _user = UserModel.fromJson(data.first);
-              notifyListeners();
-            }
-          },
-          onError: (error, stackTrace) {
-            debugPrint('User profile stream error: $error');
-            debugPrint('User profile stream stack: $stackTrace');
-          },
-        );
+          if (data.isNotEmpty && _profileUserId == userId && !_disposed) {
+            _user = UserModel.fromJson(data.first);
+            _cache.set('user_profile_$userId', data.first);
+            notifyListeners();
+          }
+        },
+        onError: (error, stackTrace) {
+          debugPrint('User profile stream error: $error');
+          debugPrint('User profile stream stack: $stackTrace');
+        },
+      );
     } catch (e) {
       if (_disposed || generation != _profileLoadGeneration) return;
       debugPrint("Error loading user profile: $e");
+
+      // Network or offline failure: preserve or load cached profile
+      if (_user == null) {
+        final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
+        if (cached != null) {
+          _user = UserModel.fromJson(cached);
+        }
+      }
+
       // Handle explicit auth error / 401
       if (e.toString().contains('401') ||
           e.toString().contains('Unauthorized')) {
         _user = null;
+        await _cache.set('user_profile_$userId', null);
       }
     } finally {
       if (!_disposed && generation == _profileLoadGeneration) {
@@ -132,6 +166,7 @@ class UserProvider extends ChangeNotifier {
       final newUser = UserModel.fromJson(data);
 
       _user = newUser;
+      await _cache.set('user_profile_$userId', data);
       notifyListeners();
     } catch (e) {
       debugPrint("Error updating profile in provider: $e");

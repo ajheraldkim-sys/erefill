@@ -24,6 +24,8 @@ import 'core/constants.dart';
 import 'core/services/offline_queue_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/offline_order_sync_service.dart';
+import 'core/providers/connectivity_provider.dart';
+import 'core/widgets/offline_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -137,6 +139,7 @@ class _ERefillAppState extends State<ERefillApp> {
         ChangeNotifierProvider(create: (_) => CreditProvider(_deliverySvc)),
         ChangeNotifierProvider(create: (_) => InventoryProvider(_deliverySvc)),
         ChangeNotifierProvider(create: (_) => ReportProvider(_deliverySvc)),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -171,7 +174,12 @@ class _ERefillAppState extends State<ERefillApp> {
                     ThemeMode.system => shadcn.ThemeMode.system,
                     _ => shadcn.ThemeMode.light,
                   },
-                  child: child,
+                  child: Column(
+                    children: [
+                      const OfflineBanner(),
+                      Expanded(child: child ?? const SizedBox.shrink()),
+                    ],
+                  ),
                 );
               },
             ),

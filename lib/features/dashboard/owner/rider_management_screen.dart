@@ -382,14 +382,17 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () {
+                              onTap: () async {
                                 HapticFeedback.selectionClick();
-                                context.openRiderPerformance(
+                                await context.openRiderPerformance(
                                   riderId: rider['id'].toString(),
                                   riderName:
                                       rider['full_name']?.toString() ??
                                       'Rider Profile',
                                 );
+                                if (mounted) {
+                                  _fetchRidersDirect();
+                                }
                               },
                               borderRadius: AppUi.pillRadius,
                               child: Padding(
@@ -599,12 +602,15 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
     );
   }
 
-  void _showEditRiderDialog(Map<String, dynamic> rider) {
-    showEditRiderCredentialsDialog(
+  void _showEditRiderDialog(Map<String, dynamic> rider) async {
+    final updated = await showEditRiderCredentialsDialog(
       context,
       rider,
       onUpdated: _fetchRidersDirect,
     );
+    if (updated == true && mounted) {
+      _fetchRidersDirect();
+    }
   }
 
   static Future<bool?> showEditRiderCredentialsDialog(
@@ -615,39 +621,75 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
     final supabase = Supabase.instance.client;
     final riderId = rider['id']?.toString() ?? '';
 
+    // Always fetch the authoritative current profile record from Supabase
+    // so the edit form immediately displays current authorized information, not stale list cache
+    Map<String, dynamic> activeRider = Map<String, dynamic>.from(rider);
+    try {
+      final fresh = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', riderId)
+          .maybeSingle();
+      if (fresh != null) {
+        activeRider = Map<String, dynamic>.from(fresh);
+      }
+    } catch (e) {
+      debugPrint('Warning: Could not fetch fresh rider profile before edit: $e');
+    }
+
+    String initialFirst = activeRider['first_name']?.toString().trim() ?? '';
+    String initialLast = activeRider['last_name']?.toString().trim() ?? '';
+    String initialMi = activeRider['mi']?.toString().trim() ?? '';
+    String? initialSuffix = activeRider['suffix']?.toString().trim();
+    if (initialSuffix == '' || initialSuffix == 'null' || initialSuffix == 'None') {
+      initialSuffix = null;
+    }
+
     // Fallback name parsing for existing rows where first_name and last_name are null
-    String initialFirst = rider['first_name']?.toString() ?? '';
-    String initialLast = rider['last_name']?.toString() ?? '';
     if (initialFirst.isEmpty && initialLast.isEmpty) {
-      final rawFullName = rider['full_name']?.toString().trim() ?? '';
+      final rawFullName = activeRider['full_name']?.toString().trim() ?? '';
       if (rawFullName.isNotEmpty) {
         final parts = rawFullName.split(RegExp(r'\s+'));
+        const suffixes = {'Jr.', 'Sr.', 'II', 'III', 'IV', 'V'};
+        if (parts.length > 2 && suffixes.contains(parts.last)) {
+          initialSuffix ??= parts.last;
+          parts.removeLast();
+        }
         if (parts.length == 1) {
           initialFirst = parts.first;
-        } else if (parts.length >= 2) {
+        } else if (parts.length == 2) {
           initialFirst = parts.first;
-          initialLast = parts.sublist(1).join(' ');
+          initialLast = parts[1];
+        } else if (parts.length >= 3) {
+          if (parts[1].length <= 2) {
+            initialFirst = parts[0];
+            initialMi = parts[1].replaceAll('.', '');
+            initialLast = parts.sublist(2).join(' ');
+          } else {
+            initialFirst = parts[0];
+            initialLast = parts.sublist(1).join(' ');
+          }
         }
       }
     }
 
     final firstNameController = TextEditingController(text: initialFirst);
     final lastNameController = TextEditingController(text: initialLast);
-    final miController = TextEditingController(
-      text: rider['mi']?.toString() ?? '',
-    );
-    String? selectedSuffix = rider['suffix']?.toString();
+    final miController = TextEditingController(text: initialMi);
+    String? selectedSuffix = initialSuffix;
     final phoneController = TextEditingController(
-      text: rider['phone']?.toString() ?? '',
+      text: activeRider['phone']?.toString().trim() ?? '',
     );
     final vehicleController = TextEditingController(
-      text: rider['vehicle_type']?.toString() ?? '',
+      text: activeRider['vehicle_type']?.toString().trim() ?? '',
     );
     final licenseController = TextEditingController(
-      text: rider['license_number']?.toString() ?? '',
+      text: activeRider['license_number']?.toString().trim() ?? '',
     );
     final passwordController = TextEditingController();
     bool isSaving = false;
+
+    if (!context.mounted) return false;
 
     return showModalBottomSheet<bool>(
       context: context,
@@ -662,7 +704,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
             MediaQuery.of(sheetContext).viewInsets.bottom + 40,
           ),
           decoration: BoxDecoration(
-            color: AppUi.surfaceOf(context),
+            color: AppUi.surfaceOf(sheetContext),
             borderRadius: AppUi.radiusSheetTop,
           ),
           child: SingleChildScrollView(
@@ -675,7 +717,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppUi.borderOf(context),
+                      color: AppUi.borderOf(sheetContext),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -686,14 +728,14 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: AppUi.textPrimaryOf(context),
+                    color: AppUi.textPrimaryOf(sheetContext),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "Update profile details or assign a new password for @${rider['username'] ?? 'rider'}",
+                  "Update profile details or assign a new password for @${activeRider['username'] ?? rider['username'] ?? 'rider'}",
                   style: TextStyle(
-                    color: AppUi.textSecondaryOf(context),
+                    color: AppUi.textSecondaryOf(sheetContext),
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),
@@ -832,6 +874,14 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
 
                           setSheetState(() => isSaving = true);
                           try {
+                            final composedName = [
+                              fname,
+                              mi,
+                              lname,
+                              selectedSuffix ?? '',
+                            ].where((s) => s.trim().isNotEmpty).join(' ').trim();
+
+                            bool rpcSucceeded = false;
                             try {
                               await supabase.rpc(
                                 'owner_update_rider_credentials',
@@ -853,41 +903,55 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                       : newPass,
                                 },
                               );
+                              rpcSucceeded = true;
                             } catch (rpcErr) {
                               debugPrint(
-                                'RPC update failed, checking fallback: $rpcErr',
+                                'RPC update failed, falling back to direct profiles update: $rpcErr',
                               );
-                              // Fallback: direct profiles update for profile details if owner owns the rider
-                              final ownerId = SafeSupabase.currentUserId;
-                              final composedName =
-                                  [fname, mi, lname, selectedSuffix ?? '']
-                                      .where((s) => s.trim().isNotEmpty)
-                                      .join(' ')
-                                      .trim();
+                            }
 
-                              await supabase
-                                  .from('profiles')
-                                  .update({
-                                    'first_name': fname,
-                                    'last_name': lname,
-                                    'mi': mi.isEmpty ? null : mi,
-                                    'suffix': selectedSuffix,
-                                    'full_name': composedName,
-                                    'phone': phone.isEmpty ? null : phone,
-                                    'vehicle_type': vehicle.isEmpty
-                                        ? null
-                                        : vehicle,
-                                    'license_number': license.isEmpty
-                                        ? null
-                                        : license,
-                                    'updated_at': DateTime.now()
-                                        .toIso8601String(),
-                                  })
-                                  .eq('id', riderId)
-                                  .eq('owner_id', ownerId ?? '');
+                            // Always guarantee the profiles table is updated with authoritative current values
+                            final updatePayload = <String, dynamic>{
+                              'first_name': fname,
+                              'last_name': lname,
+                              'mi': mi.isEmpty ? null : mi,
+                              'suffix': selectedSuffix,
+                              'full_name': composedName,
+                              'phone': phone.isEmpty ? null : phone,
+                              'vehicle_type': vehicle.isEmpty ? null : vehicle,
+                              'license_number': license.isEmpty ? null : license,
+                              'updated_at': DateTime.now().toIso8601String(),
+                            };
 
-                              if (newPass.isNotEmpty) {
-                                throw 'Profile updated, but password update requires database migration or admin rights: $rpcErr';
+                            await supabase
+                                .from('profiles')
+                                .update(updatePayload)
+                                .eq('id', riderId);
+
+                            if (!rpcSucceeded && newPass.isNotEmpty) {
+                              throw 'Profile details updated, but password update requires database migration or admin rights.';
+                            }
+
+                            // Immediately update local disk cache so offline & instant loads show current information
+                            final ownerId = SafeSupabase.currentUserId;
+                            if (ownerId != null) {
+                              final cached = await LocalDataCache.instance
+                                  .get<List<dynamic>>('owner_riders_$ownerId');
+                              if (cached != null) {
+                                final updatedList = cached.map((r) {
+                                  if (r is Map && r['id']?.toString() == riderId) {
+                                    return {
+                                      ...r,
+                                      ...updatePayload,
+                                      'full_name': composedName,
+                                    };
+                                  }
+                                  return r;
+                                }).toList();
+                                await LocalDataCache.instance.set(
+                                  'owner_riders_$ownerId',
+                                  updatedList,
+                                );
                               }
                             }
 
@@ -1157,6 +1221,19 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
         } else if (resStr.startsWith('error:')) {
           throw resStr.replaceFirst('error:', '').trim();
         }
+      }
+
+      // Explicitly populate profile columns so newly registered rider shows complete info
+      try {
+        await supabase.from('profiles').update({
+          'first_name': fname.trim(),
+          'last_name': lname.trim(),
+          'mi': mi.trim().isEmpty ? null : mi.trim(),
+          'suffix': suffix.trim().isEmpty ? null : suffix.trim(),
+          'full_name': composedName,
+        }).eq('username', user.trim());
+      } catch (err) {
+        debugPrint('Non-critical: could not backfill name fields on creation: $err');
       }
 
       await _fetchRidersDirect();

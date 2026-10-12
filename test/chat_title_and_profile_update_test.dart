@@ -174,5 +174,51 @@ void main() {
       );
     });
   });
+
+  group('Message image and attachment tests', () {
+    test('Message.isImage returns true for image type and parses metadata', () {
+      final msg = Message(
+        id: 'msg-img-1',
+        roomId: 'room-1',
+        senderId: 'user-1',
+        content: 'Photo',
+        messageType: MessageType.image,
+        metadata: {
+          'image_path': 'chats/room-1/sample.jpg',
+          'image_url': 'https://storage.supabase.co/chats/room-1/sample.jpg',
+        },
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      expect(msg.isImage, isTrue);
+      expect(msg.metadata['image_path'], equals('chats/room-1/sample.jpg'));
+      expect(
+        msg.metadata['image_url'],
+        equals('https://storage.supabase.co/chats/room-1/sample.jpg'),
+      );
+    });
+
+    test('Message serializes and deserializes image message correctly', () {
+      final json = {
+        'id': 'msg-img-2',
+        'room_id': 'room-1',
+        'sender_id': 'user-2',
+        'content': 'Check this photo',
+        'message_type': 'image',
+        'metadata': {
+          'image_path': 'chats/room-1/proof.jpg',
+          'image_url': 'https://example.com/proof.jpg',
+        },
+        'created_at': DateTime.now().toIso8601String(),
+        'read_at': null,
+      };
+
+      final msg = Message.fromJson(json);
+      expect(msg.isImage, isTrue);
+      expect(msg.metadata['image_url'], equals('https://example.com/proof.jpg'));
+      expect(msg.content, equals('Check this photo'));
+    });
+  });
 }
 

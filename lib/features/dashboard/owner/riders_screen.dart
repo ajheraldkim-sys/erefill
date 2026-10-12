@@ -3,6 +3,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'rider_logistics_map.dart';
 import 'rider_management_screen.dart';
+import '../../payouts/widgets/owner_payout_requests_tab.dart';
 
 class RidersScreen extends StatefulWidget {
   final String ownerId;
@@ -19,7 +20,7 @@ class _RidersScreenState extends State<RidersScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -77,6 +78,16 @@ class _RidersScreenState extends State<RidersScreen>
                     ],
                   ),
                 ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.payments_rounded, size: 18),
+                      SizedBox(width: 8),
+                      Text('Payouts'),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -86,6 +97,7 @@ class _RidersScreenState extends State<RidersScreen>
               children: [
                 RiderLogisticsMap(ownerId: widget.ownerId),
                 const RiderManagementScreen(),
+                OwnerPayoutRequestsTab(ownerId: widget.ownerId),
               ],
             ),
           ),

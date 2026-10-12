@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/features/chat/models/system_notification.dart';
 import 'package:erefill/core/services/notification_service.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -58,11 +59,27 @@ class NotificationProvider extends ChangeNotifier {
     await _notifSub?.cancel();
     if (generation != _listenGeneration) return;
 
-    _isLoading = true;
-    _initialLoadCompleted = false;
-    _knownIds.clear();
-    _notifications = [];
-    notifyListeners();
+    final cacheKey = 'system_notifications_$userId';
+
+    // 0ms instant offline load from disk
+    final cached = await LocalDataCache.instance.get<List<dynamic>>(cacheKey);
+    if (cached != null && cached.isNotEmpty && generation == _listenGeneration) {
+      final list = cached
+          .map((item) =>
+              SystemNotification.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _notifications = list;
+      _knownIds.addAll(list.map((n) => n.id));
+      _isLoading = false;
+      notifyListeners();
+    } else {
+      _isLoading = true;
+      _initialLoadCompleted = false;
+      _knownIds.clear();
+      _notifications = [];
+      notifyListeners();
+    }
 
     try {
       _notifSub = SafeSupabase.listen(
@@ -105,6 +122,13 @@ class NotificationProvider extends ChangeNotifier {
           _initialLoadCompleted = true;
           _isLoading = false;
           notifyListeners();
+
+          unawaited(
+            LocalDataCache.instance.set(
+              cacheKey,
+              incoming.map((n) => n.toJson()).toList(),
+            ),
+          );
         },
         onError: (error, stackTrace) {
           debugPrint('Notification stream error: $error');
@@ -148,6 +172,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> markAsRead(String notificationId) async {
+    final userId = _supabase.auth.currentUser?.id;
     try {
       await _supabase
           .from('system_notifications')
@@ -164,6 +189,14 @@ class NotificationProvider extends ChangeNotifier {
           readAt: DateTime.now(),
         );
         notifyListeners();
+        if (userId != null) {
+          unawaited(
+            LocalDataCache.instance.set(
+              'system_notifications_$userId',
+              _notifications.map((n) => n.toJson()).toList(),
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error marking notification as read: $e');
@@ -188,6 +221,12 @@ class NotificationProvider extends ChangeNotifier {
           .map((n) => n.copyWith(isRead: true, readAt: DateTime.now()))
           .toList();
       notifyListeners();
+      unawaited(
+        LocalDataCache.instance.set(
+          'system_notifications_$userId',
+          _notifications.map((n) => n.toJson()).toList(),
+        ),
+      );
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
     }

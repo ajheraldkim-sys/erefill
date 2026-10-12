@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:erefill/core/utils/safe_supabase.dart';
 
 class OfflineAction {
   final String id;
-  final String actionType; // 'CREATE_ORDER', 'ASSIGN_RIDER'
+  final String actionType; // 'CREATE_ORDER', 'ASSIGN_RIDER', 'UPDATE_ORDER_STATUS'
   final Map<String, dynamic> payload;
   final DateTime createdAt;
 
@@ -50,7 +51,7 @@ class OfflineQueueService {
       _keyForUser(userId),
       jsonEncode(currentQueue.map((e) => e.toJson()).toList()),
     );
-    debugPrint('OfflineQueueService: Queued action ${action.id}');
+    debugPrint('OfflineQueueService: Queued action ${action.id} (${action.actionType})');
   }
 
   /// Retrieves all pending actions
@@ -60,6 +61,13 @@ class OfflineQueueService {
     if (raw == null) return [];
     final List<dynamic> decoded = jsonDecode(raw);
     return decoded.map((e) => OfflineAction.fromJson(e)).toList();
+  }
+
+  /// Returns total number of pending actions for the current/specified user
+  static Future<int> getPendingCount({String? userId}) async {
+    final effectiveUserId = userId ?? Supabase.instance.client.auth.currentUser?.id;
+    final queue = await getQueue(userId: effectiveUserId);
+    return queue.length;
   }
 
   /// Processes the queue when online
@@ -93,6 +101,22 @@ class OfflineQueueService {
           );
           if (assigned != true) {
             throw StateError('Rider assignment was rejected by the server.');
+          }
+        } else if (action.actionType == 'UPDATE_ORDER_STATUS') {
+          final orderId = action.payload['order_id']?.toString();
+          final newStatus = action.payload['new_status']?.toString();
+          final reason = action.payload['reason']?.toString();
+          if (orderId != null && newStatus != null) {
+            final res = await SafeSupabase.transitionOrderStatus(
+              orderId: orderId,
+              newStatus: newStatus,
+              reason: reason,
+            );
+            if (res['success'] != true) {
+              throw StateError(
+                res['message']?.toString() ?? 'Status update rejected',
+              );
+            }
           }
         }
       } catch (e) {

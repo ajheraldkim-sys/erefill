@@ -16,6 +16,12 @@ class OrderStatusPresentation {
 
   static OrderStatusPresentation fromStatus(String? status) {
     switch ((status ?? 'pending').toLowerCase()) {
+      case 'pending_sync':
+        return const OrderStatusPresentation(
+          label: 'Queued Offline',
+          color: Color(0xFFF59E0B),
+          icon: Icons.cloud_upload_outlined,
+        );
       case 'pending':
         return const OrderStatusPresentation(
           label: 'Pending',
@@ -551,6 +557,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
 
   static int statusIndex(String status) {
     final normalized = switch (status) {
+      'pending_sync' => 'pending',
       'ready' => 'ready_for_pickup',
       'rider_assigned' => 'assigned_to_rider',
       'delivering' => 'out_for_delivery',

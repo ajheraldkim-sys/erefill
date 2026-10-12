@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/providers/user_provider.dart';
+import '../../../core/services/report_export_service.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../models/credit_model.dart';
@@ -835,6 +837,69 @@ class _ReportsAnalyticsTab extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 14),
+
+          // Export PDF Report Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppUi.blueSoft,
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
+              border: Border.all(color: AppUi.blueBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: AppUi.bluePrimary,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_getRangeLabel(reportProv.range)} PDF Report',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppUi.bluePrimary,
+                        ),
+                      ),
+                      const Text(
+                        'Official sales, deliveries & tax statement',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _exportPdf(context, reportProv, share: false),
+                  icon: const Icon(Icons.print_rounded, size: 15),
+                  label: const Text('Print/Save'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppUi.bluePrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  onPressed: () => _exportPdf(context, reportProv, share: true),
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  tooltip: 'Share PDF',
+                  color: AppUi.bluePrimary,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
 
           // Summary Metrics Grid
@@ -968,5 +1033,86 @@ class _ReportsAnalyticsTab extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _getRangeLabel(ReportRange range) {
+    switch (range) {
+      case ReportRange.today:
+        return 'Today';
+      case ReportRange.thisWeek:
+        return 'This Week';
+      case ReportRange.thisMonth:
+        return 'This Month';
+      case ReportRange.thisYear:
+        return 'This Year';
+      case ReportRange.allTime:
+        return 'All Time';
+      case ReportRange.custom:
+        return 'Custom Range';
+    }
+  }
+
+  Future<void> _exportPdf(
+    BuildContext context,
+    ReportProvider reportProv, {
+    required bool share,
+  }) async {
+    final user = context.read<UserProvider>().user;
+    final stationName = user?.stationName ?? 'eRefill Water Station';
+    final stationAddress = user?.completeAddress ??
+        '${user?.barangay ?? ''}, ${user?.town ?? 'Surigao del Sur'}';
+    final stationPhone = user?.phone;
+    final rangeLabel = _getRangeLabel(reportProv.range);
+
+    final dailyBreakdown = reportProv.dailySeries
+        .map((d) => {
+              'date': d.date,
+              'gallons': d.gallons,
+              'income': d.income,
+            })
+        .toList();
+
+    final riderStats = reportProv.leaderboard
+        .map((r) => {
+              'name': r.rider.fullName,
+              'count': r.deliveryCount,
+              'gallons': r.totalGallons,
+              'commission': r.totalCommission,
+            })
+        .toList();
+
+    if (share) {
+      await ReportExportService.shareReport(
+        context: context,
+        stationName: stationName,
+        stationAddress: stationAddress,
+        stationPhone: stationPhone,
+        rangeLabel: rangeLabel,
+        totalDeliveries: reportProv.totalDeliveries,
+        totalGallons: reportProv.totalGallons,
+        totalIncome: reportProv.totalIncome,
+        totalExpenses: reportProv.totalExpenses,
+        totalCommission: reportProv.totalCommission,
+        netProfit: reportProv.netProfit,
+        dailyBreakdown: dailyBreakdown,
+        riderStats: riderStats,
+      );
+    } else {
+      await ReportExportService.printReport(
+        context: context,
+        stationName: stationName,
+        stationAddress: stationAddress,
+        stationPhone: stationPhone,
+        rangeLabel: rangeLabel,
+        totalDeliveries: reportProv.totalDeliveries,
+        totalGallons: reportProv.totalGallons,
+        totalIncome: reportProv.totalIncome,
+        totalExpenses: reportProv.totalExpenses,
+        totalCommission: reportProv.totalCommission,
+        netProfit: reportProv.netProfit,
+        dailyBreakdown: dailyBreakdown,
+        riderStats: riderStats,
+      );
+    }
   }
 }

@@ -6,6 +6,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:erefill/core/services/offline_queue_service.dart';
+import 'package:erefill/features/dashboard/rider/services/offline_delivery_queue_service.dart';
 
 /// Service responsible for offline-first order persistence and
 /// automatic background synchronization when internet connectivity returns.
@@ -23,6 +25,17 @@ class OfflineOrderSyncService {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isSyncing = false;
   final _uuid = const Uuid();
+  final StreamController<int> _pendingCountController =
+      StreamController<int>.broadcast();
+
+  Stream<int> get onPendingCountChanged => _pendingCountController.stream;
+
+  Future<void> _notifyPendingCount() async {
+    try {
+      final count = await getPendingSyncCount();
+      _pendingCountController.add(count);
+    } catch (_) {}
+  }
 
   Future<Database> get db async {
     _db ??= await _initDb();
@@ -74,6 +87,15 @@ class OfflineOrderSyncService {
             '🌐 Network connection active: Triggering offline order synchronization...',
           );
           syncPendingOrders();
+          // Also process owner/customer action queue and rider delivery queue
+          final client = Supabase.instance.client;
+          OfflineQueueService.processQueue(client).catchError((e) {
+            debugPrint('OfflineQueueService sync error: $e');
+          });
+          OfflineDeliveryQueueService().syncPendingDeliveries().catchError((e) {
+            debugPrint('OfflineDeliveryQueueService sync error: $e');
+            return 0;
+          });
         }
       },
     );
@@ -124,6 +146,8 @@ class OfflineOrderSyncService {
     );
 
     debugPrint('📦 Offline order queued locally in SQLite: $orderId');
+
+    unawaited(_notifyPendingCount());
 
     // Attempt an immediate background sync if network is currently available
     unawaited(syncPendingOrders());
@@ -239,33 +263,41 @@ class OfflineOrderSyncService {
       debugPrint('Offline order sync error: $e');
     } finally {
       _isSyncing = false;
+      unawaited(_notifyPendingCount());
     }
   }
 
   /// Retrieves cached offline orders for display in customer history.
   Future<List<Map<String, dynamic>>> getOfflineOrders() async {
-    final localDatabase = await db;
-    return await localDatabase.query(
-      tableOfflineOrders,
-      orderBy: 'created_at DESC',
-    );
+    try {
+      final localDatabase = await db;
+      return await localDatabase.query(
+        tableOfflineOrders,
+        orderBy: 'created_at DESC',
+      );
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Count of pending un-synchronized orders.
   Future<int> getPendingSyncCount() async {
-    final localDatabase = await db;
-    final res = await localDatabase.rawQuery(
-      'SELECT COUNT(*) as count FROM $tableOfflineOrders WHERE status = ?',
-      ['pending_sync'],
-    );
-    if (res.isNotEmpty) {
-      return (res.first['count'] as num?)?.toInt() ?? 0;
-    }
+    try {
+      final localDatabase = await db;
+      final res = await localDatabase.rawQuery(
+        'SELECT COUNT(*) as count FROM $tableOfflineOrders WHERE status = ?',
+        ['pending_sync'],
+      );
+      if (res.isNotEmpty) {
+        return (res.first['count'] as num?)?.toInt() ?? 0;
+      }
+    } catch (_) {}
     return 0;
   }
 
   void dispose() {
     _connectivitySubscription?.cancel();
+    _pendingCountController.close();
   }
 }
 

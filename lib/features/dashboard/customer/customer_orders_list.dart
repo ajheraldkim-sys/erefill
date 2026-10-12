@@ -15,6 +15,7 @@ import '../../../core/services/offline_order_sync_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import 'package:flutter/services.dart';
 import 'review_modal.dart';
+import '../../subscriptions/widgets/customer_subscriptions_tab.dart';
 
 class CustomerOrdersList extends StatefulWidget {
   final VoidCallback? onNavigateToStations;
@@ -171,12 +172,25 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
       _syncRiderLocationSubscriptions();
       LocalDataCache.instance.set('customer_orders_$userId', fullOrders);
     } catch (e) {
-      debugPrint('Online orders fetch error, loading from local SQLite: $e');
+      debugPrint('Online orders fetch error, loading from local SQLite and disk cache: $e');
       final offlineOrders =
           await OfflineOrderSyncService().getOfflineOrders();
+      final cached = await LocalDataCache.instance.get<List<dynamic>>(
+        'customer_orders_$userId',
+      );
+      final cachedList = cached != null
+          ? cached.map((item) => Map<String, dynamic>.from(item as Map)).toList()
+          : <Map<String, dynamic>>[];
+
+      final cachedIds = cachedList.map((o) => o['id']).toSet();
+      final pendingOffline = offlineOrders
+          .where((o) => !cachedIds.contains(o['id']))
+          .toList();
+
+      final combined = [...pendingOffline, ...cachedList];
       if (!mounted) return;
       setState(() {
-        _myOrders = offlineOrders;
+        _myOrders = combined.isNotEmpty ? combined : offlineOrders;
         _isLoading = false;
       });
     }
@@ -311,10 +325,10 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
         children: [
           TabScreenHeroHeader(
             title: 'My refills',
-            subtitle: 'Order tracking',
+            subtitle: 'Order tracking & routine',
             actions: [
               SizedBox(
-                width: 176,
+                width: 250,
                 child: _buildSegmentControl(
                   activeOrders.length,
                   pastOrders.length,
@@ -323,34 +337,38 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
             ],
           ),
           Expanded(
-            child: RefreshIndicator(
-              color: AppUi.bluePrimary,
-              onRefresh: _fetchOrders,
-              child: currentList.isEmpty
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.45,
-                          child: _buildEmptyState(),
-                        ),
-                      ],
-                    )
-                  : ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
-                      padding: AppUi.pagePadding.copyWith(top: 12, bottom: 96),
-                      itemCount: currentList.length,
-                      itemBuilder: (context, index) {
-                        final order = currentList[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildOrderCard(order),
-                        );
-                      },
-                    ),
-            ),
+            child: _activeSegment == 2
+                ? CustomerSubscriptionsTab(
+                    onBrowseStations: widget.onNavigateToStations,
+                  )
+                : RefreshIndicator(
+                    color: AppUi.bluePrimary,
+                    onRefresh: _fetchOrders,
+                    child: currentList.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.45,
+                                child: _buildEmptyState(),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: AppUi.pagePadding.copyWith(top: 12, bottom: 96),
+                            itemCount: currentList.length,
+                            itemBuilder: (context, index) {
+                              final order = currentList[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildOrderCard(order),
+                              );
+                            },
+                          ),
+                  ),
           ),
         ],
       ),
@@ -363,11 +381,13 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
         _segmentChip('Active', activeCount, 0),
         const SizedBox(width: 4),
         _segmentChip('History', historyCount, 1),
+        const SizedBox(width: 4),
+        _segmentChip('Routine', null, 2),
       ],
     );
   }
 
-  Widget _segmentChip(String label, int count, int index) {
+  Widget _segmentChip(String label, int? count, int index) {
     final selected = _activeSegment == index;
     return Expanded(
       child: Material(
@@ -380,7 +400,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
           },
           borderRadius: AppUi.pillRadius,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -389,15 +409,15 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
                   style: TextStyle(
                     color: selected ? AppUi.bluePrimary : Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
                 ),
-                if (count > 0) ...[
-                  const SizedBox(width: 6),
+                if (count != null && count > 0) ...[
+                  const SizedBox(width: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
+                      horizontal: 5,
+                      vertical: 1,
                     ),
                     decoration: BoxDecoration(
                       color: selected
@@ -409,7 +429,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
                       '$count',
                       style: TextStyle(
                         color: selected ? AppUi.bluePrimary : Colors.white,
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
