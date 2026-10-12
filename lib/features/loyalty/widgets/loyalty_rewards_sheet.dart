@@ -129,6 +129,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
             style: ElevatedButton.styleFrom(
               backgroundColor: AppUi.bluePrimary,
               foregroundColor: Colors.white,
+              minimumSize: const Size(0, 40),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Redeem'),
@@ -515,6 +516,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 42),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -571,6 +573,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF15803D),
                     foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 42),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -697,6 +700,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
                   disabledForegroundColor: Colors.grey,
+                  minimumSize: const Size(0, 36),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

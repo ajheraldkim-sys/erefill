@@ -949,26 +949,38 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
-  Widget _buildQuickReorderCard(BuildContext context) {
+  Widget _buildQuickOrderButton(BuildContext context) {
+    final targetStation = _quickOrderStation ??
+        (_stations.isNotEmpty ? _stations.first : null);
     final order = _lastCompletedOrder;
-    final station = _quickOrderStation!;
-    final stationName =
-        station['station_name']?.toString().trim().isNotEmpty == true
-        ? station['station_name'].toString()
-        : station['full_name']?.toString() ?? 'Water Station';
+    final isReorder = _quickOrderStation != null && order != null;
+    final stationName = targetStation != null
+        ? ((targetStation['station_name']?.toString().trim().isNotEmpty == true)
+            ? targetStation['station_name'].toString()
+            : (targetStation['full_name']?.toString() ?? 'Nearby Station'))
+        : null;
+
     final totalAmount = (order?['total_amount'] as num?)?.toDouble();
     final itemsList = order?['order_items'] as List? ?? const [];
     final itemCount = itemsList.length;
     final itemSummary = itemCount > 0
         ? '$itemCount item${itemCount == 1 ? '' : 's'}'
-        : 'Your last order';
+        : null;
 
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => _handleQuickOrder(station, order: order),
+        onTap: _isProcessingQuickOrder
+            ? null
+            : () {
+                if (targetStation != null) {
+                  _handleQuickOrder(targetStation, order: order);
+                } else {
+                  _openStations(context);
+                }
+              },
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -995,11 +1007,22 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons.replay_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
+                child: _isProcessingQuickOrder
+                    ? const Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        isReorder ? Icons.replay_rounded : Icons.bolt_rounded,
+                        color: Colors.white,
+                        size: 26,
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1016,7 +1039,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
-                        order != null ? '⚡ QUICK REORDER' : '⚡ QUICK REFILL',
+                        isReorder ? '⚡ QUICK REORDER' : '⚡ QUICK ORDER',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 8.5,
@@ -1027,9 +1050,11 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      order != null
-                          ? 'Order again from $stationName'
-                          : 'Quick refill from $stationName',
+                      stationName != null
+                          ? (isReorder
+                              ? 'Order again from $stationName'
+                              : 'Quick refill from $stationName')
+                          : 'Quick order water in 1 tap',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1042,8 +1067,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                     const SizedBox(height: 2),
                     Text(
                       totalAmount != null
-                          ? '$itemSummary · ₱${totalAmount.toStringAsFixed(0)}'
-                          : itemSummary,
+                          ? '${itemSummary ?? "Refill"} · ₱${totalAmount.toStringAsFixed(0)}'
+                          : (stationName != null
+                              ? '1-tap refill · Pre-filled cart'
+                              : 'Tap to pick station & order faster'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1056,51 +1083,44 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                 ),
               ),
               const SizedBox(width: 8),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _handleQuickOrder(station, order: order),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(99),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_isProcessingQuickOrder)
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFF087F8C),
-                            ),
-                          )
-                        else ...[
-                          const Text(
-                            'Quick Order',
-                            style: TextStyle(
-                              color: Color(0xFF087F8C),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.bolt_rounded,
-                            color: Color(0xFF087F8C),
-                            size: 16,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isProcessingQuickOrder)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF087F8C),
+                        ),
+                      )
+                    else ...[
+                      const Text(
+                        'Quick Order',
+                        style: TextStyle(
+                          color: Color(0xFF087F8C),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.bolt_rounded,
+                        color: Color(0xFF087F8C),
+                        size: 16,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -1157,24 +1177,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       delegate: SliverChildListDelegate([
                         _buildHomeBanner(context),
                         AppUi.vGapMd,
-                        if (_activeOrder == null &&
-                            _quickOrderStation != null) ...[
-                          _buildQuickReorderCard(context),
-                          AppUi.vGapMd,
-                        ] else if (_activeOrder == null) ...[
-                          FriendlyHeroCard(
-                            role: ExperienceRole.customer,
-                            scene: ExperienceScene.discover,
-                            eyebrow: 'Easy refill',
-                            title: 'Order your usual water faster',
-                            message:
-                                'Pick a saved or nearby station, choose quantity, and confirm with fewer decisions.',
-                            actionLabel: 'Find stations',
-                            actionIcon: Icons.search_rounded,
-                            onAction: () => _openStations(context),
-                          ),
-                          AppUi.vGapMd,
-                        ],
+                        _buildQuickOrderButton(context),
+                        AppUi.vGapMd,
                         Row(
                           children: [
                             const Text(

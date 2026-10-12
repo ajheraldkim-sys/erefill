@@ -85,7 +85,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(AppUi.radiusControl),
           ),
           elevation: 0,
-          minimumSize: const Size(double.infinity, 52),
+          minimumSize: const Size(64, 48),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
