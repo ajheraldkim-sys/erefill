@@ -12,6 +12,7 @@ import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/utils/order_product_helpers.dart';
 import '../../../core/services/offline_order_sync_service.dart';
+import '../../../core/services/local_data_cache.dart';
 import 'package:flutter/services.dart';
 import 'review_modal.dart';
 
@@ -36,8 +37,21 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
   @override
   void initState() {
     super.initState();
+    _loadCachedOrders();
     _fetchOrders();
     _subscribeToOrderChanges();
+  }
+
+  Future<void> _loadCachedOrders() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    final cached = await LocalDataCache.instance.get<List<dynamic>>('customer_orders_$userId');
+    if (cached != null && cached.isNotEmpty && mounted) {
+      setState(() {
+        _myOrders = cached.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _isLoading = false; // Zero waiting time for returning customers
+      });
+    }
   }
 
   void _syncRiderLocationSubscriptions() {
@@ -149,11 +163,13 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
           .toList();
 
       if (!mounted) return;
+      final fullOrders = [...pendingOffline, ...onlineOrders];
       setState(() {
-        _myOrders = [...pendingOffline, ...onlineOrders];
+        _myOrders = fullOrders;
         _isLoading = false;
       });
       _syncRiderLocationSubscriptions();
+      LocalDataCache.instance.set('customer_orders_$userId', fullOrders);
     } catch (e) {
       debugPrint('Online orders fetch error, loading from local SQLite: $e');
       final offlineOrders =

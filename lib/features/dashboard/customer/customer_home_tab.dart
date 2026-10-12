@@ -19,6 +19,7 @@ import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/notification_preview_sheet.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/services/station_data_cache.dart';
+import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/widgets/app_cached_image.dart';
 
@@ -62,11 +63,32 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadCachedHome();
     _startHomeBannerTimer();
     _fetchData();
     _subscribeToOrders();
     _subscribeToFavorites();
     _subscribeToStations();
+  }
+
+  Future<void> _loadCachedHome() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    final cached = await LocalDataCache.instance.get<Map<String, dynamic>>('customer_home_${user.id}');
+    if (cached != null && mounted) {
+      setState(() {
+        _userFirstName = cached['userFirstName']?.toString() ?? _userFirstName;
+        _userMunicipality = cached['userMunicipality']?.toString() ?? _userMunicipality;
+        _stations = List<Map<String, dynamic>>.from(cached['stations'] as List? ?? const []);
+        _favoriteStations = List<Map<String, dynamic>>.from(cached['favoriteStations'] as List? ?? const []);
+        _stationCount = _stations.length;
+        _quickOrderStation = cached['quickOrderStation'] as Map<String, dynamic>?;
+        _quickStationIsLastOrder = cached['quickStationIsLastOrder'] == true;
+        _lastCompletedOrder = cached['lastCompletedOrder'] as Map<String, dynamic>?;
+        _activeOrder = cached['activeOrder'] as Map<String, dynamic>?;
+        _isLoading = false; // Instantly hide skeleton loaders!
+      });
+    }
   }
 
   @override
@@ -324,6 +346,18 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
             ? Map<String, dynamic>.from(orders.first)
             : null;
         _isLoading = false;
+      });
+
+      // Background cache snapshot for instant rendering on next open/revisit
+      LocalDataCache.instance.set('customer_home_${user.id}', {
+        'userFirstName': firstName,
+        'userMunicipality': town ?? '',
+        'stations': stations,
+        'favoriteStations': favorites,
+        'quickOrderStation': quickStation,
+        'quickStationIsLastOrder': quickIsLastOrder,
+        'lastCompletedOrder': lastCompleted,
+        'activeOrder': _activeOrder,
       });
     } catch (e) {
       debugPrint('Home fetch error: $e');

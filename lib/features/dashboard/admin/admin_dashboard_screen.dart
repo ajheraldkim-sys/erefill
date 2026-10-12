@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -48,7 +49,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _loadDiskCache();
     _loadAllData();
+  }
+
+  Future<void> _loadDiskCache() async {
+    final cached = await LocalDataCache.instance.get<Map<String, dynamic>>('admin_dashboard_cache');
+    if (cached != null && mounted) {
+      setState(() {
+        _users = List<Map<String, dynamic>>.from(cached['users'] as List? ?? const []);
+        _stations = List<Map<String, dynamic>>.from(cached['stations'] as List? ?? const []);
+        _orders = List<Map<String, dynamic>>.from(cached['orders'] as List? ?? const []);
+        _stats = Map<String, dynamic>.from(cached['stats'] as Map? ?? const {});
+        _loading = false; // Zero waiting time for admins!
+      });
+    }
   }
 
   @override
@@ -59,10 +74,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   Future<void> _loadAllData() async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (_users.isEmpty && _stations.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       // 1. Fetch Profiles
@@ -172,6 +189,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           'today_gmv': todayGmv,
         };
         _loading = false;
+      });
+
+      LocalDataCache.instance.set('admin_dashboard_cache', {
+        'users': profilesList,
+        'stations': stationsList,
+        'orders': ordersList,
+        'stats': _stats,
       });
     } catch (e) {
       if (!mounted) return;

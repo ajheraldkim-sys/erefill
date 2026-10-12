@@ -8,6 +8,7 @@ import 'package:erefill/widgets/app_widgets.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 
 class RiderManagementScreen extends StatefulWidget {
   const RiderManagementScreen({super.key});
@@ -273,8 +274,21 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
   @override
   void initState() {
     super.initState();
+    _loadDiskCache();
     _fetchRidersDirect();
     _setupRidersListener();
+  }
+
+  Future<void> _loadDiskCache() async {
+    final ownerId = SafeSupabase.currentUserId;
+    if (ownerId == null) return;
+    final cached = await LocalDataCache.instance.get<List<dynamic>>('owner_riders_$ownerId');
+    if (cached != null && cached.isNotEmpty && mounted) {
+      setState(() {
+        _riders = cached;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -301,6 +315,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
           _riders = res;
           _isLoading = false;
         });
+        LocalDataCache.instance.set('owner_riders_$ownerId', res);
       }
     } catch (e) {
       debugPrint('Error fetching riders directly: $e');

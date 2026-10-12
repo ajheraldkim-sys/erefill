@@ -11,6 +11,7 @@ import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'add_order_dialog.dart';
 import '../customer/checkout_rules.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -60,7 +61,22 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     });
 
     _loadRiders();
+    _loadDiskCache();
     _initOrdersStream();
+  }
+
+  Future<void> _loadDiskCache() async {
+    final ownerId = supabase.auth.currentUser?.id;
+    if (ownerId == null) return;
+    final cached = await LocalDataCache.instance.get<List<dynamic>>('owner_orders_$ownerId');
+    if (cached != null && cached.isNotEmpty && mounted) {
+      final list = cached.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      _cachedOrders = list;
+      if (_ordersStreamController != null && !_ordersStreamController!.isClosed) {
+        _ordersStreamController!.add(list);
+      }
+      setState(() {});
+    }
   }
 
   void _initOrdersStream() {
@@ -86,6 +102,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       }
       setState(() {});
     }
+    LocalDataCache.instance.set('owner_orders_$ownerId', data);
   }
 
   @override
