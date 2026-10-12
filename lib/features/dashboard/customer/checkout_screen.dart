@@ -482,6 +482,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           );
           if (!mounted) return;
           final launched = await PaymentLaunchService.launchCheckoutUrl(checkoutUrl);
+          if (!mounted) return;
           if (!launched) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

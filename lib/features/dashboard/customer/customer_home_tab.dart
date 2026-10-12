@@ -16,6 +16,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/notification_preview_sheet.dart';
 import '../../../core/routing/app_navigation.dart';
+import '../../../core/services/station_data_cache.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/widgets/app_cached_image.dart';
 
@@ -238,6 +239,12 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final favorites = StationQueryHelpers.withAvailabilityAll(
         List<Map<String, dynamic>>.from(ownerRows).where((s) => favIds.contains(s['id']?.toString())),
       ).map((s) => StationPriceHelpers.withResolvedPrice(Map<String, dynamic>.from(s), ownerPrices: ownerPrices)).toList();
+
+      final prefetchIds = {
+        ...stations.map((s) => s['id']?.toString()),
+        ...favorites.map((s) => s['id']?.toString()),
+      }.whereType<String>().toList();
+      StationDataCache.instance.prefetch(prefetchIds);
 
       final orders = batchResults[3] as List? ?? const [];
       final lastCompletedOrders = batchResults[5] as List? ?? const [];

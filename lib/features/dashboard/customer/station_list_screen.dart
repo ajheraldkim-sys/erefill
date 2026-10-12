@@ -14,6 +14,7 @@ import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
 import '../../../core/routing/app_navigation.dart';
+import '../../../core/services/station_data_cache.dart';
 import '../../../core/widgets/map_tiles.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/user_provider.dart';
@@ -1050,6 +1051,11 @@ class _StationListScreenState extends State<StationListScreen> {
         final ownerRows = snapshot.data ?? [];
         final scoped = _scopeByTown(ownerRows);
         final stations = _filterStations(scoped);
+        if (stations.isNotEmpty) {
+          StationDataCache.instance.prefetch(
+            stations.map((s) => s['id']?.toString() ?? '').toList(),
+          );
+        }
         final mappableStations = _mappableFrom(stations);
 
         final town = _userTown?.trim();

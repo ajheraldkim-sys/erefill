@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,12 +10,14 @@ import '../../../core/constants.dart';
 import '../../../core/db_tables.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/services/external_navigation_service.dart';
+import '../../../core/services/station_data_cache.dart';
 import '../../../core/utils/friendly_errors.dart';
 import '../../../core/utils/order_product_helpers.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/water_types.dart';
 import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/widgets/auth_dialogs.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../models/cart_model.dart';
 import '../../chat/models/chat_room.dart';
 import '../../chat/services/chat_service.dart';
@@ -39,6 +43,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   bool _isFav = false;
   bool _isPlacingOrder = false;
 
+  StreamSubscription<String>? _cacheSub;
+
   // Real-time refill options configured by this station.
   List<dynamic> _products = [];
   List<int> _ratingCounts = List.filled(5, 0);
@@ -53,13 +59,40 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   void initState() {
     super.initState();
     _stationData = Map<String, dynamic>.from(widget.station);
+    final ownerId = _stationData['id']?.toString();
+    final cached = StationDataCache.instance.get(ownerId);
+
+    if (cached != null) {
+      // Instant rendering from real-time in-memory cache (0ms)
+      _isLoadingPurified = false;
+      _products = cached.products;
+      _ratingCounts = cached.ratingCounts;
+      _pricePerGallon = cached.pricePerGallon;
+      _baseDeliveryFee = cached.baseDeliveryFee;
+      _waterType = cached.waterType;
+      if (cached.profileData != null) {
+        _stationData = {..._stationData, ...cached.profileData!};
+      }
+      _stationData['price_per_gallon'] = _pricePerGallon;
+      if (ownerId != null) _resolveSelectedProduct(ownerId);
+    } else {
+      // Seed immediately with initial station data so UI renders without delay
+      _pricePerGallon = (_stationData['price_per_gallon'] as num?)?.toDouble() ??
+          StationPriceHelpers.priceForStation(_stationData);
+      _waterType = _stationData['primary_water_type']?.toString();
+      _baseDeliveryFee =
+          (_stationData['base_delivery_fee'] as num?)?.toDouble() ?? 25.0;
+      if (ownerId != null) _resolveSelectedProduct(ownerId);
+    }
+
     _checkIsFav();
-    _loadWaterOptions();
+    _loadWaterOptions(forceRefresh: cached == null);
     _subscribeToStationUpdates();
   }
 
   @override
   void dispose() {
+    _cacheSub?.cancel();
     final channel = _stationChannel;
     if (channel != null) {
       _supabase.removeChannel(channel);
@@ -91,6 +124,16 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     final ownerId = _stationData['id']?.toString();
     if (ownerId == null) return;
 
+    // Listen to real-time cache updates for instantaneous UI refresh
+    _cacheSub = StationDataCache.instance.onStationUpdated.listen((updatedId) {
+      if (updatedId == ownerId && mounted) {
+        final fresh = StationDataCache.instance.get(ownerId);
+        if (fresh != null) {
+          _applyBundle(fresh);
+        }
+      }
+    });
+
     _stationChannel = _supabase
         .channel('station_details_updates:$ownerId')
         .onPostgresChanges(
@@ -102,7 +145,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             column: 'owner_id',
             value: ownerId,
           ),
-          callback: (_) => _loadWaterOptions(),
+          callback: (payload) {
+            StationDataCache.instance.applyRealtimeEvent(
+              table: DbTables.waterOptions,
+              ownerId: ownerId,
+              record: payload.newRecord.isNotEmpty ? payload.newRecord : payload.oldRecord,
+              eventType: payload.eventType.name.toUpperCase(),
+            );
+            _loadWaterOptions(forceRefresh: true);
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -113,7 +164,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             column: 'owner_id',
             value: ownerId,
           ),
-          callback: (_) => _loadWaterOptions(),
+          callback: (payload) {
+            StationDataCache.instance.applyRealtimeEvent(
+              table: 'owner_settings',
+              ownerId: ownerId,
+              record: payload.newRecord.isNotEmpty ? payload.newRecord : payload.oldRecord,
+              eventType: payload.eventType.name.toUpperCase(),
+            );
+            _loadWaterOptions(forceRefresh: true);
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -124,7 +183,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             column: 'id',
             value: ownerId,
           ),
-          callback: (_) => _loadWaterOptions(),
+          callback: (payload) {
+            StationDataCache.instance.applyRealtimeEvent(
+              table: 'profiles',
+              ownerId: ownerId,
+              record: payload.newRecord.isNotEmpty ? payload.newRecord : payload.oldRecord,
+              eventType: payload.eventType.name.toUpperCase(),
+            );
+            _loadWaterOptions(forceRefresh: true);
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
@@ -135,7 +202,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             column: 'station_id',
             value: ownerId,
           ),
-          callback: (_) => _loadWaterOptions(),
+          callback: (_) => _loadWaterOptions(forceRefresh: true),
         )
         .subscribe();
   }
@@ -185,7 +252,58 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     }
   }
 
-  Future<void> _loadWaterOptions() async {
+  void _resolveSelectedProduct(String ownerId) {
+    final settingsPrice = _pricePerGallon ?? 0;
+    final previouslySelectedId = _selectedProduct?['id']?.toString();
+    Map<String, dynamic>? previouslySelectedProduct;
+    for (final product in _products) {
+      if (product['id']?.toString() == previouslySelectedId) {
+        previouslySelectedProduct =
+            OrderProductHelpers.withDisplayDefaults(
+              Map<String, dynamic>.from(product),
+            );
+        break;
+      }
+    }
+    final defaultProduct = OrderProductHelpers.defaultFromList(
+      _products,
+      stationWaterType: _waterType,
+    );
+    if (previouslySelectedProduct != null) {
+      _selectedProduct = previouslySelectedProduct;
+    } else if (defaultProduct != null) {
+      _selectedProduct = OrderProductHelpers.withDisplayDefaults(
+        defaultProduct,
+      );
+    } else if (settingsPrice > 0) {
+      _selectedProduct = OrderProductHelpers.displayFallback(
+        ownerId: ownerId,
+        price: settingsPrice,
+        waterType: _waterType,
+      );
+    } else {
+      _selectedProduct = null;
+    }
+  }
+
+  void _applyBundle(CachedStationBundle bundle) {
+    final ownerId = bundle.ownerId;
+    setState(() {
+      _isLoadingPurified = false;
+      _pricePerGallon = bundle.pricePerGallon;
+      _baseDeliveryFee = bundle.baseDeliveryFee;
+      _waterType = bundle.waterType;
+      _ratingCounts = bundle.ratingCounts;
+      _products = bundle.products;
+      if (bundle.profileData != null) {
+        _stationData = {..._stationData, ...bundle.profileData!};
+      }
+      _stationData['price_per_gallon'] = _pricePerGallon;
+      _resolveSelectedProduct(ownerId);
+    });
+  }
+
+  Future<void> _loadWaterOptions({bool forceRefresh = false}) async {
     final generation = ++_waterOptionsLoadGeneration;
     final ownerId = _stationData['id']?.toString();
     if (ownerId == null) {
@@ -194,91 +312,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     }
 
     try {
-      final productData = await _supabase
-          .from(DbTables.waterOptions)
-          .select(OrderProductHelpers.coreSelectFields)
-          .eq('owner_id', ownerId)
-          .eq('is_available', true)
-          .order('price', ascending: true);
-
-      final settingsData = await _supabase
-          .from('owner_settings')
-          .select('base_delivery_fee, price_per_gallon')
-          .eq('owner_id', ownerId)
-          .maybeSingle();
-
-      final profileData = await _supabase
-          .from('profiles')
-          .select(
-            'primary_water_type, average_rating, review_count, station_name, '
-            'complete_address, barangay, town, latitude, longitude, '
-            'station_photo_url, is_open, station_availability, phone',
-          )
-          .eq('id', ownerId)
-          .maybeSingle();
-
-      List<int> ratingCounts = List.filled(5, 0);
-      try {
-        final reviews = await _supabase
-            .from('reviews')
-            .select('rating')
-            .eq('station_id', ownerId);
-        for (final review in reviews) {
-          final rating = (review['rating'] as num?)?.toInt();
-          if (rating != null && rating >= 1 && rating <= 5) {
-            ratingCounts[rating - 1]++;
-          }
-        }
-      } catch (e) {
-        debugPrint('Error loading station rating breakdown: $e');
-      }
+      // Parallelized & cached bundle fetch
+      final bundle = await StationDataCache.instance.getOrFetch(
+        ownerId,
+        forceRefresh: forceRefresh,
+      );
 
       if (mounted && generation == _waterOptionsLoadGeneration) {
-        setState(() {
-          _isLoadingPurified = false;
-          _pricePerGallon =
-              (settingsData?['price_per_gallon'] as num?)?.toDouble();
-          _baseDeliveryFee =
-              (settingsData?['base_delivery_fee'] as num?)?.toDouble() ?? 25.0;
-          _waterType = profileData?['primary_water_type']?.toString();
-          _ratingCounts = ratingCounts;
-          _products = productData;
-          if (profileData != null) {
-            _stationData = {..._stationData, ...profileData};
-          }
-          _stationData['price_per_gallon'] = _pricePerGallon;
-          final settingsPrice = _pricePerGallon ?? 0;
-          final previouslySelectedId = _selectedProduct?['id']?.toString();
-          Map<String, dynamic>? previouslySelectedProduct;
-          for (final product in _products) {
-            if (product['id']?.toString() == previouslySelectedId) {
-              previouslySelectedProduct =
-                  OrderProductHelpers.withDisplayDefaults(
-                    Map<String, dynamic>.from(product),
-                  );
-              break;
-            }
-          }
-          final defaultProduct = OrderProductHelpers.defaultFromList(
-            _products,
-            stationWaterType: _waterType,
-          );
-          if (previouslySelectedProduct != null) {
-            _selectedProduct = previouslySelectedProduct;
-          } else if (defaultProduct != null) {
-            _selectedProduct = OrderProductHelpers.withDisplayDefaults(
-              defaultProduct,
-            );
-          } else if (settingsPrice > 0) {
-            _selectedProduct = OrderProductHelpers.displayFallback(
-              ownerId: ownerId,
-              price: settingsPrice,
-              waterType: _waterType,
-            );
-          } else {
-            _selectedProduct = null;
-          }
-        });
+        _applyBundle(bundle);
       }
     } catch (e) {
       if (generation == _waterOptionsLoadGeneration) {
@@ -1320,11 +1361,17 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   const SizedBox(height: 12),
 
                   // Product Cards List
-                  if (_isLoadingPurified)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: CircularProgressIndicator(),
+                  if (_isLoadingPurified && _products.isEmpty)
+                    Column(
+                      children: List.generate(
+                        2,
+                        (index) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Skeleton(
+                            height: 84,
+                            borderRadius: 18,
+                          ),
+                        ),
                       ),
                     )
                   else if (_products.isNotEmpty)
