@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
+import '../../core/providers/user_provider.dart';
 import '../../core/widgets/brand/hero_header.dart';
 import '../../core/widgets/brand/axo_states.dart';
 import 'models/chat_room.dart';
@@ -45,6 +47,15 @@ class _InboxScreenState extends State<InboxScreen> {
   final Set<String> _selectedRoomIds = {};
   List<ChatRoom> _allRooms =
       []; // Store currently visible rooms for selection logic and bulk actions
+
+  String _getRoomTitle(ChatRoom room) {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    String? myRole;
+    try {
+      myRole = context.read<UserProvider>().user?.role;
+    } catch (_) {}
+    return room.getDisplayTitle(currentUserId: myId, currentUserRole: myRole);
+  }
 
   @override
   void dispose() {
@@ -287,7 +298,7 @@ class _InboxScreenState extends State<InboxScreen> {
         final filteredRooms = _searchQuery.isEmpty
             ? tabRooms
             : tabRooms.where((room) {
-                final title = room.displayTitle.toLowerCase();
+                final title = _getRoomTitle(room).toLowerCase();
                 final lastMsg = room.lastMessage?.content.toLowerCase() ?? '';
                 return title.contains(_searchQuery) ||
                     lastMsg.contains(_searchQuery);
@@ -343,7 +354,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            room.displayTitle,
+                            _getRoomTitle(room),
                             style: TextStyle(
                               fontWeight: hasUnread
                                   ? FontWeight.w900
@@ -415,7 +426,7 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Widget _buildAvatar(ChatRoom room) {
-    final title = room.displayTitle.trim();
+    final title = _getRoomTitle(room).trim();
     final isPerson = !ChatRoom.isGenericTitle(title) && title.isNotEmpty;
 
     // Check if any participant has an avatar_url
@@ -544,7 +555,7 @@ class _InboxScreenState extends State<InboxScreen> {
     _chatService.markAsRead(room.id);
     context.openChat(
       roomId: room.id,
-      roomTitle: room.displayTitle,
+      roomTitle: _getRoomTitle(room),
       roomType: room.roomType,
     );
   }

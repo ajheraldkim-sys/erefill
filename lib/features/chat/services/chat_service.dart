@@ -11,6 +11,26 @@ import 'chat_cache_service.dart';
 class ChatService {
   final SupabaseClient _supabase = Supabase.instance.client;
   final ChatCacheService _cache = ChatCacheService();
+  final Map<String, Map<String, dynamic>> _profileCache = {};
+
+  Future<void> _batchLoadProfiles(Set<String> userIds) async {
+    final missing = userIds.where((id) => !_profileCache.containsKey(id)).toList();
+    if (missing.isEmpty) return;
+    try {
+      final res = await _supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url, role, station_name')
+          .inFilter('id', missing);
+      for (final p in res) {
+        final id = p['id']?.toString();
+        if (id != null) {
+          _profileCache[id] = Map<String, dynamic>.from(p);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error batch-loading profiles for messages: $e');
+    }
+  }
 
   // ==================== ROOM MANAGEMENT ====================
 
@@ -170,117 +190,203 @@ class ChatService {
     }
   }
 
-  /// Get or create order delivery chat room
+  /// Helper to convert raw room JSON to ChatRoom model
+  ChatRoom _parseRoomJson(Map<String, dynamic> roomData) {
+    final participantsJson = roomData['participants'] as List<dynamic>? ?? [];
+    final participants = <ChatParticipant>[];
+    for (final p in participantsJson) {
+      try {
+        if (p is Map) {
+          participants.add(ChatParticipant.fromJson(Map<String, dynamic>.from(p)));
+        }
+      } catch (e) {
+        debugPrint('Error parsing participant: $e');
+      }
+    }
+    final roomJson = {
+      'id': roomData['id']?.toString(),
+      'room_type': roomData['room_type']?.toString() ?? 'order_delivery',
+      'reference_id': roomData['reference_id']?.toString(),
+      'owner_id': roomData['owner_id']?.toString(),
+      'title': roomData['title']?.toString(),
+      'status': roomData['status']?.toString() ?? 'active',
+      'created_at': roomData['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+      'updated_at': roomData['updated_at']?.toString() ?? DateTime.now().toIso8601String(),
+      'metadata': (roomData['metadata'] as Map<String, dynamic>?) ?? {},
+      'participants': participants.map((p) => p.toJson()).toList(),
+    };
+    return ChatRoom.fromJson(roomJson);
+  }
+
+  /// Get or create Customer ↔ Rider chat room (strictly isolated from owner)
+  Future<ChatRoom> getOrCreateCustomerRiderRoom({
+    required String orderId,
+    required String customerId,
+    required String riderId,
+    String? customerName,
+    String? riderName,
+  }) async {
+    try {
+      final response = await _supabase.rpc(
+        'get_or_create_customer_rider_chat_room',
+        params: {
+          'p_order_id': orderId,
+          'p_customer_id': customerId,
+          'p_rider_id': riderId,
+          'p_customer_name': customerName,
+          'p_rider_name': riderName,
+        },
+      );
+      if (response != null && response is Map) {
+        final room = _parseRoomJson(Map<String, dynamic>.from(response));
+        final enriched = await _enrichRooms([room]);
+        return enriched.first;
+      }
+    } catch (e) {
+      debugPrint('get_or_create_customer_rider_chat_room RPC error, fallback: $e');
+    }
+
+    return await _getOrCreateDirectRoom(
+      referenceId: orderId,
+      roomType: ChatRoomType.orderDelivery,
+      channel: 'customer_rider',
+      ownerId: customerId,
+      title: riderName != null ? '$riderName (Rider)' : 'Rider Delivery',
+      participants: [
+        {'user_id': customerId, 'role_in_room': 'customer'},
+        {'user_id': riderId, 'role_in_room': 'rider'},
+      ],
+      metadata: {
+        'channel': 'customer_rider',
+        'order_id': orderId,
+        'customer_name': customerName,
+        'rider_name': riderName,
+      },
+    );
+  }
+
+  /// Get or create Customer ↔ Owner chat room (strictly isolated from rider)
+  Future<ChatRoom> getOrCreateCustomerOwnerRoom({
+    required String orderId,
+    required String customerId,
+    required String ownerId,
+    String? stationName,
+    String? customerName,
+  }) async {
+    try {
+      final response = await _supabase.rpc(
+        'get_or_create_customer_owner_chat_room',
+        params: {
+          'p_order_id': orderId,
+          'p_customer_id': customerId,
+          'p_owner_id': ownerId,
+          'p_station_name': stationName,
+          'p_customer_name': customerName,
+        },
+      );
+      if (response != null && response is Map) {
+        final room = _parseRoomJson(Map<String, dynamic>.from(response));
+        final enriched = await _enrichRooms([room]);
+        return enriched.first;
+      }
+    } catch (e) {
+      debugPrint('get_or_create_customer_owner_chat_room RPC error, fallback: $e');
+    }
+
+    return await _getOrCreateDirectRoom(
+      referenceId: orderId,
+      roomType: ChatRoomType.customerSupport,
+      channel: 'customer_owner',
+      ownerId: ownerId,
+      title: stationName ?? 'Station Support',
+      participants: [
+        {'user_id': customerId, 'role_in_room': 'customer'},
+        {'user_id': ownerId, 'role_in_room': 'owner'},
+      ],
+      metadata: {
+        'channel': 'customer_owner',
+        'order_id': orderId,
+        'station_name': stationName,
+        'customer_name': customerName,
+      },
+    );
+  }
+
+  /// Get or create Owner ↔ Rider chat room (strictly isolated dispatch channel)
+  Future<ChatRoom> getOrCreateOwnerRiderRoom({
+    required String orderId,
+    required String ownerId,
+    required String riderId,
+    String? stationName,
+    String? riderName,
+  }) async {
+    try {
+      final response = await _supabase.rpc(
+        'get_or_create_owner_rider_chat_room',
+        params: {
+          'p_order_id': orderId,
+          'p_owner_id': ownerId,
+          'p_rider_id': riderId,
+          'p_station_name': stationName,
+          'p_rider_name': riderName,
+        },
+      );
+      if (response != null && response is Map) {
+        final room = _parseRoomJson(Map<String, dynamic>.from(response));
+        final enriched = await _enrichRooms([room]);
+        return enriched.first;
+      }
+    } catch (e) {
+      debugPrint('get_or_create_owner_rider_chat_room RPC error, fallback: $e');
+    }
+
+    return await _getOrCreateDirectRoom(
+      referenceId: orderId,
+      roomType: ChatRoomType.riderDispatch,
+      channel: 'owner_rider',
+      ownerId: ownerId,
+      title: riderName != null ? '$riderName (Rider)' : 'Rider Dispatch',
+      participants: [
+        {'user_id': ownerId, 'role_in_room': 'owner'},
+        {'user_id': riderId, 'role_in_room': 'rider'},
+      ],
+      metadata: {
+        'channel': 'owner_rider',
+        'order_id': orderId,
+        'station_name': stationName,
+        'rider_name': riderName,
+      },
+    );
+  }
+
+  /// Backward-compatible router that directs order chat requests to the appropriate isolated channel
   Future<ChatRoom> getOrCreateOrderChatRoom({
     required String orderId,
     required String customerId,
     required String ownerId,
     String? riderId,
   }) async {
-    // 0. Pre-check: see if chat room for this order already exists
-    try {
-      final existing = await _supabase
-          .from('chat_rooms')
-          .select()
-          .eq('reference_id', orderId)
-          .maybeSingle();
+    final currentUserId = _supabase.auth.currentUser?.id;
 
-      if (existing != null) {
-        final roomId = existing['id'].toString();
-        final currentUserId = _supabase.auth.currentUser?.id;
-        if (currentUserId != null) {
-          try {
-            final myP = await _supabase
-                .from('chat_participants')
-                .select('id')
-                .eq('room_id', roomId)
-                .eq('user_id', currentUserId)
-                .maybeSingle();
-            if (myP == null) {
-              await _supabase.from('chat_participants').insert({
-                'room_id': roomId,
-                'user_id': currentUserId,
-                'role_in_room': currentUserId == ownerId
-                    ? 'owner'
-                    : (currentUserId == riderId ? 'rider' : 'customer'),
-              });
-            }
-          } catch (_) {}
-        }
-        final participants = await _getParticipants(roomId);
-        final room = ChatRoom.fromJson({
-          ...Map<String, dynamic>.from(existing),
-          'participants': participants.map((p) => p.toJson()).toList(),
-        });
-        final enriched = await _enrichRooms([room]);
-        return enriched.first;
+    if (riderId != null && riderId.isNotEmpty) {
+      if (currentUserId == ownerId) {
+        return getOrCreateOwnerRiderRoom(
+          orderId: orderId,
+          ownerId: ownerId,
+          riderId: riderId,
+        );
       }
-    } catch (e) {
-      debugPrint('Preliminary check for existing order chat room: $e');
-    }
-
-    // 1. Try RPC function to create/get chat room
-    try {
-      final rpcParams = <String, dynamic>{
-        'p_order_id': orderId,
-        'p_customer_id': customerId,
-        'p_owner_id': ownerId,
-      };
-      if (riderId != null && riderId.isNotEmpty) {
-        rpcParams['p_rider_id'] = riderId;
-      }
-
-      final response = await _supabase.rpc(
-        'create_order_chat_room',
-        params: rpcParams,
+      return getOrCreateCustomerRiderRoom(
+        orderId: orderId,
+        customerId: customerId,
+        riderId: riderId,
       );
-
-      if (response != null && response is Map) {
-        final roomData = Map<String, dynamic>.from(response);
-        final participantsJson =
-            roomData['participants'] as List<dynamic>? ?? [];
-        final participants = <ChatParticipant>[];
-
-        for (final p in participantsJson) {
-          try {
-            if (p is Map) {
-              participants.add(
-                  ChatParticipant.fromJson(Map<String, dynamic>.from(p)));
-            }
-          } catch (e) {
-            debugPrint('Error parsing participant: $e');
-          }
-        }
-
-        final roomJson = {
-          'id': roomData['id']?.toString(),
-          'room_type': roomData['room_type']?.toString() ?? 'order_delivery',
-          'reference_id': roomData['reference_id']?.toString(),
-          'owner_id': roomData['owner_id']?.toString(),
-          'title': roomData['title']?.toString(),
-          'status': roomData['status']?.toString() ?? 'active',
-          'created_at': roomData['created_at']?.toString() ??
-              DateTime.now().toIso8601String(),
-          'updated_at': roomData['updated_at']?.toString() ??
-              DateTime.now().toIso8601String(),
-          'participants': participants.map((p) => p.toJson()).toList(),
-        };
-
-        final room = ChatRoom.fromJson(roomJson);
-        final enriched = await _enrichRooms([room]);
-        return enriched.first;
-      }
-    } catch (e) {
-      debugPrint(
-          'create_order_chat_room RPC error, falling back to direct table: $e');
     }
 
-    // Direct table fallback
-    return await _getOrCreateOrderRoomDirect(
+    return getOrCreateCustomerOwnerRoom(
       orderId: orderId,
       customerId: customerId,
       ownerId: ownerId,
-      riderId: riderId,
     );
   }
 
@@ -374,8 +480,24 @@ class ChatService {
   Future<List<Message>> _messagesFromRows(
     List<Map<String, dynamic>> rows,
   ) async {
+    final senderIds = rows
+        .map((r) => r['sender_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (senderIds.isNotEmpty) {
+      await _batchLoadProfiles(senderIds);
+    }
+
     final signedRows = await Future.wait(rows.map(_withSignedImageUrl));
-    return signedRows.map((row) => Message.fromJson(row)).toList();
+    return signedRows.map((row) {
+      final sId = row['sender_id']?.toString();
+      final enriched = Map<String, dynamic>.from(row);
+      if (sId != null && _profileCache.containsKey(sId)) {
+        enriched['sender_profile'] = _profileCache[sId];
+      }
+      return Message.fromJson(enriched);
+    }).toList();
   }
 
   Future<Map<String, dynamic>> _withSignedImageUrl(
@@ -774,7 +896,7 @@ class ChatService {
         final pData = await _supabase
             .from('chat_participants')
             .select(
-                'id, room_id, user_id, role_in_room, joined_at, profiles(full_name, username, avatar_url)')
+                'id, room_id, user_id, role_in_room, joined_at, profiles(full_name, username, avatar_url, station_name, role)')
             .inFilter('room_id', roomIds);
 
         for (final row in (pData as List)) {
@@ -790,9 +912,12 @@ class ChatService {
       }
     }
 
-    // 2. Collect order delivery rooms to enrich customer & station name
-    final orderRooms =
-        rooms.where((r) => r.isOrderDelivery && r.referenceId != null).toList();
+    // 2. Collect order-linked rooms to enrich customer & station name
+    final orderRooms = rooms
+        .where((r) =>
+            (r.isOrderDelivery || r.isCustomerSupport || r.isRiderDispatch) &&
+            r.referenceId != null)
+        .toList();
     final orderMap = <String, Map<String, dynamic>>{};
     if (orderRooms.isNotEmpty) {
       final orderIds =
@@ -822,13 +947,13 @@ class ChatService {
       if (room.referenceId != null &&
           orderMap.containsKey(room.referenceId)) {
         final order = orderMap[room.referenceId]!;
-        if (order['customer_name'] != null) {
+        if (order['customer_name'] != null && metadata['customer_name'] == null) {
           metadata['customer_name'] = order['customer_name'];
         }
-        if (order['station_name'] != null) {
+        if (order['station_name'] != null && metadata['station_name'] == null) {
           metadata['station_name'] = order['station_name'];
         }
-        if (order['assigned_rider_id'] != null) {
+        if (order['assigned_rider_id'] != null && metadata['assigned_rider_id'] == null) {
           metadata['assigned_rider_id'] = order['assigned_rider_id'];
         }
       }
@@ -840,16 +965,15 @@ class ChatService {
     }).toList();
   }
 
-  Future<ChatRoom> _getOrCreateOrderRoomDirect({
-    required String orderId,
-    required String customerId,
+  Future<ChatRoom> _getOrCreateDirectRoom({
+    required String referenceId,
+    required ChatRoomType roomType,
+    required String channel,
     required String ownerId,
-    String? riderId,
+    required String title,
+    required List<Map<String, String>> participants,
+    required Map<String, dynamic> metadata,
   }) async {
-    final currentUserId = _supabase.auth.currentUser?.id;
-    final isOwner = currentUserId != null && currentUserId == ownerId;
-
-    // 1. Check if room exists for this order
     Map<String, dynamic>? roomRow;
     String? roomId;
 
@@ -857,7 +981,8 @@ class ChatService {
       final existing = await _supabase
           .from('chat_rooms')
           .select()
-          .eq('reference_id', orderId)
+          .eq('reference_id', referenceId)
+          .eq('room_type', roomType.value)
           .maybeSingle();
 
       if (existing != null) {
@@ -865,58 +990,33 @@ class ChatService {
         roomRow = Map<String, dynamic>.from(existing);
       }
     } catch (e) {
-      debugPrint('Direct check existing order room error: $e');
+      debugPrint('Direct check existing $channel room error: $e');
     }
 
-    // 2. If room does not exist yet, attempt insert
     if (roomRow == null || roomId == null) {
-      final preferredType = isOwner ? 'order_delivery' : 'customer_support';
-      final fallbackType = isOwner ? 'customer_support' : 'order_delivery';
-
-      Map<String, dynamic>? inserted;
-
       try {
-        final res = await _supabase
+        final inserted = await _supabase
             .from('chat_rooms')
             .insert({
-              'reference_id': orderId,
-              'room_type': preferredType,
+              'reference_id': referenceId,
+              'room_type': roomType.value,
               'owner_id': ownerId,
-              'title': 'Refill Order Chat',
+              'title': title,
               'status': 'active',
+              'metadata': metadata,
             })
             .select()
             .single();
-        inserted = Map<String, dynamic>.from(res);
-      } catch (insertErr) {
-        debugPrint('Direct chat room insert with $preferredType failed: $insertErr');
-        try {
-          final res2 = await _supabase
-              .from('chat_rooms')
-              .insert({
-                'reference_id': orderId,
-                'room_type': fallbackType,
-                'owner_id': ownerId,
-                'title': 'Refill Order Chat',
-                'status': 'active',
-              })
-              .select()
-              .single();
-          inserted = Map<String, dynamic>.from(res2);
-        } catch (insertErr2) {
-          debugPrint('Direct chat room insert with $fallbackType failed: $insertErr2');
-        }
-      }
-
-      if (inserted != null) {
         roomId = inserted['id'].toString();
-        roomRow = inserted;
-      } else {
+        roomRow = Map<String, dynamic>.from(inserted);
+      } catch (insertErr) {
+        debugPrint('Direct insert $channel room error: $insertErr');
         try {
           final recheck = await _supabase
               .from('chat_rooms')
               .select()
-              .eq('reference_id', orderId)
+              .eq('reference_id', referenceId)
+              .eq('room_type', roomType.value)
               .maybeSingle();
           if (recheck != null) {
             roomId = recheck['id'].toString();
@@ -927,72 +1027,32 @@ class ChatService {
     }
 
     if (roomId == null || roomRow == null) {
-      throw Exception('Could not initialize chat room for this order.');
+      throw Exception('Could not initialize chat channel for this conversation.');
     }
 
-    // 3. Ensure current user is in participants first (authorized by RLS)
-    if (currentUserId != null) {
+    for (final p in participants) {
       try {
-        final existingP = await _supabase
-            .from('chat_participants')
-            .select('id')
-            .eq('room_id', roomId)
-            .eq('user_id', currentUserId)
-            .maybeSingle();
-        if (existingP == null) {
-          final roleInRoom = isOwner
-              ? 'owner'
-              : (currentUserId == riderId ? 'rider' : 'customer');
-          await _supabase.from('chat_participants').insert({
-            'room_id': roomId,
-            'user_id': currentUserId,
-            'role_in_room': roleInRoom,
-          });
-        }
+        await _supabase.from('chat_participants').insert({
+          'room_id': roomId,
+          'user_id': p['user_id'],
+          'role_in_room': p['role_in_room'],
+        });
       } catch (e) {
-        debugPrint('Error inserting current user as participant: $e');
+        // Safe ignore duplicate participant
       }
     }
 
-    // 4. Try ensuring other participants
-    final otherParticipants = [
-      if (customerId != currentUserId)
-        {'user_id': customerId, 'role_in_room': 'customer'},
-      if (ownerId != currentUserId)
-        {'user_id': ownerId, 'role_in_room': 'owner'},
-      if (riderId != null && riderId.isNotEmpty && riderId != currentUserId)
-        {'user_id': riderId, 'role_in_room': 'rider'},
-    ];
-
-    for (final p in otherParticipants) {
-      try {
-        final existingP = await _supabase
-            .from('chat_participants')
-            .select('id')
-            .eq('room_id', roomId)
-            .eq('user_id', p['user_id']!)
-            .maybeSingle();
-        if (existingP == null) {
-          await _supabase.from('chat_participants').insert({
-            'room_id': roomId,
-            'user_id': p['user_id'],
-            'role_in_room': p['role_in_room'],
-          });
-        }
-      } catch (e) {
-        debugPrint('Safe ignore - adding other participant: $e');
-      }
-    }
-
-    final participants = await _getParticipants(roomId);
+    final pList = await _getParticipants(roomId);
     final room = ChatRoom.fromJson({
       ...roomRow,
-      'participants': participants.map((p) => p.toJson()).toList(),
+      'participants': pList.map((p) => p.toJson()).toList(),
     });
 
     final enriched = await _enrichRooms([room]);
     return enriched.first;
   }
+
+
 
   Future<ChatRoom> _getOrCreateSupportRoomDirect({
     required String customerId,

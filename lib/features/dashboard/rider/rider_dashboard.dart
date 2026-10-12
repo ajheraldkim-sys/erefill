@@ -848,11 +848,11 @@ class _RiderDashboardState extends State<RiderDashboard> {
 
     try {
       final chatService = ChatService();
-      final room = await chatService.getOrCreateOrderChatRoom(
+      final room = await chatService.getOrCreateCustomerRiderRoom(
         orderId: orderId,
         customerId: customerId,
-        ownerId: ownerId,
         riderId: riderId,
+        customerName: customerName,
       );
       if (mounted) Navigator.pop(context);
 

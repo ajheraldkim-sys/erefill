@@ -1645,10 +1645,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     try {
-      final room = await _chatService.getOrCreateOrderChatRoom(
+      final customerName = _currentOrder?['customer_name']?.toString();
+      final room = await _chatService.getOrCreateCustomerOwnerRoom(
         orderId: orderId,
         customerId: customerId,
         ownerId: ownerId,
+        stationName: stationName,
+        customerName: customerName,
       );
 
       if (mounted) Navigator.pop(context);
@@ -1657,7 +1660,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         context.openChat(
           roomId: room.id,
           roomTitle: 'Chat with $stationName',
-          roomType: ChatRoomType.orderDelivery,
+          roomType: ChatRoomType.customerSupport,
         );
       }
     } catch (e) {
@@ -1691,12 +1694,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
 
     try {
-      final chatService = ChatService();
-      final room = await chatService.getOrCreateOrderChatRoom(
+      final customerName = _currentOrder?['customer_name']?.toString();
+      final room = await _chatService.getOrCreateCustomerRiderRoom(
         orderId: orderId,
         customerId: customerId,
-        ownerId: ownerId,
         riderId: riderId,
+        customerName: customerName,
+        riderName: riderName,
       );
 
       if (mounted) Navigator.pop(context);

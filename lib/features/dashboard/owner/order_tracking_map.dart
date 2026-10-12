@@ -295,18 +295,20 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
 
     try {
       final chatService = ChatService();
-      final room = await chatService.getOrCreateOrderChatRoom(
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? '';
+      final room = await chatService.getOrCreateOwnerRiderRoom(
         orderId: widget.orderId,
-        customerId: _order?['customer_id'] ?? '',
-        ownerId: _order?['owner_id'] ?? '',
+        ownerId: _order?['owner_id'] ?? currentUserId,
         riderId: riderId,
+        stationName: _order?['station_name'],
+        riderName: _rider?['full_name'],
       );
 
       if (mounted) {
         context.openChat(
           roomId: room.id,
           roomTitle: 'Chat with ${_rider?['full_name'] ?? 'Rider'}',
-          roomType: ChatRoomType.orderDelivery,
+          roomType: ChatRoomType.riderDispatch,
         );
       }
     } catch (e) {

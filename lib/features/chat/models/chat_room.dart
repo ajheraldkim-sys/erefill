@@ -168,13 +168,15 @@ class ChatRoom {
         lower == 'order delivery chat';
   }
 
-  String getDisplayTitle({String? currentUserId}) {
+  String getDisplayTitle({String? currentUserId, String? currentUserRole}) {
     String? myId = currentUserId;
     if (myId == null) {
       try {
         myId = Supabase.instance.client.auth.currentUser?.id;
       } catch (_) {}
     }
+
+    final role = (currentUserRole ?? '').trim().toLowerCase();
 
     // 1. Try to find the OTHER participant (not myself) with a valid name
     if (participants != null && participants!.isNotEmpty) {
@@ -183,8 +185,6 @@ class ChatRoom {
           : participants!;
 
       if (others.isNotEmpty) {
-        // Priority order for counterparty:
-        // - If order delivery: check Rider, Customer, Owner
         final riders =
             others.where((p) => p.roleInRoom == ParticipantRole.rider).toList();
         final customers = others
@@ -193,16 +193,48 @@ class ChatRoom {
         final owners =
             others.where((p) => p.roleInRoom == ParticipantRole.owner).toList();
 
-        final candidates = [
-          ...riders,
-          ...customers,
-          ...owners,
-          ...others,
-        ];
+        List<ChatParticipant> candidates;
+        if (role == 'customer') {
+          if (isCustomerSupport) {
+            candidates = [...owners, ...others];
+          } else {
+            candidates = [...riders, ...owners, ...others];
+          }
+        } else if (role == 'owner') {
+          if (isRiderDispatch) {
+            candidates = [...riders, ...others];
+          } else {
+            candidates = [...customers, ...others];
+          }
+        } else if (role == 'rider') {
+          if (isRiderDispatch) {
+            candidates = [...owners, ...others];
+          } else {
+            candidates = [...customers, ...others];
+          }
+        } else {
+          candidates = [
+            ...riders,
+            ...customers,
+            ...owners,
+            ...others,
+          ];
+        }
 
         for (final p in candidates) {
           final profile = p.userProfile;
           if (profile != null) {
+            // For customer or rider looking at an owner participant, prioritize station_name
+            if ((role == 'customer' || role == 'rider' || isCustomerSupport || isRiderDispatch) &&
+                p.roleInRoom == ParticipantRole.owner) {
+              final stationName = profile['station_name']?.toString().trim();
+              if (stationName != null &&
+                  stationName.isNotEmpty &&
+                  !isGenericTitle(stationName)) {
+                return stationName;
+              }
+            }
+
             final fullName = profile['full_name']?.toString().trim();
             if (fullName != null &&
                 fullName.isNotEmpty &&
@@ -241,6 +273,32 @@ class ChatRoom {
       final customerName = metadata['customer_name']?.toString().trim();
       final stationName = metadata['station_name']?.toString().trim();
       final riderName = metadata['rider_name']?.toString().trim();
+
+      if (role == 'customer') {
+        if (isCustomerSupport && stationName != null && stationName.isNotEmpty && !isGenericTitle(stationName)) {
+          return stationName;
+        }
+        if (riderName != null && riderName.isNotEmpty && !isGenericTitle(riderName)) {
+          return '$riderName (Rider)';
+        }
+        if (stationName != null && stationName.isNotEmpty && !isGenericTitle(stationName)) {
+          return stationName;
+        }
+      } else if (role == 'owner') {
+        if (customerName != null && customerName.isNotEmpty && !isGenericTitle(customerName)) {
+          return customerName;
+        }
+        if (riderName != null && riderName.isNotEmpty && !isGenericTitle(riderName)) {
+          return '$riderName (Rider)';
+        }
+      } else if (role == 'rider') {
+        if (customerName != null && customerName.isNotEmpty && !isGenericTitle(customerName)) {
+          return customerName;
+        }
+        if (stationName != null && stationName.isNotEmpty && !isGenericTitle(stationName)) {
+          return stationName;
+        }
+      }
 
       if (riderName != null &&
           riderName.isNotEmpty &&
@@ -341,8 +399,8 @@ class ChatParticipant {
     // Safely extract values with null checks - extremely resilient to missing fields
     final id = json['id']?.toString() ?? 'unknown-id';
     final roomId = json['room_id']?.toString() ?? '';
-    final userId = json['user_id']?.toString() ?? 'unknown-user';
-    final roleInRoomStr = json['role_in_room']?.toString() ?? 'customer';
+    final userId = json['user_id']?.toString() ?? json['id']?.toString() ?? 'unknown-user';
+    final roleInRoomStr = json['role_in_room']?.toString() ?? json['role']?.toString() ?? 'customer';
     final joinedAtStr = json['joined_at']?.toString();
 
     Map<String, dynamic>? profile;
@@ -354,12 +412,17 @@ class ChatParticipant {
       if (first is Map) profile = Map<String, dynamic>.from(first);
     } else if (json['userProfile'] is Map) {
       profile = Map<String, dynamic>.from(json['userProfile'] as Map);
-    } else if (json['full_name'] != null || json['username'] != null) {
+    } else if (json['full_name'] != null || json['username'] != null || json['station_name'] != null) {
       profile = {
         'full_name': json['full_name'],
         'username': json['username'],
         'avatar_url': json['avatar_url'],
+        'station_name': json['station_name'],
       };
+    }
+
+    if (profile != null && json['station_name'] != null && profile['station_name'] == null) {
+      profile['station_name'] = json['station_name'];
     }
 
     return ChatParticipant(

@@ -12,6 +12,7 @@ import '../../../core/routing/app_navigation.dart';
 import 'models/chat_room.dart';
 import 'models/quick_reply.dart';
 import 'services/chat_service.dart';
+import 'utils/chat_identity_resolver.dart';
 
 /// Enhanced ChatScreen with room-based architecture
 /// Supports all roles: Customer, Rider, Owner
@@ -327,6 +328,25 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String get _displayTitle {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    String? myRole;
+    try {
+      myRole = context.read<UserProvider>().user?.role;
+    } catch (_) {}
+
+    if (_room != null) {
+      final roomObj = ChatRoom.fromJson(_room!);
+      final resolved = ChatIdentityResolver.resolveRoomDisplayTitle(
+        room: roomObj,
+        currentUserId: myId,
+        currentUserRole: myRole,
+        orderContext: _orderContext,
+      );
+      if (!ChatRoom.isGenericTitle(resolved)) {
+        return resolved;
+      }
+    }
+
     if (widget.roomTitle != null &&
         !ChatRoom.isGenericTitle(widget.roomTitle)) {
       return widget.roomTitle!;
@@ -334,24 +354,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_otherUserName != null && _otherUserName!.isNotEmpty) {
       return _otherUserName!;
     }
-    if (_room != null) {
-      final room = ChatRoom.fromJson(_room!);
-      final title = room.displayTitle;
-      if (!ChatRoom.isGenericTitle(title)) return title;
-    }
     if (widget.receiverName != null &&
         widget.receiverName!.isNotEmpty &&
         !ChatRoom.isGenericTitle(widget.receiverName)) {
       return widget.receiverName!;
     }
-    try {
-      final myRole =
-          context.read<UserProvider>().user?.role.toLowerCase();
-      if (myRole == 'owner' || myRole == 'rider') {
-        final cust = _orderContext?['customer_name']?.toString().trim();
-        if (cust != null && cust.isNotEmpty) return cust;
-      }
-    } catch (_) {}
     if (_orderContext?['station_name'] != null) {
       final st = _orderContext!['station_name'].toString().trim();
       if (st.isNotEmpty) return st;
@@ -365,21 +372,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String get _chatSubtitle {
     if (_selectedMessageIds.isNotEmpty) return 'Choose an action';
-    if (_orderContext?['station_name'] != null) {
-      final station = _orderContext!['station_name'].toString();
-      final status = _orderContext?['status']?.toString();
-      if (status != null && status.isNotEmpty) {
-        final formattedStatus = status.replaceAll('_', ' ');
-        return '$station • ${formattedStatus[0].toUpperCase()}${formattedStatus.substring(1)}';
-      }
-      return station;
-    }
+    String? myRole;
+    try {
+      myRole = context.read<UserProvider>().user?.role;
+    } catch (_) {}
+
+    ChatRoom? roomObj;
     if (_room != null) {
-      return _room!['room_type'] == 'order_delivery'
-          ? 'Refill delivery conversation'
-          : 'Customer support';
+      roomObj = ChatRoom.fromJson(_room!);
     }
-    return 'Water refill conversation';
+    return ChatIdentityResolver.resolveRoomSubtitle(
+      room: roomObj,
+      currentUserRole: myRole,
+      orderContext: _orderContext,
+    );
   }
 
   @override
@@ -734,6 +740,42 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildUserMessage(Message msg, bool isMine) {
     final isSelected = _selectedMessageIds.contains(msg.id);
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    String? myRole;
+    try {
+      myRole = context.read<UserProvider>().user?.role;
+    } catch (_) {}
+
+    ParticipantRole? senderRole;
+    Map<String, dynamic>? senderProfile = msg.senderProfile;
+
+    if (_room != null && _room!['participants'] is List) {
+      final pList = _room!['participants'] as List;
+      for (final p in pList) {
+        if (p is Map && (p['user_id'] == msg.senderId || p['id'] == msg.senderId)) {
+          if (p['role_in_room'] != null) {
+            senderRole = ParticipantRole.fromString(p['role_in_room'].toString());
+          }
+          senderProfile ??= (p['profiles'] as Map<String, dynamic>?) ??
+              (p['userProfile'] as Map<String, dynamic>?);
+          break;
+        }
+      }
+    }
+
+    final senderDisplayName = ChatIdentityResolver.resolveSenderName(
+      senderId: msg.senderId,
+      currentUserId: myId,
+      currentUserRole: myRole,
+      senderRole: senderRole,
+      senderProfile: senderProfile,
+      roomMetadata: _room?['metadata'] as Map<String, dynamic>?,
+      orderContext: _orderContext,
+      roomType: widget.roomType ??
+          (_room != null ? ChatRoomType.fromString(_room!['room_type']?.toString() ?? '') : null),
+      isSystemMessage: msg.isSystemMessage,
+    );
+
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -743,6 +785,18 @@ class _ChatScreenState extends State<ChatScreen> {
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
+            if (!isMine)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 4),
+                child: Text(
+                  senderDisplayName,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
+              ),
             InkWell(
               onLongPress: () => _toggleSelection(msg.id),
               onTap: _selectedMessageIds.isNotEmpty
