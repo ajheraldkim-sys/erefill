@@ -4,33 +4,18 @@ import 'package:erefill/core/widgets/account/account_ui.dart';
 
 void main() {
   group('Station Category Labels and Rider Updates Tests', () {
-    testWidgets('AccountSectionLabel aligns right when textAlign is TextAlign.right',
+    testWidgets('AccountSectionLabel aligns to left side by default',
         (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: Column(
               children: [
-                AccountSectionLabel(
-                  'Station identity',
-                  textAlign: TextAlign.right,
-                ),
-                AccountSectionLabel(
-                  'Pricing & delivery',
-                  textAlign: TextAlign.right,
-                ),
-                AccountSectionLabel(
-                  'Catalog & operations',
-                  textAlign: TextAlign.right,
-                ),
-                AccountSectionLabel(
-                  'Preferences',
-                  textAlign: TextAlign.right,
-                ),
-                AccountSectionLabel(
-                  'Security & account',
-                  textAlign: TextAlign.right,
-                ),
+                AccountSectionLabel('Station identity'),
+                AccountSectionLabel('Pricing & delivery'),
+                AccountSectionLabel('Catalog & operations'),
+                AccountSectionLabel('Preferences'),
+                AccountSectionLabel('Security & account'),
               ],
             ),
           ),
@@ -41,7 +26,7 @@ void main() {
       expect(labelFinder, findsOneWidget);
 
       final textWidget = tester.widget<Text>(labelFinder);
-      expect(textWidget.textAlign, TextAlign.right);
+      expect(textWidget.textAlign, TextAlign.start);
 
       final containerFinder = find.ancestor(
         of: labelFinder,
@@ -49,6 +34,37 @@ void main() {
       );
       expect(containerFinder, findsWidgets);
 
+      final container = tester.widget<Container>(containerFinder.first);
+      expect(container.alignment, Alignment.centerLeft);
+    });
+
+    testWidgets('AccountSectionLabel supports custom alignment if specified',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                AccountSectionLabel(
+                  'Custom aligned label',
+                  textAlign: TextAlign.right,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final labelFinder = find.text('CUSTOM ALIGNED LABEL');
+      expect(labelFinder, findsOneWidget);
+
+      final textWidget = tester.widget<Text>(labelFinder);
+      expect(textWidget.textAlign, TextAlign.right);
+
+      final containerFinder = find.ancestor(
+        of: labelFinder,
+        matching: find.byType(Container),
+      );
       final container = tester.widget<Container>(containerFinder.first);
       expect(container.alignment, Alignment.centerRight);
     });
@@ -64,4 +80,3 @@ void main() {
     });
   });
 }
-
