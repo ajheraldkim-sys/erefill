@@ -1465,14 +1465,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             color: AppUi.blueSoft.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.lock_outline_rounded,
                                 size: 14,
                                 color: AppUi.bluePrimary,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'You will complete payment securely via ${CheckoutRules.paymentLabel(_paymentMethod)} (PayMongo) after placing your order.',
