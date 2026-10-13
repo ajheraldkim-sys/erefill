@@ -44,11 +44,28 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
     }
 
     try {
-      final order = await _supabase
+      var order = await _supabase
           .from('orders')
           .select()
           .eq('id', orderId)
           .single();
+
+      final status = (order['payment_status'] ?? '').toString().toLowerCase();
+      if (widget.isSuccess && status != 'success' && status != 'paid') {
+        try {
+          final verifyRes = await _supabase.functions.invoke(
+            'create-payment-checkout',
+            body: {'action': 'verify', 'order_id': orderId},
+          );
+          if (verifyRes.data is Map && verifyRes.data['verified'] == true) {
+            order = await _supabase
+                .from('orders')
+                .select()
+                .eq('id', orderId)
+                .single();
+          }
+        } catch (_) {}
+      }
 
       if (!mounted) return;
       setState(() {

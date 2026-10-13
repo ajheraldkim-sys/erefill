@@ -763,18 +763,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<String> _createOnlinePaymentCheckout({
     required String orderId,
     required String paymentMethod,
+    bool forceNewCheckout = false,
   }) async {
     final normalizedMethod = paymentMethod.trim().toLowerCase().replaceAll('paymaya', 'maya');
-    final response = await supabase.functions.invoke(
-      'create-payment-checkout',
-      body: {'order_id': orderId, 'payment_method': normalizedMethod},
-    );
+    try {
+      final response = await supabase.functions.invoke(
+        'create-payment-checkout',
+        body: {
+          'order_id': orderId,
+          'payment_method': normalizedMethod,
+          if (forceNewCheckout) 'force_new_checkout': true,
+        },
+      );
 
-    final data = response.data;
-    if (data is Map && data['checkout_url'] is String) {
-      return data['checkout_url'] as String;
+      final data = response.data;
+      if (data is Map) {
+        final checkoutUrl = data['checkout_url']?.toString().trim();
+        if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
+          return checkoutUrl;
+        }
+        if (data['error'] != null) {
+          throw Exception(data['error'].toString());
+        }
+      }
+      if (response.status != 200) {
+        throw Exception('Payment gateway server returned status ${response.status}.');
+      }
+      throw Exception('Payment checkout session was not created.');
+    } on FunctionException catch (fe) {
+      final details = fe.details;
+      if (details is Map && details['error'] != null) {
+        throw Exception(details['error'].toString());
+      } else if (details is String && details.isNotEmpty) {
+        throw Exception(details);
+      } else if (fe.reasonPhrase != null && fe.reasonPhrase!.isNotEmpty) {
+        throw Exception(fe.reasonPhrase!);
+      }
+      rethrow;
     }
-    throw Exception('Payment checkout was not created.');
   }
 
   Future<void> _showPaymentVerificationSheet({
@@ -1449,8 +1475,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'You will complete payment securely via PayMongo after placing your order.',
-                                  style: TextStyle(
+                                  'You will complete payment securely via ${CheckoutRules.paymentLabel(_paymentMethod)} (PayMongo) after placing your order.',
+                                  style: const TextStyle(
                                     color: AppUi.bluePrimary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -1843,13 +1869,39 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
     setState(() => _isCheckingStatus = true);
 
     try {
-      final record = await _supabase
+      var record = await _supabase
           .from('orders')
           .select()
           .eq('id', widget.orderId)
           .single();
 
-      final status = (record['payment_status'] ?? '').toString().toLowerCase();
+      var status = (record['payment_status'] ?? '').toString().toLowerCase();
+
+      // If still awaiting confirmation, verify directly against PayMongo via Edge Function
+      if (status != 'success' && status != 'paid' && status != 'succeeded') {
+        try {
+          final verifyRes = await _supabase.functions.invoke(
+            'create-payment-checkout',
+            body: {
+              'action': 'verify',
+              'order_id': widget.orderId,
+            },
+          );
+          final vData = verifyRes.data;
+          if (vData is Map && vData['payment_status'] != null) {
+            final verifiedStatus = vData['payment_status'].toString().toLowerCase();
+            if (verifiedStatus == 'success' || verifiedStatus == 'paid') {
+              record = await _supabase
+                  .from('orders')
+                  .select()
+                  .eq('id', widget.orderId)
+                  .single();
+              status = 'success';
+            }
+          }
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           _paymentStatus = status;
@@ -1904,8 +1956,6 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
         body: {
           'order_id': widget.orderId,
           'payment_method': normalizedMethod,
-          // The saved URL could not be opened, so request a clean session
-          // instead of receiving the same inaccessible checkout again.
           'force_new_checkout': true,
         },
       );
@@ -1921,7 +1971,23 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
         }
         return;
       }
-      throw Exception('Could not reopen payment checkout.');
+      final err = data is Map ? data['error'] : null;
+      throw Exception(err?.toString() ?? 'Could not reopen payment checkout.');
+    } on FunctionException catch (fe) {
+      final details = fe.details;
+      final msg = details is Map && details['error'] != null
+          ? details['error'].toString()
+          : details is String && details.isNotEmpty
+          ? details
+          : fe.reasonPhrase ?? 'Could not reopen payment checkout.';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

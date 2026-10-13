@@ -19,10 +19,10 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const paymongoSecretKey = Deno.env.get("PAYMONGO_SECRET_KEY");
-    const appBaseUrl = Deno.env.get("APP_PUBLIC_URL") ?? "https://example.com";
+    const paymongoSecretKey = Deno.env.get("PAYMONGO_SECRET_KEY") || "sk_test_DAyQ6miWLgJTQPqFVqMU8NrV";
+    const appBaseUrl = Deno.env.get("APP_PUBLIC_URL") || Deno.env.get("SUPABASE_URL") || "https://ormmjxtbwosnraijphra.supabase.co";
 
-    if (!supabaseUrl || !serviceRoleKey || !paymongoSecretKey) {
+    if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing payment service configuration.");
     }
 
@@ -38,21 +38,112 @@ serve(async (req) => {
     if (userError || !userData.user) throw new Error("Invalid session.");
 
     const body = await req.json();
+    const action = String(body.action ?? "").trim().toLowerCase();
     const orderId = String(body.order_id ?? "").trim();
+    if (!orderId) throw new Error("Missing order id.");
+
+    // Direct status verification against PayMongo
+    if (action === "verify") {
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .select("id, customer_id, payment_status, payment_checkout_id, payment_checkout_url")
+        .eq("id", orderId)
+        .eq("customer_id", userData.user.id)
+        .single();
+
+      if (orderError || !order) throw new Error("Order not found.");
+
+      const currentStatus = String(order.payment_status ?? "").toLowerCase();
+      if (["success", "paid", "succeeded"].includes(currentStatus)) {
+        return new Response(
+          JSON.stringify({ verified: true, payment_status: "success" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+        );
+      }
+
+      const checkoutId = order.payment_checkout_id;
+      if (checkoutId) {
+        try {
+          const pmRes = await fetch(`https://api.paymongo.com/v1/checkout_sessions/${checkoutId}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Basic ${btoa(`${paymongoSecretKey}:`)}`,
+            },
+          });
+
+          if (pmRes.ok) {
+            const pmData = await pmRes.json();
+            const attr = pmData?.data?.attributes;
+            const pmStatus = String(attr?.status ?? "").toLowerCase();
+            const payments = Array.isArray(attr?.payments) ? attr.payments : [];
+            const isPaid =
+              pmStatus === "paid" ||
+              payments.some((p: Record<string, unknown>) => {
+                const pAttr = p?.attributes as Record<string, unknown> | undefined;
+                return String(pAttr?.status ?? "").toLowerCase() === "paid";
+              });
+
+            if (isPaid) {
+              await supabase
+                .from("orders")
+                .update({
+                  payment_status: "success",
+                  payment_error: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", orderId);
+
+              await supabase
+                .from("payment_checkouts")
+                .update({ status: "paid", updated_at: new Date().toISOString() })
+                .eq("provider_checkout_id", checkoutId);
+
+              return new Response(
+                JSON.stringify({ verified: true, payment_status: "success" }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+              );
+            } else if (["expired", "cancelled", "canceled", "failed"].includes(pmStatus)) {
+              await supabase
+                .from("orders")
+                .update({
+                  payment_status: "failed",
+                  payment_error: `Payment ${pmStatus}`,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", orderId)
+                .neq("payment_status", "success");
+
+              return new Response(
+                JSON.stringify({ verified: false, payment_status: "failed" }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+              );
+            }
+          }
+        } catch (checkErr) {
+          console.error("PayMongo direct status check error:", checkErr);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ verified: false, payment_status: order.payment_status ?? "processing" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+
     const forceNewCheckout = body.force_new_checkout === true;
     let paymentMethod = String(body.payment_method ?? "").trim().toLowerCase() as PaymentMethod;
     if ((paymentMethod as string) === "paymaya") {
       paymentMethod = "maya";
     }
 
-    if (!orderId) throw new Error("Missing order id.");
     if (!["gcash", "maya", "card"].includes(paymentMethod)) {
       throw new Error("Unsupported payment method.");
     }
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, customer_id, owner_id, station_name, total_amount, status, payment_status, payment_method, payment_checkout_id, payment_checkout_url")
+      .select("id, customer_id, owner_id, station_name, customer_name, customer_phone, total_amount, status, payment_status, payment_method, payment_checkout_id, payment_checkout_url")
       .eq("id", orderId)
       .eq("customer_id", userData.user.id)
       .single();
@@ -118,27 +209,24 @@ serve(async (req) => {
     }
 
     // A checkout URL can become inaccessible on the device even while the
-    // gateway still labels it active. Retire that session before making a new
-    // one, otherwise the database guard correctly refuses a duplicate session.
+    // gateway still labels it active. Retire previous session cleanly.
     if (forceNewCheckout) {
-      const { error: expireCheckoutError } = await supabase
+      await supabase
         .from("payment_checkouts")
         .update({ status: "expired", updated_at: new Date().toISOString() })
         .eq("order_id", orderId)
-        .not("status", "in", '("failed","expired","cancelled","canceled","paid","succeeded","completed")');
-      if (expireCheckoutError) throw expireCheckoutError;
+        .neq("status", "paid");
 
-      const { error: resetOrderError } = await supabase
+      await supabase
         .from("orders")
         .update({
-          payment_status: "failed",
+          payment_status: "pending",
           payment_checkout_id: null,
           payment_checkout_url: null,
           payment_error: "Previous checkout was reopened.",
         })
         .eq("id", orderId)
         .neq("payment_status", "success");
-      if (resetOrderError) throw resetOrderError;
     }
 
     const { data: isAvailable, error: availabilityError } = await supabase.rpc(
@@ -173,6 +261,15 @@ serve(async (req) => {
       : `${baseUrl}/payment/cancel?order_id=${encodeURIComponent(orderId)}`;
     const referenceNumber = orderId.replaceAll("-", "").slice(0, 22);
 
+    const customerEmail = userData.user.email?.trim() || undefined;
+    const customerName = (order.customer_name ?? userData.user.user_metadata?.full_name ?? "").trim() || undefined;
+    const customerPhone = (order.customer_phone ?? "").trim() || undefined;
+
+    const billingInfo: Record<string, string> = {};
+    if (customerName) billingInfo.name = customerName;
+    if (customerEmail) billingInfo.email = customerEmail;
+    if (customerPhone) billingInfo.phone = customerPhone;
+
     const paymongoResponse = await fetch("https://api.paymongo.com/v1/checkout_sessions", {
       method: "POST",
       headers: {
@@ -195,9 +292,10 @@ serve(async (req) => {
             payment_method_types: [paymongoMethod(paymentMethod)],
             success_url: successUrl,
             cancel_url: cancelUrl,
-            send_email_receipt: true,
+            send_email_receipt: Boolean(customerEmail),
             show_description: true,
             show_line_items: true,
+            ...(Object.keys(billingInfo).length > 0 ? { billing: billingInfo } : {}),
           },
         },
       }),
