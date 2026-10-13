@@ -44,6 +44,9 @@
                 <data
                     android:scheme="io.supabase.erefill"
                     android:host="login-callback" />
+                <data
+                    android:scheme="io.supabase.erefill"
+                    android:host="reset-password" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

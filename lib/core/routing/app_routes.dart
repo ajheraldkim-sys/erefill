@@ -7,6 +7,7 @@ abstract final class AppRoutes {
   static const customerSignup = '/signup/customer';
   static const ownerSignup = '/signup/owner';
   static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
   static const paymentSuccess = '/payment/success';
   static const paymentCancel = '/payment/cancel';
   static const paymentCallback = '/payment-callback';

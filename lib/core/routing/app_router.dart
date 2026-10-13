@@ -8,6 +8,7 @@ import '../../features/auth/screens/customer_signup_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/owner_signup_screen.dart';
+import '../../features/auth/screens/reset_password_screen.dart';
 import '../../features/auth/screens/signup_role_screen.dart';
 import '../../features/auth/widgets/auth_wrapper.dart';
 import '../../features/onboarding/screens/welcome_onboarding_screen.dart';
@@ -90,6 +91,14 @@ class AppRouter {
             final query = state.uri.hasQuery ? '?${state.uri.query}' : '';
             return '${AppRoutes.paymentCallback}$query';
           }
+          if ((state.uri.host == 'reset-password' ||
+                  state.uri.path.contains('reset-password')) &&
+              path != AppRoutes.resetPassword) {
+            return AppRoutes.resetPassword;
+          }
+          if (state.uri.host == 'login-callback') {
+            return AppRoutes.home;
+          }
         } catch (_) {
           // Fallback if Supabase instance is uninitialized in standalone tests
         }
@@ -126,6 +135,10 @@ class AppRouter {
         _pushed(
           AppRoutes.forgotPassword,
           (_, _) => const ForgotPasswordScreen(),
+        ),
+        _pushed(
+          AppRoutes.resetPassword,
+          (_, _) => const ResetPasswordScreen(),
         ),
         _pushed(
           AppRoutes.paymentSuccess,
