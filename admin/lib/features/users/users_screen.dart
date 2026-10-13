@@ -672,21 +672,22 @@ class _UsersScreenState extends State<UsersScreen> {
                               ],
                             ],
                           ),
-                          const SizedBox(height: 14),
+                          if (role == 'owner') ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ShadcnOutlineButton(
+                                height: 34,
+                                icon: LucideIcons.store,
+                                text: 'Station Fleet',
+                                onPressed: () =>
+                                    _openStationForOwner(u['id'] as String),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
                           Row(
                             children: [
-                              if (role == 'owner') ...[
-                                Expanded(
-                                  child: ShadcnOutlineButton(
-                                    height: 36,
-                                    icon: LucideIcons.store,
-                                    text: 'Station',
-                                    onPressed: () =>
-                                        _openStationForOwner(u['id'] as String),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
                               Expanded(
                                 child: AdminManageButton(
                                   height: 36,
@@ -695,18 +696,19 @@ class _UsersScreenState extends State<UsersScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              if (isSuspended)
-                                AdminActivateButton(
-                                  height: 36,
-                                  text: 'Unsuspend',
-                                  onPressed: () => _toggleSuspendUser(u),
-                                )
-                              else
-                                AdminSuspendButton(
-                                  height: 36,
-                                  text: 'Suspend',
-                                  onPressed: () => _toggleSuspendUser(u),
-                                ),
+                              Expanded(
+                                child: isSuspended
+                                    ? AdminActivateButton(
+                                        height: 36,
+                                        text: 'Unsuspend',
+                                        onPressed: () => _toggleSuspendUser(u),
+                                      )
+                                    : AdminSuspendButton(
+                                        height: 36,
+                                        text: 'Suspend',
+                                        onPressed: () => _toggleSuspendUser(u),
+                                      ),
+                              ),
                             ],
                           ),
                         ],

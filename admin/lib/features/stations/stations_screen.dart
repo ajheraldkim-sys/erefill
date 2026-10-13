@@ -692,25 +692,26 @@ class _StationsScreenState extends State<StationsScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          if (isPending)
-                            AdminActivateButton(
-                              height: 36,
-                              text: 'Approve',
-                              icon: LucideIcons.check,
-                              onPressed: () => _approveStation(s),
-                            )
-                          else if (isSuspended)
-                            AdminActivateButton(
-                              height: 36,
-                              text: 'Reactivate',
-                              onPressed: () => _toggleStationSuspend(s),
-                            )
-                          else
-                            AdminSuspendButton(
-                              height: 36,
-                              text: 'Suspend',
-                              onPressed: () => _toggleStationSuspend(s),
-                            ),
+                          Expanded(
+                            child: isPending
+                                ? AdminActivateButton(
+                                    height: 36,
+                                    text: 'Approve',
+                                    icon: LucideIcons.check,
+                                    onPressed: () => _approveStation(s),
+                                  )
+                                : isSuspended
+                                ? AdminActivateButton(
+                                    height: 36,
+                                    text: 'Reactivate',
+                                    onPressed: () => _toggleStationSuspend(s),
+                                  )
+                                : AdminSuspendButton(
+                                    height: 36,
+                                    text: 'Suspend',
+                                    onPressed: () => _toggleStationSuspend(s),
+                                  ),
+                          ),
                         ],
                       ),
                     ],
