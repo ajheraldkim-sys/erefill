@@ -17,29 +17,69 @@ class LocalDataCache {
   static const String _prefix = 'erefill_disk_cache_';
   final Map<String, dynamic> _memoryCache = {};
   final Map<String, Future<dynamic>> _inFlight = {};
+  SharedPreferences? _prefs;
+
+  SharedPreferences? get prefs => _prefs;
+
+  /// Warm up cache on app launch so all screens load synchronously in 0ms.
+  Future<void> init() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      for (final key in _prefs!.getKeys()) {
+        if (key.startsWith(_prefix)) {
+          final cleanKey = key.substring(_prefix.length);
+          final raw = _prefs!.getString(key);
+          if (raw != null) {
+            try {
+              _memoryCache[cleanKey] = jsonDecode(raw);
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('LocalDataCache init error: $e');
+    }
+  }
 
   /// Synchronously get in-memory cached data if available (0ms).
   T? getMemory<T>(String key) {
     final val = _memoryCache[key];
     if (val is T) return val;
+    if (val is Map && T == (Map<String, dynamic>)) {
+      try {
+        return Map<String, dynamic>.from(val) as T;
+      } catch (_) {}
+    }
+    if (val is List && T == (List<Map<String, dynamic>>)) {
+      try {
+        return val.map((e) => Map<String, dynamic>.from(e as Map)).toList() as T;
+      } catch (_) {}
+    }
+    if (val is List && T == (List<dynamic>)) {
+      return List<dynamic>.from(val) as T;
+    }
     return null;
+  }
+
+  /// Store data in memory immediately (synchronous 0ms).
+  void setMemory(String key, dynamic value) {
+    _memoryCache[key] = value;
   }
 
   /// Read data from memory or fallback to SharedPreferences disk cache.
   Future<T?> get<T>(String key) async {
-    if (_memoryCache.containsKey(key)) {
-      final val = _memoryCache[key];
-      if (val is T) return val;
-    }
+    final mem = getMemory<T>(key);
+    if (mem != null) return mem;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      _prefs = prefs;
       final raw = prefs.getString('$_prefix$key');
       if (raw == null) return null;
 
       final decoded = jsonDecode(raw);
       _memoryCache[key] = decoded;
-      if (decoded is T) return decoded;
+      return getMemory<T>(key);
     } catch (e) {
       debugPrint('LocalDataCache get error for $key: $e');
     }
@@ -50,7 +90,8 @@ class LocalDataCache {
   Future<void> set(String key, dynamic value) async {
     _memoryCache[key] = value;
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      _prefs = prefs;
       if (value == null) {
         await prefs.remove('$_prefix$key');
       } else {
@@ -98,7 +139,8 @@ class LocalDataCache {
   Future<void> invalidate(String key) async {
     _memoryCache.remove(key);
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      _prefs = prefs;
       await prefs.remove('$_prefix$key');
     } catch (_) {}
   }
@@ -107,7 +149,8 @@ class LocalDataCache {
   Future<void> clear() async {
     _memoryCache.clear();
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      _prefs = prefs;
       final keys = prefs.getKeys().where((k) => k.startsWith(_prefix)).toList();
       for (final k in keys) {
         await prefs.remove(k);

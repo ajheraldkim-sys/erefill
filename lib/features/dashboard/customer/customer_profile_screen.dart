@@ -87,9 +87,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     super.didChangeDependencies();
     final user = Provider.of<UserProvider>(context).user;
     if (user != null && !_isEditingProfile) {
-      setState(() {
-        _updateFieldsFromUser(user);
-      });
+      _updateFieldsFromUser(user);
+      _isLoading = false;
     }
   }
 
@@ -152,9 +151,12 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
+    final hasExistingData = _firstNameController.text.isNotEmpty || _phoneController.text.isNotEmpty;
     setState(() {
       _loadError = null;
-      _isLoading = true;
+      if (!hasExistingData) {
+        _isLoading = true;
+      }
     });
     try {
       final user = supabase.auth.currentUser;

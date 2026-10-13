@@ -63,6 +63,28 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // Instant synchronous 0ms memory hydration before first build frame
+    final user = supabase.auth.currentUser;
+    final cached = user != null
+        ? LocalDataCache.instance.getMemory<Map<String, dynamic>>('customer_home_${user.id}')
+        : (LocalDataCache.instance.getMemory<Map<String, dynamic>>('customer_home_guest') ??
+            LocalDataCache.instance.getMemory<Map<String, dynamic>>('customer_home_stations'));
+    if (cached != null) {
+      _userFirstName = cached['userFirstName']?.toString() ?? _userFirstName;
+      _userMunicipality = cached['userMunicipality']?.toString() ?? _userMunicipality;
+      _stations = List<Map<String, dynamic>>.from(cached['stations'] as List? ?? const []);
+      _favoriteStations = List<Map<String, dynamic>>.from(cached['favoriteStations'] as List? ?? const []);
+      _stationCount = _stations.length;
+      _quickOrderStation = cached['quickOrderStation'] as Map<String, dynamic>?;
+      _quickStationIsLastOrder = cached['quickStationIsLastOrder'] == true;
+      _lastCompletedOrder = cached['lastCompletedOrder'] as Map<String, dynamic>?;
+      _activeOrder = cached['activeOrder'] as Map<String, dynamic>?;
+      if (_stations.isNotEmpty) {
+        _isLoading = false; // Zero waiting time on customer home!
+      }
+    }
+
     _loadCachedHome();
     _startHomeBannerTimer();
     _fetchData();
@@ -349,7 +371,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       });
 
       // Background cache snapshot for instant rendering on next open/revisit
-      LocalDataCache.instance.set('customer_home_${user.id}', {
+      final homeSnapshot = {
         'userFirstName': firstName,
         'userMunicipality': town ?? '',
         'stations': stations,
@@ -358,7 +380,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         'quickStationIsLastOrder': quickIsLastOrder,
         'lastCompletedOrder': lastCompleted,
         'activeOrder': _activeOrder,
-      });
+      };
+      LocalDataCache.instance.set('customer_home_${user.id}', homeSnapshot);
+      LocalDataCache.instance.set('customer_home_guest', homeSnapshot);
     } catch (e) {
       debugPrint('Home fetch error: $e');
       if (mounted) setState(() => _isLoading = false);

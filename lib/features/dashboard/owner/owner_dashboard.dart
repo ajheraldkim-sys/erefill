@@ -432,6 +432,14 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
   @override
   void initState() {
     super.initState();
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      final mem = LocalDataCache.instance.getMemory<Map<String, dynamic>>('owner_overview_${user.id}');
+      if (mem != null) {
+        _stats = Map<String, dynamic>.from(mem['stats'] as Map? ?? {});
+        _recentOrders = List<dynamic>.from(mem['recentOrders'] as List? ?? []);
+      }
+    }
     _loadCachedOverview();
     _setupOrdersListener();
     _loadInventorySnapshot();

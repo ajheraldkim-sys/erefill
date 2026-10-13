@@ -22,6 +22,7 @@ import 'package:erefill/features/settings/payment_account_models.dart';
 import 'package:erefill/features/settings/payment_settings_service.dart';
 import 'package:erefill/features/settings/owner/owner_settings_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:go_router/go_router.dart';
 import 'package:erefill/core/routing/app_routes.dart';
 import 'service_catalog_screen.dart';
@@ -106,6 +107,19 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   @override
   void initState() {
     super.initState();
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      final cachedSettings = LocalDataCache.instance.getMemory<Map<String, dynamic>>('owner_settings_${user.id}');
+      if (cachedSettings != null) {
+        _updateSettingsFromData(cachedSettings);
+        _isLoading = false;
+      }
+      final cachedProfile = LocalDataCache.instance.getMemory<Map<String, dynamic>>('user_profile_${user.id}');
+      if (cachedProfile != null) {
+        _updateProfileFromData(cachedProfile);
+        _isLoading = false;
+      }
+    }
     _loadAllData();
     _setupRealtimeListener();
   }
@@ -558,7 +572,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
+                        onPressed: () {
+                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                            Navigator.pop(sheetContext);
+                          }
+                        },
                         icon: const Icon(Icons.close_rounded),
                       ),
                     ],
@@ -711,7 +729,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingStation,
           onPressed: () async {
             final saved = await _saveStationDetails();
-            if (saved && sheetContext.mounted) Navigator.pop(sheetContext);
+            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
+              Navigator.pop(sheetContext);
+            }
           },
         ),
       ],
@@ -828,7 +848,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
+                        onPressed: () {
+                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                            Navigator.pop(sheetContext);
+                          }
+                        },
                         icon: const Icon(Icons.close_rounded),
                       ),
                     ],
@@ -956,7 +980,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingOwner,
           onPressed: () async {
             final saved = await _saveOwnerDetails();
-            if (saved && sheetContext.mounted) Navigator.pop(sheetContext);
+            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
+              Navigator.pop(sheetContext);
+            }
           },
         ),
       ],
@@ -1080,7 +1106,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
+                        onPressed: () {
+                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                            Navigator.pop(sheetContext);
+                          }
+                        },
                         icon: const Icon(Icons.close_rounded),
                       ),
                     ],
@@ -1159,7 +1189,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingPricing,
           onPressed: () async {
             final saved = await _savePricingAndDelivery();
-            if (saved && sheetContext.mounted) {
+            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
               Navigator.pop(sheetContext);
             }
           },
@@ -1258,7 +1288,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
+                        onPressed: () {
+                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                            Navigator.pop(sheetContext);
+                          }
+                        },
                         icon: const Icon(Icons.close_rounded),
                       ),
                     ],
@@ -1409,7 +1443,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingPayments,
           onPressed: () async {
             final saved = await _savePaymentMethods();
-            if (saved && sheetContext.mounted) {
+            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
               Navigator.pop(sheetContext);
             }
           },
@@ -1728,7 +1762,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
+              onPressed: () {
+                if (dialogCtx.mounted && Navigator.canPop(dialogCtx)) {
+                  Navigator.pop(dialogCtx);
+                }
+              },
               child: const Text('Cancel'),
             ),
             FilledButton(
@@ -1742,7 +1780,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                   );
                   return;
                 }
-                Navigator.pop(dialogCtx);
+                if (dialogCtx.mounted && Navigator.canPop(dialogCtx)) {
+                  Navigator.pop(dialogCtx);
+                }
                 try {
                   await service.create(
                     scope: PaymentAccountScope.ownerPayoutAccounts,
@@ -1781,12 +1821,18 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         content: const Text('You can sign back in anytime.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              if (context.mounted && Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+            },
             child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () async {
-              Navigator.pop(context);
+              if (context.mounted && Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
               await supabase.auth.signOut();
               if (!context.mounted) return;
               context.resetToAuth();

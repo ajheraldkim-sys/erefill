@@ -101,10 +101,20 @@ class StationDataCache {
   /// Stream of ownerIds that have been updated in real-time.
   Stream<String> get onStationUpdated => _stationUpdatesController.stream;
 
-  /// Returns cached bundle synchronously if available.
+  /// Returns cached bundle synchronously if available (0ms).
   CachedStationBundle? get(String? ownerId) {
     if (ownerId == null || ownerId.isEmpty) return null;
-    return _cache[ownerId];
+    if (_cache.containsKey(ownerId)) return _cache[ownerId];
+    // Check if LocalDataCache already has it hydrated in memory
+    final diskMem = LocalDataCache.instance.getMemory<Map<String, dynamic>>('station_bundle_$ownerId');
+    if (diskMem != null) {
+      try {
+        final bundle = CachedStationBundle.fromJson(diskMem);
+        _cache[ownerId] = bundle;
+        return bundle;
+      } catch (_) {}
+    }
+    return null;
   }
 
   /// Store or update cached bundle manually.

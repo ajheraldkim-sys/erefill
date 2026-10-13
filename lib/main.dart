@@ -26,6 +26,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/offline_order_sync_service.dart';
 import 'core/providers/connectivity_provider.dart';
 import 'core/widgets/offline_banner.dart';
+import 'core/services/local_data_cache.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +41,9 @@ void main() async {
       // ignore: deprecated_member_use
       anonKey: AppConstants.supabaseAnonKey,
     );
+
+    // Warm up local disk cache so all app screens load instantly (0ms)
+    await LocalDataCache.instance.init();
 
     // Initialize unified push & in-app notifications
     await NotificationService.instance.initialize();

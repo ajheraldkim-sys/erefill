@@ -26,6 +26,11 @@ class UserProvider extends ChangeNotifier {
     final currentUserId = _supabase.auth.currentUser?.id;
     if (currentUserId != null) {
       _profileUserId = currentUserId;
+      final mem = _cache.getMemory<Map<String, dynamic>>('user_profile_$currentUserId');
+      if (mem != null) {
+        _user = UserModel.fromJson(mem);
+        _isLoading = false;
+      }
       _cache.get<Map<String, dynamic>>('user_profile_$currentUserId').then((cached) {
         if (cached != null && _user == null && !_disposed) {
           _user = UserModel.fromJson(cached);
@@ -73,13 +78,21 @@ class UserProvider extends ChangeNotifier {
       _profileSub?.cancel();
       _profileSub = null;
 
-      // Immediately attempt disk cache read so offline launch is instantaneous
+      // 1. Immediately check synchronous in-memory cache (0ms)
+      final mem = _cache.getMemory<Map<String, dynamic>>('user_profile_$userId');
+      if (mem != null && !_disposed && generation == _profileLoadGeneration) {
+        _user = UserModel.fromJson(mem);
+        _isLoading = false;
+        notifyListeners();
+      }
+
+      // 2. Fallback to disk cache if memory didn't have it
       final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
       if (cached != null && !_disposed && generation == _profileLoadGeneration) {
         _user = UserModel.fromJson(cached);
         _isLoading = false;
         notifyListeners();
-      } else {
+      } else if (_user == null) {
         _user = null;
         _isLoading = true;
         notifyListeners();

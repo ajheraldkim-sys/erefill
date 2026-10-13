@@ -84,6 +84,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       _baseDeliveryFee =
           (_stationData['base_delivery_fee'] as num?)?.toDouble() ?? 25.0;
       if (ownerId != null) _resolveSelectedProduct(ownerId);
+      // Immediately allow instant user interaction with display fallback product (0ms)
+      _isLoadingPurified = false;
     }
 
     _checkIsFav();

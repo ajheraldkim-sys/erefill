@@ -43,6 +43,11 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    final syncCached = _orderCache.getCachedHistorySync();
+    if (syncCached.isNotEmpty) {
+      _deliveredOrders = syncCached;
+      _isLoading = false;
+    }
     _loadInitialCache();
     _fetchHistory();
   }

@@ -132,6 +132,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
   @override
   void initState() {
     super.initState();
+    final myId = supabase.auth.currentUser?.id;
     final initialUser = context.read<UserProvider>().user;
     if (initialUser != null) {
       _profile = {
@@ -149,7 +150,28 @@ class _RiderDashboardState extends State<RiderDashboard> {
         'avatar_url': initialUser.avatarUrl,
       };
       _isLoading = false;
+    } else if (myId != null) {
+      final cachedProf = LocalDataCache.instance.getMemory<Map<String, dynamic>>('rider_profile_$myId');
+      if (cachedProf != null) {
+        _profile = cachedProf;
+        _isLoading = false;
+      }
     }
+
+    if (myId != null) {
+      final cachedStats = LocalDataCache.instance.getMemory<Map<String, dynamic>>('rider_stats_$myId');
+      if (cachedStats != null) {
+        _completedDeliveries = (cachedStats['completed'] as num?)?.toInt() ?? 0;
+        _totalEarnings = (cachedStats['earnings'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    final syncOrders = _orderCache.getCachedActiveOrdersSync();
+    if (syncOrders.isNotEmpty) {
+      _myActiveOrders = syncOrders;
+      _isLoading = false;
+    }
+
     _loadInitialCache();
     _loadRiderData(); // START NETWORK FETCH
     _setupProfileListener();
@@ -197,6 +219,12 @@ class _RiderDashboardState extends State<RiderDashboard> {
             },
           );
         });
+        unawaited(
+          LocalDataCache.instance.set('rider_stats_$myId', {
+            'completed': _completedDeliveries,
+            'earnings': _totalEarnings,
+          }),
+        );
       }
     } catch (e) {
       debugPrint("Error loading stats: $e");
@@ -349,6 +377,12 @@ class _RiderDashboardState extends State<RiderDashboard> {
         LocalDataCache.instance.set('rider_profile_$myId', profileResult),
       );
     }
+    unawaited(
+      LocalDataCache.instance.set('rider_stats_$myId', {
+        'completed': completedCount,
+        'earnings': earningsTotal,
+      }),
+    );
   }
 
   void _listenForNewJobs() {

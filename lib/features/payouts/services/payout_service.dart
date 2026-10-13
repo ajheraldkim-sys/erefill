@@ -15,13 +15,21 @@ class PayoutService {
   /// Fetch requests for a rider (with instant offline cache fallback)
   Future<List<RiderPayoutRequest>> getRiderPayoutRequests(String riderId) async {
     final cacheKey = 'rider_payouts_$riderId';
-    final cached = await _cache.get<List<dynamic>>(cacheKey);
+    final mem = _cache.getMemory<List<dynamic>>(cacheKey);
     List<RiderPayoutRequest> localList = [];
-    if (cached != null) {
-      localList = cached
+    if (mem != null) {
+      localList = mem
           .map((item) =>
               RiderPayoutRequest.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
+    } else {
+      final cached = await _cache.get<List<dynamic>>(cacheKey);
+      if (cached != null) {
+        localList = cached
+            .map((item) =>
+                RiderPayoutRequest.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
     }
 
     try {
@@ -37,7 +45,9 @@ class PayoutService {
       await _cache.set(cacheKey, res);
       return freshList;
     } catch (e) {
-      debugPrint('Supabase getRiderPayoutRequests fallback: $e');
+      if (kDebugMode && !e.toString().contains('PGRST205')) {
+        debugPrint('Supabase getRiderPayoutRequests fallback: $e');
+      }
     }
 
     return localList;
@@ -93,13 +103,21 @@ class PayoutService {
   /// Get pending and processed payout requests for station owner
   Future<List<RiderPayoutRequest>> getOwnerPayoutRequests(String ownerId) async {
     final cacheKey = 'owner_payouts_$ownerId';
-    final cached = await _cache.get<List<dynamic>>(cacheKey);
+    final mem = _cache.getMemory<List<dynamic>>(cacheKey);
     List<RiderPayoutRequest> localList = [];
-    if (cached != null) {
-      localList = cached
+    if (mem != null) {
+      localList = mem
           .map((item) =>
               RiderPayoutRequest.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
+    } else {
+      final cached = await _cache.get<List<dynamic>>(cacheKey);
+      if (cached != null) {
+        localList = cached
+            .map((item) =>
+                RiderPayoutRequest.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
     }
 
     try {
@@ -115,7 +133,9 @@ class PayoutService {
       await _cache.set(cacheKey, res);
       return freshList;
     } catch (e) {
-      debugPrint('Supabase getOwnerPayoutRequests fallback: $e');
+      if (kDebugMode && !e.toString().contains('PGRST205')) {
+        debugPrint('Supabase getOwnerPayoutRequests fallback: $e');
+      }
     }
 
     return localList;

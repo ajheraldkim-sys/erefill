@@ -38,6 +38,14 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
   @override
   void initState() {
     super.initState();
+    final userId = supabase.auth.currentUser?.id;
+    if (userId != null) {
+      final mem = LocalDataCache.instance.getMemory<List<dynamic>>('customer_orders_$userId');
+      if (mem != null && mem.isNotEmpty) {
+        _myOrders = mem.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _isLoading = false;
+      }
+    }
     _loadCachedOrders();
     _fetchOrders();
     _subscribeToOrderChanges();

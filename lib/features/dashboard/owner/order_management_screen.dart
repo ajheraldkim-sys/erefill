@@ -62,6 +62,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       }
     });
 
+    final ownerId = supabase.auth.currentUser?.id;
+    if (ownerId != null) {
+      final cached = LocalDataCache.instance.getMemory<List<dynamic>>('owner_orders_$ownerId');
+      if (cached != null && cached.isNotEmpty) {
+        _cachedOrders = cached.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    }
+
     _loadRiders();
     _loadDiskCache();
     _initOrdersStream();
