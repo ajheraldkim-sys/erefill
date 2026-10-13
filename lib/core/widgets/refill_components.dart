@@ -653,6 +653,8 @@ class _SparklineChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (data.length < 2) return const SizedBox.shrink();
+
     final spots = data.asMap().entries.map((e) {
       return FlSpot(e.key.toDouble(), e.value);
     }).toList();

@@ -663,6 +663,20 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
     return '₱${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
   }
 
+  List<double> _parseTrend(dynamic rawTrend) {
+    if (rawTrend is! List) {
+      return const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    }
+    try {
+      final list = rawTrend
+          .map((e) => (e as num?)?.toDouble() ?? 0.0)
+          .toList(growable: false);
+      return list.length >= 2 ? list : const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    } catch (_) {
+      return const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    }
+  }
+
   Widget _buildInventoryCard() {
     final inventory = _inventory;
     return Material(
@@ -1073,12 +1087,12 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                   child: DashboardStatCard(
                                     label: "Today's revenue",
                                     value: _formatCurrency(
-                                      _stats['revenueToday']?.toDouble() ?? 0,
+                                      (_stats['revenueToday'] as num?)?.toDouble() ?? 0.0,
                                     ),
                                     icon: Icons.payments_outlined,
                                     color: AppUi.bluePrimary,
                                     delta: '+12%',
-                                    trend: (_stats['revenueTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
+                                    trend: _parseTrend(_stats['revenueTrend']),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1089,7 +1103,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     icon: Icons.water_drop_outlined,
                                     color: const Color(0xFFF59E0B),
                                     delta: '+8%',
-                                    trend: (_stats['ordersTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
+                                    trend: _parseTrend(_stats['ordersTrend']),
                                   ),
                                 ),
                               ],
@@ -1104,8 +1118,8 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     icon: Icons.schedule_rounded,
                                     color: AppUi.accentCyan,
                                     onTap: widget.onViewOrders,
-                                    delta: (_stats['pending'] ?? 0) > 0 ? 'Active' : 'Clear',
-                                    trend: (_stats['pendingTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
+                                    delta: ((_stats['pending'] as num?)?.toInt() ?? 0) > 0 ? 'Active' : 'Clear',
+                                    trend: _parseTrend(_stats['pendingTrend']),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -1116,7 +1130,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                                     icon: Icons.check_circle_outline_rounded,
                                     color: AppUi.accentGreen,
                                     delta: '+15%',
-                                    trend: (_stats['deliveredTrend'] as List<double>?) ?? const [0, 0, 0, 0, 0, 0, 0],
+                                    trend: _parseTrend(_stats['deliveredTrend']),
                                   ),
                                 ),
                               ],
@@ -1220,25 +1234,25 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                             children: [
                               _buildLogisticsChip(
                                 'Pending',
-                                _stats['pending'] ?? 0,
+                                (_stats['pending'] as num?)?.toInt() ?? 0,
                                 AppUi.textMuted,
                               ),
                               const SizedBox(width: 8),
                               _buildLogisticsChip(
                                 'Preparing',
-                                _stats['preparing'] ?? 0,
+                                (_stats['preparing'] as num?)?.toInt() ?? 0,
                                 const Color(0xFF8B5CF6),
                               ),
                               const SizedBox(width: 8),
                               _buildLogisticsChip(
                                 'Ready',
-                                _stats['ready'] ?? 0,
+                                (_stats['ready'] as num?)?.toInt() ?? 0,
                                 const Color(0xFF0F766E),
                               ),
                               const SizedBox(width: 8),
                               _buildLogisticsChip(
                                 'Delivering',
-                                _stats['delivering'] ?? 0,
+                                (_stats['delivering'] as num?)?.toInt() ?? 0,
                                 const Color(0xFFF59E0B),
                               ),
                             ],
@@ -1372,7 +1386,8 @@ class _OrderListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final customer = order['profiles'] as Map<String, dynamic>?;
+    final rawCustomer = order['profiles'];
+    final customer = rawCustomer is Map ? Map<String, dynamic>.from(rawCustomer) : null;
 
     // Priority: 1. Denormalized column in 'orders', 2. Joined Profile name, 3. Fallback
     final customerName =

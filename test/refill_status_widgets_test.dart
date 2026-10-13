@@ -1,3 +1,4 @@
+import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/water_types.dart';
 import 'package:flutter/material.dart';
@@ -128,6 +129,67 @@ void main() {
     );
 
     expect(find.text('Out for Delivery'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('DashboardStatCard renders smoothly with trend and delta', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: DashboardStatCard(
+            label: "Today's revenue",
+            value: '₱1,250',
+            icon: Icons.payments_outlined,
+            delta: '+12%',
+            trend: [100.0, 200.0, 150.0, 300.0, 250.0, 400.0, 500.0],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text("Today's revenue"), findsOneWidget);
+    expect(find.text('₱1,250'), findsOneWidget);
+    expect(find.text('+12%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('DashboardStatCard handles flat trend and single-point list gracefully', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              DashboardStatCard(
+                label: 'Flat trend',
+                value: '10',
+                icon: Icons.show_chart,
+                trend: [0.0, 0.0, 0.0],
+              ),
+              DashboardStatCard(
+                label: 'Single point',
+                value: '5',
+                icon: Icons.show_chart,
+                trend: [1.0],
+              ),
+              DashboardStatCard(
+                label: 'Empty trend',
+                value: '0',
+                icon: Icons.show_chart,
+                trend: [],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Flat trend'), findsOneWidget);
+    expect(find.text('Single point'), findsOneWidget);
+    expect(find.text('Empty trend'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
