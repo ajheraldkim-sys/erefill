@@ -443,6 +443,17 @@ class ChatService {
         .eq('id', roomId);
   }
 
+  /// Unarchive a chat room back to active
+  Future<void> unarchiveChatRoom(String roomId) async {
+    await _supabase
+        .from('chat_rooms')
+        .update({
+          'status': ChatRoomStatus.active.value,
+          'archived_at': null,
+        })
+        .eq('id', roomId);
+  }
+
   // ==================== MESSAGE MANAGEMENT ====================
 
   /// Get messages for a chat room
@@ -630,7 +641,7 @@ class ChatService {
   }
 
   /// Delete specific messages (Soft Delete)
-  Future<void> deleteMessages(List<String> messageIds) async {
+  Future<void> deleteMessages(List<String> messageIds, {String? roomId}) async {
     final myId = _supabase.auth.currentUser?.id;
     if (myId == null) return;
 
@@ -639,6 +650,10 @@ class ChatService {
         .update({'deleted_at': DateTime.now().toIso8601String()})
         .inFilter('id', messageIds)
         .eq('sender_id', myId);
+
+    if (roomId != null) {
+      await _cache.cacheMessages(roomId, []);
+    }
   }
 
   /// Clear all messages in a room (Soft Delete)
@@ -651,6 +666,8 @@ class ChatService {
         .update({'deleted_at': DateTime.now().toIso8601String()})
         .eq('room_id', roomId)
         .eq('sender_id', myId);
+
+    await _cache.cacheMessages(roomId, []);
   }
 
   /// Mark all messages in a room as read

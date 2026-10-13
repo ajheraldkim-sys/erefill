@@ -539,12 +539,29 @@ class _ChatScreenState extends State<ChatScreen> {
                           color: Colors.white,
                         ),
                         onSelected: (val) {
+                          if (val == 'archive') _archiveChat();
                           if (val == 'clear') _clearChat();
                         },
                         itemBuilder: (context) => const [
                           PopupMenuItem(
+                            value: 'archive',
+                            child: Row(
+                              children: [
+                                Icon(Icons.archive_outlined, size: 18),
+                                SizedBox(width: 8),
+                                Text('Archive chat'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
                             value: 'clear',
-                            child: Text('Clear history'),
+                            child: Row(
+                              children: [
+                                Icon(Icons.cleaning_services_outlined, size: 18),
+                                SizedBox(width: 8),
+                                Text('Clear my messages'),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1139,11 +1156,34 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _deleteSelectedMessages() async {
     if (_selectedMessageIds.isEmpty) return;
 
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    final ownSelectedCount = _allMessages
+        .where((m) => _selectedMessageIds.contains(m.id) && m.senderId == myId)
+        .length;
+    final othersSelectedCount = _selectedMessageIds.length - ownSelectedCount;
+
+    if (ownSelectedCount == 0) {
+      setState(() => _selectedMessageIds.clear());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You can only delete messages you sent.'),
+            backgroundColor: AppUi.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    final messageText = othersSelectedCount > 0
+        ? 'Delete $ownSelectedCount message(s) you sent? Note: $othersSelectedCount message(s) from other participants cannot be deleted.'
+        : 'Delete $ownSelectedCount message(s)?';
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Messages'),
-        content: Text('Delete ${_selectedMessageIds.length} messages?'),
+        content: Text(messageText),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1158,8 +1198,57 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     if (confirm == true) {
-      await _chatService.deleteMessages(_selectedMessageIds.toList());
+      await _chatService.deleteMessages(
+        _selectedMessageIds.toList(),
+        roomId: widget.roomId,
+      );
       setState(() => _selectedMessageIds.clear());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$ownSelectedCount message(s) deleted.'),
+            backgroundColor: AppUi.accentGreen,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _archiveChat() async {
+    final roomId = widget.roomId;
+    if (roomId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Archive Conversation'),
+        content: const Text(
+          'Archive this chat? It will be moved to the Archived tab in your inbox.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Archive', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _chatService.archiveChatRoom(roomId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conversation archived.'),
+            backgroundColor: AppUi.accentGreen,
+          ),
+        );
+        Navigator.of(context).maybePop();
+      }
     }
   }
 
@@ -1187,6 +1276,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (confirm == true) {
       await _chatService.clearChat(roomId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your messages in this chat have been cleared.'),
+            backgroundColor: AppUi.accentGreen,
+          ),
+        );
+      }
     }
   }
 

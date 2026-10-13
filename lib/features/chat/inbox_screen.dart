@@ -103,11 +103,14 @@ class _InboxScreenState extends State<InboxScreen> {
                       onPressed: _selectAllRooms,
                     ),
                     IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
+                      icon: Icon(
+                        _selectedTab == 3
+                            ? Icons.unarchive_outlined
+                            : Icons.archive_outlined,
                         color: Colors.white,
                       ),
-                      onPressed: _deleteSelectedRooms,
+                      tooltip: _selectedTab == 3 ? 'Restore' : 'Archive',
+                      onPressed: _handleArchiveOrRestoreRooms,
                     ),
                     IconButton(
                       icon: const Icon(
@@ -196,48 +199,51 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Widget _buildCategoryTabs() {
     final colorScheme = Theme.of(context).colorScheme;
-    final tabs = ['All Messages', 'Order Chats', 'Support'];
-    return Row(
-      children: List.generate(tabs.length, (index) {
-        final isSelected = _selectedTab == index;
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: InkWell(
-            onTap: () {
-              if (_selectedTab != index) {
-                setState(() {
-                  _selectedTab = index;
-                  _selectedRoomIds
-                      .clear(); // Clear selection when switching tabs
-                });
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected ? AppUi.bluePrimary : colorScheme.surface,
-                borderRadius: AppUi.controlRadius,
-                border: Border.all(
-                  color: isSelected
-                      ? AppUi.bluePrimary
-                      : AppUi.borderOf(context),
+    final tabs = ['All Messages', 'Order Chats', 'Support', 'Archived'];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(tabs.length, (index) {
+          final isSelected = _selectedTab == index;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: () {
+                if (_selectedTab != index) {
+                  setState(() {
+                    _selectedTab = index;
+                    _selectedRoomIds
+                        .clear(); // Clear selection when switching tabs
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppUi.bluePrimary : colorScheme.surface,
+                  borderRadius: AppUi.controlRadius,
+                  border: Border.all(
+                    color: isSelected
+                        ? AppUi.bluePrimary
+                        : AppUi.borderOf(context),
+                  ),
                 ),
-              ),
-              child: Text(
-                tabs[index],
-                style: TextStyle(
-                  color: isSelected
-                      ? Colors.white
-                      : AppUi.textSecondaryOf(context),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
+                child: Text(
+                  tabs[index],
+                  style: TextStyle(
+                    color: isSelected
+                        ? Colors.white
+                        : AppUi.textSecondaryOf(context),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
@@ -283,15 +289,20 @@ class _InboxScreenState extends State<InboxScreen> {
         List<ChatRoom> tabRooms;
         switch (_selectedTab) {
           case 1:
-            tabRooms = allFetchedRooms.where((r) => r.isOrderDelivery).toList();
+            tabRooms = allFetchedRooms
+                .where((r) => r.isOrderDelivery && !r.isArchived)
+                .toList();
             break;
           case 2:
             tabRooms = allFetchedRooms
-                .where((r) => r.isCustomerSupport)
+                .where((r) => r.isCustomerSupport && !r.isArchived)
                 .toList();
             break;
+          case 3:
+            tabRooms = allFetchedRooms.where((r) => r.isArchived).toList();
+            break;
           default:
-            tabRooms = allFetchedRooms;
+            tabRooms = allFetchedRooms.where((r) => !r.isArchived).toList();
         }
 
         // 2. Filter by Search Query
@@ -582,16 +593,22 @@ class _InboxScreenState extends State<InboxScreen> {
     });
   }
 
-  Future<void> _deleteSelectedRooms() async {
+  Future<void> _handleArchiveOrRestoreRooms() async {
+    final isArchivedTab = _selectedTab == 3;
+    final count = _selectedRoomIds.length;
+    if (count == 0) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(
-          'Archive Conversations',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          isArchivedTab ? 'Restore Conversations' : 'Archive Conversations',
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         content: Text(
-          'Archive ${_selectedRoomIds.length} conversation threads?',
+          isArchivedTab
+              ? 'Restore $count conversation thread(s) back to your active inbox?'
+              : 'Archive $count conversation thread(s)? They will be hidden from your active inbox and moved to the Archived tab.',
         ),
         shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
         actions: [
@@ -607,10 +624,10 @@ class _InboxScreenState extends State<InboxScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Archive',
+            child: Text(
+              isArchivedTab ? 'Restore' : 'Archive',
               style: TextStyle(
-                color: Color(0xFFEF4444),
+                color: isArchivedTab ? AppUi.bluePrimary : const Color(0xFFEF4444),
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -619,10 +636,27 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
     );
     if (confirm == true) {
-      for (final id in _selectedRoomIds) {
-        await _chatService.archiveChatRoom(id);
+      final roomIdsToProcess = _selectedRoomIds.toList();
+      for (final id in roomIdsToProcess) {
+        if (isArchivedTab) {
+          await _chatService.unarchiveChatRoom(id);
+        } else {
+          await _chatService.archiveChatRoom(id);
+        }
       }
       setState(() => _selectedRoomIds.clear());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isArchivedTab
+                  ? '$count conversation(s) restored to inbox.'
+                  : '$count conversation(s) archived.',
+            ),
+            backgroundColor: AppUi.accentGreen,
+          ),
+        );
+      }
     }
   }
 
