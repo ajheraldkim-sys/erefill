@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -35,6 +36,7 @@ class StationListScreen extends StatefulWidget {
 
 class _StationListScreenState extends State<StationListScreen> {
   final supabase = Supabase.instance.client;
+  late final StreamController<List<Map<String, dynamic>>> _stationsController;
   late final Stream<List<Map<String, dynamic>>> _stationsStream;
   RealtimeChannel? _pricingChannel;
   RealtimeChannel? _favoritesChannel;
@@ -60,15 +62,8 @@ class _StationListScreenState extends State<StationListScreen> {
   @override
   void initState() {
     super.initState();
-    _stationsStream = supabase
-        .from('profiles')
-        .stream(primaryKey: ['id'])
-        .eq('role', 'owner')
-        .handleError((error, stackTrace) {
-          debugPrint('Station list stream error: $error');
-          debugPrint('Station list stream stack: $stackTrace');
-          return <Map<String, dynamic>>[];
-        });
+    _stationsController = StreamController<List<Map<String, dynamic>>>.broadcast();
+    _stationsStream = _stationsController.stream;
     if (widget.initialFilter != null && widget.initialFilter!.isNotEmpty) {
       _selectedFilter = widget.initialFilter!;
     }
@@ -87,15 +82,50 @@ class _StationListScreenState extends State<StationListScreen> {
         'cached_owner_stations',
       );
       if (cached != null && cached.isNotEmpty && mounted) {
+        final list = cached
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         setState(() {
-          _cachedStations = cached
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+          _cachedStations = list;
           _isLoading = false;
         });
+        if (!_stationsController.isClosed) {
+          _stationsController.add(list);
+        }
       }
     } catch (e) {
       debugPrint('Error loading cached stations: $e');
+    }
+    await _fetchStations();
+  }
+
+  Future<void> _fetchStations({bool isRefresh = false}) async {
+    try {
+      final res = await supabase
+          .from('profiles')
+          .select()
+          .eq('role', 'owner')
+          .order('station_name');
+      final stations = List<Map<String, dynamic>>.from(res as List);
+      if (mounted) {
+        setState(() {
+          _cachedStations = stations;
+          _isLoading = false;
+        });
+        if (!_stationsController.isClosed) {
+          _stationsController.add(stations);
+        }
+      }
+      unawaited(LocalDataCache.instance.set('cached_owner_stations', stations));
+    } catch (e) {
+      debugPrint('Error fetching stations via REST: $e');
+      if (_cachedStations.isNotEmpty) {
+        if (!_stationsController.isClosed) {
+          _stationsController.add(_cachedStations);
+        }
+      } else if (mounted && !_stationsController.isClosed) {
+        _stationsController.addError(e);
+      }
     }
   }
 
@@ -139,6 +169,7 @@ class _StationListScreenState extends State<StationListScreen> {
 
   @override
   void dispose() {
+    _stationsController.close();
     final channel = _pricingChannel;
     if (channel != null) {
       supabase.removeChannel(channel);
@@ -1062,7 +1093,7 @@ class _StationListScreenState extends State<StationListScreen> {
                 title: 'Could not load stations',
                 message: snapshot.error.toString(),
                 actionLabel: 'Retry',
-                onAction: () => setState(() {}),
+                onAction: () => _fetchStations(isRefresh: true),
                 compact: true,
               ),
             ),

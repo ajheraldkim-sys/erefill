@@ -85,16 +85,8 @@ class ChatService {
       return await fetchAll();
     }
 
-    // Listen for room updates with throttling
-    yield* _supabase
-        .from('chat_rooms')
-        .stream(primaryKey: ['id'])
-        .order('updated_at', ascending: false)
-        .handleError((error, stackTrace) {
-          debugPrint('Chat room stream error: $error');
-          debugPrint('Chat room stream stack: $stackTrace');
-          return <Map<String, dynamic>>[];
-        })
+    // Safely poll for room updates without overloading Postgres replication slots
+    yield* Stream.periodic(const Duration(seconds: 8))
         .asyncMap((_) => throttledFetchAll());
   }
 
@@ -129,16 +121,8 @@ class ChatService {
       return await fetchAndFilter();
     }
 
-    // Listen for room updates with throttling
-    yield* _supabase
-        .from('chat_rooms')
-        .stream(primaryKey: ['id'])
-        .order('updated_at', ascending: false)
-        .handleError((error, stackTrace) {
-          debugPrint('Chat room filtered stream error: $error');
-          debugPrint('Chat room filtered stream stack: $stackTrace');
-          return <Map<String, dynamic>>[];
-        })
+    // Safely poll for room updates without overloading Postgres replication slots
+    yield* Stream.periodic(const Duration(seconds: 8))
         .asyncMap((_) => throttledFetchAndFilter());
   }
 

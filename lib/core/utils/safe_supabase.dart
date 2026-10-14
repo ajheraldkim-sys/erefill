@@ -287,6 +287,22 @@ class SafeSupabase {
     }
   }
 
+  static DateTime? _lastStreamErrorLog;
+  static String? _lastStreamErrorMsg;
+
+  static void _logStreamError(Object error) {
+    final now = DateTime.now();
+    final msg = error.toString();
+    if (_lastStreamErrorMsg == msg &&
+        _lastStreamErrorLog != null &&
+        now.difference(_lastStreamErrorLog!).inSeconds < 15) {
+      return;
+    }
+    _lastStreamErrorMsg = msg;
+    _lastStreamErrorLog = now;
+    debugPrint('SafeSupabase realtime stream error: $error (resilient fallback active)');
+  }
+
   static StreamSubscription<List<Map<String, dynamic>>> listen(
     Stream<List<Map<String, dynamic>>> stream,
     FutureOr<void> Function(List<Map<String, dynamic>>) onData, {
@@ -299,7 +315,7 @@ class SafeSupabase {
         await onData(data);
       },
       onError: (Object error, StackTrace stackTrace) {
-        debugPrint('SafeSupabase realtime stream error: $error');
+        _logStreamError(error);
         onError?.call(error, stackTrace);
       },
       onDone: onDone,

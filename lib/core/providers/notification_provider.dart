@@ -144,18 +144,51 @@ class NotificationProvider extends ChangeNotifier {
           );
         },
         onError: (error, stackTrace) {
-          debugPrint('Notification stream error: $error');
-          debugPrint('Notification stream stack: $stackTrace');
+          debugPrint('Notification stream error: $error (resilient REST fallback active)');
           if (generation == _listenGeneration) {
             _isLoading = false;
             notifyListeners();
+            _fetchNotificationsRest(userId, generation);
           }
         },
       );
+      // Proactively fetch latest notifications via REST immediately
+      _fetchNotificationsRest(userId, generation);
     } catch (e) {
       debugPrint('Error in NotificationProvider: $e');
       _isLoading = false;
       notifyListeners();
+      _fetchNotificationsRest(userId, generation);
+    }
+  }
+
+  Future<void> _fetchNotificationsRest(String userId, int generation) async {
+    try {
+      final res = await _supabase
+          .from('system_notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      if (generation != _listenGeneration) return;
+      final list = (res as List)
+          .map((json) => SystemNotification.fromJson(json as Map<String, dynamic>))
+          .toList();
+      _knownIds
+        ..clear()
+        ..addAll(list.map((n) => n.id));
+      _notifications = list;
+      _initialLoadCompleted = true;
+      _isLoading = false;
+      notifyListeners();
+      unawaited(
+        LocalDataCache.instance.set(
+          'system_notifications_$userId',
+          list.map((n) => n.toJson()).toList(),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error fetching notifications via REST: $e');
     }
   }
 
