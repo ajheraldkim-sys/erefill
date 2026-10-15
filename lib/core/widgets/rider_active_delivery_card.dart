@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
+import 'animations/pulsing_dot.dart';
+import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
 double _safeDouble(dynamic value, {double fallback = 0}) {
@@ -62,22 +64,22 @@ class RiderActiveDeliveryCard extends StatelessWidget {
     final isPaid = paymentStatus == 'success' || paymentStatus == 'paid';
     final isCod = paymentMethod == 'cod' || paymentMethod == 'cash';
 
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: BorderRadius.circular(AppUi.radiusCard),
-      child: InkWell(
+    final statusColor = OrderStatusColors.getColor(status);
+
+    return RepaintBoundary(
+      child: PressBounce(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+        pressedScale: 0.985,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppUi.radiusCard),
-            color: AppUi.bluePrimary,
+            color: statusColor,
             boxShadow: [
               BoxShadow(
-                color: AppUi.bluePrimary.withValues(alpha: 0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: statusColor.withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -86,17 +88,30 @@ class RiderActiveDeliveryCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const Positioned(
+                        top: -3,
+                        right: -3,
+                        child: PulsingDot(
+                          color: Colors.white,
+                          size: 6,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
@@ -109,7 +124,11 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  OrderStatusBadge(status: status, showIcon: false),
+                  OrderStatusChip(
+                    status: status,
+                    onFullColorSurface: true,
+                    showIcon: false,
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -181,10 +200,10 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                       color: Colors.white,
                       borderRadius: AppUi.pillRadius,
                     ),
-                    child: const Text(
+                    child: Text(
                       'View delivery',
                       style: TextStyle(
-                        color: AppUi.bluePrimary,
+                        color: statusColor,
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
                       ),

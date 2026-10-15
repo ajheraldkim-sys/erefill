@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../constants.dart';
 import '../experience_widgets.dart';
 import '../skeleton.dart';
+import 'refill_lottie.dart';
 
 enum AxoPose { wave, happy, thinking, delivery, empty, success }
 
@@ -44,23 +45,12 @@ class EmptyStateCard extends StatelessWidget {
                       : ExperienceScene.empty,
                   height: compact ? 94 : 126,
                 ),
-                Container(
-                  width: axoSize,
-                  height: axoSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                  ),
-                  child: Icon(
-                    pose == AxoPose.success
-                        ? Icons.check_circle_rounded
-                        : pose == AxoPose.empty
-                        ? Icons.inbox_outlined
-                        : Icons.water_drop_rounded,
-                    size: axoSize * 0.52,
-                    color: AppUi.bluePrimary,
-                  ),
-                ),
+                if (pose == AxoPose.success)
+                  RefillLottie.success(width: axoSize, height: axoSize)
+                else if (pose == AxoPose.delivery)
+                  RefillLottie.rider(width: axoSize * 1.2, height: axoSize)
+                else
+                  RefillLottie.mascot(width: axoSize, height: axoSize),
               ],
             ),
           ),

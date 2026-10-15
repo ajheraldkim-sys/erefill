@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Lightweight route page for pushed routes.
+/// Smooth, high-performance slide and fade page transition for pushed routes.
 ///
-/// Most routes contain data-heavy lists or maps. Avoiding a full-screen fade
-/// and slide keeps navigation responsive on lower-end devices.
+/// Features a subtle horizontal glide with natural deceleration
+/// and a soft opacity blend, providing fluid navigation.
 CustomTransitionPage<T> fadeSlidePage<T>({
   required LocalKey key,
   required Widget child,
@@ -12,9 +12,33 @@ CustomTransitionPage<T> fadeSlidePage<T>({
   return CustomTransitionPage<T>(
     key: key,
     child: child,
-    transitionDuration: Duration.zero,
-    reverseTransitionDuration: Duration.zero,
-    transitionsBuilder: (context, animation, secondaryAnimation, child) => child,
+    transitionDuration: const Duration(milliseconds: 240),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curvedAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+
+      final slideTween = Tween<Offset>(
+        begin: const Offset(0.06, 0.0),
+        end: Offset.zero,
+      );
+
+      final fadeTween = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      );
+
+      return SlideTransition(
+        position: slideTween.animate(curvedAnimation),
+        child: FadeTransition(
+          opacity: fadeTween.animate(curvedAnimation),
+          child: child,
+        ),
+      );
+    },
   );
 }
 

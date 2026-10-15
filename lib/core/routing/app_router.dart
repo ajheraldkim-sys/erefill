@@ -256,12 +256,23 @@ class AppRouter {
         }),
         _pushed(AppRoutes.savedAddresses, (context, state) {
           final extra = state.extra;
-          if (extra is! Map<String, dynamic>) {
-            return _missingRoute('Address context missing');
+          SavedAddressLaunchContext launch;
+          if (extra is SavedAddressLaunchContext) {
+            launch = extra;
+          } else if (extra is Map<String, dynamic>) {
+            launch = SavedAddressLaunchContext.fromMap(extra);
+          } else {
+            final user = context.read<UserProvider>().user;
+            launch = SavedAddressLaunchContext(
+              address: user?.completeAddress ?? '',
+              landmark: user?.landmark ?? '',
+              town: user?.town,
+              barangay: user?.barangay,
+              latitude: user?.latitude ?? 0.0,
+              longitude: user?.longitude ?? 0.0,
+            );
           }
-          return SavedAddressesScreen(
-            launch: SavedAddressLaunchContext.fromMap(extra),
-          );
+          return SavedAddressesScreen(launch: launch);
         }),
         _pushed(AppRoutes.riderHistory, (context, state) {
           final riderId = state.uri.queryParameters['riderId'];

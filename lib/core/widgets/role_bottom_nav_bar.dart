@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../constants.dart';
 
@@ -45,16 +46,17 @@ class RoleBottomNavBar extends StatelessWidget {
           decoration: BoxDecoration(
             color: surfaceColor,
             borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: AppUi.borderOf(context)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                blurRadius: 24,
+                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                blurRadius: 20,
                 spreadRadius: 0,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, 4),
               ),
               BoxShadow(
-                color: AppUi.bluePrimary.withValues(alpha: isDark ? 0.12 : 0.06),
-                blurRadius: 12,
+                color: AppUi.bluePrimary.withValues(alpha: isDark ? 0.12 : 0.04),
+                blurRadius: 10,
                 spreadRadius: -2,
                 offset: const Offset(0, 2),
               ),
@@ -91,7 +93,12 @@ class RoleBottomNavBar extends StatelessWidget {
               ),
               child: NavigationBar(
                 selectedIndex: currentIndex,
-                onDestinationSelected: onTap,
+                onDestinationSelected: (index) {
+                  if (index != currentIndex) {
+                    HapticFeedback.selectionClick();
+                  }
+                  onTap(index);
+                },
                 height: 64,
                 elevation: 0,
                 backgroundColor: Colors.transparent,
@@ -106,7 +113,7 @@ class RoleBottomNavBar extends StatelessWidget {
                         icon: item.icon,
                         badgeCount: item.badgeCount,
                       ),
-                      selectedIcon: _NavIcon(
+                      selectedIcon: _ActiveNavIcon(
                         icon: item.activeIcon,
                         badgeCount: item.badgeCount,
                       ),
@@ -118,6 +125,30 @@ class RoleBottomNavBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ActiveNavIcon extends StatelessWidget {
+  final IconData icon;
+  final int badgeCount;
+
+  const _ActiveNavIcon({required this.icon, this.badgeCount = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(icon),
+      tween: Tween<double>(begin: 0.75, end: 1.0),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
+      child: _NavIcon(icon: icon, badgeCount: badgeCount),
     );
   }
 }

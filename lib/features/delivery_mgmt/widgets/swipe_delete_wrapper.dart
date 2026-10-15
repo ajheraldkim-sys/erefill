@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 
 class SwipeDeleteWrapper extends StatelessWidget {
   final Widget child;
@@ -22,7 +23,7 @@ class SwipeDeleteWrapper extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444),
+          color: AppColors.uiError,
           borderRadius: AppUi.radiusLg,
         ),
         child: const Column(

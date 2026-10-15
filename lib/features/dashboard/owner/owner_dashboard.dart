@@ -11,6 +11,7 @@ import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
+import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/notification_preview_sheet.dart';
 import 'package:erefill/core/widgets/role_bottom_nav_bar.dart';
 import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
@@ -417,12 +418,14 @@ class _OwnerHomeOverview extends StatefulWidget {
   State<_OwnerHomeOverview> createState() => _OwnerHomeOverviewState();
 }
 
-class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
+class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
+    with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
   Map<String, dynamic> _stats = {};
   List<dynamic> _recentOrders = [];
   OwnerInventorySnapshot? _inventory;
   StreamSubscription? _ordersSub;
+  RealtimeChannel? _ordersChannel;
   final _inventoryService = OwnerInventoryService();
   int _previousPendingCount = 0;
   bool _isFirstOrdersLoad = true;
@@ -432,6 +435,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final user = supabase.auth.currentUser;
     if (user != null) {
       final mem = LocalDataCache.instance.getMemory<Map<String, dynamic>>('owner_overview_${user.id}');
@@ -443,11 +447,21 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
     _loadCachedOverview();
     _setupOrdersListener();
     _loadInventorySnapshot();
+    _refreshOrdersSnapshot();
     _periodicRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) {
         _loadInventorySnapshot();
+        _refreshOrdersSnapshot();
       }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadInventorySnapshot();
+      _refreshOrdersSnapshot();
+    }
   }
 
   Future<void> _loadCachedOverview() async {
@@ -483,9 +497,200 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _periodicRefreshTimer?.cancel();
     _ordersSub?.cancel();
+    if (_ordersChannel != null) {
+      supabase.removeChannel(_ordersChannel!);
+    }
     super.dispose();
+  }
+
+  Future<void> _processOrders(List<dynamic> data) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    final now = DateTime.now();
+
+    double todayRevenue = 0;
+    int todayOrdersCount = 0;
+    int pendingCount = 0;
+    int acceptedCount = 0;
+    int preparingCount = 0;
+    int readyCount = 0;
+    int assignedCount = 0;
+    int deliveringCount = 0;
+    int deliveredTodayCount = 0;
+
+    for (var o in data) {
+      final rawCreated = o['created_at']?.toString();
+      final dt = rawCreated != null
+          ? DateTime.tryParse(rawCreated)?.toLocal()
+          : null;
+      final isToday = dt != null &&
+          dt.year == now.year &&
+          dt.month == now.month &&
+          dt.day == now.day;
+
+      if (isToday) {
+        todayOrdersCount++;
+        todayRevenue += (o['total_amount'] ?? 0).toDouble();
+      }
+
+      final status = o['status'];
+      if (status == 'pending') pendingCount++;
+      if (status == 'accepted') acceptedCount++;
+      if (status == 'preparing') preparingCount++;
+      if (status == 'ready_for_pickup') readyCount++;
+      if (status == 'assigned_to_rider') assignedCount++;
+      if (status == 'out_for_delivery') deliveringCount++;
+      if (status == 'delivered' && isToday) deliveredTodayCount++;
+    }
+
+    if (!_isFirstOrdersLoad && pendingCount > _previousPendingCount) {
+      HapticFeedback.heavyImpact();
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.bolt, color: Colors.amber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    pendingCount - _previousPendingCount == 1
+                        ? 'New refill order received!'
+                        : '${pendingCount - _previousPendingCount} new refill orders received!',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            action: SnackBarAction(
+              label: 'VIEW',
+              textColor: Colors.white,
+              onPressed: widget.onViewOrders,
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF0077B6),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+    _isFirstOrdersLoad = false;
+    _previousPendingCount = pendingCount;
+
+    List<Map<String, dynamic>> enrichedRecent = [];
+    try {
+      final res = await supabase
+          .from('orders')
+          .select(
+            '*, profiles!orders_customer_id_fkey(full_name, avatar_url)',
+          )
+          .eq('owner_id', user.id)
+          .order('created_at', ascending: false)
+          .limit(5);
+      enrichedRecent = List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('Failed to fetch enriched recent orders, trying fallback: $e');
+      try {
+        final simple = await supabase
+            .from('orders')
+            .select('*')
+            .eq('owner_id', user.id)
+            .order('created_at', ascending: false)
+            .limit(5);
+        enrichedRecent = List<Map<String, dynamic>>.from(simple);
+      } catch (err2) {
+        debugPrint('Failed fallback recent orders: $err2');
+      }
+    }
+
+    // Compute real 7-day daily trends from database orders
+    final List<double> revenueTrend7Days = List.filled(7, 0.0);
+    final List<double> ordersTrend7Days = List.filled(7, 0.0);
+    final List<double> deliveredTrend7Days = List.filled(7, 0.0);
+    final List<double> pendingTrend7Days = List.filled(7, 0.0);
+
+    // Calculate start of each of the last 7 calendar days (0 = 6 days ago, 6 = today)
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final sevenDaysAgo = todayMidnight.subtract(const Duration(days: 6));
+
+    for (var o in data) {
+      final rawCreated = o['created_at']?.toString();
+      final dt = rawCreated != null
+          ? DateTime.tryParse(rawCreated)?.toLocal()
+          : null;
+      if (dt == null) continue;
+
+      final orderDayMidnight = DateTime(dt.year, dt.month, dt.day);
+      final dayOffset = orderDayMidnight.difference(sevenDaysAgo).inDays;
+
+      if (dayOffset >= 0 && dayOffset < 7) {
+        final amount = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+        final status = o['status']?.toString();
+
+        ordersTrend7Days[dayOffset] += 1;
+        if (status != 'cancelled') {
+          revenueTrend7Days[dayOffset] += amount;
+        }
+        if (status == 'delivered') {
+          deliveredTrend7Days[dayOffset] += 1;
+        }
+        if (status == 'pending') {
+          pendingTrend7Days[dayOffset] += 1;
+        }
+      }
+    }
+
+    final double calculatedWeeklyRevenue =
+        revenueTrend7Days.fold<double>(0.0, (sum, val) => sum + val);
+    final int calculatedWeeklyOrders =
+        ordersTrend7Days.fold<int>(0, (sum, val) => sum + val.toInt());
+
+    if (mounted) {
+      setState(() {
+        _stats = {
+          'ordersToday': todayOrdersCount,
+          'revenueToday': todayRevenue,
+          'pending': pendingCount,
+          'accepted': acceptedCount,
+          'preparing': preparingCount,
+          'ready': readyCount,
+          'assigned': assignedCount,
+          'delivering': deliveringCount,
+          'delivered': deliveredTodayCount,
+          'weeklyRevenue': calculatedWeeklyRevenue,
+          'weeklyOrders': calculatedWeeklyOrders,
+          'revenueTrend': revenueTrend7Days,
+          'ordersTrend': ordersTrend7Days,
+          'pendingTrend': pendingTrend7Days,
+          'deliveredTrend': deliveredTrend7Days,
+        };
+        _recentOrders = enrichedRecent;
+      });
+      unawaited(
+        LocalDataCache.instance.set('owner_overview_${user.id}', {
+          'stats': _stats,
+          'recentOrders': enrichedRecent,
+        }),
+      );
+    }
+  }
+
+  Future<void> _refreshOrdersSnapshot() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final data = await supabase
+          .from('orders')
+          .select('*')
+          .eq('owner_id', user.id);
+      await _processOrders(data);
+    } catch (e) {
+      debugPrint('Failed to refresh owner orders snapshot: $e');
+    }
   }
 
   void _setupOrdersListener() async {
@@ -497,173 +702,38 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
           .from('orders')
           .stream(primaryKey: ['id'])
           .eq('owner_id', user.id),
-      (data) async {
-        final now = DateTime.now();
+      (data) => _processOrders(data),
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('Orders stream error: $error');
+        debugPrint('Orders stream stack: $stackTrace');
+      },
+    );
 
-          double todayRevenue = 0;
-          int todayOrdersCount = 0;
-          int pendingCount = 0;
-          int acceptedCount = 0;
-          int preparingCount = 0;
-          int readyCount = 0;
-          int assignedCount = 0;
-          int deliveringCount = 0;
-          int deliveredTodayCount = 0;
+    if (_ordersChannel != null) {
+      supabase.removeChannel(_ordersChannel!);
+      _ordersChannel = null;
+    }
 
-          for (var o in data) {
-            final rawCreated = o['created_at']?.toString();
-            final dt = rawCreated != null
-                ? DateTime.tryParse(rawCreated)?.toLocal()
-                : null;
-            final isToday = dt != null &&
-                dt.year == now.year &&
-                dt.month == now.month &&
-                dt.day == now.day;
-
-            if (isToday) {
-              todayOrdersCount++;
-              todayRevenue += (o['total_amount'] ?? 0).toDouble();
-            }
-
-            final status = o['status'];
-            if (status == 'pending') pendingCount++;
-            if (status == 'accepted') acceptedCount++;
-            if (status == 'preparing') preparingCount++;
-            if (status == 'ready_for_pickup') readyCount++;
-            if (status == 'assigned_to_rider') assignedCount++;
-            if (status == 'out_for_delivery') deliveringCount++;
-            if (status == 'delivered' && isToday) deliveredTodayCount++;
-          }
-
-          if (!_isFirstOrdersLoad && pendingCount > _previousPendingCount) {
-            HapticFeedback.heavyImpact();
-            if (mounted) {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.bolt, color: Colors.amber),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          pendingCount - _previousPendingCount == 1
-                              ? 'New refill order received!'
-                              : '${pendingCount - _previousPendingCount} new refill orders received!',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                  action: SnackBarAction(
-                    label: 'VIEW',
-                    textColor: Colors.white,
-                    onPressed: widget.onViewOrders,
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: const Color(0xFF0077B6),
-                  duration: const Duration(seconds: 5),
-                ),
-              );
-            }
-          }
-          _isFirstOrdersLoad = false;
-          _previousPendingCount = pendingCount;
-
-          List<Map<String, dynamic>> enrichedRecent = [];
-          try {
-            final res = await supabase
-                .from('orders')
-                .select(
-                  '*, profiles!orders_customer_id_fkey(full_name, avatar_url)',
-                )
-                .eq('owner_id', user.id)
-                .order('created_at', ascending: false)
-                .limit(5);
-            enrichedRecent = List<Map<String, dynamic>>.from(res);
-          } catch (e) {
-            debugPrint('Failed to fetch enriched recent orders, trying fallback: $e');
-            try {
-              final simple = await supabase
-                  .from('orders')
-                  .select('*')
-                  .eq('owner_id', user.id)
-                  .order('created_at', ascending: false)
-                  .limit(5);
-              enrichedRecent = List<Map<String, dynamic>>.from(simple);
-            } catch (err2) {
-              debugPrint('Failed fallback recent orders: $err2');
-            }
-          }
-
-          // Compute real 7-day daily trends from database orders
-          final List<double> revenueTrend7Days = List.filled(7, 0.0);
-          final List<double> ordersTrend7Days = List.filled(7, 0.0);
-          final List<double> deliveredTrend7Days = List.filled(7, 0.0);
-          final List<double> pendingTrend7Days = List.filled(7, 0.0);
-
-          // Calculate start of each of the last 7 calendar days (0 = 6 days ago, 6 = today)
-          final todayMidnight = DateTime(now.year, now.month, now.day);
-          final sevenDaysAgo = todayMidnight.subtract(const Duration(days: 6));
-
-          for (var o in data) {
-            final rawCreated = o['created_at']?.toString();
-            final dt = rawCreated != null
-                ? DateTime.tryParse(rawCreated)?.toLocal()
-                : null;
-            if (dt == null) continue;
-
-            final orderDayMidnight = DateTime(dt.year, dt.month, dt.day);
-            final dayOffset = orderDayMidnight.difference(sevenDaysAgo).inDays;
-
-            if (dayOffset >= 0 && dayOffset < 7) {
-              final amount = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
-              final status = o['status']?.toString();
-
-              ordersTrend7Days[dayOffset] += 1;
-              if (status != 'cancelled') {
-                revenueTrend7Days[dayOffset] += amount;
-              }
-              if (status == 'delivered') {
-                deliveredTrend7Days[dayOffset] += 1;
-              }
-              if (status == 'pending') {
-                pendingTrend7Days[dayOffset] += 1;
-              }
-            }
-          }
-
-          if (mounted) {
-            setState(() {
-              _stats = {
-                'ordersToday': todayOrdersCount,
-                'revenueToday': todayRevenue,
-                'pending': pendingCount,
-                'accepted': acceptedCount,
-                'preparing': preparingCount,
-                'ready': readyCount,
-                'assigned': assignedCount,
-                'delivering': deliveringCount,
-                'delivered': deliveredTodayCount,
-                'weeklyRevenue': todayRevenue,
-                'weeklyOrders': todayOrdersCount,
-                'revenueTrend': revenueTrend7Days,
-                'ordersTrend': ordersTrend7Days,
-                'pendingTrend': pendingTrend7Days,
-                'deliveredTrend': deliveredTrend7Days,
-              };
-              _recentOrders = enrichedRecent;
+    _ordersChannel = supabase
+        .channel('public:orders:owner_overview:${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'orders',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'owner_id',
+            value: user.id,
+          ),
+          callback: (_) => _refreshOrdersSnapshot(),
+        )
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.timedOut) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) _setupOrdersListener();
             });
-            unawaited(
-              LocalDataCache.instance.set('owner_overview_${user.id}', {
-                'stats': _stats,
-                'recentOrders': enrichedRecent,
-              }),
-            );
           }
-        }, onError: (Object error, StackTrace stackTrace) {
-          debugPrint('Orders stream error: $error');
-          debugPrint('Orders stream stack: $stackTrace');
         });
   }
 
@@ -1016,7 +1086,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
               },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                  parent: ClampingScrollPhysics(),
                 ),
                 slivers: [
                   SliverPadding(
@@ -1035,7 +1105,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                               message:
                                   'Customers can order confidently once your profile, location, and pricing are complete.',
                               icon: Icons.lightbulb_outline_rounded,
-                              color: const Color(0xFFF59E0B),
+                              color: AppColors.uiWarning,
                               actionLabel: 'Open account setup',
                               onAction: widget.onOpenAccount,
                             ),
@@ -1237,31 +1307,31 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                         const SizedBox(height: 12),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
+                          physics: const ClampingScrollPhysics(),
                           child: Row(
                             children: [
                               _buildLogisticsChip(
                                 'Pending',
                                 (_stats['pending'] as num?)?.toInt() ?? 0,
-                                AppUi.textMuted,
+                                OrderStatusColors.getColor('pending'),
                               ),
                               const SizedBox(width: 8),
                               _buildLogisticsChip(
                                 'Preparing',
                                 (_stats['preparing'] as num?)?.toInt() ?? 0,
-                                const Color(0xFF8B5CF6),
+                                OrderStatusColors.getColor('preparing'),
                               ),
                               const SizedBox(width: 8),
                               _buildLogisticsChip(
                                 'Ready',
                                 (_stats['ready'] as num?)?.toInt() ?? 0,
-                                const Color(0xFF0F766E),
+                                OrderStatusColors.getColor('ready_for_pickup'),
                               ),
                               const SizedBox(width: 8),
                               _buildLogisticsChip(
                                 'Delivering',
                                 (_stats['delivering'] as num?)?.toInt() ?? 0,
-                                const Color(0xFFF59E0B),
+                                OrderStatusColors.getColor('out_for_delivery'),
                               ),
                             ],
                           ),
@@ -1299,7 +1369,12 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
                             compact: true,
                           )
                         else
-                          ..._recentOrders.map((o) => _OrderListItem(order: o)),
+                          ..._recentOrders.map(
+                            (o) => _OrderListItem(
+                              order: o,
+                              onTap: widget.onViewOrders,
+                            ),
+                          ),
                       ]),
                     ),
                   ),
@@ -1389,121 +1464,19 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview> {
 
 class _OrderListItem extends StatelessWidget {
   final Map<String, dynamic> order;
+  final VoidCallback? onTap;
 
-  const _OrderListItem({required this.order});
+  const _OrderListItem({required this.order, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final rawCustomer = order['profiles'];
-    final customer = rawCustomer is Map ? Map<String, dynamic>.from(rawCustomer) : null;
-
-    // Priority: 1. Denormalized column in 'orders', 2. Joined Profile name, 3. Fallback
-    final customerName =
-        order['customer_name'] ?? customer?['full_name'] ?? 'Guest Customer';
-
-    final status = order['status'];
-    final createdAtValue = order['created_at']?.toString();
-    final parsedTime =
-        DateTime.tryParse(createdAtValue ?? '') ?? DateTime.now();
-    final time = parsedTime.toLocal();
-    final timeStr = '${time.hour}:${time.minute.toString().padLeft(2, '0')}';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        borderRadius: AppUi.cardRadius,
-        border: Border.all(color: AppUi.borderOf(context)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppUi.bluePrimary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.person_outline_rounded,
-                color: AppUi.bluePrimary,
-                size: 24,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customerName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: AppUi.textPrimaryOf(context),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Order ID: #${order['id'].toString().substring(0, 5)} • $timeStr',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppUi.textSecondaryOf(context),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildStatusBadge(status),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    switch (status) {
-      case 'pending':
-        color = AppUi.textMuted;
-        break;
-      case 'accepted':
-        color = AppUi.accentCyan;
-        break;
-      case 'preparing':
-        color = const Color(0xFFF59E0B);
-        break;
-      case 'ready_for_pickup':
-        color = const Color(0xFF0F766E);
-        break;
-      case 'assigned_to_rider':
-        color = AppUi.bluePrimary;
-        break;
-      case 'out_for_delivery':
-        color = const Color(0xFF6366F1);
-        break;
-      case 'delivered':
-        color = const Color(0xFF10B981);
-        break;
-      default:
-        color = Colors.grey;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-          color: color,
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: OrderCard(
+        order: order,
+        role: OrderCardRole.owner,
+        isFullColor: true,
+        onTap: onTap,
       ),
     );
   }

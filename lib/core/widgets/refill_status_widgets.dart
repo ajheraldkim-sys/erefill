@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
+import '../theme/app_colors.dart';
 import '../water_types.dart';
+import 'order_card.dart';
+
+export '../theme/app_colors.dart';
+export 'order_card.dart';
 
 class OrderStatusPresentation {
   final String label;
@@ -15,68 +20,80 @@ class OrderStatusPresentation {
   });
 
   static OrderStatusPresentation fromStatus(String? status) {
-    switch ((status ?? 'pending').toLowerCase()) {
+    final normalized = (status ?? 'pending').toLowerCase().trim();
+    switch (normalized) {
       case 'pending_sync':
         return const OrderStatusPresentation(
           label: 'Queued Offline',
-          color: Color(0xFFF59E0B),
+          color: AppColors.statusPending,
           icon: Icons.cloud_upload_outlined,
         );
       case 'pending':
         return const OrderStatusPresentation(
           label: 'Pending',
-          color: Color(0xFFF59E0B),
+          color: AppColors.statusPending,
           icon: Icons.schedule_rounded,
         );
       case 'accepted':
+      case 'confirmed':
         return const OrderStatusPresentation(
           label: 'Accepted',
-          color: AppUi.bluePrimary,
+          color: AppColors.statusConfirmed,
           icon: Icons.thumb_up_alt_outlined,
         );
       case 'preparing':
+      case 'in_prep':
         return const OrderStatusPresentation(
           label: 'Preparing',
-          color: Color(0xFF8B5CF6),
+          color: AppColors.statusPreparing,
           icon: Icons.water_drop_rounded,
         );
       case 'ready':
       case 'ready_for_pickup':
         return const OrderStatusPresentation(
           label: 'Ready for Pickup',
-          color: Color(0xFF0F766E),
+          color: AppColors.statusReady,
           icon: Icons.inventory_2_outlined,
         );
       case 'rider_assigned':
       case 'assigned_to_rider':
         return const OrderStatusPresentation(
           label: 'Assigned to Rider',
-          color: AppUi.bluePrimary,
+          color: AppColors.statusOutForDelivery,
           icon: Icons.person_pin_circle_outlined,
         );
       case 'delivering':
       case 'out_for_delivery':
+      case 'dispatched':
         return const OrderStatusPresentation(
           label: 'Out for Delivery',
-          color: Color(0xFF7C3AED),
+          color: AppColors.statusOutForDelivery,
           icon: Icons.delivery_dining_rounded,
         );
       case 'delivered':
+      case 'completed':
         return const OrderStatusPresentation(
           label: 'Delivered',
-          color: AppUi.accentGreen,
+          color: AppColors.statusCompleted,
           icon: Icons.check_circle_rounded,
         );
       case 'cancelled':
+      case 'canceled':
         return const OrderStatusPresentation(
           label: 'Cancelled',
-          color: Color(0xFFEF4444),
+          color: AppColors.statusCancelled,
           icon: Icons.cancel_rounded,
+        );
+      case 'rejected':
+        return const OrderStatusPresentation(
+          label: 'Rejected',
+          color: AppColors.statusRejected,
+          icon: Icons.block_rounded,
         );
       default:
         return const OrderStatusPresentation(
           label: 'Processing',
-          color: AppUi.textSecondary,
+          color: AppColors.statusNeutral,
           icon: Icons.help_outline_rounded,
         );
     }
@@ -97,35 +114,10 @@ class OrderStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = OrderStatusPresentation.fromStatus(status);
-    final stateColor = state.label == 'Processing'
-        ? AppUi.textSecondaryOf(context)
-        : state.color;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: stateColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: stateColor.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showIcon) ...[
-            Icon(state.icon, size: 12, color: stateColor),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            uppercase ? state.label.toUpperCase() : state.label,
-            style: TextStyle(
-              fontSize: uppercase ? 10 : 11,
-              color: stateColor,
-              fontWeight: FontWeight.w800,
-              letterSpacing: uppercase ? 0.5 : 0.2,
-            ),
-          ),
-        ],
-      ),
+    return OrderStatusChip(
+      status: status,
+      showIcon: showIcon,
+      uppercase: uppercase,
     );
   }
 }
@@ -593,6 +585,8 @@ class RefillOrderStatusTimeline extends StatelessWidget {
       (label: 'Delivered', icon: Icons.check_rounded),
     ];
 
+    final statusColor = OrderStatusColors.getColor(status);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -613,10 +607,10 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: AppUi.blueSoft,
+                      color: statusColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(stage.icon, color: AppUi.bluePrimary, size: 20),
+                    child: Icon(stage.icon, color: statusColor, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -656,6 +650,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                         icon: milestones[i].icon,
                         isComplete: i < progressIndex,
                         isCurrent: i == progressIndex,
+                        statusColor: statusColor,
                       ),
                     ),
                     if (i < milestones.length - 1)
@@ -665,7 +660,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                           margin: const EdgeInsets.only(bottom: 20),
                           decoration: BoxDecoration(
                             color: i < progressIndex
-                                ? AppUi.bluePrimary
+                                ? statusColor
                                 : AppUi.dividerOf(context),
                             borderRadius: BorderRadius.circular(99),
                           ),
@@ -695,12 +690,14 @@ class _ProgressMilestone extends StatelessWidget {
   final IconData icon;
   final bool isComplete;
   final bool isCurrent;
+  final Color statusColor;
 
   const _ProgressMilestone({
     required this.label,
     required this.icon,
     required this.isComplete,
     required this.isCurrent,
+    this.statusColor = AppUi.bluePrimary,
   });
 
   @override
@@ -712,10 +709,10 @@ class _ProgressMilestone extends StatelessWidget {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: isReached ? AppUi.bluePrimary : AppUi.surfaceOf(context),
+            color: isReached ? statusColor : AppUi.surfaceOf(context),
             shape: BoxShape.circle,
             border: Border.all(
-              color: isReached ? AppUi.bluePrimary : AppUi.dividerOf(context),
+              color: isReached ? statusColor : AppUi.dividerOf(context),
               width: 2,
             ),
           ),
@@ -733,7 +730,7 @@ class _ProgressMilestone extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: isCurrent
-                ? AppUi.bluePrimary
+                ? statusColor
                 : AppUi.textSecondaryOf(context),
             fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
             fontSize: 9,

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/report_export_service.dart';
 import '../../../core/widgets/app_form_fields.dart';
@@ -285,10 +286,10 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
     final isPartial = !isPaid && credit.paidAmount > 0;
 
     final badgeColor = isPaid
-        ? AppUi.successFg
+        ? AppColors.uiSuccess
         : isPartial
-        ? const Color(0xFFF59E0B)
-        : AppUi.error;
+        ? AppColors.uiWarning
+        : AppColors.uiError;
 
     final badgeText = isPaid
         ? 'PAID'
@@ -339,7 +340,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                     ? Icons.cloud_done_rounded
                     : Icons.cloud_off_rounded,
                 size: 16,
-                color: credit.isSynced ? AppUi.successFg : const Color(0xFFF59E0B),
+                color: credit.isSynced ? AppColors.uiSuccess : AppColors.uiWarning,
               ),
             ],
           ),
@@ -684,8 +685,8 @@ class _DeliveryLogsTab extends StatelessWidget {
                                 : Icons.cloud_off_rounded,
                             size: 16,
                             color: d.isSynced
-                                ? AppUi.successFg
-                                : const Color(0xFFF59E0B),
+                                ? AppColors.uiSuccess
+                                : AppColors.uiWarning,
                           ),
                         ],
                       ),
@@ -934,7 +935,7 @@ class _ReportsAnalyticsTab extends StatelessWidget {
                   context,
                   title: 'Deliveries',
                   value: '${reportProv.totalDeliveries}',
-                  color: const Color(0xFFF59E0B),
+                  color: OrderStatusColors.outForDelivery,
                   icon: Icons.local_shipping_rounded,
                 ),
               ),
@@ -944,7 +945,7 @@ class _ReportsAnalyticsTab extends StatelessWidget {
                   context,
                   title: 'Net Profit',
                   value: '₱${reportProv.netProfit.toStringAsFixed(0)}',
-                  color: const Color(0xFF10B981),
+                  color: AppColors.statusCompleted,
                   icon: Icons.trending_up_rounded,
                 ),
               ),

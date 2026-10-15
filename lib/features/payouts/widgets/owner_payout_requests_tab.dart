@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/theme/app_colors.dart';
 import '../models/payout_model.dart';
 import '../services/payout_service.dart';
 
@@ -153,19 +154,19 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
 
     switch (req.status) {
       case 'disbursed':
-        statusColor = const Color(0xFF10B981);
+        statusColor = AppColors.statusCompleted;
         statusLabel = 'DISBURSED';
         break;
       case 'approved':
-        statusColor = const Color(0xFF3B82F6);
+        statusColor = AppColors.statusConfirmed;
         statusLabel = 'APPROVED';
         break;
       case 'rejected':
-        statusColor = const Color(0xFFEF4444);
+        statusColor = AppColors.statusRejected;
         statusLabel = 'DECLINED';
         break;
       default:
-        statusColor = const Color(0xFFF59E0B);
+        statusColor = AppColors.statusPending;
         statusLabel = 'PENDING';
     }
 

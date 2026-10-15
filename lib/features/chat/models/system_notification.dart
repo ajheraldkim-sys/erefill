@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 
 enum NotificationType {
   orderAssigned,
@@ -91,19 +91,19 @@ enum NotificationType {
   Color get color {
     switch (this) {
       case NotificationType.orderAssigned:
-        return const Color(0xFF10B981); // green
+        return AppColors.statusConfirmed;
       case NotificationType.earningsPayout:
-        return const Color(0xFFF59E0B); // amber
+        return AppColors.statusPending;
       case NotificationType.systemAlert:
-        return AppUi.bluePrimary;
+        return AppColors.uiInfo;
       case NotificationType.stationBroadcast:
-        return const Color(0xFF8B5CF6); // purple
+        return AppColors.brandPrimary;
       case NotificationType.orderCancelled:
-        return const Color(0xFFEF4444); // red
+        return AppColors.statusCancelled;
       case NotificationType.newMessage:
-        return AppUi.bluePrimary;
+        return AppColors.brandPrimary;
       case NotificationType.deliveryReminder:
-        return const Color(0xFFF97316); // orange
+        return AppColors.statusOutForDelivery;
     }
   }
 }
@@ -145,13 +145,13 @@ enum NotificationPriority {
   Color get color {
     switch (this) {
       case NotificationPriority.low:
-        return Colors.grey;
+        return AppColors.statusNeutral;
       case NotificationPriority.normal:
-        return const Color(0xFF3B82F6);
+        return AppColors.uiInfo;
       case NotificationPriority.high:
-        return const Color(0xFFF59E0B);
+        return AppColors.uiWarning;
       case NotificationPriority.urgent:
-        return const Color(0xFFEF4444);
+        return AppColors.uiError;
     }
   }
 }

@@ -166,12 +166,14 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                 icon: Container(
                   padding: const EdgeInsets.all(AppUi.spacingXs),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : AppUi.blueSoft,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     registeredService == null ? Icons.add : Icons.edit,
-                    color: Colors.white,
+                    color: AppUi.bluePrimary,
                     size: 20,
                   ),
                 ),
@@ -179,21 +181,29 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
             ],
             bottom: TextField(
               onChanged: (v) => setState(() => _searchQuery = v),
-              style: const TextStyle(color: AppUi.textPrimary),
+              style: TextStyle(color: AppUi.textPrimaryOf(context)),
               decoration: InputDecoration(
                 hintText: 'Search price or notes',
                 hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: AppUi.textSecondaryOf(context),
                 ),
                 prefixIcon: Icon(
                   Icons.search,
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: AppUi.textSecondaryOf(context),
                 ),
                 filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.15),
+                fillColor: AppUi.surfaceOf(context),
                 border: OutlineInputBorder(
                   borderRadius: AppUi.pillRadius,
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: AppUi.borderOf(context)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppUi.pillRadius,
+                  borderSide: BorderSide(color: AppUi.borderOf(context)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: AppUi.pillRadius,
+                  borderSide: const BorderSide(color: AppUi.bluePrimary, width: 2),
                 ),
               ),
             ),

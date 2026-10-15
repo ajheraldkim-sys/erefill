@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -771,61 +773,49 @@ class _GoogleIcon extends StatelessWidget {
 class _GooglePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
     final cx = size.width / 2;
     final cy = size.height / 2;
-    final r = size.width / 2;
+    final radius = size.width / 2;
+    final ringRadius = radius * 0.9;
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.38
+      ..strokeCap = StrokeCap.round;
 
-    // Draw colored arcs (simplified Google G colors)
-    // Red top
-    paint.color = const Color(0xFFEA4335);
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: r),
-      -1.4,
-      2.0,
-      false,
-      paint
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.36,
-    );
-    // Green bottom-right
-    paint.color = const Color(0xFF34A853);
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: r),
-      0.6,
-      1.0,
-      false,
-      paint,
-    );
-    // Yellow bottom-left
-    paint.color = const Color(0xFFFBBC05);
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: r),
-      1.6,
-      0.8,
-      false,
-      paint,
-    );
-    // Blue left
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: r),
-      2.4,
-      0.7,
-      false,
-      paint,
+    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: ringRadius);
+
+    ringPaint.color = const Color(0xFF4285F4);
+    canvas.drawArc(rect, 1.9 * math.pi, 1.0 * math.pi, false, ringPaint);
+
+    ringPaint.color = const Color(0xFF34A853);
+    canvas.drawArc(rect, 0.1 * math.pi, 0.9 * math.pi, false, ringPaint);
+
+    ringPaint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(rect, 0.95 * math.pi, 0.9 * math.pi, false, ringPaint);
+
+    ringPaint.color = const Color(0xFFEA4335);
+    canvas.drawArc(rect, -0.9 * math.pi, 0.9 * math.pi, false, ringPaint);
+
+    final cutout = Paint()..color = Colors.white;
+    canvas.drawCircle(
+      Offset(cx + radius * 0.08, cy),
+      radius * 0.58,
+      cutout,
     );
 
-    // White inner circle to make it look like a ring
-    paint
-      ..color = Colors.white
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 0;
-    canvas.drawCircle(Offset(cx, cy), r * 0.6, paint);
-
-    // Blue "G" bar going right
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawRect(Rect.fromLTWH(cx, cy - r * 0.18, r * 0.9, r * 0.36), paint);
+    final accentBar = Paint()..color = const Color(0xFF4285F4);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          cx + radius * 0.12,
+          cy - radius * 0.18,
+          radius * 0.68,
+          radius * 0.36,
+        ),
+        Radius.circular(radius * 0.12),
+      ),
+      accentBar,
+    );
   }
 
   @override

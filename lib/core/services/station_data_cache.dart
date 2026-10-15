@@ -12,6 +12,7 @@ class CachedStationBundle {
   final Map<String, dynamic>? settingsData;
   final Map<String, dynamic>? profileData;
   final List<int> ratingCounts;
+  final List<dynamic> reviews;
   final double? pricePerGallon;
   final double baseDeliveryFee;
   final String? waterType;
@@ -23,6 +24,7 @@ class CachedStationBundle {
     this.settingsData,
     this.profileData,
     required this.ratingCounts,
+    this.reviews = const [],
     this.pricePerGallon,
     required this.baseDeliveryFee,
     this.waterType,
@@ -38,6 +40,7 @@ class CachedStationBundle {
     'settingsData': settingsData,
     'profileData': profileData,
     'ratingCounts': ratingCounts,
+    'reviews': reviews,
     'pricePerGallon': pricePerGallon,
     'baseDeliveryFee': baseDeliveryFee,
     'waterType': waterType,
@@ -57,6 +60,7 @@ class CachedStationBundle {
         ratingCounts: (json['ratingCounts'] as List? ?? const [0, 0, 0, 0, 0])
             .map((e) => (e as num).toInt())
             .toList(),
+        reviews: (json['reviews'] as List? ?? const []).cast<dynamic>(),
         pricePerGallon: (json['pricePerGallon'] as num?)?.toDouble(),
         baseDeliveryFee: (json['baseDeliveryFee'] as num?)?.toDouble() ?? 25.0,
         waterType: json['waterType']?.toString(),
@@ -69,6 +73,7 @@ class CachedStationBundle {
     Map<String, dynamic>? settingsData,
     Map<String, dynamic>? profileData,
     List<int>? ratingCounts,
+    List<dynamic>? reviews,
     double? pricePerGallon,
     double? baseDeliveryFee,
     String? waterType,
@@ -79,6 +84,7 @@ class CachedStationBundle {
       settingsData: settingsData ?? this.settingsData,
       profileData: profileData ?? this.profileData,
       ratingCounts: ratingCounts ?? this.ratingCounts,
+      reviews: reviews ?? this.reviews,
       pricePerGallon: pricePerGallon ?? this.pricePerGallon,
       baseDeliveryFee: baseDeliveryFee ?? this.baseDeliveryFee,
       waterType: waterType ?? this.waterType,
@@ -230,11 +236,33 @@ class StationDataCache {
           .eq('id', ownerId)
           .maybeSingle(),
 
-      // 3: Rating breakdown
-      supabase
-          .from('reviews')
-          .select('rating')
-          .eq('station_id', ownerId),
+      // 3: Customer reviews & rating breakdown
+      () async {
+        try {
+          final res = await supabase
+              .from('reviews')
+              .select(
+                'id, rating, comment, created_at, customer_id, '
+                'profiles:customer_id(full_name, avatar_url)',
+              )
+              .eq('station_id', ownerId)
+              .order('created_at', ascending: false);
+          return (res as List? ?? const []).cast<dynamic>();
+        } catch (e) {
+          debugPrint('StationDataCache: Profile join failed on reviews ($e), falling back to flat query');
+          try {
+            final fallback = await supabase
+                .from('reviews')
+                .select('id, rating, comment, created_at, customer_id')
+                .eq('station_id', ownerId)
+                .order('created_at', ascending: false);
+            return (fallback as List? ?? const []).cast<dynamic>();
+          } catch (e2) {
+            debugPrint('StationDataCache: Failed to fetch reviews ($e2)');
+            return const <dynamic>[];
+          }
+        }
+      }(),
     ]);
 
     final productData = (results[0] as List? ?? const []).cast<dynamic>();
@@ -243,25 +271,43 @@ class StationDataCache {
     final reviewRows = results[3] as List? ?? const [];
 
     final ratingCounts = List<int>.filled(5, 0);
+    double ratingSum = 0.0;
     for (final review in reviewRows) {
       final rating = (review['rating'] as num?)?.toInt();
       if (rating != null && rating >= 1 && rating <= 5) {
         ratingCounts[rating - 1]++;
+        ratingSum += rating;
       }
     }
+
+    final liveReviewCount = reviewRows.length;
+    final liveAverageRating =
+        liveReviewCount > 0 ? (ratingSum / liveReviewCount) : 0.0;
+
+    final baseProfileData = profileData ?? <String, dynamic>{};
+    final enrichedProfileData = {
+      ...baseProfileData,
+      'review_count': liveReviewCount > 0
+          ? liveReviewCount
+          : ((baseProfileData['review_count'] as num?)?.toInt() ?? 0),
+      'average_rating': liveReviewCount > 0
+          ? liveAverageRating
+          : ((baseProfileData['average_rating'] as num?)?.toDouble() ?? 0.0),
+    };
 
     final pricePerGallon =
         (settingsData?['price_per_gallon'] as num?)?.toDouble();
     final baseDeliveryFee =
         (settingsData?['base_delivery_fee'] as num?)?.toDouble() ?? 25.0;
-    final waterType = profileData?['primary_water_type']?.toString();
+    final waterType = enrichedProfileData['primary_water_type']?.toString();
 
     return CachedStationBundle(
       ownerId: ownerId,
       products: productData,
       settingsData: settingsData,
-      profileData: profileData,
+      profileData: enrichedProfileData,
       ratingCounts: ratingCounts,
+      reviews: reviewRows,
       pricePerGallon: pricePerGallon,
       baseDeliveryFee: baseDeliveryFee,
       waterType: waterType,
@@ -284,6 +330,7 @@ class StationDataCache {
                 ownerId: id,
                 products: const [],
                 ratingCounts: List.filled(5, 0),
+                reviews: const [],
                 baseDeliveryFee: 25.0,
                 cachedAt: DateTime.now(),
               );
@@ -335,8 +382,12 @@ class StationDataCache {
       final mergedProfile = {...?existing.profileData, ...record};
       final wt = record['primary_water_type']?.toString() ?? existing.waterType;
       set(ownerId, existing.copyWith(profileData: mergedProfile, waterType: wt));
+    } else if (table == 'reviews') {
+      // Invalidate memory and disk cache so getOrFetch fetches fresh reviews immediately
+      invalidate(ownerId);
+      getOrFetch(ownerId, forceRefresh: true).catchError((_) => existing);
     } else {
-      // For reviews or other tables, trigger background refresh
+      // For other tables, trigger background refresh
       getOrFetch(ownerId, forceRefresh: true).catchError((_) => existing);
     }
   }

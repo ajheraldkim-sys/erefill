@@ -118,6 +118,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget _buildAuthenticatedContent(BuildContext context, UserProvider userProvider) {
     final user = userProvider.user;
     if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && userProvider.user == null && !userProvider.isLoading) {
+          userProvider.refreshProfile();
+        }
+      });
       return Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
         body: SafeArea(

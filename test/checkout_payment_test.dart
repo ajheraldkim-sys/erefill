@@ -56,6 +56,22 @@ void main() {
         missingMapPin.message,
         'Pin your map location on your delivery address to continue.',
       );
+
+      final zeroCoordinatePin = CheckoutRules.validate(
+        cart: cart,
+        customerId: 'customer-id',
+        isStationOpen: true,
+        customerProfile: {
+          'complete_address': 'Purok 1',
+          'latitude': 0.0,
+          'longitude': 0.0,
+        },
+      );
+      expect(zeroCoordinatePin.canSubmit, isFalse);
+      expect(
+        zeroCoordinatePin.message,
+        'Pin your map location on your delivery address to continue.',
+      );
     });
 
     test('allows complete checkout details in test mode payment methods', () {
@@ -83,12 +99,23 @@ void main() {
         'landmark': 'Beside hall',
         'latitude': 9.21,
         'longitude': 125.88,
+        'map_pin_town': 'Madrid',
       });
 
       expect(selected['complete_address'], 'Market Road');
       expect(selected['barangay'], 'Poblacion');
       expect(selected['latitude'], 9.21);
       expect(selected['longitude'], 125.88);
+      expect(CheckoutRules.deliveryProfileIssue(selected), isNull);
+
+      final mismatchedPinTown = {
+        ...selected,
+        'map_pin_town': 'Cantilan',
+      };
+      expect(
+        CheckoutRules.deliveryProfileIssue(mismatchedPinTown),
+        'Confirm this address on the map before using it for delivery.',
+      );
     });
   });
 

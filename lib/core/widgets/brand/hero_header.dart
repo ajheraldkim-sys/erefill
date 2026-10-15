@@ -37,6 +37,7 @@ class CustomerHeroHeader extends StatelessWidget {
   final Widget? searchBar;
   final VoidCallback? onNotificationTap;
   final VoidCallback? onFavoritesTap;
+  final VoidCallback? onLocationTap;
   final int notificationCount;
   final int favoritesCount;
 
@@ -47,6 +48,7 @@ class CustomerHeroHeader extends StatelessWidget {
     this.searchBar,
     this.onNotificationTap,
     this.onFavoritesTap,
+    this.onLocationTap,
     this.notificationCount = 0,
     this.favoritesCount = 0,
   });
@@ -87,27 +89,43 @@ class CustomerHeroHeader extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            size: 14,
-                            color: onHeroSoft,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              location,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                      InkWell(
+                        onTap: onLocationTap,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on_rounded,
+                                size: 14,
                                 color: onHeroSoft,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  location,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: onHeroSoft,
+                                  ),
+                                ),
+                              ),
+                              if (onLocationTap != null) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  size: 16,
+                                  color: onHeroSoft,
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),

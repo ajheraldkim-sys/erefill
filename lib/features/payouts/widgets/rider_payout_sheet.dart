@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/theme/app_colors.dart';
 import '../models/payout_model.dart';
 import '../services/payout_service.dart';
 
@@ -303,22 +304,22 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
 
     switch (req.status) {
       case 'disbursed':
-        statusColor = const Color(0xFF10B981);
+        statusColor = AppColors.statusCompleted;
         statusLabel = 'DISBURSED';
         statusIcon = Icons.check_circle_rounded;
         break;
       case 'approved':
-        statusColor = const Color(0xFF3B82F6);
+        statusColor = AppColors.statusConfirmed;
         statusLabel = 'APPROVED';
         statusIcon = Icons.thumb_up_rounded;
         break;
       case 'rejected':
-        statusColor = const Color(0xFFEF4444);
+        statusColor = AppColors.statusRejected;
         statusLabel = 'DECLINED';
         statusIcon = Icons.cancel_rounded;
         break;
       default:
-        statusColor = const Color(0xFFF59E0B);
+        statusColor = AppColors.statusPending;
         statusLabel = 'PENDING';
         statusIcon = Icons.hourglass_top_rounded;
     }

@@ -95,11 +95,26 @@ class LocalDataCache {
       if (value == null) {
         await prefs.remove('$_prefix$key');
       } else {
-        await prefs.setString('$_prefix$key', jsonEncode(value));
+        await prefs.setString('$_prefix$key', _encode(value));
       }
     } catch (e) {
       debugPrint('LocalDataCache set error for $key: $e');
     }
+  }
+
+  /// Encodes cache values defensively. Feature-level models may use a Set for
+  /// in-memory de-duplication, but JSON and SharedPreferences support lists
+  /// only. This converter applies recursively through [jsonEncode].
+  String _encode(dynamic value) {
+    return jsonEncode(
+      value,
+      toEncodable: (nonEncodable) {
+        if (nonEncodable is Set) {
+          return nonEncodable.toList(growable: false);
+        }
+        return (nonEncodable as dynamic).toJson();
+      },
+    );
   }
 
   /// Deduplicate concurrent network fetches while instantly returning or saving cache.
@@ -142,6 +157,20 @@ class LocalDataCache {
       final prefs = _prefs ?? await SharedPreferences.getInstance();
       _prefs = prefs;
       await prefs.remove('$_prefix$key');
+    } catch (_) {}
+  }
+
+  /// Invalidate all cache entries matching a prefix pattern
+  Future<void> invalidatePattern(String prefix) async {
+    _memoryCache.removeWhere((k, _) => k.startsWith(prefix));
+    try {
+      final prefs = _prefs ?? await SharedPreferences.getInstance();
+      _prefs = prefs;
+      final fullPrefix = '$_prefix$prefix';
+      final keys = prefs.getKeys().where((k) => k.startsWith(fullPrefix)).toList();
+      for (final k in keys) {
+        await prefs.remove(k);
+      }
     } catch (_) {}
   }
 

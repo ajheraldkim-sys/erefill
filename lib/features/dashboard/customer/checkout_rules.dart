@@ -138,6 +138,7 @@ class CheckoutRules {
       'landmark': address['landmark'],
       'latitude': address['latitude'],
       'longitude': address['longitude'],
+      'map_pin_town': address['map_pin_town'],
     };
   }
 
@@ -189,9 +190,20 @@ class CheckoutRules {
       return 'Add your delivery address below to continue.';
     }
 
-    final customerLat = (customerProfile?['latitude'] as num?)?.toDouble();
-    final customerLng = (customerProfile?['longitude'] as num?)?.toDouble();
-    if (customerLat == null || customerLng == null) {
+    // A saved-address pin is verified when an explicit map_pin_town is provided.
+    // Legacy profiles or addresses where map_pin_town is null remain supported as
+    // long as they have usable delivery coordinates.
+    final town = customerProfile?['town']?.toString();
+    final pinTown = customerProfile?['map_pin_town']?.toString();
+    if (pinTown != null &&
+        pinTown.isNotEmpty &&
+        town != null &&
+        town.isNotEmpty &&
+        pinTown != town) {
+      return 'Confirm this address on the map before using it for delivery.';
+    }
+
+    if (!hasUsableDeliveryCoordinates(customerProfile)) {
       return 'Pin your map location on your delivery address to continue.';
     }
 
@@ -200,6 +212,23 @@ class CheckoutRules {
 
   static bool isDeliveryProfileReady(Map<String, dynamic>? customerProfile) {
     return deliveryProfileIssue(customerProfile) == null;
+  }
+
+  /// `0,0` is a fallback/sentinel, not a deliverable map location. The
+  /// previous null-only check allowed it through and sent orders to a
+  /// location inconsistent with the selected municipality.
+  static bool hasUsableDeliveryCoordinates(
+    Map<String, dynamic>? customerProfile,
+  ) {
+    final latitude = (customerProfile?['latitude'] as num?)?.toDouble();
+    final longitude = (customerProfile?['longitude'] as num?)?.toDouble();
+    return latitude != null &&
+        longitude != null &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180 &&
+        (latitude != 0 || longitude != 0);
   }
 
   static String statusTitle(String status) {

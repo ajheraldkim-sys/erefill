@@ -33,10 +33,11 @@ abstract final class OrderProductHelpers {
     return isValidProductId(product['id']);
   }
 
-  /// Picks the default product from a loaded list — no user selection required.
+  /// Picks the default product from a loaded list — prioritizing customer preferred water type when provided.
   static Map<String, dynamic>? defaultFromList(
     List<dynamic> products, {
     String? stationWaterType,
+    String? preferredWaterType,
   }) {
     if (products.isEmpty) return null;
 
@@ -53,12 +54,28 @@ abstract final class OrderProductHelpers {
               .toList();
     if (pool.isEmpty) return null;
 
+    // 1. If preferredWaterType is provided, prioritize matching customer's preference
+    if (preferredWaterType != null && preferredWaterType.trim().isNotEmpty) {
+      final customerPreferred = WaterTypes.byName(preferredWaterType);
+      for (final product in pool) {
+        final type = WaterTypes.byName(
+          product['category']?.toString() ?? product['name']?.toString(),
+        );
+        if (type.shortName.toLowerCase() == customerPreferred.shortName.toLowerCase()) {
+          return product;
+        }
+      }
+    }
+
+    // 2. Otherwise match the station's primary water type
     final preferred = WaterTypes.byName(stationWaterType);
     for (final product in pool) {
       final type = WaterTypes.byName(
         product['category']?.toString() ?? product['name']?.toString(),
       );
-      if (type.shortName == preferred.shortName) return product;
+      if (type.shortName.toLowerCase() == preferred.shortName.toLowerCase()) {
+        return product;
+      }
     }
 
     pool.sort((a, b) {
@@ -120,13 +137,18 @@ abstract final class OrderProductHelpers {
     Map<String, dynamic>? selected,
     List<dynamic> products = const [],
     String? waterType,
+    String? preferredWaterType,
     double? settingsPrice,
   }) async {
     if (isRealProduct(selected)) {
       return selected;
     }
 
-    final fromList = defaultFromList(products, stationWaterType: waterType);
+    final fromList = defaultFromList(
+      products,
+      stationWaterType: waterType,
+      preferredWaterType: preferredWaterType,
+    );
     if (isRealProduct(fromList)) {
       return fromList;
     }

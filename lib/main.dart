@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:erefill/features/settings/customer/user_settings_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
@@ -34,6 +36,15 @@ void main() async {
   // Configure native Android edge-to-edge system navigation and transparent status bar
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(AppTheme.baseOverlayStyle(false));
+
+  // Unlock high-refresh-rate display mode (120Hz/90Hz) on supported Android screens
+  if (Platform.isAndroid) {
+    try {
+      await FlutterDisplayMode.setHighRefreshRate();
+    } catch (e) {
+      debugPrint('DisplayMode 120Hz initialization skipped: $e');
+    }
+  }
 
   try {
     await Supabase.initialize(
@@ -194,13 +205,16 @@ class _ERefillAppState extends State<ERefillApp> {
   }
 }
 
-/// Prevents elastic / stretching overscroll across all platforms and screens.
+/// Delivers smooth momentum scrolling with gentle rubber-band elasticity
+/// and fluid stretching across Android and iOS platforms.
 class AppScrollBehavior extends MaterialScrollBehavior {
   const AppScrollBehavior();
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    return const ClampingScrollPhysics();
+    return const BouncingScrollPhysics(
+      parent: AlwaysScrollableScrollPhysics(),
+    );
   }
 
   @override
@@ -209,6 +223,9 @@ class AppScrollBehavior extends MaterialScrollBehavior {
     Widget child,
     ScrollableDetails details,
   ) {
-    return child;
+    return StretchingOverscrollIndicator(
+      axisDirection: details.direction,
+      child: child,
+    );
   }
 }

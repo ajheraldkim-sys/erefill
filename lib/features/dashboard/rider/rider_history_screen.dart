@@ -6,6 +6,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
+import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/services/receipt_service.dart';
 import 'services/order_cache_service.dart';
 
@@ -192,26 +193,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                         ],
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(
-                                          0xFF10B981,
-                                        ).withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text(
-                                        'Delivered',
-                                        style: TextStyle(
-                                          color: Color(0xFF10B981),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
+                                    const OrderStatusBadge(status: 'delivered'),
                                   ],
                                 ),
                                 const SizedBox(height: 20),
@@ -358,13 +340,13 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFFDCFCE7),
+                                  color: AppColors.uiSuccessBg,
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
                                   Icons.celebration_rounded,
                                   size: 40,
-                                  color: Color(0xFF166534),
+                                  color: AppColors.statusCompleted,
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -373,7 +355,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 18,
-                                  color: Color(0xFF14532D),
+                                  color: AppColors.statusCompleted,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -381,7 +363,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                               Text(
                                 'RECEIPT #ID: #${order['id'].toString().toUpperCase()}',
                                 style: const TextStyle(
-                                  color: Color(0xFF166534),
+                                  color: AppColors.statusCompleted,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1.5,
@@ -746,8 +728,8 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
             const SizedBox(height: 6),
             ListTile(
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFFDCFCE7),
-                child: Icon(Icons.print_rounded, color: Color(0xFF16A34A)),
+                backgroundColor: AppColors.uiSuccessBg,
+                child: Icon(Icons.print_rounded, color: AppColors.uiSuccess),
               ),
               title: const Text('Thermal Mobile Printer (58mm)',
                   style: TextStyle(fontWeight: FontWeight.w700)),
@@ -767,8 +749,8 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
             const SizedBox(height: 6),
             ListTile(
               leading: const CircleAvatar(
-                backgroundColor: Color(0xFFFEF3C7),
-                child: Icon(Icons.point_of_sale_rounded, color: Color(0xFFD97706)),
+                backgroundColor: AppColors.uiWarningBg,
+                child: Icon(Icons.point_of_sale_rounded, color: AppColors.uiWarning),
               ),
               title: const Text('Thermal Station Printer (80mm)',
                   style: TextStyle(fontWeight: FontWeight.w700)),

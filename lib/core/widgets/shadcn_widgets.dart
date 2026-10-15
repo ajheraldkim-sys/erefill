@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' as material;
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 export 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
@@ -42,27 +43,38 @@ class ShadcnPrimaryButton extends StatelessWidget {
             height: 18,
             child: shadcn.CircularProgressIndicator(),
           )
-        : Row(
-            mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
-              ],
-              if (child != null)
-                Flexible(child: child!)
-              else
-                Flexible(
-                  child: Text(
+        : FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18),
+                  const SizedBox(width: 8),
+                ],
+                if (child != null)
+                  child!
+                else
+                  Text(
                     text!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           );
+
+    final handlePress = enabled && !isLoading && onPressed != null
+        ? () {
+            HapticFeedback.lightImpact();
+            onPressed!();
+          }
+        : null;
 
     final hasShadcn = _hasShadcnTheme(context);
     if (!hasShadcn) {
@@ -70,18 +82,22 @@ class ShadcnPrimaryButton extends StatelessWidget {
         style: material.FilledButton.styleFrom(
           backgroundColor: const material.Color(0xFF2563EB),
           foregroundColor: material.Colors.white,
-          shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(8)),
+          shape: material.RoundedRectangleBorder(
+            borderRadius: material.BorderRadius.circular(8),
+          ),
           padding: const material.EdgeInsets.symmetric(horizontal: 16),
         ),
-        onPressed: enabled && !isLoading ? onPressed : null,
+        onPressed: handlePress,
         child: effectiveChild,
       );
-      if (width != null) return SizedBox(width: width, height: height, child: mBtn);
+      if (width != null) {
+        return SizedBox(width: width, height: height, child: mBtn);
+      }
       return SizedBox(height: height, child: mBtn);
     }
 
     final btn = shadcn.PrimaryButton(
-      onPressed: enabled && !isLoading ? onPressed : null,
+      onPressed: handlePress,
       child: effectiveChild,
     );
 
@@ -111,31 +127,42 @@ class ShadcnOutlineButton extends StatelessWidget {
     this.width,
     this.height = 48,
     this.enabled = true,
-  }) : assert(child != null || text != null, 'Either child or text must be provided');
+  }) : assert(
+         child != null || text != null,
+         'Either child or text must be provided',
+       );
 
   @override
   Widget build(BuildContext context) {
-    final effectiveChild = Row(
-      mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, size: 18),
-          const SizedBox(width: 8),
-        ],
-        if (child != null)
-          Flexible(child: child!)
-        else
-          Flexible(
-            child: Text(
+    final effectiveChild = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18),
+            const SizedBox(width: 8),
+          ],
+          if (child != null)
+            child!
+          else
+            Text(
               text!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
-          ),
-      ],
+        ],
+      ),
     );
+
+    final handlePress = enabled && onPressed != null
+        ? () {
+            HapticFeedback.lightImpact();
+            onPressed!();
+          }
+        : null;
 
     final hasShadcn = _hasShadcnTheme(context);
     if (!hasShadcn) {
@@ -146,7 +173,7 @@ class ShadcnOutlineButton extends StatelessWidget {
           shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(8)),
           padding: const material.EdgeInsets.symmetric(horizontal: 16),
         ),
-        onPressed: enabled ? onPressed : null,
+        onPressed: handlePress,
         child: effectiveChild,
       );
       if (width != null) return SizedBox(width: width, height: height, child: mBtn);
@@ -154,7 +181,7 @@ class ShadcnOutlineButton extends StatelessWidget {
     }
 
     final btn = shadcn.OutlineButton(
-      onPressed: enabled ? onPressed : null,
+      onPressed: handlePress,
       child: effectiveChild,
     );
 
@@ -194,27 +221,38 @@ class ShadcnDestructiveButton extends StatelessWidget {
             height: 18,
             child: shadcn.CircularProgressIndicator(),
           )
-        : Row(
-            mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
-              ],
-              if (child != null)
-                Flexible(child: child!)
-              else
-                Flexible(
-                  child: Text(
+        : FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: width == null ? MainAxisSize.min : MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18),
+                  const SizedBox(width: 8),
+                ],
+                if (child != null)
+                  child!
+                else
+                  Text(
                     text!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           );
+
+    final handlePress = !isLoading && onPressed != null
+        ? () {
+            HapticFeedback.mediumImpact();
+            onPressed!();
+          }
+        : null;
 
     final hasShadcn = _hasShadcnTheme(context);
     if (!hasShadcn) {
@@ -222,18 +260,22 @@ class ShadcnDestructiveButton extends StatelessWidget {
         style: material.FilledButton.styleFrom(
           backgroundColor: const material.Color(0xFFDC2626),
           foregroundColor: material.Colors.white,
-          shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(8)),
+          shape: material.RoundedRectangleBorder(
+            borderRadius: material.BorderRadius.circular(8),
+          ),
           padding: const material.EdgeInsets.symmetric(horizontal: 16),
         ),
-        onPressed: !isLoading ? onPressed : null,
+        onPressed: handlePress,
         child: effectiveChild,
       );
-      if (width != null) return SizedBox(width: width, height: height, child: mBtn);
+      if (width != null) {
+        return SizedBox(width: width, height: height, child: mBtn);
+      }
       return SizedBox(height: height, child: mBtn);
     }
 
     final btn = shadcn.DestructiveButton(
-      onPressed: !isLoading ? onPressed : null,
+      onPressed: handlePress,
       child: effectiveChild,
     );
 
@@ -257,30 +299,34 @@ class ShadcnGhostButton extends StatelessWidget {
     this.child,
     this.text,
     this.icon,
-  }) : assert(child != null || text != null, 'Either child or text must be provided');
+  }) : assert(
+         child != null || text != null,
+         'Either child or text must be provided',
+       );
 
   @override
   Widget build(BuildContext context) {
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, size: 18),
-          const SizedBox(width: 8),
-        ],
-        if (child != null)
-          Flexible(child: child!)
-        else
-          Flexible(
-            child: Text(
+    final content = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18),
+            const SizedBox(width: 8),
+          ],
+          if (child != null)
+            child!
+          else
+            Text(
               text!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
-          ),
-      ],
+        ],
+      ),
     );
 
     final hasShadcn = _hasShadcnTheme(context);

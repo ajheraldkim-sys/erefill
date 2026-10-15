@@ -10,6 +10,7 @@ import '../../chat/models/chat_room.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/refill_lottie.dart';
 import '../../../core/widgets/erefill_header.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
 import 'checkout_rules.dart';
@@ -34,6 +35,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final supabase = Supabase.instance.client;
   final _chatService = ChatService();
   RealtimeChannel? _orderChannel;
+  Timer? _orderPollingTimer;
   Map<String, dynamic>? _currentOrder;
   Map<String, dynamic>? _riderProfile;
   List<Map<String, dynamic>>? _orderItems;
@@ -184,13 +186,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _subscribeToOrderUpdates() {
-    final orderId = _currentOrder?['id'];
+    final orderId = _currentOrder?['id'] ?? widget.orderId;
     if (orderId == null) return;
+
+    if (_orderChannel != null) {
+      supabase.removeChannel(_orderChannel!);
+      _orderChannel = null;
+    }
 
     _orderChannel = supabase
         .channel('public:orders:$orderId')
         .onPostgresChanges(
-          event: PostgresChangeEvent.update,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'orders',
           filter: PostgresChangeFilter(
@@ -199,32 +206,63 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             value: orderId,
           ),
           callback: (payload) {
-            if (!mounted) return;
-
-            final oldStatus = _currentOrder?['status'];
-            final newStatus = payload.newRecord['status'] as String?;
-            final oldRiderId = _currentOrder?['assigned_rider_id'];
-            final newRiderId = payload.newRecord['assigned_rider_id'];
-
-            setState(() {
-              _currentOrder = {...(_currentOrder ?? {}), ...payload.newRecord};
-            });
-
-            if (newRiderId != null && oldRiderId == null) {
-              _loadRiderProfile();
-            }
-
-            // Show haptic and notification for status change
-            if (newStatus != oldStatus && newStatus != null) {
-              HapticFeedback.heavyImpact();
-              _showStatusNotification(newStatus);
-              if (newStatus == 'cancelled') {
-                // Already handled by UI re-build from _currentOrder update
-              }
-            }
+            _refreshOrderState();
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.timedOut) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) _subscribeToOrderUpdates();
+            });
+          }
+        });
+
+    _startOrderPollingTimer();
+  }
+
+  void _startOrderPollingTimer() {
+    _orderPollingTimer?.cancel();
+    _orderPollingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      final status = _currentOrder?['status']?.toString();
+      if (status != 'delivered' && status != 'cancelled') {
+        _refreshOrderState();
+      }
+    });
+  }
+
+  Future<void> _refreshOrderState() async {
+    final orderId = _currentOrder?['id'] ?? widget.orderId;
+    if (orderId == null) return;
+    try {
+      final updated = await supabase
+          .from('orders')
+          .select()
+          .eq('id', orderId)
+          .maybeSingle();
+      if (updated != null && mounted) {
+        final oldStatus = _currentOrder?['status'];
+        final newStatus = updated['status'] as String?;
+        final oldRiderId = _currentOrder?['assigned_rider_id'];
+        final newRiderId = updated['assigned_rider_id'];
+
+        setState(() {
+          _currentOrder = {...(_currentOrder ?? {}), ...updated};
+        });
+
+        if (newRiderId != null && oldRiderId == null) {
+          _loadRiderProfile();
+        }
+
+        if (newStatus != oldStatus && newStatus != null) {
+          HapticFeedback.heavyImpact();
+          _showStatusNotification(newStatus);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error polling order state: $e');
+    }
   }
 
   void _showStatusNotification(String status) {
@@ -289,6 +327,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   void dispose() {
+    _orderPollingTimer?.cancel();
     if (_orderChannel != null) {
       supabase.removeChannel(_orderChannel!);
     }
@@ -333,7 +372,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Payment has already been confirmed for this order.'),
-            backgroundColor: Color(0xFF10B981),
+            backgroundColor: AppColors.uiSuccess,
           ),
         );
         return;
@@ -345,7 +384,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('This order is $orderStatus and is no longer eligible for payment.'),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.uiError,
           ),
         );
         return;
@@ -474,7 +513,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: AppUi.dialogRadius),
         title: const Row(
           children: [
-            Icon(Icons.cancel_outlined, color: Color(0xFFEF4444)),
+            Icon(Icons.cancel_outlined, color: AppColors.statusCancelled),
             SizedBox(width: 8),
             Text(
               'Cancel Order?',
@@ -494,7 +533,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.statusCancelled,
             ),
             child: const Text('Yes, Cancel Order'),
           ),
@@ -522,7 +561,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Order has been cancelled.'),
-            backgroundColor: Color(0xFFEF4444),
+            backgroundColor: AppColors.statusCancelled,
           ),
         );
       }
@@ -564,6 +603,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final createdAt =
         DateTime.tryParse(order['created_at']?.toString() ?? '') ??
         DateTime.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
@@ -595,7 +635,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+          parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         child: Column(
@@ -603,35 +643,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: AppUi.heroColorOf(context),
+                color: isDark ? AppUi.surfaceRaisedOf(context) : AppUi.surfaceOf(context),
                 borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                border: Border.all(color: AppUi.borderOf(context)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.18),
+                      color: isDark
+                          ? AppUi.bluePrimary.withValues(alpha: 0.18)
+                          : AppUi.blueSoft,
                     ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      color: Colors.white,
-                      size: 26,
+                    child: Center(
+                      child: ClipOval(
+                        child: status == 'delivered'
+                            ? const RefillLottie.success(width: 44, height: 44)
+                            : (status == 'delivering' ||
+                                    status == 'assigned_to_rider' ||
+                                    status == 'out_for_delivery')
+                                ? const RefillLottie.rider(width: 48, height: 48)
+                                : (status == 'preparing' ||
+                                        status == 'ready_for_pickup')
+                                    ? const RefillLottie.waterDrop(
+                                        width: 40,
+                                        height: 40,
+                                      )
+                                    : const Icon(
+                                        Icons.local_shipping_rounded,
+                                        color: AppUi.bluePrimary,
+                                        size: 24,
+                                      ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           OrderStatusPresentation.fromStatus(status).label,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: AppUi.textPrimaryOf(context),
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
                           ),
@@ -642,7 +708,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: AppUi.textSecondaryOf(context),
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                           ),
@@ -651,8 +717,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Text(
                           '₱${totalAmount.toStringAsFixed(0)} · ${_formatDate(createdAt)}',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                            fontSize: 11,
+                            color: AppUi.textSecondaryOf(context),
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -670,15 +736,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   vertical: 9,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: AppColors.statusCancelled.withValues(alpha: 0.08),
                   borderRadius: AppUi.cardRadius,
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(
+                    color: AppColors.statusCancelled.withValues(alpha: 0.25),
+                  ),
                 ),
                 child: const Row(
                   children: [
                     Icon(
                       Icons.cancel_rounded,
-                      color: Colors.redAccent,
+                      color: AppColors.statusCancelled,
                       size: 18,
                     ),
                     SizedBox(width: 8),
@@ -686,7 +754,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       child: Text(
                         'Order cancelled. Contact the station if you need help.',
                         style: TextStyle(
-                          color: Colors.red,
+                          color: AppColors.statusCancelled,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -717,18 +785,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   icon: const Icon(
                     Icons.cancel_outlined,
                     size: 18,
-                    color: Color(0xFFEF4444),
+                    color: AppColors.statusCancelled,
                   ),
                   label: const Text(
                     'Cancel Order',
                     style: TextStyle(
-                      color: Color(0xFFEF4444),
+                      color: AppColors.statusCancelled,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFFECACA)),
-                    backgroundColor: const Color(0xFFFEF2F2),
+                    side: BorderSide(
+                      color: AppColors.statusCancelled.withValues(alpha: 0.3),
+                    ),
+                    backgroundColor:
+                        AppColors.statusCancelled.withValues(alpha: 0.08),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.cardRadius,
                     ),
@@ -840,7 +911,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6),
+                  color: OrderStatusColors.outForDelivery,
                   borderRadius: AppUi.controlRadius,
                 ),
                 child: const Icon(
@@ -933,9 +1004,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
+        color: AppColors.statusCompleted.withValues(alpha: 0.1),
         borderRadius: AppUi.cardRadius,
-        border: Border.all(color: const Color(0xFFDCFCE7)),
+        border: Border.all(
+          color: AppColors.statusCompleted.withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -944,7 +1017,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               const Icon(
                 Icons.celebration_rounded,
-                color: Color(0xFF15803D),
+                color: AppColors.statusCompleted,
                 size: 22,
               ),
               const SizedBox(width: 9),
@@ -952,7 +1025,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Text(
                   'Water delivered!',
                   style: TextStyle(
-                    color: Color(0xFF14532D),
+                    color: AppColors.statusCompleted,
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
@@ -965,7 +1038,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   visualDensity: VisualDensity.compact,
                   icon: const Icon(
                     Icons.photo_camera_outlined,
-                    color: Color(0xFF166534),
+                    color: AppColors.statusCompleted,
                   ),
                 ),
             ],
@@ -982,7 +1055,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF166534),
+                  color: AppColors.statusCompleted,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1001,9 +1074,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _hasReviewed ? 'Review shared' : 'Rate your experience',
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF166534),
+                backgroundColor: AppColors.statusCompleted,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFF166534),
+                disabledBackgroundColor: AppColors.statusCompleted,
                 disabledForegroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: AppUi.controlRadius,
@@ -1646,7 +1719,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Issue reported. We will investigate.'),
-                        backgroundColor: Colors.orange,
+                        backgroundColor: AppColors.uiWarning,
                       ),
                     );
                   }
@@ -1655,14 +1728,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Failed: $e'),
-                        backgroundColor: Colors.red,
+                        backgroundColor: AppColors.uiError,
                       ),
                     );
                   }
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: AppColors.uiError,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Submit Report'),

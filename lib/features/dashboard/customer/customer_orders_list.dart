@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:latlong2/latlong.dart';
@@ -25,11 +26,13 @@ class CustomerOrdersList extends StatefulWidget {
   State<CustomerOrdersList> createState() => _CustomerOrdersListState();
 }
 
-class _CustomerOrdersListState extends State<CustomerOrdersList> {
+class _CustomerOrdersListState extends State<CustomerOrdersList>
+    with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _myOrders = [];
   bool _isLoading = true;
   RealtimeChannel? _ordersChannel;
+  Timer? _pollingTimer;
   final Map<String, RealtimeChannel> _riderChannels = {};
   final Map<String, LatLng> _riderLocations = {};
   final Map<String, int> _reviewedOrderRatings = {};
@@ -38,6 +41,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final userId = supabase.auth.currentUser?.id;
     if (userId != null) {
       final mem = LocalDataCache.instance.getMemory<List<dynamic>>('customer_orders_$userId');
@@ -49,6 +53,31 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
     _loadCachedOrders();
     _fetchOrders();
     _subscribeToOrderChanges();
+    _startOrdersPollingTimer();
+  }
+
+  void _startOrdersPollingTimer() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted) return;
+      final hasActiveOrders = _myOrders.any(
+        (o) => o['status'] != 'delivered' && o['status'] != 'cancelled',
+      );
+      if (hasActiveOrders) {
+        _fetchOrders();
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchOrders();
+      _startOrdersPollingTimer();
+    } else {
+      _pollingTimer?.cancel();
+      _pollingTimer = null;
+    }
   }
 
   Future<void> _loadCachedOrders() async {
@@ -118,6 +147,8 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollingTimer?.cancel();
     if (_ordersChannel != null) {
       supabase.removeChannel(_ordersChannel!);
     }
@@ -208,6 +239,11 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
+    if (_ordersChannel != null) {
+      supabase.removeChannel(_ordersChannel!);
+      _ordersChannel = null;
+    }
+
     _ordersChannel = supabase
         .channel('orders_list:$userId')
         .onPostgresChanges(
@@ -227,7 +263,14 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
           table: 'order_items',
           callback: (_) => _fetchOrders(),
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.timedOut) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) _subscribeToOrderChanges();
+            });
+          }
+        });
   }
 
   Future<void> _handleBuyAgain(Map<String, dynamic> order) async {
@@ -334,15 +377,10 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
           TabScreenHeroHeader(
             title: 'My refills',
             subtitle: 'Order tracking & routine',
-            actions: [
-              SizedBox(
-                width: 250,
-                child: _buildSegmentControl(
-                  activeOrders.length,
-                  pastOrders.length,
-                ),
-              ),
-            ],
+            bottom: _buildSegmentControl(
+              activeOrders.length,
+              pastOrders.length,
+            ),
           ),
           Expanded(
             child: _activeSegment == 2
@@ -384,59 +422,84 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
   }
 
   Widget _buildSegmentControl(int activeCount, int historyCount) {
-    return Row(
-      children: [
-        _segmentChip('Active', activeCount, 0),
-        const SizedBox(width: 4),
-        _segmentChip('History', historyCount, 1),
-        const SizedBox(width: 4),
-        _segmentChip('Routine', null, 2),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white.withValues(alpha: 0.08)
+            : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(
+          color: AppUi.borderOf(context),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          _segmentChip('Active', activeCount, 0),
+          const SizedBox(width: 4),
+          _segmentChip('History', historyCount, 1),
+          const SizedBox(width: 4),
+          _segmentChip('Routine', null, 2),
+        ],
+      ),
     );
   }
 
   Widget _segmentChip(String label, int? count, int index) {
     final selected = _activeSegment == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Expanded(
       child: Material(
-        color: selected ? Colors.white : Colors.white.withValues(alpha: 0.15),
-        borderRadius: AppUi.pillRadius,
+        color: selected
+            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(99),
+        elevation: selected ? 1 : 0,
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
             setState(() => _activeSegment = index);
           },
-          borderRadius: AppUi.pillRadius,
+          borderRadius: BorderRadius.circular(99),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   label,
                   style: TextStyle(
-                    color: selected ? AppUi.bluePrimary : Colors.white,
-                    fontWeight: FontWeight.w800,
+                    color: selected
+                        ? AppUi.bluePrimary
+                        : (isDark ? Colors.white70 : AppUi.textSecondary),
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),
                 if (count != null && count > 0) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
+                      horizontal: 6,
+                      vertical: 1.5,
                     ),
                     decoration: BoxDecoration(
                       color: selected
-                          ? AppUi.bluePrimary.withValues(alpha: 0.12)
-                          : Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
+                          ? AppUi.blueSoft
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.12)
+                              : Colors.black.withValues(alpha: 0.06)),
+                      borderRadius: BorderRadius.circular(99),
                     ),
                     child: Text(
                       '$count',
                       style: TextStyle(
-                        color: selected ? AppUi.bluePrimary : Colors.white,
+                        color: selected
+                            ? AppUi.bluePrimary
+                            : (isDark ? Colors.white70 : AppUi.textSecondary),
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                       ),
@@ -455,9 +518,6 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
     final status = (order['status'] ?? 'pending').toString();
     final station = order['profiles'] as Map<String, dynamic>?;
     final stationName = station?['station_name'] ?? 'Water station';
-    final total = (order['total_amount'] as num?)?.toDouble() ?? 0.0;
-    final createdAtRaw = order['created_at']?.toString();
-    final date = DateTime.tryParse(createdAtRaw ?? '') ?? DateTime.now();
     final statusLabel = OrderStatusPresentation.fromStatus(status).label;
     final isActive = _activeSegment == 0;
 
@@ -469,204 +529,152 @@ class _CustomerOrdersListState extends State<CustomerOrdersList> {
       );
     }
 
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: AppUi.cardRadius,
-      child: InkWell(
-        onTap: () => _openOrder(order),
-        borderRadius: AppUi.cardRadius,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: AppUi.cardDecorationOf(context),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppUi.blueSoft,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.water_drop_rounded,
-                      color: AppUi.bluePrimary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(stationName, style: AppUi.sectionTitle),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Order #${order['id'].toString().substring(0, 8).toUpperCase()} · ${date.day}/${date.month}/${date.year}',
-                          style: AppUi.captionText,
-                        ),
-                      ],
-                    ),
-                  ),
-                  OrderStatusBadge(status: status),
-                ],
+    Widget? bottomAction;
+    if (status == 'delivered') {
+      final orderIdStr = order['id']?.toString() ?? '';
+      final reviewedRating = _reviewedOrderRatings[orderIdStr];
+
+      if (reviewedRating != null) {
+        bottomAction = Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
               ),
-              const SizedBox(height: 12),
-              Row(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Text(
-                      _buildOrderItemsString(order),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppUi.captionText.copyWith(
-                        color: AppUi.textSecondaryOf(context),
-                      ),
-                    ),
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 16,
+                    color: Colors.amberAccent,
                   ),
+                  const SizedBox(width: 4),
                   Text(
-                    '₱${total.toStringAsFixed(0)}',
+                    'Rated $reviewedRating★',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: AppUi.bluePrimary,
-                      fontSize: 15,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
                     ),
                   ),
                 ],
               ),
-              if (status == 'delivered') ...[
-                const SizedBox(height: 12),
-                Builder(
-                  builder: (context) {
-                    final orderIdStr = order['id']?.toString() ?? '';
-                    final reviewedRating = _reviewedOrderRatings[orderIdStr];
-
-                    if (reviewedRating != null) {
-                      return Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.amber.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  size: 16,
-                                  color: Colors.amber,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Rated $reviewedRating★',
-                                  style: const TextStyle(
-                                    color: Colors.amber,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                _handleBuyAgain(order);
-                              },
-                              icon: const Icon(Icons.replay_rounded, size: 16),
-                              label: const Text('Reorder refill'),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              ReviewModal.show(
-                                context: context,
-                                orderId: orderIdStr,
-                                stationId:
-                                    (order['owner_id'] ?? '').toString(),
-                                stationName: stationName,
-                                onReviewSubmitted: _fetchOrders,
-                              );
-                            },
-                            icon: const Icon(
-                              Icons.star_rounded,
-                              size: 16,
-                              color: Colors.amber,
-                            ),
-                            label: const Text('Rate refill'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.amber.shade800,
-                              side: BorderSide(color: Colors.amber.shade300),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              _handleBuyAgain(order);
-                            },
-                            icon: const Icon(Icons.replay_rounded, size: 16),
-                            label: const Text('Reorder'),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ] else if (status != 'cancelled') ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      _handleBuyAgain(order);
-                    },
-                    icon: const Icon(Icons.replay_rounded, size: 16),
-                    label: const Text('Reorder refill'),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _handleBuyAgain(order);
+                },
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Reorder refill'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: OrderStatusColors.getColor('delivered'),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-              ],
-            ],
+              ),
+            ),
+          ],
+        );
+      } else {
+        bottomAction = Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ReviewModal.show(
+                    context: context,
+                    orderId: orderIdStr,
+                    stationId: (order['owner_id'] ?? '').toString(),
+                    stationName: stationName,
+                    onReviewSubmitted: _fetchOrders,
+                  );
+                },
+                icon: const Icon(
+                  Icons.star_rounded,
+                  size: 16,
+                  color: Colors.amber,
+                ),
+                label: const Text('Rate refill'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF1E293B),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _handleBuyAgain(order);
+                },
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Reorder'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: OrderStatusColors.getColor('delivered'),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+    } else if (status != 'cancelled') {
+      bottomAction = SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            _handleBuyAgain(order);
+          },
+          icon: const Icon(Icons.replay_rounded, size: 16),
+          label: const Text('Reorder refill'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppUi.bluePrimary,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  String _buildOrderItemsString(Map<String, dynamic> order) {
-    if ((order['order_items'] as List?)?.isNotEmpty ?? false) {
-      final items = (order['order_items'] as List);
-      return items
-          .map((i) {
-            final quantity = i['quantity'] ?? 1;
-            final name = i['product_name'] ?? i['water_type'] ?? 'Water refill';
-            return '${quantity}x $name';
-          })
-          .join(', ');
+      );
     }
-    return '${order['quantity'] ?? 1}x ${order['water_type'] ?? 'Water refill'}';
+
+    return OrderCard(
+      order: order,
+      role: OrderCardRole.customer,
+      onTap: () => _openOrder(order),
+      bottomAction: bottomAction,
+    );
   }
 
   Widget _buildEmptyState() {

@@ -18,6 +18,7 @@ import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
+import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/notification_preview_sheet.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/profile_query_helpers.dart';
@@ -81,7 +82,8 @@ class RiderDashboard extends StatefulWidget {
   State<RiderDashboard> createState() => _RiderDashboardState();
 }
 
-class _RiderDashboardState extends State<RiderDashboard> {
+class _RiderDashboardState extends State<RiderDashboard>
+    with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
   final _locationService = LocationService();
   final _orderCache = OrderCacheService();
@@ -89,6 +91,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
   bool _isSyncingOffline = false;
   RealtimeChannel? _ordersChannel;
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  Timer? _riderPollingTimer;
 
   List<Map<String, dynamic>> _myActiveOrders = [];
   // Location mapping
@@ -132,6 +135,8 @@ class _RiderDashboardState extends State<RiderDashboard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startRiderPollingTimer();
     final myId = supabase.auth.currentUser?.id;
     final initialUser = context.read<UserProvider>().user;
     if (initialUser != null) {
@@ -177,6 +182,26 @@ class _RiderDashboardState extends State<RiderDashboard> {
     _setupProfileListener();
     _listenForNewJobs();
     _locationService.startTracking();
+  }
+
+  void _startRiderPollingTimer() {
+    _riderPollingTimer?.cancel();
+    _riderPollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        _loadRiderData();
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadRiderData();
+      _startRiderPollingTimer();
+    } else {
+      _riderPollingTimer?.cancel();
+      _riderPollingTimer = null;
+    }
   }
 
   void _setupProfileListener() {
@@ -306,7 +331,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
             .inFilter('status', [
               'assigned_to_rider',
               'out_for_delivery',
+              'ready_for_pickup',
               'preparing',
+              'accepted',
             ])
             .order('created_at', ascending: false),
         supabase
@@ -389,6 +416,11 @@ class _RiderDashboardState extends State<RiderDashboard> {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
 
+    if (_ordersChannel != null) {
+      supabase.removeChannel(_ordersChannel!);
+      _ordersChannel = null;
+    }
+
     _ordersChannel = supabase
         .channel('public:orders:rider:$myId')
         .onPostgresChanges(
@@ -438,7 +470,14 @@ class _RiderDashboardState extends State<RiderDashboard> {
             });
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.timedOut) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) _listenForNewJobs();
+            });
+          }
+        });
   }
 
   void _showNewJobAlert(Map<String, dynamic> rawOrder) {
@@ -1005,6 +1044,8 @@ class _RiderDashboardState extends State<RiderDashboard> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _riderPollingTimer?.cancel();
     if (_ordersChannel != null) {
       supabase.removeChannel(_ordersChannel!);
     }
@@ -1031,6 +1072,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
         activeOrders: _myActiveOrders,
         onNavigate: (index) => _changeTab(index),
         onRefresh: _loadRiderData,
+        onToggleOnline: _toggleOnlineStatus,
       ),
       _buildDispatchTab(),
       RiderHistoryScreen(riderId: myId ?? ''),
@@ -1127,7 +1169,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
             actions: [
               IconButton(
                 onPressed: _loadRiderData,
-                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                icon: Icon(Icons.refresh_rounded, color: AppUi.textPrimaryOf(context)),
                 tooltip: 'Refresh dispatch',
               ),
             ],
@@ -1300,7 +1342,9 @@ class _RiderDashboardState extends State<RiderDashboard> {
         color: AppUi.surfaceOf(context),
         borderRadius: AppUi.cardRadius,
         border: Border.all(
-          color: isOutForDelivery ? AppUi.bluePrimary : AppUi.borderOf(context),
+          color: isOutForDelivery
+              ? OrderStatusColors.getColor('out_for_delivery')
+              : AppUi.borderOf(context),
           width: isOutForDelivery ? 2 : 1,
         ),
         boxShadow: [
@@ -1327,7 +1371,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: isOutForDelivery
-                        ? AppUi.blueSoft
+                        ? OrderStatusColors.getColor('out_for_delivery').withValues(alpha: 0.12)
                         : AppUi.chipBgOf(context),
                     shape: BoxShape.circle,
                   ),
@@ -1336,7 +1380,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
                         ? Icons.local_shipping_rounded
                         : Icons.pending_actions_rounded,
                     color: isOutForDelivery
-                        ? AppUi.bluePrimary
+                        ? OrderStatusColors.getColor('out_for_delivery')
                         : AppUi.textSecondaryOf(context),
                     size: 18,
                   ),
@@ -1364,10 +1408,10 @@ class _RiderDashboardState extends State<RiderDashboard> {
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
                           color: isPaid
-                              ? const Color(0xFF059669)
+                              ? AppColors.uiSuccess
                               : isCod
-                              ? const Color(0xFFD97706)
-                              : const Color(0xFFDC2626),
+                              ? AppColors.uiWarning
+                              : AppColors.uiError,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -1493,10 +1537,10 @@ class _RiderDashboardState extends State<RiderDashboard> {
                         fontSize: 9,
                         fontWeight: FontWeight.w900,
                         color: isPaid
-                            ? const Color(0xFF059669)
+                            ? AppColors.uiSuccess
                             : isCod
-                            ? const Color(0xFFD97706)
-                            : const Color(0xFFDC2626),
+                            ? AppColors.uiWarning
+                            : AppColors.uiError,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -1610,6 +1654,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
   }
 
   Widget _buildDeliveryTimeline(String status) {
+    final statusColor = OrderStatusColors.getColor(status);
     int currentStep = 0;
     if (status == 'assigned_to_rider') {
       currentStep = 0;
@@ -1630,7 +1675,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(color: AppUi.bluePale.withValues(alpha: 0.35)),
+      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.08)),
       child: Row(
         children: [
           for (int i = 0; i < steps.length; i++) ...[
@@ -1645,7 +1690,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
                           child: Container(
                             height: 2,
                             color: i <= currentStep
-                                ? AppUi.bluePrimary
+                                ? statusColor
                                 : AppUi.borderColor,
                           ),
                         )
@@ -1657,18 +1702,18 @@ class _RiderDashboardState extends State<RiderDashboard> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: i <= currentStep
-                              ? AppUi.bluePrimary
+                              ? statusColor
                               : Colors.white,
                           border: Border.all(
                             color: i <= currentStep
-                                ? AppUi.bluePrimary
+                                ? statusColor
                                 : AppUi.borderColor,
                             width: 2,
                           ),
                           boxShadow: i == currentStep
                               ? [
                                   BoxShadow(
-                                    color: AppUi.bluePrimary.withValues(
+                                    color: statusColor.withValues(
                                       alpha: 0.25,
                                     ),
                                     blurRadius: 6,
@@ -1690,7 +1735,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
                           child: Container(
                             height: 2,
                             color: i < currentStep
-                                ? AppUi.bluePrimary
+                                ? statusColor
                                 : AppUi.borderColor,
                           ),
                         )
@@ -1708,7 +1753,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
                           ? FontWeight.w800
                           : FontWeight.w600,
                       color: i <= currentStep
-                          ? AppUi.bluePrimary
+                          ? statusColor
                           : AppUi.textMuted,
                     ),
                   ),
@@ -1722,41 +1767,7 @@ class _RiderDashboardState extends State<RiderDashboard> {
   }
 
   Widget _statusChip(String status) {
-    Color color;
-    String label;
-    switch (status) {
-      case 'assigned_to_rider':
-        color = AppUi.bluePrimary;
-        label = 'Assigned';
-        break;
-      case 'preparing':
-        color = const Color(0xFFF59E0B);
-        label = 'Legacy pickup';
-        break;
-      case 'out_for_delivery':
-        color = AppUi.bluePrimary;
-        label = 'En route';
-        break;
-      default:
-        color = AppUi.textSecondary;
-        label = status.replaceAll('_', ' ');
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 9,
-          color: color,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.8,
-        ),
-      ),
-    );
+    return OrderStatusBadge(status: status, uppercase: true);
   }
 
   Future<bool> _saveRiderProfile() async {
@@ -2662,6 +2673,7 @@ class _RiderHomeOverview extends StatelessWidget {
   final List<Map<String, dynamic>> activeOrders;
   final ValueChanged<int> onNavigate;
   final Future<void> Function()? onRefresh;
+  final Future<void> Function(bool)? onToggleOnline;
 
   const _RiderHomeOverview({
     required this.profile,
@@ -2670,6 +2682,7 @@ class _RiderHomeOverview extends StatelessWidget {
     required this.activeOrders,
     required this.onNavigate,
     this.onRefresh,
+    this.onToggleOnline,
   });
 
   String get _greeting {
@@ -2679,10 +2692,87 @@ class _RiderHomeOverview extends StatelessWidget {
     return 'Good evening';
   }
 
+  Widget _buildOnlineStatusCard(BuildContext context, bool isOnline) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isOnline
+              ? AppUi.accentGreen.withValues(alpha: 0.3)
+              : AppUi.borderOf(context),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isOnline ? AppUi.accentGreen : Colors.black)
+                .withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isOnline ? AppUi.accentGreen : AppUi.textMuted,
+              boxShadow: isOnline
+                  ? [
+                      BoxShadow(
+                        color: AppUi.accentGreen.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isOnline ? "YOU'RE ONLINE" : "YOU'RE OFFLINE",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: isOnline ? AppUi.accentGreen : AppUi.textSecondary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isOnline
+                      ? 'Ready to receive station deliveries'
+                      : 'Switch online to accept dispatches',
+                  style: AppUi.captionText,
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: isOnline,
+            activeTrackColor: AppUi.accentGreen,
+            onChanged: onToggleOnline != null
+                ? (v) => onToggleOnline!(v)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final fullName = profile?['full_name'] ?? 'Rider';
     final firstName = fullName.split(' ').first;
+    final isOnline = profile?['is_online'] == true;
     final active = activeOrders.isNotEmpty ? activeOrders.first : null;
 
     return Scaffold(
@@ -2711,6 +2801,8 @@ class _RiderHomeOverview extends StatelessWidget {
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
+                        _buildOnlineStatusCard(context, isOnline),
+                        AppUi.vGapMd,
                         if (active != null) ...[
                           RiderActiveDeliveryCard(
                             order: active,
@@ -2750,7 +2842,7 @@ class _RiderHomeOverview extends StatelessWidget {
                                     label: 'Completed',
                                     value: '$completedCount',
                                     icon: Icons.check_circle_rounded,
-                                    color: AppUi.bluePrimary,
+                                    color: OrderStatusColors.getColor('completed'),
                                   ),
                                 ),
                               ],
@@ -2763,7 +2855,7 @@ class _RiderHomeOverview extends StatelessWidget {
                                     label: 'Active jobs',
                                     value: '${activeOrders.length}',
                                     icon: Icons.local_shipping_rounded,
-                                    color: AppUi.accentCyan,
+                                    color: OrderStatusColors.getColor('out_for_delivery'),
                                     onTap: () => onNavigate(1),
                                   ),
                                 ),
@@ -2774,7 +2866,7 @@ class _RiderHomeOverview extends StatelessWidget {
                                     value:
                                         '${activeOrders.where((o) => o['status'] == 'assigned_to_rider').length}',
                                     icon: Icons.inventory_2_outlined,
-                                    color: const Color(0xFFF59E0B),
+                                    color: OrderStatusColors.getColor('ready_for_pickup'),
                                     onTap: () => onNavigate(1),
                                   ),
                                 ),

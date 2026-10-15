@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/providers/notification_provider.dart';
+import 'package:erefill/core/widgets/notification_detail_dialog.dart';
 import 'package:erefill/features/chat/models/system_notification.dart';
 
 void showNotificationPreviewSheet(
@@ -79,9 +80,11 @@ void showNotificationPreviewSheet(
                         return _NotificationPreviewTile(
                           notification: notification,
                           onTap: () {
-                            provider.markAsRead(notification.id);
                             Navigator.pop(sheetContext);
-                            onViewAll();
+                            showNotificationDetailDialog(
+                              context,
+                              notification: notification,
+                            );
                           },
                         );
                       },

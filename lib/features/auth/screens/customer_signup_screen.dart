@@ -13,6 +13,8 @@ import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:erefill/core/water_types.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/user_provider.dart';
 
 class CustomerSignupScreen extends StatefulWidget {
   const CustomerSignupScreen({super.key});
@@ -191,7 +193,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
         final addr = _addressController.text.trim();
         if (addr.isNotEmpty) {
           try {
-            await Supabase.instance.client.from('customer_addresses').insert({
+            final addrPayload = <String, dynamic>{
               'customer_id': newUserId,
               'label': 'Home',
               'complete_address': addr,
@@ -204,8 +206,23 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               'longitude': _pickedLocation.longitude != 0
                   ? _pickedLocation.longitude
                   : 125.9833,
+              'map_pin_town': _selectedTown,
               'is_default': true,
-            });
+            };
+            try {
+              await Supabase.instance.client
+                  .from('customer_addresses')
+                  .insert(addrPayload);
+            } catch (e) {
+              if (e.toString().contains('map_pin_town')) {
+                addrPayload.remove('map_pin_town');
+                await Supabase.instance.client
+                    .from('customer_addresses')
+                    .insert(addrPayload);
+              } else {
+                rethrow;
+              }
+            }
           } catch (e) {
             debugPrint('Initial address insert safeguard: $e');
           }
@@ -213,6 +230,10 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
       }
       if (!mounted) return;
       _showMessage("Account created. Welcome to eRefill.");
+      if (mounted) {
+        await context.read<UserProvider>().refreshProfile();
+      }
+      if (!mounted) return;
       context.goHome();
     } catch (e) {
       if (!mounted) return;

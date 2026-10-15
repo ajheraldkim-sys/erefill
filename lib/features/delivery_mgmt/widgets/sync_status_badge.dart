@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 import '../services/sync_service.dart';
 
 class SyncStatusBadge extends StatelessWidget {
@@ -25,21 +26,21 @@ class SyncStatusBadge extends StatelessWidget {
         return const _StatusChip(
           key: ValueKey('syncing'),
           label: 'Syncing...',
-          color: AppUi.bluePrimary,
+          color: AppColors.brandPrimary,
           icon: Icons.sync_rounded,
         );
       case SyncStatus.synced:
         return const _StatusChip(
           key: ValueKey('synced'),
           label: 'Synced',
-          color: Color(0xFF10B981),
+          color: AppColors.statusCompleted,
           icon: Icons.cloud_done_rounded,
         );
       case SyncStatus.error:
         return const _StatusChip(
           key: ValueKey('error'),
           label: 'Needs Sync',
-          color: Color(0xFFF59E0B),
+          color: AppColors.uiWarning,
           icon: Icons.cloud_off_rounded,
         );
       case SyncStatus.idle:

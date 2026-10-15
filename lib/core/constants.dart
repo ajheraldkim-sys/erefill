@@ -34,6 +34,15 @@ class AppConstants {
     'Madrid': '8316',
   };
 
+  /// Initial map positions for the municipalities supported by eRefill.
+  /// They are starting points only; customers must still place the pin at
+  /// their precise delivery location.
+  static const Map<String, ({double latitude, double longitude})>
+  municipalityCenters = {
+    'Cantilan': (latitude: 9.3517, longitude: 125.9784),
+    'Madrid': (latitude: 9.2745, longitude: 125.9643),
+  };
+
   static const Map<String, List<String>> municipalityData = {
     'Cantilan': [
       'Bugsukan',
@@ -111,12 +120,12 @@ class AppConstants {
 
 class AppUi {
   // Premium coastal palette
-  static const Color bluePrimary = Color(0xFF087E8B);
-  static const Color bluePrimaryDark = Color(0xFF066873);
-  static const Color blueSoft = Color(0xFFE3F3F3);
-  static const Color blueBorder = Color(0xFFC6E0E1);
-  static const Color bluePale = Color(0xFFF0F8F8);
-  static const Color deepBlue = Color(0xFF193438);
+  static const Color bluePrimary = Color(0xFF0F71C3);
+  static const Color bluePrimaryDark = Color(0xFF0C5BA0);
+  static const Color blueSoft = Color(0xFFE8F3FC);
+  static const Color blueBorder = Color(0xFFBAD7F2);
+  static const Color bluePale = Color(0xFFF1F7FD);
+  static const Color deepBlue = Color(0xFF10283B);
   static const Color accentCyan = Color(0xFF42C2C8);
   static const Color accentGreen = Color(0xFF21866A);
 
@@ -261,8 +270,8 @@ class AppUi {
   static BoxDecoration flatCardDecorationOf(BuildContext context) =>
       BoxDecoration(color: surfaceOf(context), borderRadius: radiusLg);
 
-  /// Softened 1px hairline border tokens for reduced visual noise.
-  static const Color borderLight = Color(0xFFF1F4F5);
+  /// Refined 1px border tokens for crisp contrast across light and dark modes.
+  static const Color borderLight = Color(0xFFE2E8F0);
   static const Color borderDark = Color(0xFF243237);
   static const Color borderColor = borderLight;
   static bool isDark(BuildContext context) =>
@@ -359,13 +368,13 @@ class AppUi {
       labelStyle: TextStyle(
         color: textSecondaryOf(context),
         fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       floatingLabelStyle: const TextStyle(
         color: bluePrimary,
         fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       hintStyle: TextStyle(
@@ -429,13 +438,13 @@ class AppUi {
       labelStyle: const TextStyle(
         color: textMuted,
         fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       floatingLabelStyle: const TextStyle(
         color: bluePrimary,
         fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         letterSpacing: 0,
       ),
       hintStyle: const TextStyle(

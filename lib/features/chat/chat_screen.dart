@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/providers/user_provider.dart';
 import '../../core/widgets/brand/hero_header.dart';
 import '../../core/widgets/skeleton.dart';
@@ -235,8 +236,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               ListTile(
                 leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE0F2FE),
-                  child: Icon(Icons.camera_alt_rounded, color: AppUi.bluePrimary),
+                  backgroundColor: AppColors.brandSoft,
+                  child: Icon(Icons.camera_alt_rounded, color: AppColors.brandPrimary),
                 ),
                 title: const Text('Take a Photo', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Use camera to capture image'),
@@ -244,8 +245,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               ListTile(
                 leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFF1F5F9),
-                  child: Icon(Icons.photo_library_rounded, color: AppUi.bluePrimary),
+                  backgroundColor: AppColors.brandPale,
+                  child: Icon(Icons.photo_library_rounded, color: AppColors.brandPrimary),
                 ),
                 title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Select an existing photo'),
@@ -488,9 +489,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     context.popRoute();
                   }
                 },
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
+                  color: AppUi.textPrimaryOf(context),
                   size: 18,
                 ),
               ),
@@ -501,23 +502,23 @@ class _ChatScreenState extends State<ChatScreen> {
               actions: _selectedMessageIds.isNotEmpty
                   ? [
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.select_all_rounded,
-                          color: Colors.white,
+                          color: AppUi.textPrimaryOf(context),
                         ),
                         onPressed: _selectAllMessages,
                       ),
                       IconButton(
                         icon: const Icon(
                           Icons.delete_outline_rounded,
-                          color: Colors.white,
+                          color: AppUi.error,
                         ),
                         onPressed: _deleteSelectedMessages,
                       ),
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.close_rounded,
-                          color: Colors.white,
+                          color: AppUi.textPrimaryOf(context),
                         ),
                         onPressed: () =>
                             setState(() => _selectedMessageIds.clear()),
@@ -529,14 +530,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         IconButton(
                           icon: const Icon(
                             Icons.location_on_rounded,
-                            color: Colors.white,
+                            color: AppUi.bluePrimary,
                           ),
                           onPressed: _openMap,
                         ),
                       PopupMenuButton<String>(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.more_vert_rounded,
-                          color: Colors.white,
+                          color: AppUi.textPrimaryOf(context),
                         ),
                         onSelected: (val) {
                           if (val == 'archive') _archiveChat();

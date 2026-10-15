@@ -14,6 +14,7 @@ import '../../../core/widgets/brand/hero_header.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
+import '../../../core/widgets/animations/animated_favorite_button.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/services/station_data_cache.dart';
 import '../../../core/widgets/map_tiles.dart';
@@ -74,6 +75,15 @@ class _StationListScreenState extends State<StationListScreen> {
     _subscribeToFavorites();
     _determinePosition();
     _fetchFavorites();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // CustomerHome retains this tab. Subscribe to the profile provider so a
+    // newly selected default address immediately changes the municipality
+    // scope instead of keeping the tab filtered to the previous town.
+    _userTown = context.watch<UserProvider>().user?.town;
   }
 
   Future<void> _loadCachedStations() async {
@@ -784,23 +794,12 @@ class _StationListScreenState extends State<StationListScreen> {
                       child: Material(
                         color: AppUi.surfaceOf(context).withValues(alpha: 0.94),
                         shape: const CircleBorder(),
-                        child: IconButton(
-                          tooltip: isFavorite
-                              ? 'Remove from favorites'
-                              : 'Add to favorites',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: stationId.isEmpty
+                        child: AnimatedFavoriteButton(
+                          isFavorite: isFavorite,
+                          onToggle: stationId.isEmpty
                               ? null
-                              : () => _toggleFav(stationId),
-                          icon: Icon(
-                            isFavorite
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            color: isFavorite
-                                ? Colors.redAccent
-                                : AppUi.textMuted,
-                            size: 21,
-                          ),
+                              : (_) => _toggleFav(stationId),
+                          size: 21,
                         ),
                       ),
                     ),
@@ -1309,16 +1308,20 @@ class _StationListScreenState extends State<StationListScreen> {
                       ),
                       foregroundColor: WidgetStateProperty.resolveWith(
                         (states) => states.contains(WidgetState.selected)
-                            ? AppUi.bluePrimary
-                            : Colors.white,
+                            ? (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : AppUi.bluePrimary)
+                            : AppUi.textSecondaryOf(context),
                       ),
                       backgroundColor: WidgetStateProperty.resolveWith(
                         (states) => states.contains(WidgetState.selected)
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.14),
+                            ? (Theme.of(context).brightness == Brightness.dark
+                                ? AppUi.bluePrimary
+                                : AppUi.surfaceOf(context))
+                            : Colors.transparent,
                       ),
                       side: WidgetStatePropertyAll(
-                        BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                        BorderSide(color: AppUi.borderOf(context)),
                       ),
                     ),
                     segments: const [
@@ -1504,6 +1507,9 @@ class _StationListScreenState extends State<StationListScreen> {
                     : _isMapView
                     ? buildMapView()
                     : CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
                         slivers: [
                           SliverToBoxAdapter(
                             child: Padding(
@@ -1591,7 +1597,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                     separatorBuilder: (context, index) =>
                                         const SizedBox(height: 10),
                                     itemBuilder: (context, index) =>
-                                        _buildStationListTile(stations[index]),
+                                        RepaintBoundary(
+                                          child: _buildStationListTile(stations[index]),
+                                        ),
                                   ),
                                 ),
                         ],

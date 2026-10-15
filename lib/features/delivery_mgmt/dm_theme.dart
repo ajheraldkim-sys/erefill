@@ -2,30 +2,31 @@
 import 'package:flutter/material.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 
 class DmColors {
   static const bg = AppUi.pageBg;
   static const surface = AppUi.surface;
   static const border = AppUi.borderColor;
-  static const borderFocus = AppUi.bluePrimary;
+  static const borderFocus = AppColors.brandPrimary;
 
-  static const primary = AppUi.bluePrimary;
-  static const primarySoft = AppUi.blueSoft;
+  static const primary = AppColors.brandPrimary;
+  static const primarySoft = AppColors.brandSoft;
 
-  static const green = AppUi.accentGreen;
-  static const greenSoft = AppUi.successBg;
+  static const green = AppColors.statusCompleted;
+  static const greenSoft = AppColors.uiSuccessBg;
 
-  static const red = AppUi.error;
-  static const redSoft = Color(0xFFFEF2F2);
+  static const red = AppColors.statusCancelled;
+  static const redSoft = AppColors.uiErrorBg;
 
-  static const amber = Color(0xFFF59E0B);
-  static const amberSoft = Color(0xFFFFFBEB);
+  static const amber = AppColors.statusPending;
+  static const amberSoft = AppColors.uiWarningBg;
 
-  static const purple = Color(0xFF7C3AED);
+  static const purple = AppColors.statusPreparing;
   static const purpleSoft = Color(0xFFF5F3FF);
 
-  static const sky = AppUi.accentCyan;
-  static const skySoft = AppUi.bluePale;
+  static const sky = AppColors.accentCyan;
+  static const skySoft = AppColors.brandPale;
 
   static const textPrimary = AppUi.textPrimary;
   static const textSecondary = AppUi.textSecondary;
@@ -335,12 +336,12 @@ class DmUi {
   /// Avatar circle with colored initial
   static Color avatarColor(String name) {
     final colors = [
-      AppUi.bluePrimary,
-      const Color(0xFF7C3AED),
-      AppUi.accentGreen,
-      const Color(0xFFF59E0B),
-      AppUi.error,
-      AppUi.accentCyan,
+      AppColors.brandPrimary,
+      AppColors.statusPreparing,
+      AppColors.statusCompleted,
+      AppColors.statusPending,
+      AppColors.statusCancelled,
+      AppColors.accentCyan,
     ];
     if (name.isEmpty) return colors[0];
     return colors[name.codeUnitAt(0) % colors.length];

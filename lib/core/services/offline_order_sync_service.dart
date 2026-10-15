@@ -195,17 +195,28 @@ class OfflineOrderSyncService {
         try {
           // Attempt atomic RPC if available, otherwise direct insert
           try {
+            final orderData = {
+              'id': orderId,
+              'customer_id': customerId,
+              'owner_id': stationId,
+              'station_name': stationName,
+              'customer_address': deliveryAddress,
+              'delivery_address': deliveryAddress,
+              'idempotency_key': orderId,
+              'subtotal': subtotal,
+              'delivery_fee': deliveryFee,
+              'platform_fee': platformFee,
+              'total_amount': totalAmount,
+              'payment_method': paymentMethod,
+              'notes': notes,
+              'status': 'pending',
+              'created_at': row['created_at'],
+            };
             await supabase.rpc(
               'create_order_atomic',
               params: {
-                'p_id': orderId,
-                'p_customer_id': customerId,
-                'p_owner_id': stationId,
-                'p_total_amount': totalAmount,
-                'p_payment_method': paymentMethod,
-                'p_delivery_address': deliveryAddress,
-                'p_notes': notes,
-                'p_items': items,
+                'p_order_data': orderData,
+                'p_items_data': items,
               },
             );
           } catch (_) {
@@ -213,6 +224,7 @@ class OfflineOrderSyncService {
             await supabase.from('orders').insert({
               'id': orderId,
               'customer_id': customerId,
+              'owner_id': stationId,
               'station_id': stationId,
               'station_name': stationName,
               'items': items,
@@ -221,11 +233,31 @@ class OfflineOrderSyncService {
               'platform_fee': platformFee,
               'total_amount': totalAmount,
               'delivery_address': deliveryAddress,
+              'customer_address': deliveryAddress,
               'payment_method': paymentMethod,
               'notes': notes,
               'status': 'pending',
               'created_at': row['created_at'],
             });
+
+            // Populate order_items in fallback if items are present
+            if (items.isNotEmpty) {
+              final orderItems = items.map((it) {
+                final itemMap = Map<String, dynamic>.from(it as Map);
+                final unitPrice = ((itemMap['price'] ?? itemMap['unit_price'] ?? 0.0) as num).toDouble();
+                final qty = ((itemMap['quantity'] ?? 1) as num).toInt();
+                return {
+                  'order_id': orderId,
+                  'product_name': itemMap['name'] ?? itemMap['product_name'] ?? 'Refill Item',
+                  'quantity': qty,
+                  'price_at_purchase': unitPrice,
+                  'subtotal': unitPrice * qty,
+                };
+              }).toList();
+              try {
+                await supabase.from('order_items').insert(orderItems);
+              } catch (_) {}
+            }
           }
 
           // Mark as successfully synchronized

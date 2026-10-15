@@ -290,11 +290,14 @@ class NotificationService {
   void dismissInAppNotification() {
     _inAppDismissTimer?.cancel();
     _inAppDismissTimer = null;
-    if (_activeInAppOverlay != null) {
-      try {
-        _activeInAppOverlay?.remove();
-      } catch (_) {}
-      _activeInAppOverlay = null;
+    final entry = _activeInAppOverlay;
+    _activeInAppOverlay = null;
+    if (entry != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          entry.remove();
+        } catch (_) {}
+      });
     }
   }
 

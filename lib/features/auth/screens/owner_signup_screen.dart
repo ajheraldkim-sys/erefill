@@ -11,6 +11,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/user_provider.dart';
 
 class OwnerSignupScreen extends StatefulWidget {
   const OwnerSignupScreen({super.key});
@@ -171,6 +173,10 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
       );
       if (!mounted) return;
       _showMessage("Station account created. Welcome to eRefill.");
+      if (mounted) {
+        await context.read<UserProvider>().refreshProfile();
+      }
+      if (!mounted) return;
       context.goHome();
     } catch (e) {
       if (!mounted) return;

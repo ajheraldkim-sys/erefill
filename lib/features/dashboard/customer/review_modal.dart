@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
+import '../../../core/services/station_data_cache.dart';
 import '../../../core/widgets/app_form_fields.dart';
 
 class ReviewModal extends StatefulWidget {
@@ -85,6 +88,15 @@ class _ReviewModalState extends State<ReviewModal> {
             ? null
             : _commentController.text.trim(),
       });
+
+      // Invalidate cache immediately so new review and updated ratings appear instantaneously
+      StationDataCache.instance.invalidate(widget.stationId);
+      unawaited(
+        StationDataCache.instance.getOrFetch(
+          widget.stationId,
+          forceRefresh: true,
+        ),
+      );
 
       if (!mounted) return;
 

@@ -1022,14 +1022,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: AppColors.uiWarningBg,
                 borderRadius: AppUi.radiusLg,
-                border: Border.all(color: const Color(0xFFF59E0B)),
+                border: Border.all(color: AppColors.uiWarning),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.verified_user_rounded,
-                      color: Color(0xFFD97706), size: 28),
+                      color: AppColors.uiWarning, size: 28),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -1038,7 +1038,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         Text(
                           '$pendingCount Water Station${pendingCount > 1 ? "s" : ""} Pending Review',
                           style: const TextStyle(
-                            color: Color(0xFF92400E),
+                            color: AppColors.statusPending,
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
                           ),
@@ -1047,7 +1047,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         const Text(
                           'New station registrations require administrative compliance verification.',
                           style: TextStyle(
-                            color: Color(0xFFB45309),
+                            color: AppColors.statusPending,
                             fontSize: 12,
                           ),
                         ),
@@ -1056,7 +1056,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD97706),
+                      backgroundColor: AppColors.uiWarning,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 8),
@@ -1178,62 +1178,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     required IconData icon,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        borderRadius: AppUi.radiusLg,
-        border: Border.all(color: AppUi.borderOf(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppUi.textSecondaryOf(context),
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppUi.surfaceOf(context),
+          borderRadius: AppUi.radiusLg,
+          border: Border.all(color: AppUi.borderOf(context)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 16),
+                ),
+              ],
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.0, 0.2),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
                 ),
               ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppUi.textPrimaryOf(context),
                 ),
-                child: Icon(icon, color: color, size: 16),
               ),
-            ],
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: AppUi.textPrimaryOf(context),
             ),
-          ),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppUi.textMuted,
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppUi.textMuted,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1336,7 +1352,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         borderRadius: AppUi.radiusLg,
                         border: Border.all(
                           color: isPending
-                              ? const Color(0xFFF59E0B)
+                              ? AppColors.statusPending
                               : AppUi.borderOf(context),
                           width: isPending ? 1.5 : 1,
                         ),
@@ -1361,13 +1377,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF3C7),
+                                    color: AppColors.uiWarningBg,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Text(
                                     'Needs Review',
                                     style: TextStyle(
-                                      color: Color(0xFFD97706),
+                                      color: AppColors.uiWarning,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1379,10 +1395,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                       horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
                                     color: isSuspended
-                                        ? const Color(0xFFFEE2E2)
+                                        ? AppColors.uiErrorBg
                                         : (isOpen
-                                            ? AppUi.blueSoft
-                                            : const Color(0xFFF3F4F6)),
+                                            ? AppColors.brandSoft
+                                            : AppUi.borderOf(context).withValues(alpha: 0.3)),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -1391,10 +1407,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                         : (isOpen ? 'Open' : 'Closed'),
                                     style: TextStyle(
                                       color: isSuspended
-                                          ? AppUi.error
+                                          ? AppColors.statusCancelled
                                           : (isOpen
-                                              ? AppUi.bluePrimary
-                                              : AppUi.textSecondary),
+                                              ? AppColors.brandPrimary
+                                              : AppUi.textSecondaryOf(context)),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),

@@ -14,6 +14,7 @@ import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/offline_queue_service.dart';
+import 'package:erefill/core/widgets/press_bounce.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -113,6 +114,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       setState(() {});
     }
     LocalDataCache.instance.set('owner_orders_$ownerId', data);
+    LocalDataCache.instance.invalidate('owner_overview_$ownerId');
   }
 
   @override
@@ -127,6 +129,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   void _subscribeToOrders() {
     final ownerId = supabase.auth.currentUser?.id;
     if (ownerId == null) return;
+
+    if (_ordersChannel != null) {
+      supabase.removeChannel(_ordersChannel!);
+      _ordersChannel = null;
+    }
 
     _ordersChannel = supabase
         .channel('order_mgmt_updates:$ownerId')
@@ -165,7 +172,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
             _refreshOrders();
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.timedOut) {
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) _subscribeToOrders();
+            });
+          }
+        });
   }
 
   bool _matchesOrderSearch(Map<String, dynamic> order) {
@@ -244,26 +258,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   }
 
   Color _statusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return const Color(0xFFF59E0B);
-      case 'accepted':
-        return AppUi.bluePrimary;
-      case 'in_prep':
-      case 'preparing':
-        return const Color(0xFF8B5CF6);
-      case 'ready_for_pickup':
-        return const Color(0xFF0F766E);
-      case 'dispatched':
-      case 'assigned_to_rider':
-        return AppUi.bluePrimary;
-      case 'out_for_delivery':
-        return const Color(0xFF10B981);
-      case 'delivered':
-        return const Color(0xFF10B981);
-      default:
-        return AppUi.textSecondary;
-    }
+    return OrderStatusColors.getColor(status);
   }
 
   // ─── Actions ──────────────────────────────────────────────────────────────
@@ -1114,10 +1109,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.delivery_dining,
                                       size: 16,
-                                      color: AppUi.surfaceOf(context),
+                                      color: Colors.white,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
@@ -1440,10 +1435,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   }
 
   Widget _statusBadge(String status) {
-    return OrderStatusBadge(status: status, showIcon: false, uppercase: true);
+    return OrderStatusBadge(status: status, showIcon: true, uppercase: true);
   }
 
-  Widget _buildPaymentStatusBadge(Map<String, dynamic> order) {
+  Widget _buildPaymentStatusBadge(
+    Map<String, dynamic> order, {
+    bool onFullColor = false,
+  }) {
     final method = (order['payment_method'] ?? 'cod').toString().toLowerCase();
     final status = (order['payment_status'] ?? 'pending')
         .toString()
@@ -1458,6 +1456,67 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       'cancelled',
       'canceled',
     }.contains(status);
+
+    if (onFullColor) {
+      final String label;
+      final IconData icon;
+      final Color bg;
+      final Color border;
+
+      if (isPaid) {
+        label = 'Paid (${CheckoutRules.paymentLabel(method)})';
+        icon = Icons.check_circle_rounded;
+        bg = Colors.white.withValues(alpha: 0.22);
+        border = Colors.white.withValues(alpha: 0.35);
+      } else if (isCod) {
+        if (orderStatus == 'delivered') {
+          label = 'Paid (COD)';
+          icon = Icons.check_circle_rounded;
+          bg = Colors.white.withValues(alpha: 0.22);
+          border = Colors.white.withValues(alpha: 0.35);
+        } else {
+          label = 'COD • Collect';
+          icon = Icons.payments_outlined;
+          bg = Colors.black.withValues(alpha: 0.18);
+          border = Colors.white.withValues(alpha: 0.25);
+        }
+      } else if (isFailed) {
+        label = 'Payment Failed';
+        icon = Icons.error_outline_rounded;
+        bg = Colors.black.withValues(alpha: 0.3);
+        border = const Color(0xFFFCA5A5).withValues(alpha: 0.5);
+      } else {
+        label = 'Awaiting ${CheckoutRules.paymentLabel(method)}';
+        icon = Icons.schedule_rounded;
+        bg = Colors.black.withValues(alpha: 0.18);
+        border = Colors.white.withValues(alpha: 0.25);
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: Colors.white),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (isPaid) {
       return Text(
@@ -1591,7 +1650,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   Widget _buildOrderCard(Map<String, dynamic> order) {
     final orderId = (order['id'] ?? '').toString();
     final rawStatus = (order['status'] ?? 'pending').toString();
-    final isPending = rawStatus == 'pending';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final style = OrderStatusStyle.resolve(rawStatus, isDark: isDark);
 
     // Snapshot-based fields for flawless performance
     final customerName = order['customer_name'] ?? 'Guest Customer';
@@ -1603,142 +1663,184 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     final elapsed = _elapsedLabel(order['created_at']);
     final payment = (order['payment_method'] ?? 'COD').toString().toUpperCase();
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        _showOrderDetail(order);
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: AppUi.surfaceOf(context),
-          borderRadius: AppUi.cardRadius,
-          border: Border.all(
-            color: isPending
-                ? const Color(0xFFF59E0B).withValues(alpha: 0.3)
-                : AppUi.borderOf(context),
-            width: isPending ? 1.5 : 1,
+    return RepaintBoundary(
+      child: PressBounce(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _showOrderDetail(order);
+        },
+        pressedScale: 0.985,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: style.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: style.primaryColor.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Order ID chip + Status Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _shortOrderId(orderId),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppUi.chipBgOf(context),
-                          borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    OrderStatusChip(
+                      status: rawStatus,
+                      onFullColorSurface: true,
+                      uppercase: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Middle: Customer icon + Name & Elapsed + Total & Payment badge
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: AppUi.controlRadius,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 22,
                         ),
-                        child: Text(
-                          _shortOrderId(orderId),
-                          style: TextStyle(
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            customerName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: Colors.white,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$elapsed • $payment',
+                            style: TextStyle(
+                              color: style.cardSecondaryText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          total,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w900,
-                            fontSize: 11,
-                            color: AppUi.textSecondaryOf(context),
-                            letterSpacing: 0.5,
+                            fontSize: 17,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
-                      _statusBadge(rawStatus),
-                    ],
+                        const SizedBox(height: 4),
+                        _buildPaymentStatusBadge(order, onFullColor: true),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Address container with dark translucent background
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppUi.bluePrimary.withValues(alpha: 0.08),
-                          borderRadius: AppUi.controlRadius,
-                        ),
-                        child: const Icon(
-                          Icons.person_outline_rounded,
-                          color: AppUi.bluePrimary,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              customerName,
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$address${barangay.isNotEmpty ? " • $barangay" : ""}',
                               style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 17,
-                                color: AppUi.textPrimaryOf(context),
-                                letterSpacing: 0,
+                                color: style.cardSecondaryText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$elapsed • $payment',
-                              style: const TextStyle(
-                                color: AppUi.textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            total,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                              color: AppUi.textPrimaryOf(context),
-                            ),
                           ),
-                          const SizedBox(height: 2),
-                          _buildPaymentStatusBadge(order),
                         ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppUi.surfaceRaisedOf(context),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      if (landmark.isNotEmpty) ...[
+                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 14,
-                              color: AppUi.textSecondaryOf(context),
+                            const Icon(
+                              Icons.assistant_direction_rounded,
+                              size: 12,
+                              color: Colors.white,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '$address${barangay.isNotEmpty ? " • $barangay" : ""}',
-                                style: TextStyle(
-                                  color: AppUi.textSecondaryOf(context),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                landmark,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  fontStyle: FontStyle.italic,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1746,39 +1848,57 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             ),
                           ],
                         ),
-                        if (landmark.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.assistant_direction_rounded,
-                                size: 12,
-                                color: AppUi.bluePrimary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  landmark,
-                                  style: const TextStyle(
-                                    color: AppUi.bluePrimary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Bottom Row: Manage action pill
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(99),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.14),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
                         ],
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Manage Order',
+                            style: TextStyle(
+                              color: style.primaryColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 13,
+                            color: style.primaryColor,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -2052,7 +2172,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                       _isKanbanView
                           ? Icons.view_agenda_rounded
                           : Icons.view_kanban_rounded,
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : AppUi.textPrimary,
                       size: 22,
                     ),
                     tooltip: _isKanbanView
@@ -2061,9 +2183,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                   ),
                   IconButton(
                     onPressed: _openAddOrderDialog,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.add_rounded,
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : AppUi.textPrimary,
                       size: 24,
                     ),
                     tooltip: 'Add manual refill',
@@ -2073,22 +2197,37 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                   height: 44,
                   child: TextField(
                     onChanged: (value) => setState(() => _searchQuery = value),
-                    style: const TextStyle(color: AppUi.textPrimary),
+                    style: TextStyle(color: AppUi.textPrimaryOf(context)),
                     decoration: InputDecoration(
                       hintText: 'Search order, customer, or address',
-                      hintStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                      hintStyle: const TextStyle(
+                        color: AppUi.textMuted,
+                        fontSize: 13,
                       ),
-                      prefixIcon: Icon(
+                      prefixIcon: const Icon(
                         Icons.search_rounded,
                         size: 20,
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: AppUi.textSecondary,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.15),
+                      fillColor:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: AppUi.pillRadius,
-                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(99),
+                        borderSide: BorderSide(color: AppUi.borderOf(context)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(99),
+                        borderSide: BorderSide(color: AppUi.borderOf(context)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(99),
+                        borderSide: const BorderSide(
+                          color: AppUi.bluePrimary,
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
@@ -2170,14 +2309,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       {
         'id': 'pending',
         'title': 'Pending',
-        'color': const Color(0xFFF59E0B),
+        'color': OrderStatusColors.getColor('pending'),
         'filter': (Map<String, dynamic> o) =>
             (o['status'] ?? 'pending') == 'pending',
       },
       {
         'id': 'in_prep',
         'title': 'In Prep',
-        'color': AppUi.bluePrimary,
+        'color': OrderStatusColors.getColor('preparing'),
         'filter': (Map<String, dynamic> o) {
           final s = (o['status'] ?? '').toString();
           return s == 'accepted' ||
@@ -2188,7 +2327,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       {
         'id': 'dispatched',
         'title': 'Dispatched',
-        'color': const Color(0xFF8B5CF6),
+        'color': OrderStatusColors.getColor('out_for_delivery'),
         'filter': (Map<String, dynamic> o) {
           final s = (o['status'] ?? '').toString();
           return s == 'assigned_to_rider' || s == 'out_for_delivery';
@@ -2197,7 +2336,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       {
         'id': 'delivered',
         'title': 'Delivered',
-        'color': AppUi.accentGreen,
+        'color': OrderStatusColors.getColor('delivered'),
         'filter': (Map<String, dynamic> o) =>
             (o['status'] ?? '') == 'delivered',
       },
@@ -2380,7 +2519,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         _updateStatus(orderId, 'preparing');
       }
     } else if (targetStageId == 'dispatched') {
-      if (order['rider_id'] == null) {
+      final assignedRider = order['assigned_rider_id'] ?? order['rider_id'];
+      if (assignedRider == null) {
         _showOrderDetail(order);
       } else {
         _updateStatus(orderId, 'out_for_delivery');

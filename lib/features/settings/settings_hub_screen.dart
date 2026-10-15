@@ -151,22 +151,26 @@ class _SettingsTile extends StatelessWidget {
     }
   }
 
-  void _handleCustomerTap(BuildContext context) {
+  Future<void> _handleCustomerTap(BuildContext context) async {
     switch (section.key) {
       case 'profile':
         context.openCustomerSettings();
         return;
       case 'delivery_address':
-        context.openSavedAddresses(
-          const SavedAddressLaunchContext(
-            address: '',
-            landmark: '',
-            town: null,
-            barangay: null,
-            latitude: 0,
-            longitude: 0,
+        final user = context.read<UserProvider>().user;
+        await context.openSavedAddresses(
+          SavedAddressLaunchContext(
+            address: user?.completeAddress ?? '',
+            landmark: user?.landmark ?? '',
+            town: user?.town,
+            barangay: user?.barangay,
+            latitude: user?.latitude ?? 0,
+            longitude: user?.longitude ?? 0,
           ),
         );
+        if (context.mounted) {
+          await context.read<UserProvider>().refreshProfile();
+        }
         return;
       case 'notifications':
         context.openCustomerSettings();

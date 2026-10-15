@@ -234,7 +234,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
               onRefresh: _load,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
+                  parent: ClampingScrollPhysics(),
                 ),
                 slivers: [
                   if (_isLoading)

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/providers/user_provider.dart';
 import '../../core/widgets/brand/hero_header.dart';
 import '../../core/widgets/brand/axo_states.dart';
@@ -96,9 +97,9 @@ class _InboxScreenState extends State<InboxScreen> {
             actions: _selectedRoomIds.isNotEmpty
                 ? [
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.select_all_rounded,
-                        color: Colors.white,
+                        color: AppUi.textPrimaryOf(context),
                       ),
                       onPressed: _selectAllRooms,
                     ),
@@ -107,15 +108,15 @@ class _InboxScreenState extends State<InboxScreen> {
                         _selectedTab == 3
                             ? Icons.unarchive_outlined
                             : Icons.archive_outlined,
-                        color: Colors.white,
+                        color: AppUi.textPrimaryOf(context),
                       ),
                       tooltip: _selectedTab == 3 ? 'Restore' : 'Archive',
                       onPressed: _handleArchiveOrRestoreRooms,
                     ),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close_rounded,
-                        color: Colors.white,
+                        color: AppUi.textPrimaryOf(context),
                       ),
                       onPressed: () => setState(() => _selectedRoomIds.clear()),
                     ),
@@ -124,7 +125,7 @@ class _InboxScreenState extends State<InboxScreen> {
                     IconButton(
                       icon: const Icon(
                         Icons.done_all_rounded,
-                        color: Colors.white,
+                        color: AppUi.bluePrimary,
                       ),
                       onPressed: _markAllAsRead,
                     ),
@@ -501,16 +502,16 @@ class _InboxScreenState extends State<InboxScreen> {
     Color color;
     if (room.isOrderDelivery) {
       icon = Icons.local_shipping_rounded;
-      color = AppUi.bluePrimary;
+      color = AppColors.brandPrimary;
     } else if (room.isCustomerSupport) {
       icon = Icons.support_agent_rounded;
-      color = const Color(0xFF10B981);
+      color = AppColors.statusCompleted;
     } else if (room.isRiderDispatch) {
       icon = Icons.two_wheeler_rounded;
-      color = const Color(0xFFF59E0B);
+      color = AppColors.statusOutForDelivery;
     } else {
       icon = Icons.chat_bubble_rounded;
-      color = AppUi.textSecondary;
+      color = AppUi.textSecondaryOf(context);
     }
 
     return Container(

@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../constants.dart';
 import '../water_types.dart';
+import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
 /// Full-width search field for finding nearby water stations.
@@ -374,8 +375,44 @@ class StationCard extends StatelessWidget {
   }
 
   Widget _placeholderIcon() {
-    return const Center(
-      child: Icon(Icons.water_drop_rounded, size: 62, color: AppUi.bluePrimary),
+    return Container(
+      color: AppUi.blueSoft,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x0A000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.water_drop_rounded,
+                size: 28,
+                color: AppUi.bluePrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Water Station',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppUi.bluePrimary,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -547,12 +584,10 @@ class DashboardStatCard extends StatelessWidget {
     final hasTrend = trend != null && trend!.length >= 2;
     final isPositive = delta?.startsWith('+') ?? true;
 
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: AppUi.cardRadius,
-      child: InkWell(
+    return RepaintBoundary(
+      child: PressBounce(
         onTap: onTap,
-        borderRadius: AppUi.cardRadius,
+        pressedScale: 0.985,
         child: Container(
           decoration: AppUi.cardDecorationOf(context),
           child: Column(
@@ -614,12 +649,26 @@ class DashboardStatCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppUi.textPrimaryOf(context),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.2),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: Text(
+                        value,
+                        key: ValueKey(value),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppUi.textPrimaryOf(context),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -708,14 +757,31 @@ class ActiveOrderCard extends StatelessWidget {
   const ActiveOrderCard({
     super.key,
     required this.order,
-    required this.statusLabel,
+    this.statusLabel = 'Active order',
     this.onTap,
   });
+
+  int _currentStage(String? status) {
+    switch ((status ?? '').toLowerCase()) {
+      case 'out_for_delivery':
+      case 'delivering':
+        return 2;
+      case 'preparing':
+      case 'ready':
+      case 'ready_for_pickup':
+      case 'assigned_to_rider':
+      case 'rider_assigned':
+        return 1;
+      default:
+        return 0; // pending, accepted
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final stationName =
         (order['profiles'] as Map<String, dynamic>?)?['station_name'] ??
+        order['station_name']?.toString() ??
         'Water station';
     final total = (order['total_amount'] as num?)?.toDouble() ?? 0;
     final status = order['status']?.toString();
@@ -725,6 +791,9 @@ class ActiveOrderCard extends StatelessWidget {
         (order['payment_status'] ?? 'pending').toString().toLowerCase();
     final isOnline = {'gcash', 'maya', 'card'}.contains(paymentMethod);
     final isPaid = paymentStatus == 'success' || paymentStatus == 'paid';
+    final stage = _currentStage(status);
+
+    final statusColor = OrderStatusColors.getColor(status);
 
     return Material(
       color: AppUi.surfaceOf(context),
@@ -733,57 +802,190 @@ class ActiveOrderCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppUi.cardRadius,
         child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: AppUi.cardDecorationOf(context),
-          child: Row(
+          padding: const EdgeInsets.all(16),
+          decoration: AppUi.cardDecorationOf(context, elevated: true),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.local_shipping_rounded, color: AppUi.bluePrimary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(statusLabel, style: AppUi.sectionTitle),
-                    const SizedBox(height: 3),
-                    Text(
-                      '$stationName · ₱${total.toStringAsFixed(0)}',
-                      style: AppUi.captionText,
+              // Top Row: Live status dot, station name, and total
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
                     ),
-                    if (status != null) ...[
-                      const SizedBox(height: 6),
-                      OrderStatusBadge(status: status, showIcon: true),
-                    ],
-                    if (isOnline && !isPaid) ...[
-                      const SizedBox(height: 5),
-                      const Row(
-                        children: [
-                          Icon(Icons.payment_rounded, size: 12, color: Color(0xFFD97706)),
-                          SizedBox(width: 4),
-                          Text(
-                            'Awaiting online payment',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      stationName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '₱${total.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: statusColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Status Badge and Action Prompt
+              Row(
+                children: [
+                  OrderStatusBadge(status: status, showIcon: true),
+                  const Spacer(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Track order',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: statusColor,
                       ),
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppUi.navUnselected),
+              const SizedBox(height: 14),
+
+              // 3-step progress track
+              Row(
+                children: [
+                  _buildStageStep(
+                    context,
+                    label: 'Placed',
+                    isDone: stage >= 0,
+                    isActive: stage == 0,
+                    statusColor: statusColor,
+                  ),
+                  _buildStageLine(context, isDone: stage >= 1, statusColor: statusColor),
+                  _buildStageStep(
+                    context,
+                    label: 'Preparing',
+                    isDone: stage >= 1,
+                    isActive: stage == 1,
+                    statusColor: statusColor,
+                  ),
+                  _buildStageLine(context, isDone: stage >= 2, statusColor: statusColor),
+                  _buildStageStep(
+                    context,
+                    label: 'On the Way',
+                    isDone: stage >= 2,
+                    isActive: stage == 2,
+                    statusColor: statusColor,
+                  ),
+                ],
+              ),
+
+              if (isOnline && !isPaid) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.uiWarningBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.payment_rounded, size: 14, color: AppColors.uiWarning),
+                      SizedBox(width: 6),
+                      Text(
+                        'Awaiting online payment',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.uiWarning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStageStep(
+    BuildContext context, {
+    required String label,
+    required bool isDone,
+    required bool isActive,
+    required Color statusColor,
+  }) {
+    final color = isDone ? statusColor : AppUi.borderOf(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            color: isDone ? statusColor : AppUi.surfaceRaisedOf(context),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: color,
+              width: isActive ? 2 : 1,
+            ),
+          ),
+          child: Center(
+            child: isDone
+                ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
+                : Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppUi.textSecondaryOf(context).withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isDone ? FontWeight.w700 : FontWeight.w500,
+            color: isDone ? AppUi.textPrimaryOf(context) : AppUi.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStageLine(BuildContext context, {required bool isDone, required Color statusColor}) {
+    return Expanded(
+      child: Container(
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 14),
+        color: isDone ? statusColor : AppUi.borderOf(context),
       ),
     );
   }

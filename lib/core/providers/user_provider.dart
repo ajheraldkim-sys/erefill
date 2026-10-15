@@ -53,7 +53,7 @@ class UserProvider extends ChangeNotifier {
           _profileSub?.cancel();
           _profileSub = null;
           notifyListeners();
-        } else if (_profileUserId != session.user.id) {
+        } else if (_profileUserId != session.user.id || _user == null) {
           _fetchAndListenToProfile(session.user.id);
         }
       },
@@ -97,39 +97,88 @@ class UserProvider extends ChangeNotifier {
         _isLoading = true;
         notifyListeners();
       }
+    } else if (_user == null) {
+      _isLoading = true;
+      notifyListeners();
     }
 
     try {
-      final data = await _supabase
-          .from('profiles')
-          .select()
-          .eq('id', userId)
-          .single();
+      Map<String, dynamic>? data;
+      // Progressive retry loop up to 4 attempts to tolerate database trigger delay on signup
+      for (int attempt = 1; attempt <= 4; attempt++) {
+        try {
+          data = await _supabase
+              .from('profiles')
+              .select()
+              .eq('id', userId)
+              .maybeSingle();
+          if (data != null) break;
+        } catch (fetchErr) {
+          debugPrint('Profile query attempt $attempt error: $fetchErr');
+        }
+        if (attempt < 4) {
+          await Future.delayed(Duration(milliseconds: 250 * attempt));
+          if (_disposed || generation != _profileLoadGeneration) return;
+        }
+      }
+
       if (_disposed ||
           generation != _profileLoadGeneration ||
           _profileUserId != userId) {
         return;
       }
-      _user = UserModel.fromJson(data);
-      await _cache.set('user_profile_$userId', data);
 
-      _profileSub ??= SafeSupabase.listen(
-        _supabase
-            .from('profiles')
-            .stream(primaryKey: ['id'])
-            .eq('id', userId),
-        (data) {
-          if (data.isNotEmpty && _profileUserId == userId && !_disposed) {
-            _user = UserModel.fromJson(data.first);
-            _cache.set('user_profile_$userId', data.first);
-            notifyListeners();
+      if (data != null) {
+        _user = UserModel.fromJson(data);
+        await _cache.set('user_profile_$userId', data);
+      } else {
+        // Fallback 1: Local cache
+        final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
+        if (cached != null) {
+          _user = UserModel.fromJson(cached);
+        } else {
+          // Fallback 2: Synthesize from authenticated currentUser metadata for zero-lag signup
+          final currentUser = _supabase.auth.currentUser;
+          if (currentUser != null && currentUser.id == userId) {
+            final meta = currentUser.userMetadata ?? {};
+            final synthetic = <String, dynamic>{
+              'id': userId,
+              'email': currentUser.email ?? '',
+              'role': meta['role'] ?? 'customer',
+              'username': meta['username'] ??
+                  'user_${userId.length >= 8 ? userId.substring(0, 8) : userId}',
+              'full_name': meta['full_name'] ?? 'New User',
+              'first_name': meta['first_name'],
+              'last_name': meta['last_name'],
+              'mi': meta['mi'],
+              'suffix': meta['suffix'],
+              'phone': meta['phone'],
+              'town': meta['town'],
+              'barangay': meta['barangay'],
+              'complete_address': meta['complete_address'],
+              'landmark': meta['landmark'],
+              'station_name': meta['station_name'],
+              'latitude': meta['latitude'],
+              'longitude': meta['longitude'],
+              'preferred_water_type': meta['preferred_water_type'],
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+            _user = UserModel.fromJson(synthetic);
+            await _cache.set('user_profile_$userId', synthetic);
+
+            // Self-heal: Ensure row is asynchronously persisted to public.profiles
+            unawaited(_supabase
+                .from('profiles')
+                .upsert(synthetic)
+                .then((_) {})
+                .catchError((e) {
+              debugPrint('Self-healing profile upsert safeguard: $e');
+            }));
           }
-        },
-        onError: (error, stackTrace) {
-          debugPrint('User profile stream error: $error');
-          debugPrint('User profile stream stack: $stackTrace');
-        },
-      );
+        }
+      }
+
+      _attachProfileStream(userId);
     } catch (e) {
       if (_disposed || generation != _profileLoadGeneration) return;
       debugPrint("Error loading user profile: $e");
@@ -154,6 +203,26 @@ class UserProvider extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  void _attachProfileStream(String userId) {
+    _profileSub ??= SafeSupabase.listen(
+      _supabase
+          .from('profiles')
+          .stream(primaryKey: ['id'])
+          .eq('id', userId),
+      (data) {
+        if (data.isNotEmpty && _profileUserId == userId && !_disposed) {
+          _user = UserModel.fromJson(data.first);
+          _cache.set('user_profile_$userId', data.first);
+          notifyListeners();
+        }
+      },
+      onError: (error, stackTrace) {
+        debugPrint('User profile stream error: $error');
+        debugPrint('User profile stream stack: $stackTrace');
+      },
+    );
   }
 
   Future<void> refreshProfile() async {

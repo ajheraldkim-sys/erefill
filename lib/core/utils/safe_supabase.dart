@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
+import '../services/local_data_cache.dart';
 
 /// Safe Supabase helper with proper null safety and error handling
 class SafeSupabase {
@@ -160,6 +161,7 @@ class SafeSupabase {
     required String newStatus,
     String? reason,
   }) async {
+    Map<String, dynamic>? result;
     try {
       final response = await _client.rpc(
         'transition_order_status_safely',
@@ -167,30 +169,45 @@ class SafeSupabase {
       );
       if (response is Map) {
         final map = Map<String, dynamic>.from(response);
-        if (map['success'] == true) return map;
+        if (map['success'] == true) {
+          result = map;
+        }
       }
     } catch (e) {
       debugPrint('transition_order_status_safely RPC fallback triggered: $e');
     }
 
-    // Direct database update fallback
-    try {
-      final updateData = <String, dynamic>{
-        'status': newStatus,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      if (reason != null && reason.isNotEmpty) {
-        updateData['notes'] = 'Declined: $reason';
+    if (result == null) {
+      // Direct database update fallback
+      try {
+        final updateData = <String, dynamic>{
+          'status': newStatus,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        if (reason != null && reason.isNotEmpty) {
+          updateData['notes'] = 'Declined: $reason';
+        }
+        if (newStatus == 'delivered') {
+          final nowIso = DateTime.now().toIso8601String();
+          updateData['delivered_at'] = nowIso;
+          updateData['actual_completion_at'] = nowIso;
+        }
+        await _client.from('orders').update(updateData).eq('id', orderId);
+        result = {'success': true, 'fallback': true};
+      } catch (fallbackError) {
+        debugPrint('Direct order status update failed: $fallbackError');
+        rethrow;
       }
-      if (newStatus == 'delivered') {
-        updateData['delivered_at'] = DateTime.now().toIso8601String();
-      }
-      await _client.from('orders').update(updateData).eq('id', orderId);
-      return {'success': true, 'fallback': true};
-    } catch (fallbackError) {
-      debugPrint('Direct order status update failed: $fallbackError');
-      rethrow;
     }
+
+    // Invalidate cached order overviews and lists across all roles
+    unawaited(LocalDataCache.instance.invalidatePattern('owner_overview_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('owner_orders_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('customer_home_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('customer_orders_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('rider_stats_'));
+
+    return result;
   }
 
   /// Safely unlinks a rider from the station using RPC or direct fallback

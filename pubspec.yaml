@@ -51,6 +51,7 @@ dependencies:
   shadcn_flutter: ^0.0.55
   shadcn_flutter_material: ^0.0.54
   flutter_local_notifications: ^22.3.1
+  flutter_displaymode: ^0.7.0
 
 dev_dependencies:
   flutter_test:

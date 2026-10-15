@@ -14,8 +14,8 @@ void main() {
     });
 
     test('AppUi design tokens for admin adhere to coastal palette', () {
-      expect(AppUi.bluePrimary, equals(const Color(0xFF087E8B)));
-      expect(AppUi.deepBlue, equals(const Color(0xFF193438)));
+      expect(AppUi.bluePrimary, equals(const Color(0xFF0F71C3)));
+      expect(AppUi.deepBlue, equals(const Color(0xFF10283B)));
       expect(AppUi.accentGreen, equals(const Color(0xFF21866A)));
     });
   });

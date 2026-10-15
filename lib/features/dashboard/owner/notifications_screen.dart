@@ -7,6 +7,8 @@ import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
+import 'package:erefill/core/widgets/notification_detail_dialog.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -90,7 +92,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           'message': 'New refill orders waiting for acceptance',
           'type': 'urgent',
           'icon': Icons.notifications_active,
-          'color': const Color(0xFFF59E0B),
+          'color': OrderStatusColors.pending,
           'time': now,
           'action': 'View Orders',
         });
@@ -111,7 +113,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           'message': 'Assign a rider to start delivery',
           'type': 'urgent',
           'icon': Icons.assignment_ind_rounded,
-          'color': AppUi.bluePrimary,
+          'color': OrderStatusColors.readyForDelivery,
           'time': now,
           'action': 'View Orders',
         });
@@ -135,7 +137,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           'message': 'Track your riders in real-time',
           'type': 'info',
           'icon': Icons.delivery_dining,
-          'color': const Color(0xFF8B5CF6),
+          'color': OrderStatusColors.outForDelivery,
           'time': now,
           'action': 'Track',
         });
@@ -153,7 +155,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           'message': 'Orders need attention to keep delivery times on track',
           'type': 'urgent',
           'icon': Icons.timer_outlined,
-          'color': const Color(0xFFEF4444),
+          'color': AppColors.statusCancelled,
           'time': now,
           'action': 'View Orders',
         });
@@ -173,7 +175,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               'Online checkout failed or expired; customer may need help',
           'type': 'urgent',
           'icon': Icons.payment_outlined,
-          'color': const Color(0xFFEF4444),
+          'color': AppColors.uiError,
           'time': now,
           'action': 'View Orders',
         });
@@ -198,7 +200,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 'A PayMongo callback could not be applied; review the affected orders',
             'type': 'urgent',
             'icon': Icons.sync_problem_rounded,
-            'color': const Color(0xFFEF4444),
+            'color': AppColors.uiError,
             'time': now,
             'action': 'View Orders',
           });
@@ -226,7 +228,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 'Delivery log updates could not reach the server; open offline logs and sync again',
             'type': 'urgent',
             'icon': Icons.cloud_off_rounded,
-            'color': const Color(0xFFF59E0B),
+            'color': AppColors.uiWarning,
             'time': now,
             'action': 'View Logs',
           });
@@ -313,7 +315,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       onPressed: _markAllAsRead,
                       child: const Text(
                         'Mark all read',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: AppUi.bluePrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ]
@@ -411,9 +416,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ),
                               child: InkWell(
                                 onTap: () {
-                                  if (!isRead) {
-                                    _markAsRead(notification['id']);
-                                  }
+                                  showNotificationDetailDialogFromMap(
+                                    context,
+                                    notification,
+                                    onMarkRead: () {
+                                      if (!isRead) {
+                                        _markAsRead(notification['id']);
+                                      }
+                                    },
+                                  );
                                 },
                                 borderRadius: AppUi.cardRadius,
                                 child: Container(
@@ -594,11 +605,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Color _getTypeColor(String type) {
     switch (type) {
       case 'order':
-        return const Color(0xFF10B981);
+        return OrderStatusColors.confirmed;
       case 'rider':
-        return const Color(0xFF8B5CF6);
+        return OrderStatusColors.outForDelivery;
       case 'system':
-        return AppUi.bluePrimary;
+        return AppColors.brandPrimary;
       default:
         return AppUi.textSecondaryOf(context);
     }

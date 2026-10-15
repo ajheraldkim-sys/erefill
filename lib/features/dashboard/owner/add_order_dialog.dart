@@ -102,6 +102,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
         'payment_method': 'cod',
         'payment_status': _isCredit ? 'pending' : 'success',
         'rider_id': _selectedRiderId,
+        'assigned_rider_id': _selectedRiderId,
         'created_at': DateTime.now().toIso8601String(),
       };
 

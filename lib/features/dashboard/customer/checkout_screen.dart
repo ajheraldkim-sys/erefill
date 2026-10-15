@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/utils/profile_query_helpers.dart';
 import '../../../core/constants.dart';
-import '../../../core/widgets/erefill_header.dart';
+import '../../../core/widgets/map_tiles.dart';
 import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/refill_lottie.dart';
 import 'widgets/payment_method_selector.dart';
 import '../../../models/cart_model.dart';
 import 'checkout_rules.dart';
@@ -339,6 +343,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _refreshStationAvailability() async {
     final requestId = ++_availabilityRequestId;
+    if (!CheckoutRules.hasUsableDeliveryCoordinates(_customerProfile)) {
+      if (mounted) {
+        setState(() {
+          _stationAvailabilityMessage = null;
+          _checkingStationAvailability = false;
+        });
+      }
+      return;
+    }
     final lat = (_customerProfile?['latitude'] as num?)?.toDouble();
     final lng = (_customerProfile?['longitude'] as num?)?.toDouble();
     if (lat == null || lng == null) {
@@ -374,10 +387,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
       setState(() {
-        _stationAvailabilityMessage = availability['status'] != 'OK'
-            ? availability['message']?.toString() ??
-                  'This station is not available for your location right now.'
-            : null;
+        if (availability['status'] != 'OK') {
+          if (availability['status'] == 'OUT_OF_ZONE') {
+            final stationTown = (widget.station['town'] ?? widget.station['municipality'] ?? '').toString().trim();
+            final customerTown = _customerProfile?['town']?.toString().trim() ?? '';
+            if (stationTown.isNotEmpty &&
+                customerTown.isNotEmpty &&
+                stationTown.toLowerCase() != customerTown.toLowerCase()) {
+              _stationAvailabilityMessage =
+                  'This station is located in $stationTown and cannot deliver to $customerTown (outside delivery radius). Please select a station in $customerTown or change your delivery address.';
+            } else {
+              _stationAvailabilityMessage = availability['message']?.toString() ??
+                  'You are outside the service area of this station.';
+            }
+          } else {
+            _stationAvailabilityMessage = availability['message']?.toString() ??
+                'This station is not available for your location right now.';
+          }
+        } else {
+          _stationAvailabilityMessage = null;
+        }
         _checkingStationAvailability = false;
       });
     } catch (e) {
@@ -671,7 +700,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           .single();
 
       if (!mounted) return;
-      context.replaceOrderTracker(orderRecord);
+      final shortId = orderId.length >= 8 ? orderId.substring(0, 8).toUpperCase() : orderId;
+      await RefillLottie.showOrderSuccessDialog(
+        context,
+        orderNumber: shortId,
+        stationName: stationName,
+        onTrackOrder: () {
+          if (mounted) context.replaceOrderTracker(orderRecord);
+        },
+      );
     } catch (e) {
       debugPrint('Checkout submission failed: $e');
       final errStr = e.toString().toLowerCase();
@@ -973,7 +1010,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             voucherDiscount)
         .clamp(0.0, double.infinity);
     final textTheme = Theme.of(context).textTheme;
-    final paymentOptions = _selectablePaymentMethods;
     final profileReady = CheckoutRules.isDeliveryProfileReady(_customerProfile);
     final deliveryIssue = CheckoutRules.deliveryProfileIssue(_customerProfile);
     final bannerMessage =
@@ -989,10 +1025,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (cart.items.isEmpty && !_isBootstrapping) {
       return Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
-        appBar: const ERefillHeader(
-          title: 'Confirm Refill',
-          subtitle: 'Review delivery, summary & payment',
-        ),
+        appBar: _buildCustomHeader(context),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -1000,8 +1033,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 76,
+                  height: 76,
                   decoration: const BoxDecoration(
                     color: AppUi.blueSoft,
                     shape: BoxShape.circle,
@@ -1009,7 +1042,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: const Icon(
                     Icons.shopping_cart_outlined,
                     color: AppUi.bluePrimary,
-                    size: 36,
+                    size: 38,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -1054,475 +1087,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
-      appBar: const ERefillHeader(
-        title: 'Confirm Refill',
-        subtitle: 'Review delivery, summary & payment',
-      ),
+      appBar: _buildCustomHeader(context),
       body: _isBootstrapping
           ? const AxoLoader(message: 'Loading checkout...')
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Alert Banner (if any)
                   if (bannerMessage != null) ...[
                     _checkoutBanner(bannerMessage),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                   ],
 
-                  // ── 1. DELIVERY ADDRESS ──────────────────────────
-                  KeyedSubtree(
-                    key: _deliverySectionKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _sectionTitle('Delivery Address'),
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              onPressed: _openAddressSetup,
-                              child: Text(
-                                profileReady ? 'Change' : 'Add',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                  color: AppUi.bluePrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: const BoxDecoration(
-                                color: AppUi.blueSoft,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.location_on_rounded,
-                                color: AppUi.bluePrimary,
-                                size: 19,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    profileReady
-                                        ? (_customerProfile?['complete_address'] ??
-                                                  'Address not set')
-                                              .toString()
-                                        : 'Add your delivery address to continue',
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                      color: profileReady
-                                          ? AppUi.textPrimaryOf(context)
-                                          : AppUi.textSecondary,
-                                    ),
-                                  ),
-                                  if (profileReady) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      '${_customerProfile?['barangay'] ?? ''}, ${_customerProfile?['town'] ?? ''}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppUi.textSecondaryOf(context),
-                                      ),
-                                    ),
-                                    if ((_customerProfile?['landmark']
-                                            ?.toString()
-                                            .isNotEmpty ??
-                                        false)) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Landmark: ${_customerProfile!['landmark']}',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppUi.textMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_savedAddresses.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: _savedAddresses.map((address) {
-                                final id = address['id']?.toString();
-                                final isSelected = id == _selectedAddressId;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: ChoiceChip(
-                                    label: Text(
-                                      address['label']?.toString() ?? 'Address',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                      ),
-                                    ),
-                                    selected: isSelected,
-                                    onSelected: (_) =>
-                                        _selectSavedAddress(address),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                  // ── 1. DELIVERY ADDRESS CARD ──────────────────────
+                  _buildDeliveryAddressCard(context, profileReady),
+                  const SizedBox(height: 12),
+
+                  // ── 2. STATION & REFILL ITEMS CARD ───────────────
+                  _buildStationAndItemsCard(context, stationName, cart),
+                  const SizedBox(height: 12),
+
+                  // ── 3. VOUCHER / PROMOTION CARD ──────────────────
+                  _buildVoucherCard(context, voucherDiscount),
+                  const SizedBox(height: 12),
+
+                  // ── 4. PAYMENT METHOD CARD ────────────────────────
+                  _buildPaymentMethodCard(context),
+                  const SizedBox(height: 12),
+
+                  // ── 5. ORDER SUMMARY CARD ─────────────────────────
+                  _buildOrderSummaryCard(
+                    context,
+                    cart,
+                    platformFee,
+                    voucherDiscount,
+                    totalWithDelivery,
                   ),
-
-                  _sectionDivider(context),
-
-                  // ── 2. REFILL SUMMARY ───────────────────────────
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _sectionTitle('Refill Summary'),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                const Icon(
-                                  Icons.storefront_rounded,
-                                  size: 14,
-                                  color: AppUi.textMuted,
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    stationName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppUi.textMuted,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...cart.items.values.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppUi.blueSoft,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '${item.quantity}\u00D7',
-                                  style: const TextStyle(
-                                    color: AppUi.bluePrimary,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '\u20B1${(item.price * item.quantity).toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Divider(
-                          height: 1,
-                          color: AppUi.dividerOf(
-                            context,
-                          ).withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _amountRow(
-                        'Subtotal',
-                        '\u20B1${cart.totalAmount.toStringAsFixed(2)}',
-                        muted: true,
-                      ),
-                      _amountRow(
-                        'Delivery fee',
-                        '\u20B1${_deliveryFee.toStringAsFixed(2)}',
-                        muted: true,
-                      ),
-                      if (platformFee > 0)
-                        _amountRow(
-                          'Service fee',
-                          '\u20B1${platformFee.toStringAsFixed(2)}',
-                          muted: true,
-                          onInfo: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.info_outline_rounded,
-                                      color: AppUi.bluePrimary,
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'What is this fee?',
-                                      style: TextStyle(fontSize: 16),
-                                    ),
-                                  ],
-                                ),
-                                content: const Text(
-                                  'A small fee that covers 24/7 app maintenance, real-time rider tracking, and customer support so your water refills arrive smoothly.',
-                                  style: TextStyle(fontSize: 13, height: 1.45),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('Got it'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      if (_appliedVoucher != null)
-                        _amountRow(
-                          'Reward Voucher (${_appliedVoucher!.title})',
-                          '-\u20B1${voucherDiscount.toStringAsFixed(2)}',
-                          muted: true,
-                          valueColor: const Color(0xFF10B981),
-                        ),
-                      // Voucher selection card
-                      Container(
-                        margin: const EdgeInsets.only(top: 6, bottom: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _appliedVoucher != null
-                              ? const Color(0xFF10B981).withValues(alpha: 0.08)
-                              : AppUi.surfaceOf(context),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _appliedVoucher != null
-                                ? const Color(0xFF10B981)
-                                : AppUi.borderOf(context),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.local_offer_outlined,
-                              size: 16,
-                              color: _appliedVoucher != null
-                                  ? const Color(0xFF10B981)
-                                  : AppUi.bluePrimary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _appliedVoucher != null
-                                    ? 'Applied: ${_appliedVoucher!.title}'
-                                    : (_availableVouchers.isEmpty
-                                        ? 'No reward vouchers available'
-                                        : '${_availableVouchers.length} reward voucher(s) available'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: _appliedVoucher != null
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: _appliedVoucher != null
-                                      ? const Color(0xFF10B981)
-                                      : null,
-                                ),
-                              ),
-                            ),
-                            if (_appliedVoucher != null)
-                              InkWell(
-                                onTap: () => setState(() => _appliedVoucher = null),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  child: Text(
-                                    'Remove',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.redAccent,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            else if (_availableVouchers.isNotEmpty)
-                              InkWell(
-                                onTap: _showSelectVoucherSheet,
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  child: Text(
-                                    'Apply',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppUi.bluePrimary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Divider(
-                          height: 1,
-                          color: AppUi.dividerOf(
-                            context,
-                          ).withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      _amountRow(
-                        'Total',
-                        '\u20B1${totalWithDelivery.toStringAsFixed(2)}',
-                        bold: true,
-                      ),
-                    ],
-                  ),
-
-                  _sectionDivider(context),
-
-                  // ── 3. PAYMENT METHOD ───────────────────────────
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionTitle('Payment Method'),
-                      const SizedBox(height: 10),
-                      PaymentMethodSelector(
-                        selectedMethod: _paymentMethod,
-                        methods: paymentOptions,
-                        onSelected: (method) {
-                          setState(() => _paymentMethod = method);
-                        },
-                      ),
-                      if (_paymentMethod != 'cod') ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppUi.blueSoft.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.lock_outline_rounded,
-                                size: 14,
-                                color: AppUi.bluePrimary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'You will complete payment securely via ${CheckoutRules.paymentLabel(_paymentMethod)} (PayMongo) after placing your order.',
-                                  style: const TextStyle(
-                                    color: AppUi.bluePrimary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  _sectionDivider(context),
-
-                  // ── 4. DELIVERY NOTES ───────────────────────────
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _sectionTitle('Delivery Notes'),
-                          const SizedBox(width: 6),
-                          Text(
-                            '(optional)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppUi.textSecondaryOf(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      AppFormField(
-                        controller: _notesController,
-                        label: 'Special Instructions',
-                        hintText:
-                            'e.g. Leave at front gate, call upon arrival...',
-                        prefixIcon: Icons.notes_rounded,
-                        maxLines: 2,
-                        compact: true,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -1534,79 +1138,1285 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               canSubmit:
                   cart.totalItems > 0 &&
                   !_isSubmitting &&
-                  !_checkingStationAvailability,
+                  !_checkingStationAvailability &&
+                  _stationAvailabilityMessage == null,
               onConfirm: () => _confirmOrder(cart),
             ),
     );
   }
 
-  // ── helper widgets ────────────────────────────────────────────────────────
+  // ── CUSTOM TOP NAVIGATION ──────────────────────────────────────────────────
 
-  Widget _sectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.2,
-      ),
-    );
-  }
-
-  Widget _sectionDivider(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Divider(
-        height: 1,
-        color: AppUi.dividerOf(context).withValues(alpha: 0.6),
-      ),
-    );
-  }
-
-  Widget _amountRow(
-    String label,
-    String value, {
-    bool muted = false,
-    bool bold = false,
-    Color? valueColor,
-    VoidCallback? onInfo,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
+  PreferredSize _buildCustomHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(56),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: muted ? AppUi.textSecondary : null,
-                  fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-                  fontSize: bold ? 15 : 13,
+              GestureDetector(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppUi.surfaceOf(context),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppUi.borderOf(context),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.2 : 0.04,
+                        ),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.arrow_back_rounded,
+                    size: 20,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
                 ),
               ),
-              if (onInfo != null) ...[
-                const SizedBox(width: 5),
-                GestureDetector(
-                  onTap: onInfo,
-                  child: const Icon(
-                    Icons.info_outline_rounded,
-                    size: 15,
-                    color: AppUi.textMuted,
+              Text(
+                'Confirm Refill',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                  color: AppUi.textPrimaryOf(context),
+                ),
+              ),
+              const SizedBox(width: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── 1. DELIVERY ADDRESS CARD ──────────────────────────────────────────────
+
+  Widget _buildDeliveryAddressCard(BuildContext context, bool profileReady) {
+    final lat = (_customerProfile?['latitude'] as num?)?.toDouble();
+    final lng = (_customerProfile?['longitude'] as num?)?.toDouble();
+    final hasCoords = lat != null && lng != null && (lat != 0 || lng != 0);
+
+    return Container(
+      key: _deliverySectionKey,
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppUi.borderOf(context), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Map preview thumbnail on top
+          if (hasCoords)
+            SizedBox(
+              height: 110,
+              width: double.infinity,
+              child: IgnorePointer(
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: LatLng(lat, lng),
+                    initialZoom: 15.5,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.none,
+                    ),
+                  ),
+                  children: [
+                    AppMapTiles.layer(context: context),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(lat, lng),
+                          width: 38,
+                          height: 38,
+                          alignment: Alignment.topCenter,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.25),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.location_on_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              height: 80,
+              width: double.infinity,
+              color: AppUi.blueSoft.withValues(alpha: 0.6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.map_outlined,
+                    color: AppUi.bluePrimary.withValues(alpha: 0.8),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Set delivery pin on map',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.bluePrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Deliver to \u00B7 ~20-30 min',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _deliveryDestinationLabel(),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                          color: AppUi.textPrimaryOf(context),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _openAddressSetup,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text(
+                              'Change',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  profileReady
+                      ? (_customerProfile?['complete_address'] ??
+                              'No address provided')
+                          .toString()
+                      : 'Add your delivery address to continue',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (_savedAddresses.length > 1) ...[
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _savedAddresses.map((addr) {
+                        final id = addr['id']?.toString();
+                        final isSelected = id == _selectedAddressId;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: InkWell(
+                            onTap: () => _selectSavedAddress(addr),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppUi.bluePrimary.withValues(alpha: 0.12)
+                                    : AppUi.pageBgOf(context),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppUi.bluePrimary
+                                      : AppUi.borderOf(context),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                addr['label']?.toString() ?? 'Address',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? AppUi.bluePrimary
+                                      : AppUi.textSecondaryOf(context),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 2. STATION & REFILL ITEMS CARD ────────────────────────────────────────
+
+  Widget _buildStationAndItemsCard(
+    BuildContext context,
+    String stationName,
+    CartProvider cart,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppUi.borderOf(context), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Station branding header
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppUi.blueSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.water_drop_rounded,
+                  color: AppUi.bluePrimary,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  stationName,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Items list
+          ...cart.items.values.map((item) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: AppUi.blueSoft.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: item.imageUrl != null &&
+                                item.imageUrl!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CachedNetworkImage(
+                                  imageUrl: item.imageUrl!,
+                                  width: 52,
+                                  height: 52,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) => const Icon(
+                                    Icons.water_drop_outlined,
+                                    color: AppUi.bluePrimary,
+                                    size: 26,
+                                  ),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.water_drop_rounded,
+                                color: AppUi.bluePrimary,
+                                size: 26,
+                              ),
+                      ),
+                      Positioned(
+                        right: -3,
+                        bottom: -3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: Text(
+                            '${item.quantity}x',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppUi.textPrimaryOf(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _deriveContainerOrRefillType(item.name),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppUi.textSecondaryOf(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '\u20B1${(item.price * item.quantity).toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.textPrimaryOf(context),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          Divider(
+            height: 1,
+            color: AppUi.dividerOf(context).withValues(alpha: 0.6),
+          ),
+          const SizedBox(height: 10),
+
+          // Delivery notes / special instructions row
+          InkWell(
+            onTap: () => _showNotesDialog(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.notes_rounded,
+                    size: 16,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _notesController.text.trim().isEmpty
+                          ? 'Add delivery notes / gate instructions...'
+                          : 'Note: ${_notesController.text.trim()}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontStyle: _notesController.text.trim().isEmpty
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                        color: _notesController.text.trim().isEmpty
+                            ? AppUi.textSecondaryOf(context)
+                            : AppUi.textPrimaryOf(context),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    _notesController.text.trim().isEmpty
+                        ? Icons.add_rounded
+                        : Icons.edit_outlined,
+                    size: 16,
+                    color: const Color(0xFF2E7D32),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 3. VOUCHER / PROMOTION CARD ───────────────────────────────────────────
+
+  Widget _buildVoucherCard(BuildContext context, double voucherDiscount) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _showSelectVoucherSheet,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppUi.surfaceOf(context),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _appliedVoucher != null
+                  ? const Color(0xFF10B981)
+                  : AppUi.borderOf(context),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left soft-green badge matching reference screenshot
+                Container(
+                  width: 64,
+                  color: isDark
+                      ? const Color(0xFF132D21)
+                      : const Color(0xFFE8F5E9),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.confirmation_number_outlined,
+                          color: Color(0xFF2E7D32),
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Voucher',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Middle text
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _appliedVoucher != null
+                              ? 'Voucher: ${_appliedVoucher!.title}'
+                              : 'Select a voucher',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _appliedVoucher != null
+                                ? const Color(0xFF16A34A)
+                                : AppUi.textPrimaryOf(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _appliedVoucher != null
+                              ? (_appliedVoucher!.isDeliveryDiscount
+                                  ? 'Free delivery discount applied'
+                                  : '-\u20B1${voucherDiscount.toStringAsFixed(0)} discount applied')
+                              : (_availableVouchers.isEmpty
+                                  ? 'No vouchers available for this order'
+                                  : '${_availableVouchers.length} available for this order'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppUi.textSecondaryOf(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Right pill button matching reference screenshot
+                Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: Center(
+                    child: _appliedVoucher != null
+                        ? TextButton(
+                            onPressed: () {
+                              setState(() => _appliedVoucher = null);
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Remove',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E5E3B),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Select',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── 4. PAYMENT METHOD CARD ────────────────────────────────────────────────
+
+  Widget _buildPaymentMethodCard(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _showPaymentSelectorSheet,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppUi.surfaceOf(context),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppUi.borderOf(context), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Payment method',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppUi.textSecondaryOf(context),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _paymentBrandBadge(_paymentMethod),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          CheckoutRules.paymentLabel(_paymentMethod),
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppUi.textPrimaryOf(context),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _paymentSubtitle(_paymentMethod),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppUi.textSecondaryOf(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'Change',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: Color(0xFF2E7D32),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (_paymentMethod != 'cod') ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppUi.blueSoft.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lock_outline_rounded,
+                        size: 14,
+                        color: AppUi.bluePrimary,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Secure checkout powered by PayMongo Philippines',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppUi.bluePrimary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ],
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
-              fontSize: bold ? 16 : 13,
-              color: valueColor ?? (bold ? AppUi.bluePrimary : null),
+        ),
+      ),
+    );
+  }
+
+  // ── 5. ORDER SUMMARY CARD ─────────────────────────────────────────────────
+
+  Widget _buildOrderSummaryCard(
+    BuildContext context,
+    CartProvider cart,
+    double platformFee,
+    double voucherDiscount,
+    double totalWithDelivery,
+  ) {
+    final isFreeDelivery = _deliveryFee == 0 ||
+        (_appliedVoucher != null && _appliedVoucher!.isDeliveryDiscount);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppUi.borderOf(context), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _summaryRow(
+            context,
+            'Subtotal',
+            '\u20B1${cart.totalAmount.toStringAsFixed(2)}',
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Delivery fee',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: AppUi.textSecondaryOf(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              isFreeDelivery
+                  ? const Text(
+                      'Free',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2E7D32),
+                      ),
+                    )
+                  : Text(
+                      '\u20B1${_deliveryFee.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
+            ],
+          ),
+          if (platformFee > 0) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Service fee',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: AppUi.textSecondaryOf(context),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    GestureDetector(
+                      onTap: () => _showServiceFeeInfoDialog(context),
+                      child: const Icon(
+                        Icons.info_outline_rounded,
+                        size: 14,
+                        color: AppUi.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '\u20B1${platformFee.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                ),
+              ],
             ),
+          ],
+          if (_appliedVoucher != null && voucherDiscount > 0) ...[
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Voucher discount',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '-\u20B1${voucherDiscount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Divider(
+              height: 1,
+              color: AppUi.dividerOf(context).withValues(alpha: 0.6),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppUi.textPrimaryOf(context),
+                ),
+              ),
+              Text(
+                '\u20B1${totalWithDelivery.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w900,
+                  color: AppUi.textPrimaryOf(context),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(BuildContext context, String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.5,
+            color: AppUi.textSecondaryOf(context),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            color: AppUi.textPrimaryOf(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── HELPER METHODS ────────────────────────────────────────────────────────
+
+  String _deliveryDestinationLabel() {
+    if (_selectedAddressId != null && _savedAddresses.isNotEmpty) {
+      final matched = _savedAddresses.firstWhere(
+        (a) => a['id']?.toString() == _selectedAddressId,
+        orElse: () => const {},
+      );
+      final label = matched['label']?.toString();
+      if (label != null && label.isNotEmpty) return label;
+    }
+    final landmark = _customerProfile?['landmark']?.toString().trim();
+    if (landmark != null && landmark.isNotEmpty) return landmark;
+
+    final barangay = _customerProfile?['barangay']?.toString().trim();
+    if (barangay != null && barangay.isNotEmpty) return barangay;
+
+    return 'Home';
+  }
+
+  String _deriveContainerOrRefillType(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('slim')) return '5-Gallon Slim Refill';
+    if (lower.contains('round')) return '5-Gallon Round Refill';
+    if (lower.contains('gallon') || lower.contains('gal')) {
+      return '5-Gallon Refill';
+    }
+    if (lower.contains('alkaline')) return 'Alkaline Refill';
+    if (lower.contains('mineral')) return 'Mineral Refill';
+    if (lower.contains('purified')) return 'Purified Refill';
+    return 'Water Refill';
+  }
+
+  Widget _paymentBrandBadge(String method) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return switch (method) {
+      'gcash' => Container(
+          width: 44,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xFF007DFE),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'GCash',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+      'maya' => Container(
+          width: 44,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xFF00D166),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'Maya',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+      'card' => Container(
+          width: 44,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E3A8A),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.credit_card_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      _ => Container(
+          width: 44,
+          height: 32,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppUi.borderOf(context)),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(
+            Icons.payments_outlined,
+            color: Color(0xFF16A34A),
+            size: 20,
+          ),
+        ),
+    };
+  }
+
+  String _paymentSubtitle(String method) {
+    return switch (method) {
+      'gcash' => 'Fast e-wallet payment',
+      'maya' => 'Fast e-wallet payment',
+      'card' => 'Debit or credit card',
+      _ => 'Pay in cash upon arrival',
+    };
+  }
+
+  void _showPaymentSelectorSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppUi.surfaceOf(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.of(ctx).padding.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Select Payment Method',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            PaymentMethodSelector(
+              selectedMethod: _paymentMethod,
+              methods: _selectablePaymentMethods,
+              onSelected: (method) {
+                setState(() => _paymentMethod = method);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNotesDialog(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppUi.surfaceOf(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Special Instructions',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.textPrimaryOf(context),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              AppFormField(
+                controller: _notesController,
+                label: 'Delivery Notes',
+                hintText:
+                    'e.g., Leave gallon at front porch, call upon arrival...',
+                prefixIcon: Icons.notes_rounded,
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  onPressed: () {
+                    setState(() {});
+                    Navigator.pop(ctx);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppUi.bluePrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Instructions',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showServiceFeeInfoDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              color: AppUi.bluePrimary,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('What is this fee?', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'A small fee that covers 24/7 app maintenance, real-time rider tracking, and customer support so your water refills arrive smoothly.',
+          style: TextStyle(fontSize: 13, height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
           ),
         ],
       ),
@@ -1619,7 +2429,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppUi.warningBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppUi.warningFg.withValues(alpha: 0.25)),
       ),
       child: Row(
@@ -1664,27 +2474,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _selectSavedAddress(Map<String, dynamic> address) {
-    final latitude = (address['latitude'] as num?)?.toDouble();
-    final longitude = (address['longitude'] as num?)?.toDouble();
-    if (latitude == null || longitude == null) {
-      _setCheckoutHint(
-        'This address has no map pin. Tap "Change" to edit and set its location.',
-      );
+    final deliveryProfile = CheckoutRules.useSavedAddress(
+      _customerProfile ?? const {},
+      address,
+    );
+    final deliveryIssue = CheckoutRules.deliveryProfileIssue(deliveryProfile);
+    if (deliveryIssue != null) {
+      _setCheckoutHint('$deliveryIssue Tap "Change" to edit it.');
       return;
     }
     setState(() {
       _selectedAddressId = address['id']?.toString();
-      _customerProfile = CheckoutRules.useSavedAddress(
-        _customerProfile ?? const {},
-        address,
-      );
+      _customerProfile = deliveryProfile;
       _checkoutHint = null;
     });
     _refreshStationAvailability();
   }
 }
 
-// ── private reusable widgets ───────────────────────────────────────────────
+// ── FIXED BOTTOM ACTION BAR ──────────────────────────────────────────────────
 
 class _CheckoutBottomBar extends StatelessWidget {
   final double total;
@@ -1721,9 +2529,9 @@ class _CheckoutBottomBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Total to pay',
+                    'Total',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       color: AppUi.textSecondaryOf(context),
                       fontWeight: FontWeight.w500,
                     ),
@@ -1731,10 +2539,11 @@ class _CheckoutBottomBar extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '\u20B1${total.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                       letterSpacing: -0.5,
+                      color: AppUi.textPrimaryOf(context),
                     ),
                   ),
                 ],
@@ -1742,45 +2551,39 @@ class _CheckoutBottomBar extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             SizedBox(
-              height: 48,
+              height: 52,
               child: FilledButton(
                 onPressed: canSubmit ? onConfirm : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppUi.bluePrimary,
+                  backgroundColor: const Color(0xFF88BA3A),
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppUi.bluePrimary.withValues(
+                  disabledBackgroundColor: const Color(0xFF88BA3A).withValues(
                     alpha: 0.35,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(26),
                   ),
                   elevation: 0,
                 ),
                 child: isSubmitting
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 22,
+                        height: 22,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
+                          strokeWidth: 2.2,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             Colors.white,
                           ),
                         ),
                       )
-                    : const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Confirm Refill',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(width: 6),
-                          Icon(Icons.arrow_forward_rounded, size: 18),
-                        ],
+                    : const Text(
+                        'Confirm Refill',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
                       ),
               ),
             ),

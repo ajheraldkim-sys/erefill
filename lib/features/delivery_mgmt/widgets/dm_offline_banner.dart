@@ -1,5 +1,7 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/connectivity_provider.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 
 /// Banner shown in the offline delivery-management module when there is no network.
 class DmOfflineBanner extends StatelessWidget {
@@ -7,17 +9,12 @@ class DmOfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<ConnectivityResult>>(
-      stream: Connectivity().onConnectivityChanged,
-      builder: (context, snapshot) {
-        final results = snapshot.data ?? [];
-        final online = results.isNotEmpty &&
-            !results.every((r) => r == ConnectivityResult.none);
-
-        if (online) return const SizedBox.shrink();
+    return Consumer<ConnectivityProvider>(
+      builder: (context, provider, _) {
+        if (!provider.isOffline) return const SizedBox.shrink();
 
         return Material(
-          color: const Color(0xFFF59E0B),
+          color: AppColors.uiWarning,
           child: SafeArea(
             bottom: false,
             child: Padding(

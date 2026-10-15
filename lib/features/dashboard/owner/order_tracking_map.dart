@@ -10,6 +10,7 @@ import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
+import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/services/road_routing_service.dart';
 import '../../chat/services/chat_service.dart';
 import '../../chat/models/chat_room.dart';
@@ -252,25 +253,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
   }
 
   Color get _statusColor {
-    final status = _order?['status'] ?? 'pending';
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'accepted':
-        return AppUi.bluePrimary;
-      case 'preparing':
-        return Colors.purple;
-      case 'ready_for_pickup':
-        return const Color(0xFF0F766E);
-      case 'assigned_to_rider':
-        return AppUi.bluePrimary;
-      case 'out_for_delivery':
-        return const Color(0xFF8B5CF6);
-      case 'delivered':
-        return const Color(0xFF10B981);
-      default:
-        return Colors.grey;
-    }
+    return OrderStatusColors.getColor(_order?['status']?.toString());
   }
 
   Future<void> _callRider() async {

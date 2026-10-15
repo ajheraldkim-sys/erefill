@@ -89,7 +89,7 @@ void main() {
       expect(AppUi.radiusControl, 8.0);
       expect(AppUi.radiusCard, 12.0);
       expect(AppUi.cardElevation, 0.0);
-      expect(AppUi.borderLight, const Color(0xFFF1F4F5));
+      expect(AppUi.borderLight, const Color(0xFFE2E8F0));
       expect(AppUi.borderDark, const Color(0xFF243237));
     });
 

@@ -123,11 +123,11 @@ class AppTheme {
         fillColor: AppUi.lightSurfaceRaised,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppUi.radiusMd),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: AppUi.borderLight),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppUi.radiusMd),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: AppUi.borderLight),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppUi.radiusMd),

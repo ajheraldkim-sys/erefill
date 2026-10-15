@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/providers/user_provider.dart';
+import '../../core/services/local_data_cache.dart';
 import '../../core/widgets/erefill_header.dart';
 import '../../core/widgets/map_tiles.dart';
 import '../../core/widgets/skeleton.dart';
@@ -119,21 +123,38 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
         if (address.isNotEmpty) {
           try {
-            final inserted = await supabase
-                .from('customer_addresses')
-                .insert({
-                  'customer_id': customerId,
-                  'label': 'Home',
-                  'complete_address': address,
-                  'barangay': barangay,
-                  'town': town,
-                  'landmark': landmark,
-                  'latitude': lat != 0 ? lat : 9.3333,
-                  'longitude': lng != 0 ? lng : 125.9833,
-                  'is_default': true,
-                })
-                .select()
-                .maybeSingle();
+            final payload = <String, dynamic>{
+              'customer_id': customerId,
+              'label': 'Home',
+              'complete_address': address,
+              'barangay': barangay,
+              'town': town,
+              'landmark': landmark,
+              'latitude': lat != 0 ? lat : 9.3333,
+              'longitude': lng != 0 ? lng : 125.9833,
+              'map_pin_town': town,
+              'is_default': true,
+            };
+
+            Map<String, dynamic>? inserted;
+            try {
+              inserted = await supabase
+                  .from('customer_addresses')
+                  .insert(payload)
+                  .select()
+                  .maybeSingle();
+            } catch (e) {
+              if (e.toString().contains('map_pin_town')) {
+                payload.remove('map_pin_town');
+                inserted = await supabase
+                    .from('customer_addresses')
+                    .insert(payload)
+                    .select()
+                    .maybeSingle();
+              } else {
+                rethrow;
+              }
+            }
 
             if (inserted != null) {
               list = [Map<String, dynamic>.from(inserted)];
@@ -167,15 +188,25 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         'town': town,
         'barangay': addr['barangay'],
         'landmark': addr['landmark'],
+        // A saved address does not include a purok. Retaining the prior
+        // municipality's purok produces an internally inconsistent profile.
+        'purok': null,
+        'zip_code': zip,
         'latitude': (addr['latitude'] as num?)?.toDouble() ?? 0.0,
         'longitude': (addr['longitude'] as num?)?.toDouble() ?? 0.0,
       };
-      if (zip != null) {
-        payload['zip_code'] = zip;
-      }
       await supabase.from('profiles').update(payload).eq('id', customerId);
+      // Invalidate customer home and station caches so screens update immediately
+      await LocalDataCache.instance.invalidatePattern('customer_home_');
+      await LocalDataCache.instance.invalidate('cached_owner_stations');
+      if (mounted) {
+        // Do not wait for a Realtime event before the retained home and
+        // station-list tabs learn about the municipality change.
+        await context.read<UserProvider>().refreshProfile();
+      }
     } catch (e) {
       debugPrint('Error syncing default address to profile: $e');
+      rethrow;
     }
   }
 
@@ -188,7 +219,16 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         'town': null,
         'barangay': null,
         'landmark': '',
+        'purok': null,
+        'zip_code': null,
+        'latitude': null,
+        'longitude': null,
       }).eq('id', customerId);
+      await LocalDataCache.instance.invalidatePattern('customer_home_');
+      await LocalDataCache.instance.invalidate('cached_owner_stations');
+      if (mounted) {
+        await context.read<UserProvider>().refreshProfile();
+      }
     } catch (e) {
       debugPrint('Error clearing profile address: $e');
     }
@@ -198,27 +238,67 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     final customerId = supabase.auth.currentUser?.id;
     if (customerId == null) return;
 
+    final target = _addresses.firstWhere(
+      (a) => a['id'].toString() == id,
+      orElse: () => {},
+    );
+    if (target.isEmpty) return;
+
+    final town = target['town']?.toString();
+    final pinTown = target['map_pin_town']?.toString();
+    final lat = (target['latitude'] as num?)?.toDouble() ?? 0.0;
+    final lng = (target['longitude'] as num?)?.toDouble() ?? 0.0;
+    final hasValidCoords = (lat != 0 || lng != 0) &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lng >= -180 &&
+        lng <= 180;
+
+    // Only force map confirmation if coordinates are completely missing/zero,
+    // or if pinTown is explicitly non-null and differs from the address municipality.
+    final hasPinMismatch = pinTown != null &&
+        pinTown.isNotEmpty &&
+        town != null &&
+        town.isNotEmpty &&
+        pinTown != town;
+
+    if (!hasValidCoords || hasPinMismatch) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Confirm this address on the map before making it your default.',
+            ),
+          ),
+        );
+      }
+      await _showAddressForm(initial: {...target, 'is_default': true});
+      return;
+    }
+
     try {
-      // 1. Unset default for all addresses of this customer
+      // 1. Immediately update UI state for instant visual feedback
+      setState(() {
+        for (final a in _addresses) {
+          a['is_default'] = (a['id'].toString() == id);
+        }
+      });
+
+      // 2. Clear default flag from all other addresses for this customer
       await supabase
           .from('customer_addresses')
           .update({'is_default': false})
-          .eq('customer_id', customerId);
+          .eq('customer_id', customerId)
+          .neq('id', id);
 
-      // 2. Set default for selected address
+      // 3. Set the target address as default
       await supabase
           .from('customer_addresses')
           .update({'is_default': true})
-          .eq('id', id);
+          .eq('id', id)
+          .eq('customer_id', customerId);
 
-      final target = _addresses.firstWhere(
-        (a) => a['id'].toString() == id,
-        orElse: () => {},
-      );
-      if (target.isNotEmpty) {
-        await _syncToProfile(target);
-      }
-
+      await _syncToProfile(target);
       await _loadAddresses();
 
       if (mounted) {
@@ -237,6 +317,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
           SnackBar(content: Text('Could not update default address: $e')),
         );
       }
+      await _loadAddresses();
     }
   }
 
@@ -260,7 +341,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.uiError,
             ),
             onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Delete'),
@@ -273,17 +354,34 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
     try {
       await supabase.from('customer_addresses').delete().eq('id', id);
-      await _loadAddresses();
 
-      // If deleted address was default, promote next address if available
+      // If deleted address was default, promote next available address
       if (wasDefault) {
-        if (_addresses.isNotEmpty) {
-          final nextDefault = _addresses.first;
-          await _setDefault(nextDefault['id'].toString());
+        final remainingRows = await supabase
+            .from('customer_addresses')
+            .select()
+            .eq('customer_id', customerId)
+            .order('created_at', ascending: false);
+        final remaining = List<Map<String, dynamic>>.from(remainingRows);
+
+        if (remaining.isNotEmpty) {
+          final nextDefault = remaining.first;
+          await supabase
+              .from('customer_addresses')
+              .update({'is_default': false})
+              .eq('customer_id', customerId);
+          await supabase
+              .from('customer_addresses')
+              .update({'is_default': true})
+              .eq('id', nextDefault['id'])
+              .eq('customer_id', customerId);
+          await _syncToProfile(nextDefault);
         } else {
           await _clearProfileAddress();
         }
       }
+
+      await _loadAddresses();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -331,13 +429,20 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       selectedBarangay = barangays.first;
     }
 
+    final initialCenter = AppConstants.municipalityCenters[selectedTown];
     double initLat = (initial?['latitude'] as num?)?.toDouble() ??
         widget.launch.latitude;
     double initLng = (initial?['longitude'] as num?)?.toDouble() ??
         widget.launch.longitude;
-    if (initLat == 0 || initLng == 0) {
-      initLat = 9.3333;
-      initLng = 125.9833;
+    final hasInitialPin =
+        initLat >= -90 &&
+        initLat <= 90 &&
+        initLng >= -180 &&
+        initLng <= 180 &&
+        (initLat != 0 || initLng != 0);
+    if (!hasInitialPin) {
+      initLat = initialCenter?.latitude ?? 9.3333;
+      initLng = initialCenter?.longitude ?? 125.9833;
     }
 
     LatLng pickedLocation = LatLng(initLat, initLng);
@@ -345,6 +450,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     bool isDefault = initial?['is_default'] == true || _addresses.isEmpty;
     bool isSaving = false;
     bool isLocating = false;
+    final pinTown = initial?['map_pin_town']?.toString();
+    bool requiresPinConfirmation = !hasInitialPin ||
+        (pinTown != null && pinTown.isNotEmpty && pinTown != selectedTown);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -379,6 +487,16 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
               );
               return;
             }
+            if (requiresPinConfirmation) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Move the map to confirm the exact pin for the new municipality.',
+                  ),
+                ),
+              );
+              return;
+            }
 
             final customerId = supabase.auth.currentUser?.id;
             if (customerId == null) return;
@@ -386,52 +504,64 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
             setModalState(() => isSaving = true);
 
             try {
-              if (isDefault) {
-                await supabase
-                    .from('customer_addresses')
-                    .update({'is_default': false})
-                    .eq('customer_id', customerId);
+              final payload = <String, dynamic>{
+                'label': label,
+                'complete_address': completeAddress,
+                'barangay': selectedBarangay,
+                'town': selectedTown,
+                'landmark': landmark,
+                'latitude': pickedLocation.latitude,
+                'longitude': pickedLocation.longitude,
+                'map_pin_town': selectedTown,
+                'is_default': isDefault || _addresses.isEmpty,
+              };
+
+              // If setting this address as default, unset others first to avoid duplicate defaults
+              if (payload['is_default'] == true) {
+                try {
+                  await supabase
+                      .from('customer_addresses')
+                      .update({'is_default': false})
+                      .eq('customer_id', customerId);
+                } catch (e) {
+                  debugPrint('Non-fatal: clearing prior defaults: $e');
+                }
               }
 
-              if (isEditing) {
-                final payload = {
-                  'label': label,
-                  'complete_address': completeAddress,
-                  'barangay': selectedBarangay,
-                  'town': selectedTown,
-                  'landmark': landmark,
-                  'latitude': pickedLocation.latitude,
-                  'longitude': pickedLocation.longitude,
-                  'is_default': isDefault,
-                  'updated_at': DateTime.now().toIso8601String(),
-                };
-
-                await supabase
-                    .from('customer_addresses')
-                    .update(payload)
-                    .eq('id', initial['id']);
-
-                if (isDefault) {
-                  await _syncToProfile(payload);
+              Future<void> executeSave(Map<String, dynamic> data) async {
+                if (isEditing) {
+                  final editData = {
+                    ...data,
+                    'updated_at': DateTime.now().toIso8601String(),
+                  };
+                  await supabase
+                      .from('customer_addresses')
+                      .update(editData)
+                      .eq('id', initial['id'])
+                      .eq('customer_id', customerId);
+                } else {
+                  final insertData = {
+                    ...data,
+                    'customer_id': customerId,
+                  };
+                  await supabase.from('customer_addresses').insert(insertData);
                 }
-              } else {
-                final payload = {
-                  'customer_id': customerId,
-                  'label': label,
-                  'complete_address': completeAddress,
-                  'barangay': selectedBarangay,
-                  'town': selectedTown,
-                  'landmark': landmark,
-                  'latitude': pickedLocation.latitude,
-                  'longitude': pickedLocation.longitude,
-                  'is_default': isDefault || _addresses.isEmpty,
-                };
+              }
 
-                await supabase.from('customer_addresses').insert(payload);
-
-                if (isDefault || _addresses.isEmpty) {
-                  await _syncToProfile(payload);
+              try {
+                await executeSave(payload);
+              } catch (e) {
+                // If map_pin_town column is missing on remote Supabase, retry without it
+                if (e.toString().contains('map_pin_town')) {
+                  payload.remove('map_pin_town');
+                  await executeSave(payload);
+                } else {
+                  rethrow;
                 }
+              }
+
+              if (payload['is_default'] == true) {
+                await _syncToProfile(payload);
               }
 
               if (sheetContext.mounted) Navigator.pop(sheetContext);
@@ -578,6 +708,17 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                 final bList = municipalityData[town] ?? [];
                                 selectedBarangay =
                                     bList.isNotEmpty ? bList.first : null;
+                                final center =
+                                    AppConstants.municipalityCenters[town];
+                                if (center != null) {
+                                  pickedLocation = LatLng(
+                                    center.latitude,
+                                    center.longitude,
+                                  );
+                                  // Move map to the center of the newly selected municipality
+                                  requiresPinConfirmation = false;
+                                  mapController.move(pickedLocation, 14);
+                                }
                               });
                             },
                           ),
@@ -644,7 +785,10 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                       initialZoom: 15,
                                       onPositionChanged: (camera, hasGesture) {
                                         if (hasGesture) {
-                                          pickedLocation = camera.center;
+                                          setModalState(() {
+                                            pickedLocation = camera.center;
+                                            requiresPinConfirmation = false;
+                                          });
                                         }
                                       },
                                     ),
@@ -685,8 +829,11 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                                   pos.latitude,
                                                   pos.longitude,
                                                 );
-                                                setModalState(() =>
-                                                    pickedLocation = newLoc);
+                                                setModalState(() {
+                                                  pickedLocation = newLoc;
+                                                  requiresPinConfirmation =
+                                                      false;
+                                                });
                                                 mapController.move(newLoc, 16);
                                               } catch (e) {
                                                 debugPrint('GPS error: $e');
@@ -718,7 +865,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Drag map to position pin for accurate delivery.',
+                            requiresPinConfirmation
+                                ? 'Municipality changed. Drag the map to confirm the exact delivery pin.'
+                                : 'Drag map to position pin for accurate delivery.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
@@ -975,7 +1124,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                         Icons.delete_outline_rounded,
                                         size: 20,
                                       ),
-                                      color: const Color(0xFFEF4444),
+                                      color: AppColors.uiError,
                                       tooltip: 'Delete address',
                                       visualDensity: VisualDensity.compact,
                                       onPressed: () =>

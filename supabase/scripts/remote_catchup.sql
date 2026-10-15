@@ -1509,3 +1509,61 @@ COMMIT;
 -- ── Admin role and RPCs ──
 -- Deploy administrator RPC migrations using Supabase CLI or Dashboard SQL editor.
 -- Keep administrative accounts managed via secure environment variables or auth vault.
+
+-- ── Fix Review Stats Trigger & Sync Profile Rating/Counts ──
+CREATE OR REPLACE FUNCTION public.update_station_stats()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_station_id uuid;
+BEGIN
+  v_station_id := COALESCE(NEW.station_id, OLD.station_id);
+
+  IF v_station_id IS NOT NULL THEN
+    UPDATE public.profiles
+    SET
+      average_rating = (
+        SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0)
+        FROM public.reviews
+        WHERE station_id = v_station_id
+      ),
+      review_count = (
+        SELECT COUNT(*)
+        FROM public.reviews
+        WHERE station_id = v_station_id
+      )
+    WHERE id = v_station_id;
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+ALTER FUNCTION public.update_station_stats() OWNER TO postgres;
+GRANT ALL ON FUNCTION public.update_station_stats() TO authenticated;
+GRANT ALL ON FUNCTION public.update_station_stats() TO service_role;
+
+DROP TRIGGER IF EXISTS on_review_added ON public.reviews;
+DROP TRIGGER IF EXISTS trg_update_station_stats ON public.reviews;
+
+CREATE TRIGGER on_review_added
+  AFTER INSERT OR UPDATE OR DELETE ON public.reviews
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_station_stats();
+
+UPDATE public.profiles p
+SET
+  average_rating = COALESCE(sub.avg_rating, 0),
+  review_count = COALESCE(sub.cnt, 0)
+FROM (
+  SELECT
+    station_id,
+    ROUND(AVG(rating)::numeric, 1) AS avg_rating,
+    COUNT(*) AS cnt
+  FROM public.reviews
+  GROUP BY station_id
+) sub
+WHERE p.id = sub.station_id;
