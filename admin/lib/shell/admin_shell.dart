@@ -11,6 +11,7 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/fees/platform_fees_screen.dart';
 import '../features/notifications/admin_notifications_screen.dart';
 import '../features/orders/orders_screen.dart';
+import '../features/releases/app_releases_screen.dart';
 import '../features/stations/stations_screen.dart';
 import '../features/users/users_screen.dart';
 import '../providers/admin_auth_provider.dart';
@@ -21,6 +22,7 @@ enum AdminSection {
   stations,
   orders,
   users,
+  releases,
   notifications,
   settings,
 }
@@ -216,6 +218,7 @@ class _AdminShellState extends State<AdminShell> {
       AdminSection.stations => const StationsScreen(),
       AdminSection.orders => const OrdersScreen(),
       AdminSection.users => const UsersScreen(),
+      AdminSection.releases => const AppReleasesScreen(),
       AdminSection.notifications => const AdminNotificationsScreen(),
       AdminSection.settings => const PlatformFeesScreen(),
     };
@@ -254,6 +257,11 @@ class _AdminSidebar extends StatelessWidget {
       AdminSection.users,
       LucideIcons.users,
       'Users & Accounts',
+    ),
+    _NavItem(
+      AdminSection.releases,
+      LucideIcons.packageCheck,
+      'App Releases',
     ),
     _NavItem(
       AdminSection.orders,
@@ -559,6 +567,7 @@ class _AdminTopBar extends StatelessWidget {
     AdminSection.stations => 'Water Stations',
     AdminSection.orders => 'Refill Orders',
     AdminSection.users => 'Users & Accounts',
+    AdminSection.releases => 'App Releases',
     AdminSection.notifications => 'Live Notifications',
     AdminSection.settings => 'System Settings',
   };

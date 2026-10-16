@@ -53,6 +53,9 @@ dependencies:
   flutter_local_notifications: ^22.3.1
   flutter_displaymode: ^0.7.0
   flutter_svg: ^2.3.0
+  package_info_plus: ^10.2.2
+  crypto: ^3.0.7
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

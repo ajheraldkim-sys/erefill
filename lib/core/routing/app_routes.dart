@@ -30,6 +30,7 @@ abstract final class AppRoutes {
   static const savedAddresses = '/account/saved-addresses';
   static const riderHistory = '/rider/history';
   static const adminDashboard = '/admin';
+  static const mandatoryUpdate = '/update-required';
   static String orderById(String orderId) => '/orders/$orderId';
   static String orderMap(String orderId) => '/orders/$orderId/map';
 }

@@ -37,6 +37,8 @@ import '../../features/settings/payment_account_models.dart';
 import '../../features/settings/payment_accounts_screen.dart';
 import '../../features/settings/settings_hub_screen.dart';
 import '../providers/user_provider.dart';
+import '../services/app_update_service.dart';
+import '../../features/update/screens/mandatory_update_screen.dart';
 import '../widgets/brand/axo_states.dart';
 import 'app_page_transitions.dart';
 import 'app_routes.dart';
@@ -56,6 +58,16 @@ class AppRouter {
       initialLocation: AppRoutes.home,
       redirect: (context, state) {
         try {
+          // Version Enforcement Check (Mandatory Update Guard)
+          if (AppUpdateService.instance.isMandatoryUpdateRequired) {
+            if (state.uri.path != AppRoutes.mandatoryUpdate) {
+              return AppRoutes.mandatoryUpdate;
+            }
+            return null;
+          } else if (state.uri.path == AppRoutes.mandatoryUpdate) {
+            return AppRoutes.home;
+          }
+
           final session = Supabase.instance.client.auth.currentSession;
           final isAuth = session != null;
           final path = state.uri.path;
@@ -108,6 +120,10 @@ class AppRouter {
         GoRoute(
           path: AppRoutes.home,
           builder: (context, state) => const AuthWrapper(),
+        ),
+        _pushed(
+          AppRoutes.mandatoryUpdate,
+          (_, _) => const MandatoryUpdateScreen(),
         ),
         _pushed(
           AppRoutes.onboarding,

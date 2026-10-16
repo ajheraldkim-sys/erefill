@@ -31,6 +31,8 @@ import 'core/services/offline_order_sync_service.dart';
 import 'core/providers/connectivity_provider.dart';
 import 'core/widgets/offline_banner.dart';
 import 'core/services/local_data_cache.dart';
+import 'core/services/app_update_service.dart';
+import 'features/update/screens/mandatory_update_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +62,7 @@ void main() async {
     unawaited(LocalDataCache.instance.init());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(NotificationService.instance.initialize());
+      unawaited(AppUpdateService.instance.initialize());
     });
     if (kDebugMode) {
       debugPrint(
@@ -163,6 +166,7 @@ class _ERefillAppState extends State<ERefillApp> {
         ChangeNotifierProvider(create: (_) => InventoryProvider(_deliverySvc)),
         ChangeNotifierProvider(create: (_) => ReportProvider(_deliverySvc)),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
+        ChangeNotifierProvider.value(value: AppUpdateService.instance),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -200,7 +204,16 @@ class _ERefillAppState extends State<ERefillApp> {
                   child: Column(
                     children: [
                       const OfflineBanner(),
-                      Expanded(child: child ?? const SizedBox.shrink()),
+                      Expanded(
+                        child: Consumer<AppUpdateService>(
+                          builder: (context, updateSvc, _) {
+                            if (updateSvc.isMandatoryUpdateRequired) {
+                              return const MandatoryUpdateScreen();
+                            }
+                            return child ?? const SizedBox.shrink();
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 );

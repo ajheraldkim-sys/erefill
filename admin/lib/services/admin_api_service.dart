@@ -1768,6 +1768,55 @@ class AdminApiService {
     }
   }
 
+  // --- App Release Management ---
+
+  Future<List<Map<String, dynamic>>> listAppReleases() async {
+    try {
+      final rows = await _client
+          .from('app_releases')
+          .select('*')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('listAppReleases error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listAppReleaseAuditLogs({int limit = 50}) async {
+    try {
+      final rows = await _client
+          .from('app_release_audit_logs')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('listAppReleaseAuditLogs error: $e');
+      return [];
+    }
+  }
+
+  Future<void> createAppRelease(Map<String, dynamic> data) async {
+    await _client.from('app_releases').insert(data);
+  }
+
+  Future<void> updateAppRelease(String id, Map<String, dynamic> data) async {
+    await _client.from('app_releases').update(data).eq('id', id);
+  }
+
+  Future<Map<String, dynamic>> publishAppRelease(String releaseId) async {
+    final res = await _client.rpc(
+      'publish_app_release',
+      params: {'p_release_id': releaseId},
+    );
+    return _asMap(res);
+  }
+
+  Future<void> deleteAppRelease(String releaseId) async {
+    await _client.from('app_releases').delete().eq('id', releaseId);
+  }
+
   AdminPagedResult<Map<String, dynamic>> _parsePaged(dynamic result) {
     if (result is! Map) return const AdminPagedResult(total: 0, rows: []);
     final map = Map<String, dynamic>.from(result);

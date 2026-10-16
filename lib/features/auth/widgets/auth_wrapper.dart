@@ -14,6 +14,10 @@ import 'package:erefill/features/dashboard/admin/admin_dashboard_screen.dart';
 import 'package:erefill/features/auth/screens/onboarding_screen.dart';
 import 'package:erefill/features/auth/widgets/location_permission_screen.dart';
 import 'package:erefill/features/onboarding/screens/welcome_onboarding_screen.dart';
+import 'package:erefill/core/services/app_update_service.dart';
+import 'package:erefill/core/models/app_version_models.dart';
+import 'package:erefill/features/update/screens/mandatory_update_screen.dart';
+import 'package:erefill/features/update/widgets/optional_update_dialog.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -69,6 +73,19 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    // 0. Application Update Guard (Mandatory updates block all screens)
+    final updateSvc = context.watch<AppUpdateService>();
+    if (updateSvc.isMandatoryUpdateRequired) {
+      return const MandatoryUpdateScreen();
+    }
+    if (updateSvc.status == AppVersionStatus.updateAvailable && updateSvc.policy != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          OptionalUpdateDialog.maybeShow(context, updateSvc.policy!);
+        }
+      });
+    }
+
     // 1. Initial Loading Splash Screen (guaranteed minimum display time on launch/refresh)
     if (!_splashComplete || _isFirstInstall == null) {
       return const _SplashScreen();

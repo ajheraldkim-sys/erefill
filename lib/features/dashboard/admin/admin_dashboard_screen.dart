@@ -15,6 +15,7 @@ import 'package:erefill/features/dashboard/admin/views/admin_broadcast_dialog.da
 import 'package:erefill/features/dashboard/admin/views/admin_audit_log_view.dart';
 import 'package:erefill/features/dashboard/admin/views/admin_payment_failures_view.dart';
 import 'package:erefill/features/dashboard/admin/views/admin_create_dialogs.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_releases_view.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -4241,6 +4242,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _buildOpToolTile(
+          icon: Icons.system_update_alt_rounded,
+          iconColor: const Color(0xFF6366F1),
+          title: 'App Releases & Version Enforcement',
+          subtitle:
+              'Manage production releases, enforce mandatory updates, configure checksums, and audit releases.',
+          badge: 'Releases',
+          onTap: () {
+            AppHaptics.light();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminReleasesView()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
         _buildOpToolTile(
           icon: Icons.two_wheeler_rounded,
           iconColor: const Color(0xFF087E8B),

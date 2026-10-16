@@ -597,3 +597,4 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.system_notifications;
   END IF;
 END $$;
+
