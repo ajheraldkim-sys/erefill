@@ -1400,7 +1400,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   Expanded(
                                     child: Text(
                                       _offlineSyncError ??
-                                          '$_pendingOfflineCount ${_pendingOfflineCount == 1 ? "delivery" : "deliveries"} waiting to sync',
+                                         '$_pendingOfflineCount ${_pendingOfflineCount == 1 ? "delivery update" : "delivery updates"} waiting to sync. Offline completions are not confirmed until sync succeeds.',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,

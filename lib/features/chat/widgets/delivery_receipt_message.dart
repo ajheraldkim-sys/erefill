@@ -45,6 +45,10 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
     final total = _money(snapshot['total_amount']);
     final paid = _money(snapshot['amount_paid']);
     final outstanding = _money(snapshot['outstanding_balance']);
+    final paymentStatus = snapshot['payment_status']?.toString() ?? 'pending';
+    final paymentVerified =
+        paymentStatus.toLowerCase() == 'success' ||
+        paymentStatus.toLowerCase() == 'paid';
 
     return Container(
       width: double.infinity,
@@ -103,11 +107,9 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             ),
           ),
           Text(
-            outstanding <= 0
-                ? 'Paid: $paid'
-                : 'Paid: $paid  |  Outstanding: $outstanding',
+            'Payment: $paymentStatus  |  Paid: $paid  |  Outstanding: $outstanding',
             style: TextStyle(
-              color: outstanding <= 0
+              color: paymentVerified
                   ? const Color(0xFF15803D)
                   : AppUi.textSecondaryOf(context),
               fontSize: 12,
