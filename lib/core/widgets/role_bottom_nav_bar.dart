@@ -175,11 +175,26 @@ class _NavIcon extends StatelessWidget {
 
     if (badgeCount <= 0) return child;
 
+    final badgeText = badgeCount > 99 ? '99+' : '$badgeCount';
+
     return RepaintBoundary(
-      child: Badge(
-        label: Text(badgeCount > 9 ? '9+' : '$badgeCount'),
-        backgroundColor: AppUi.error,
-        child: child,
+      child: Semantics(
+        label: '$badgeCount unread notifications',
+        child: Badge(
+          label: Text(
+            badgeText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              height: 1.1,
+              letterSpacing: -0.2,
+            ),
+          ),
+          backgroundColor: AppUi.error,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          child: child,
+        ),
       ),
     );
   }

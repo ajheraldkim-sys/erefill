@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/user_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/widgets/brand/hero_header.dart';
 import '../../core/widgets/brand/axo_states.dart';
 import 'models/chat_room.dart';
@@ -565,6 +566,9 @@ class _InboxScreenState extends State<InboxScreen> {
 
   void _openChat(ChatRoom room) {
     _chatService.markAsRead(room.id);
+    try {
+      context.read<NotificationProvider>().refreshCounts();
+    } catch (_) {}
     context.openChat(
       roomId: room.id,
       roomTitle: _getRoomTitle(room),
@@ -666,6 +670,11 @@ class _InboxScreenState extends State<InboxScreen> {
         .where((room) => (room.unreadCount ?? 0) > 0)
         .map((room) => _chatService.markAsRead(room.id));
     await Future.wait(futures);
+    if (mounted) {
+      try {
+        context.read<NotificationProvider>().refreshCounts();
+      } catch (_) {}
+    }
   }
 
   Widget _buildSkeletonItem(BuildContext context, int index) {

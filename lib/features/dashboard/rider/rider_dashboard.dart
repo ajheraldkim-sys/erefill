@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:erefill/features/chat/services/chat_service.dart';
 import 'package:erefill/features/chat/models/chat_room.dart';
 import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
@@ -1269,37 +1270,42 @@ class _RiderDashboardState extends State<RiderDashboard>
               ? const AxoLoader(message: 'Preparing your rider dashboard...')
               : LazyIndexedStack(index: _selectedIndex, children: pages),
         ),
-        bottomNavigationBar: RoleBottomNavBar(
-          currentIndex: _selectedIndex,
-          onTap: (i) => _changeTab(i),
-          items: [
-            const RoleBottomNavItem(
-              icon: Icons.dashboard_outlined,
-              activeIcon: Icons.dashboard_rounded,
-              label: 'Overview',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.delivery_dining_outlined,
-              activeIcon: Icons.delivery_dining_rounded,
-              label: 'Dispatch',
-              badgeCount: activeDispatchCount,
-            ),
-            const RoleBottomNavItem(
-              icon: Icons.history_rounded,
-              activeIcon: Icons.history_sharp,
-              label: 'Logs',
-            ),
-            const RoleBottomNavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_rounded,
-              label: 'Messages',
-            ),
-            const RoleBottomNavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Profile',
-            ),
-          ],
+        bottomNavigationBar: Consumer<NotificationProvider>(
+          builder: (context, notif, _) {
+            return RoleBottomNavBar(
+              currentIndex: _selectedIndex,
+              onTap: (i) => _changeTab(i),
+              items: [
+                const RoleBottomNavItem(
+                  icon: Icons.dashboard_outlined,
+                  activeIcon: Icons.dashboard_rounded,
+                  label: 'Overview',
+                ),
+                RoleBottomNavItem(
+                  icon: Icons.delivery_dining_outlined,
+                  activeIcon: Icons.delivery_dining_rounded,
+                  label: 'Dispatch',
+                  badgeCount: activeDispatchCount,
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.history_rounded,
+                  activeIcon: Icons.history_sharp,
+                  label: 'Logs',
+                ),
+                RoleBottomNavItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  activeIcon: Icons.chat_bubble_rounded,
+                  label: 'Messages',
+                  badgeCount: notif.unreadChatCount,
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: 'Profile',
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

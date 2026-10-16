@@ -197,7 +197,10 @@ class OfflineDeliveryQueueService {
               .select('status')
               .eq('id', delivery.orderId)
               .maybeSingle();
-          if (currentOrder?['status'] == 'delivered') {
+          if (currentOrder == null) {
+            throw StateError('Order is no longer available to this rider.');
+          }
+          if (currentOrder['status'] == 'delivered') {
             final receipt = await client
                 .from('delivery_receipts')
                 .select('id')

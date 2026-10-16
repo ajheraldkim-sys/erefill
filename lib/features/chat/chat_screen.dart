@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/providers/user_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/widgets/brand/hero_header.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../../core/routing/app_navigation.dart';
@@ -127,6 +128,11 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         // Mark as read when opening
         _chatService.markAsRead(widget.roomId!);
+        if (mounted) {
+          try {
+            context.read<NotificationProvider>().refreshCounts();
+          } catch (_) {}
+        }
       }
     }
   }

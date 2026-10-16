@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/role_bottom_nav_bar.dart';
 import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
@@ -56,36 +58,42 @@ class _CustomerHomeState extends State<CustomerHome> {
           bottom: false,
           child: LazyIndexedStack(index: _selectedIndex, children: _pages),
         ),
-        bottomNavigationBar: RoleBottomNavBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => _changeTab(index),
-          items: const [
-            RoleBottomNavItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
-              label: 'Home',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.map_outlined,
-              activeIcon: Icons.map_rounded,
-              label: 'Stations',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_rounded,
-              label: 'Chat',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.receipt_long_outlined,
-              activeIcon: Icons.receipt_long_rounded,
-              label: 'Orders',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Profile',
-            ),
-          ],
+        bottomNavigationBar: Selector<NotificationProvider, int>(
+          selector: (_, provider) => provider.unreadChatCount,
+          builder: (context, unreadChatCount, _) {
+            return RoleBottomNavBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) => _changeTab(index),
+              items: [
+                const RoleBottomNavItem(
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  label: 'Home',
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.map_outlined,
+                  activeIcon: Icons.map_rounded,
+                  label: 'Stations',
+                ),
+                RoleBottomNavItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  activeIcon: Icons.chat_bubble_rounded,
+                  label: 'Chat',
+                  badgeCount: unreadChatCount,
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.receipt_long_outlined,
+                  activeIcon: Icons.receipt_long_rounded,
+                  label: 'Orders',
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: 'Profile',
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

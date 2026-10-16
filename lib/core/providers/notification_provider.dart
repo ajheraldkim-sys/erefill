@@ -13,13 +13,20 @@ class NotificationProvider extends ChangeNotifier {
   bool _isLoading = true;
   StreamSubscription? _notifSub;
   StreamSubscription<AuthState>? _authSub;
+  RealtimeChannel? _messagesChannel;
+  RealtimeChannel? _ordersChannel;
   final Set<String> _knownIds = {};
   bool _initialLoadCompleted = false;
   int _listenGeneration = 0;
 
+  int _unreadChatCount = 0;
+  int _newOrdersCount = 0;
+
   List<SystemNotification> get notifications => _notifications;
   bool get isLoading => _isLoading;
   int get unreadCount => _notifications.where((n) => !n.isRead).length;
+  int get unreadChatCount => _unreadChatCount;
+  int get newOrdersCount => _newOrdersCount;
 
   NotificationProvider() {
     _init();
@@ -45,8 +52,11 @@ class NotificationProvider extends ChangeNotifier {
         _listenGeneration++;
         _notifications = [];
         _knownIds.clear();
+        _unreadChatCount = 0;
+        _newOrdersCount = 0;
         _initialLoadCompleted = false;
         _isLoading = false;
+        _cleanupChannels();
         _notifSub?.cancel();
         _notifSub = null;
         notifyListeners();
@@ -54,33 +64,56 @@ class NotificationProvider extends ChangeNotifier {
     });
   }
 
+  void _cleanupChannels() {
+    if (_messagesChannel != null) {
+      _supabase.removeChannel(_messagesChannel!);
+      _messagesChannel = null;
+    }
+    if (_ordersChannel != null) {
+      _supabase.removeChannel(_ordersChannel!);
+      _ordersChannel = null;
+    }
+  }
+
   Future<void> _fetchAndListen(String userId) async {
     final generation = ++_listenGeneration;
     await _notifSub?.cancel();
+    _cleanupChannels();
     if (generation != _listenGeneration) return;
 
     final cacheKey = 'system_notifications_$userId';
+    final chatCacheKey = 'unread_chat_count_$userId';
+    final ordersCacheKey = 'new_orders_count_$userId';
 
     // 0ms instant offline load from disk
     final cached = await LocalDataCache.instance.get<List<dynamic>>(cacheKey);
-    if (cached != null && cached.isNotEmpty && generation == _listenGeneration) {
-      final list = cached
-          .map((item) =>
-              SystemNotification.fromJson(Map<String, dynamic>.from(item as Map)))
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      _notifications = list;
-      _knownIds.addAll(list.map((n) => n.id));
-      _isLoading = false;
-      notifyListeners();
-    } else {
-      _isLoading = true;
-      _initialLoadCompleted = false;
-      _knownIds.clear();
-      _notifications = [];
-      notifyListeners();
+    final cachedChat = await LocalDataCache.instance.get<int>(chatCacheKey);
+    final cachedOrders = await LocalDataCache.instance.get<int>(ordersCacheKey);
+
+    if (generation == _listenGeneration) {
+      if (cachedChat != null) _unreadChatCount = cachedChat;
+      if (cachedOrders != null) _newOrdersCount = cachedOrders;
+
+      if (cached != null && cached.isNotEmpty) {
+        final list = cached
+            .map((item) =>
+                SystemNotification.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _notifications = list;
+        _knownIds.addAll(list.map((n) => n.id));
+        _isLoading = false;
+        notifyListeners();
+      } else {
+        _isLoading = true;
+        _initialLoadCompleted = false;
+        _knownIds.clear();
+        _notifications = [];
+        notifyListeners();
+      }
     }
 
+    // Subscribe to system notifications stream
     try {
       _notifSub = SafeSupabase.listen(
         _supabase
@@ -95,6 +128,9 @@ class NotificationProvider extends ChangeNotifier {
               .toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+          bool hasNewMessages = false;
+          bool hasNewOrders = false;
+
           if (_initialLoadCompleted) {
             for (final notification in incoming) {
               if (!_knownIds.contains(notification.id) &&
@@ -102,7 +138,6 @@ class NotificationProvider extends ChangeNotifier {
                 final roomId = notification.metadata['room_id']?.toString() ??
                     notification.metadata['chat_room_id']?.toString();
 
-                // If user is actively typing or reading in this chat room, suppress alert banner
                 final isActiveChat =
                     notification.type == NotificationType.newMessage &&
                         roomId != null &&
@@ -124,6 +159,13 @@ class NotificationProvider extends ChangeNotifier {
                     payload: payloadJson,
                   );
                 }
+
+                if (notification.type == NotificationType.newMessage) {
+                  hasNewMessages = true;
+                }
+                if (notification.type == NotificationType.orderAssigned) {
+                  hasNewOrders = true;
+                }
               }
             }
           }
@@ -142,6 +184,10 @@ class NotificationProvider extends ChangeNotifier {
               incoming.map((n) => n.toJson()).toList(),
             ),
           );
+
+          if (hasNewMessages || hasNewOrders) {
+            _fetchNotificationCounts(userId, generation);
+          }
         },
         onError: (error, stackTrace) {
           debugPrint('Notification stream error: $error (resilient REST fallback active)');
@@ -152,14 +198,158 @@ class NotificationProvider extends ChangeNotifier {
           }
         },
       );
-      // Proactively fetch latest notifications via REST immediately
+
       _fetchNotificationsRest(userId, generation);
+      _fetchNotificationCounts(userId, generation);
+      _setupRealtimeChannels(userId, generation);
     } catch (e) {
       debugPrint('Error in NotificationProvider: $e');
       _isLoading = false;
       notifyListeners();
       _fetchNotificationsRest(userId, generation);
+      _fetchNotificationCounts(userId, generation);
     }
+  }
+
+  void _setupRealtimeChannels(String userId, int generation) {
+    try {
+      _messagesChannel = _supabase
+          .channel('rt_messages_$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'messages',
+            callback: (payload) {
+              if (generation == _listenGeneration) {
+                _fetchNotificationCounts(userId, generation);
+              }
+            },
+          )
+          .subscribe();
+
+      _ordersChannel = _supabase
+          .channel('rt_orders_$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'orders',
+            callback: (payload) {
+              if (generation == _listenGeneration) {
+                _fetchNotificationCounts(userId, generation);
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Error setting up notification realtime channels: $e');
+    }
+  }
+
+  Future<void> refreshCounts() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _fetchNotificationCounts(userId, _listenGeneration);
+  }
+
+  Future<void> _fetchNotificationCounts(String userId, int generation) async {
+    if (generation != _listenGeneration) return;
+
+    try {
+      final dynamic res = await _supabase.rpc('get_user_notification_counts');
+      if (generation != _listenGeneration) return;
+
+      if (res is Map) {
+        final parsedChats = (res['unread_chats'] as num?)?.toInt() ?? 0;
+        final parsedOrders = (res['new_orders'] as num?)?.toInt() ?? 0;
+
+        _unreadChatCount = parsedChats;
+        _newOrdersCount = parsedOrders;
+        notifyListeners();
+
+        unawaited(
+          LocalDataCache.instance.set('unread_chat_count_$userId', _unreadChatCount),
+        );
+        unawaited(
+          LocalDataCache.instance.set('new_orders_count_$userId', _newOrdersCount),
+        );
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error invoking get_user_notification_counts RPC: $e (using fallback)');
+    }
+
+    // Resilient Fallback 1: get_total_unread_chat_count RPC
+    try {
+      final chatRes = await _supabase.rpc('get_total_unread_chat_count');
+      if (generation != _listenGeneration) return;
+      _unreadChatCount = (chatRes as num?)?.toInt() ?? 0;
+    } catch (_) {
+      // Direct message query fallback
+      try {
+        final unreadRes = await _supabase
+            .from('messages')
+            .select('id')
+            .neq('sender_id', userId)
+            .not('read_by', 'cs', '{"$userId"}')
+            .limit(100);
+        if (generation == _listenGeneration) {
+          _unreadChatCount = (unreadRes as List).length;
+        }
+      } catch (_) {}
+    }
+
+    // Resilient Fallback 2: get_station_new_orders_count RPC
+    try {
+      final ordersRes = await _supabase.rpc('get_station_new_orders_count');
+      if (generation != _listenGeneration) return;
+      _newOrdersCount = (ordersRes as num?)?.toInt() ?? 0;
+    } catch (_) {
+      // Direct orders query fallback
+      try {
+        final pendingRes = await _supabase
+            .from('orders')
+            .select('id')
+            .eq('status', 'pending')
+            .isFilter('owner_acknowledged_at', null)
+            .limit(100);
+        if (generation == _listenGeneration) {
+          _newOrdersCount = (pendingRes as List).length;
+        }
+      } catch (_) {}
+    }
+
+    if (generation == _listenGeneration) {
+      notifyListeners();
+      unawaited(
+        LocalDataCache.instance.set('unread_chat_count_$userId', _unreadChatCount),
+      );
+      unawaited(
+        LocalDataCache.instance.set('new_orders_count_$userId', _newOrdersCount),
+      );
+    }
+  }
+
+  Future<void> acknowledgeOrder(String orderId) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      await _supabase.rpc('acknowledge_order', params: {'p_order_id': orderId});
+    } catch (e) {
+      try {
+        await _supabase.from('orders').update({
+          'owner_acknowledged_at': DateTime.now().toIso8601String(),
+        }).eq('id', orderId);
+      } catch (err) {
+        debugPrint('Failed to acknowledge order $orderId: $err');
+      }
+    }
+
+    if (_newOrdersCount > 0) {
+      _newOrdersCount = (_newOrdersCount - 1).clamp(0, 999999);
+      notifyListeners();
+    }
+    _fetchNotificationCounts(userId, _listenGeneration);
   }
 
   Future<void> _fetchNotificationsRest(String userId, int generation) async {
@@ -283,6 +473,7 @@ class NotificationProvider extends ChangeNotifier {
   @override
   void dispose() {
     _listenGeneration++;
+    _cleanupChannels();
     _notifSub?.cancel();
     _authSub?.cancel();
     super.dispose();

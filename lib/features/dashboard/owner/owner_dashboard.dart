@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -291,36 +292,42 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           bottom: false,
           child: LazyIndexedStack(index: _selectedIndex, children: screens),
         ),
-        bottomNavigationBar: RoleBottomNavBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => _changeTab(index),
-          items: const [
-            RoleBottomNavItem(
-              icon: Icons.dashboard_outlined,
-              activeIcon: Icons.dashboard_rounded,
-              label: 'Overview',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.receipt_long_outlined,
-              activeIcon: Icons.receipt_long_rounded,
-              label: 'Orders',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.delivery_dining_outlined,
-              activeIcon: Icons.delivery_dining_rounded,
-              label: 'Riders',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_rounded,
-              label: 'Messages',
-            ),
-            RoleBottomNavItem(
-              icon: Icons.storefront_outlined,
-              activeIcon: Icons.storefront_rounded,
-              label: 'Station',
-            ),
-          ],
+        bottomNavigationBar: Consumer<NotificationProvider>(
+          builder: (context, notif, _) {
+            return RoleBottomNavBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) => _changeTab(index),
+              items: [
+                const RoleBottomNavItem(
+                  icon: Icons.dashboard_outlined,
+                  activeIcon: Icons.dashboard_rounded,
+                  label: 'Overview',
+                ),
+                RoleBottomNavItem(
+                  icon: Icons.receipt_long_outlined,
+                  activeIcon: Icons.receipt_long_rounded,
+                  label: 'Orders',
+                  badgeCount: notif.newOrdersCount,
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.delivery_dining_outlined,
+                  activeIcon: Icons.delivery_dining_rounded,
+                  label: 'Riders',
+                ),
+                RoleBottomNavItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  activeIcon: Icons.chat_bubble_rounded,
+                  label: 'Messages',
+                  badgeCount: notif.unreadChatCount,
+                ),
+                const RoleBottomNavItem(
+                  icon: Icons.storefront_outlined,
+                  activeIcon: Icons.storefront_rounded,
+                  label: 'Station',
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

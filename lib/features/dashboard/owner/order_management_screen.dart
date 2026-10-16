@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
@@ -423,6 +425,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     }
 
     try {
+      context.read<NotificationProvider>().acknowledgeOrder(orderId);
+    } catch (_) {}
+
+    try {
       final result = await SafeSupabase.transitionOrderStatus(
         orderId: orderId,
         newStatus: newStatus,
@@ -697,6 +703,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
   void _showOrderDetail(Map<String, dynamic> order) {
     final orderId = (order['id'] ?? '').toString();
+    if (orderId.isNotEmpty && order['owner_acknowledged_at'] == null) {
+      order['owner_acknowledged_at'] = DateTime.now().toIso8601String();
+      try {
+        context.read<NotificationProvider>().acknowledgeOrder(orderId);
+      } catch (e) {
+        debugPrint('Error triggering acknowledgeOrder in details: $e');
+      }
+    }
     final rawStatus = (order['status'] ?? 'pending').toString();
     final assignedRiderId = order['assigned_rider_id'];
 

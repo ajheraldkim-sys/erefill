@@ -212,7 +212,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
               : ListView.separated(
                   shrinkWrap: true,
                   itemCount: _deliveryFeeHistory.length,
-                  separatorBuilder: (_, __) => const Divider(height: 16),
+                  separatorBuilder: (context, index) => const Divider(height: 16),
                   itemBuilder: (ctx, idx) {
                     final log = _deliveryFeeHistory[idx];
                     final details = log['details'] is Map
@@ -1190,9 +1190,9 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                 onPressed: _showDeliveryFeeHistoryDialog,
               ),
               const SizedBox(width: 10),
-              ShadcnButton(
+              AdminManageButton(
                 height: 40,
-                loading: _savingDeliveryFee,
+                isLoading: _savingDeliveryFee,
                 icon: LucideIcons.check,
                 text: 'Save Delivery Policy',
                 onPressed: _saveDeliveryFeePolicy,
