@@ -97,7 +97,7 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎉 Water refill station created and verified!'),
+          content: Text('Water refill station created and verified!'),
           backgroundColor: AppColors.statusDelivered,
         ),
       );
@@ -361,7 +361,7 @@ class _CreateUserSheetState extends State<_CreateUserSheet> {
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🎉 ${_role.toUpperCase()} account created successfully!'),
+          content: Text('${_role.toUpperCase()} account created successfully!'),
           backgroundColor: AppColors.statusDelivered,
         ),
       );

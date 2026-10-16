@@ -246,7 +246,7 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
                 ),
               ],
               children: [
-                AdminDetailRow('Rating', '${_selectedReview!['rating'] ?? '—'} ★'),
+                AdminDetailRow('Rating', '${_selectedReview!['rating'] ?? '—'} / 5'),
                 AdminDetailRow('Station', _selectedReview!['station_name']?.toString() ?? '—'),
                 AdminDetailRow('Customer', _selectedReview!['customer_name']?.toString() ?? '—'),
                 AdminDetailRow('Comment', _selectedReview!['comment']?.toString() ?? '—'),
@@ -254,7 +254,7 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
               ],
             ),
       body: AdminDataPanel(
-        title: 'Low-rated reviews (≤2★)',
+        title: 'Low-rated reviews (<= 2 stars)',
         isEmpty: rows.isEmpty,
         child: ListView.separated(
           itemCount: rows.length,

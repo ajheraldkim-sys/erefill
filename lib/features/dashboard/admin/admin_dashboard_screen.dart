@@ -817,7 +817,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   return DropdownMenuItem<String>(
                     value: r['id']?.toString(),
                     child: Text(
-                      '${r['full_name'] ?? "Rider"} (${isOnline ? "🟢 Online" : "⚪ Offline"})',
+                      '${r['full_name'] ?? "Rider"} (${isOnline ? "Online" : "Offline"})',
                     ),
                   );
                 }).toList(),
@@ -1042,7 +1042,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          '📊 Orders CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
+          'Orders CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
         ),
         backgroundColor: AppColors.statusDelivered,
       ),
@@ -1083,7 +1083,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          '📊 Stations CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
+          'Stations CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
         ),
         backgroundColor: AppColors.statusDelivered,
       ),
@@ -1122,7 +1122,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          '📊 Users CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
+          'Users CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
         ),
         backgroundColor: AppColors.statusDelivered,
       ),
@@ -2756,7 +2756,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     }),
                     const SizedBox(width: 8),
                     _filterChip(
-                      'Pending Review ⚠️',
+                      'Pending Review',
                       'pending',
                       _stationFilter,
                       (v) {

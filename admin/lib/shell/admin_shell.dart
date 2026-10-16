@@ -133,7 +133,8 @@ class _AdminShellState extends State<AdminShell> {
             });
             if (compact) _scaffoldKey.currentState?.closeDrawer();
           },
-          onToggle: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+          onToggle: () =>
+              setState(() => _sidebarCollapsed = !_sidebarCollapsed),
           onSignOut: () => context.read<AdminAuthProvider>().signOut(),
         );
         final content = SafeArea(
@@ -588,9 +589,18 @@ class _AdminTopBar extends StatelessWidget {
                   children: [
                     Text('Admin', style: adminCaptionTextStyle(context)),
                     const SizedBox(width: 4),
-                    Icon(LucideIcons.chevronRight, size: 14, color: AppUi.textSecondaryOf(context)),
+                    Icon(
+                      LucideIcons.chevronRight,
+                      size: 14,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
                     const SizedBox(width: 4),
-                    Text(_title, style: adminCaptionTextStyle(context).copyWith(color: AppUi.bluePrimary)),
+                    Text(
+                      _title,
+                      style: adminCaptionTextStyle(
+                        context,
+                      ).copyWith(color: AppUi.bluePrimary),
+                    ),
                   ],
                 ),
               if (!compact) AppUi.vGapXs,
@@ -611,7 +621,9 @@ class _AdminTopBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppUi.accentGreen.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppUi.accentGreen.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: AppUi.accentGreen.withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -669,7 +681,11 @@ class _AdminTopBar extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(LucideIcons.shieldCheck, size: 16, color: AppUi.bluePrimary),
+                const Icon(
+                  LucideIcons.shieldCheck,
+                  size: 16,
+                  color: AppUi.bluePrimary,
+                ),
                 if (!compact) ...[
                   AppUi.hGapSm,
                   ConstrainedBox(

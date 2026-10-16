@@ -118,7 +118,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('📢 Broadcast sent successfully to $recipientsCount user(s)!'),
+          content: Text('Broadcast sent successfully to $recipientsCount user(s)!'),
           backgroundColor: AppColors.statusDelivered,
         ),
       );

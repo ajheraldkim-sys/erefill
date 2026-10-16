@@ -182,7 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return AdminPageScaffold(
       onRefresh: _load,
       header: AdminSectionHeader(
-        title: 'Welcome back, Admin 👋',
+        title: 'Welcome back, Admin',
         subtitle: now,
         trailing: Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
