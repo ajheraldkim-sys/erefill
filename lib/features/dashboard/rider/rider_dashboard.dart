@@ -761,7 +761,9 @@ class _RiderDashboardState extends State<RiderDashboard>
           suggestedEmpty += _safeInt(item['quantity']);
         }
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not load order quantities for delivery review: $error');
+    }
 
     if (!mounted) return;
 
@@ -901,11 +903,10 @@ class _RiderDashboardState extends State<RiderDashboard>
       }
 
       // Update UI after delivery confirms
-      setState(() {
-        _myActiveOrders.removeWhere((o) => o['id'] == orderId);
-      });
-
       if (mounted) {
+        setState(() {
+          _myActiveOrders.removeWhere((o) => o['id'] == orderId);
+        });
         _showSuccess('Delivery verified and completed.');
       }
       await _removeLocalDeliveryProof(localPhoto, localSignature);
@@ -935,13 +936,20 @@ class _RiderDashboardState extends State<RiderDashboard>
             emptyGallonsReturned: completion.emptyGallonsReturned,
           ),
         );
-        setState(() {
-          _myActiveOrders.removeWhere((o) => o['id'] == orderId);
-        });
+        if (mounted) {
+          setState(() {
+            _myActiveOrders.removeWhere((o) => o['id'] == orderId);
+          });
+        }
         await _checkOfflineQueue();
         if (mounted) {
-          _showSuccess(
-            'Saved offline! Delivery will sync automatically when online.',
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Proof saved offline. Delivery is not confirmed until it syncs.',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       } catch (queueError) {

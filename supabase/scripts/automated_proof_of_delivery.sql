@@ -197,6 +197,86 @@ CREATE TRIGGER trg_guard_rider_delivery_record_updates
 BEFORE UPDATE ON public.orders
 FOR EACH ROW EXECUTE FUNCTION public.guard_rider_delivery_record_updates();
 
+CREATE OR REPLACE FUNCTION public.guard_verified_delivery_record_mutations()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_old_evidence jsonb;
+  v_new_evidence jsonb;
+BEGIN
+  IF OLD.status = 'delivered' THEN
+    v_old_evidence := jsonb_build_object(
+      'delivery_photo_url', OLD.delivery_photo_url,
+      'delivery_signature_url', OLD.delivery_signature_url,
+      'actual_completion_at', OLD.actual_completion_at,
+      'delivery_note', OLD.delivery_note,
+      'empty_gallons_returned', OLD.empty_gallons_returned,
+      'delivery_latitude', OLD.delivery_latitude,
+      'delivery_longitude', OLD.delivery_longitude,
+      'payment_status', OLD.payment_status,
+      'total_amount', OLD.total_amount,
+      'subtotal', OLD.subtotal,
+      'delivery_fee', OLD.delivery_fee,
+      'platform_fee', OLD.platform_fee
+    );
+    v_new_evidence := jsonb_build_object(
+      'delivery_photo_url', NEW.delivery_photo_url,
+      'delivery_signature_url', NEW.delivery_signature_url,
+      'actual_completion_at', NEW.actual_completion_at,
+      'delivery_note', NEW.delivery_note,
+      'empty_gallons_returned', NEW.empty_gallons_returned,
+      'delivery_latitude', NEW.delivery_latitude,
+      'delivery_longitude', NEW.delivery_longitude,
+      'payment_status', NEW.payment_status,
+      'total_amount', NEW.total_amount,
+      'subtotal', NEW.subtotal,
+      'delivery_fee', NEW.delivery_fee,
+      'platform_fee', NEW.platform_fee
+    );
+
+    IF v_old_evidence IS DISTINCT FROM v_new_evidence THEN
+      IF auth.role() IS DISTINCT FROM 'service_role'
+         AND NOT public.is_admin() THEN
+        RAISE EXCEPTION
+          'Verified delivery evidence and receipt amounts cannot be modified.';
+      END IF;
+
+      IF public.is_admin() THEN
+        INSERT INTO public.audit_logs (
+          actor_id,
+          action,
+          entity_type,
+          entity_id,
+          old_value,
+          new_value,
+          metadata
+        )
+        VALUES (
+          auth.uid(),
+          'ADMIN_CORRECT_DELIVERY_RECORD',
+          'order',
+          OLD.id::text,
+          v_old_evidence,
+          v_new_evidence,
+          jsonb_build_object('receipt_preserved', true)
+        );
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_guard_verified_delivery_record_mutations
+  ON public.orders;
+CREATE TRIGGER trg_guard_verified_delivery_record_mutations
+BEFORE UPDATE ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.guard_verified_delivery_record_mutations();
+
 CREATE OR REPLACE FUNCTION public.guard_system_message_spoofing()
 RETURNS trigger
 LANGUAGE plpgsql
