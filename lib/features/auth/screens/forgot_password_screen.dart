@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../../../core/constants.dart';
 import '../../../core/utils/friendly_errors.dart';
-import '../../../core/widgets/brand/erefill_logo.dart';
 import '../../../core/widgets/app_form_fields.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -63,8 +62,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         child: Column(
           children: [
-            const ERefillLogo(size: 44, showWordmark: true),
-            const SizedBox(height: 28),
             Text(
               _sent ? 'Check your email' : 'Forgot password?',
               style: TextStyle(

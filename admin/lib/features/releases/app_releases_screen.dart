@@ -63,7 +63,8 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
       if (_statusFilter != 'all' && status != _statusFilter) return false;
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
-        final match = version.contains(query) ||
+        final match =
+            version.contains(query) ||
             title.contains(query) ||
             notes.contains(query);
         if (!match) return false;
@@ -101,32 +102,47 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               runSpacing: 10,
               children: [
                 OutlinedButton.icon(
-                  onPressed: _openAuditLogsModal,
+                  onPressed: () => _openAuditLogsModal(context),
                   icon: const Icon(LucideIcons.fileText, size: 16),
                   label: const Text('Audit Logs'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => _openPreviewModal(active),
+                  onPressed: () => _openPreviewModal(context, active),
                   icon: const Icon(LucideIcons.eye, size: 16),
                   label: const Text('Preview Screens'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _openReleaseForm,
+                  onPressed: () => _openReleaseForm(context),
                   icon: const Icon(LucideIcons.plus, size: 16),
                   label: const Text('New Release'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppUi.bluePrimary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ],
@@ -143,7 +159,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                 runSpacing: 16,
                 children: [
                   SizedBox(
-                    width: isNarrow ? constraints.maxWidth : (constraints.maxWidth - 48) / 4,
+                    width: isNarrow
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 48) / 4,
                     child: AdminKpiTile(
                       label: 'Active Android Version',
                       value: active != null
@@ -154,7 +172,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     ),
                   ),
                   SizedBox(
-                    width: isNarrow ? constraints.maxWidth : (constraints.maxWidth - 48) / 4,
+                    width: isNarrow
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 48) / 4,
                     child: AdminKpiTile(
                       label: 'Min Supported Version',
                       value: active != null
@@ -165,22 +185,26 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     ),
                   ),
                   SizedBox(
-                    width: isNarrow ? constraints.maxWidth : (constraints.maxWidth - 48) / 4,
+                    width: isNarrow
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 48) / 4,
                     child: AdminKpiTile(
                       label: 'Enforcement Policy',
                       value: active != null
                           ? (active['update_type'] == 'mandatory'
-                              ? 'Mandatory Gate'
-                              : 'Optional Notice')
+                                ? 'Mandatory Gate'
+                                : 'Optional Notice')
                           : 'Standard',
-                      icon: LucideIcons.circleAlert,
+                      icon: LucideIcons.alertCircle,
                       color: active?['update_type'] == 'mandatory'
                           ? const Color(0xFFEF4444)
                           : const Color(0xFFF59E0B),
                     ),
                   ),
                   SizedBox(
-                    width: isNarrow ? constraints.maxWidth : (constraints.maxWidth - 48) / 4,
+                    width: isNarrow
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 48) / 4,
                     child: AdminKpiTile(
                       label: 'Total Release History',
                       value: '${_releases.length} Builds',
@@ -211,7 +235,10 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       isDense: true,
                       filled: true,
                       fillColor: AppUi.pageBgOf(context),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(color: AppUi.borderOf(context)),
@@ -227,15 +254,30 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('Platform: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const Text(
+                      'Platform: ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                     DropdownButton<String>(
                       value: _platformFilter,
                       underline: const SizedBox.shrink(),
                       items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All Platforms')),
-                        DropdownMenuItem(value: 'android', child: Text('Android (APK)')),
+                        DropdownMenuItem(
+                          value: 'all',
+                          child: Text('All Platforms'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'android',
+                          child: Text('Android (APK)'),
+                        ),
                         DropdownMenuItem(value: 'ios', child: Text('iOS')),
-                        DropdownMenuItem(value: 'web', child: Text('Web Deployment')),
+                        DropdownMenuItem(
+                          value: 'web',
+                          child: Text('Web Deployment'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _platformFilter = val);
@@ -246,15 +288,30 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('Status: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const Text(
+                      'Status: ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                     DropdownButton<String>(
                       value: _statusFilter,
                       underline: const SizedBox.shrink(),
                       items: const [
-                        DropdownMenuItem(value: 'all', child: Text('All Statuses')),
-                        DropdownMenuItem(value: 'published', child: Text('Published')),
+                        DropdownMenuItem(
+                          value: 'all',
+                          child: Text('All Statuses'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'published',
+                          child: Text('Published'),
+                        ),
                         DropdownMenuItem(value: 'draft', child: Text('Draft')),
-                        DropdownMenuItem(value: 'deprecated', child: Text('Deprecated')),
+                        DropdownMenuItem(
+                          value: 'deprecated',
+                          child: Text('Deprecated'),
+                        ),
                       ],
                       onChanged: (val) {
                         if (val != null) setState(() => _statusFilter = val);
@@ -285,9 +342,16 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               accent: AppUi.error,
               child: Column(
                 children: [
-                  const Icon(LucideIcons.triangleAlert, color: AppUi.error, size: 36),
+                  const Icon(
+                    LucideIcons.alertTriangle,
+                    color: AppUi.error,
+                    size: 36,
+                  ),
                   const SizedBox(height: 12),
-                  Text('Failed to load releases: $_error', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Failed to load releases: $_error',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: _loadReleases,
@@ -299,14 +363,24 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
           else if (_filteredReleases.isEmpty)
             AdminGlassCard(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 48,
+                  horizontal: 24,
+                ),
                 child: Column(
                   children: [
-                    Icon(LucideIcons.packageOpen, size: 48, color: AppUi.textSecondaryOf(context)),
+                    Icon(
+                      LucideIcons.packageOpen,
+                      size: 48,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'No Releases Found',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -315,7 +389,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: _openReleaseForm,
+                      onPressed: () => _openReleaseForm(context),
                       icon: const Icon(LucideIcons.plus, size: 16),
                       label: const Text('Create First Release'),
                     ),
@@ -355,7 +429,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
     final downloadUrl = r['download_url']?.toString() ?? '';
     final checksum = r['checksum_sha256']?.toString() ?? '';
     final publishedAt = r['published_at'] != null
-        ? DateFormat('MMM d, yyyy · HH:mm').format(DateTime.parse(r['published_at'].toString()))
+        ? DateFormat(
+            'MMM d, yyyy · HH:mm',
+          ).format(DateTime.parse(r['published_at'].toString()))
         : null;
 
     final isMandatory = updateType == 'mandatory';
@@ -380,7 +456,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isActive ? LucideIcons.circleCheck : LucideIcons.package,
+                  isActive ? LucideIcons.checkCircle2 : LucideIcons.package,
                   color: isActive ? const Color(0xFF10B981) : AppUi.bluePrimary,
                   size: 28,
                 ),
@@ -397,14 +473,26 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       children: [
                         Text(
                           'v$version (Build $build)',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
                         ),
                         _buildBadge(platform, Colors.blueGrey),
-                        _buildBadge(channel.replaceAll('_', ' '), Colors.indigo),
+                        _buildBadge(
+                          channel.replaceAll('_', ' '),
+                          Colors.indigo,
+                        ),
                         if (isActive)
-                          _buildBadge('ACTIVE IN PRODUCTION', const Color(0xFF10B981))
+                          _buildBadge(
+                            'ACTIVE IN PRODUCTION',
+                            const Color(0xFF10B981),
+                          )
                         else
-                          _buildBadge(status.toUpperCase(), isPublished ? Colors.blue : Colors.amber),
+                          _buildBadge(
+                            status.toUpperCase(),
+                            isPublished ? Colors.blue : Colors.amber,
+                          ),
                         _buildBadge(
                           isMandatory ? 'MANDATORY UPDATE' : 'OPTIONAL UPDATE',
                           isMandatory ? const Color(0xFFEF4444) : Colors.teal,
@@ -414,13 +502,19 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     const SizedBox(height: 6),
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
                     if (publishedAt != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         'Published on $publishedAt',
-                        style: TextStyle(fontSize: 12, color: AppUi.textSecondaryOf(context)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppUi.textSecondaryOf(context),
+                        ),
                       ),
                     ],
                   ],
@@ -434,32 +528,39 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                       ),
-                      onPressed: () => _confirmPublishRelease(r),
+                      onPressed: () => _confirmPublishRelease(context, r),
                       icon: const Icon(LucideIcons.send, size: 14),
                       label: const Text('Publish'),
                     ),
                     IconButton(
                       tooltip: 'Edit release draft',
-                      onPressed: () => _openReleaseForm(existing: r),
-                      icon: const Icon(LucideIcons.pencil, size: 18),
+                      onPressed: () => _openReleaseForm(context, existing: r),
+                      icon: const Icon(LucideIcons.fileEdit, size: 18),
                     ),
                     IconButton(
                       tooltip: 'Delete release draft',
-                      onPressed: () => _confirmDeleteRelease(id),
-                      icon: const Icon(LucideIcons.trash2, size: 18, color: AppUi.error),
+                      onPressed: () => _confirmDeleteRelease(context, id),
+                      icon: const Icon(
+                        LucideIcons.trash2,
+                        size: 18,
+                        color: AppUi.error,
+                      ),
                     ),
                   ] else ...[
                     if (!isActive)
                       OutlinedButton.icon(
-                        onPressed: () => _confirmActivateRelease(r),
+                        onPressed: () => _confirmActivateRelease(context, r),
                         icon: const Icon(LucideIcons.check, size: 14),
                         label: const Text('Set Active'),
                       ),
                     IconButton(
                       tooltip: 'Edit release details',
-                      onPressed: () => _openReleaseForm(existing: r),
+                      onPressed: () => _openReleaseForm(context, existing: r),
                       icon: const Icon(LucideIcons.settings, size: 18),
                     ),
                   ],
@@ -486,27 +587,41 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       children: [
                         const Text(
                           'MINIMUM SUPPORTED CLIENT:',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Requires >= v$minVer (Build $minBuild)',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: isMandatory ? const Color(0xFFDC2626) : AppUi.textSecondaryOf(context),
+                            color: isMandatory
+                                ? const Color(0xFFDC2626)
+                                : AppUi.textSecondaryOf(context),
                           ),
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'DISTRIBUTION ENDPOINT:',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         InkWell(
                           onTap: () {
                             Clipboard.setData(ClipboardData(text: downloadUrl));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Download URL copied to clipboard')),
+                              const SnackBar(
+                                content: Text(
+                                  'Download URL copied to clipboard',
+                                ),
+                              ),
                             );
                           },
                           child: Text(
@@ -524,29 +639,46 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     ),
                   ),
                   SizedBox(
-                    width: isNarrow ? constraints.maxWidth : constraints.maxWidth - 340,
+                    width: isNarrow
+                        ? constraints.maxWidth
+                        : constraints.maxWidth - 340,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'RELEASE NOTES & HIGHLIGHTS:',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.5),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           notes.isEmpty ? 'No release notes provided.' : notes,
-                          style: TextStyle(fontSize: 13, height: 1.4, color: AppUi.textSecondaryOf(context)),
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: AppUi.textSecondaryOf(context),
+                          ),
                         ),
                         if (checksum.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(LucideIcons.fingerprint, size: 14, color: Colors.blueGrey),
+                              const Icon(
+                                LucideIcons.fingerprint,
+                                size: 14,
+                                color: Colors.blueGrey,
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'SHA-256: $checksum',
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -558,9 +690,13 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                                 tooltip: 'Copy SHA-256 Checksum',
                                 icon: const Icon(LucideIcons.copy, size: 14),
                                 onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: checksum));
+                                  Clipboard.setData(
+                                    ClipboardData(text: checksum),
+                                  );
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('SHA-256 Checksum copied')),
+                                    const SnackBar(
+                                      content: Text('SHA-256 Checksum copied'),
+                                    ),
                                   );
                                 },
                               ),
@@ -589,14 +725,22 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.4),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: color,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }
 
   // --- Dialogs & Operations ---
 
-  Future<void> _confirmPublishRelease(Map<String, dynamic> r) async {
+  Future<void> _confirmPublishRelease(
+    BuildContext context,
+    Map<String, dynamic> r,
+  ) async {
     final isMandatory = r['update_type'] == 'mandatory';
     final version = r['version'];
     final minVer = r['min_supported_version'];
@@ -607,7 +751,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         title: Row(
           children: [
             Icon(
-              isMandatory ? LucideIcons.triangleAlert : LucideIcons.send,
+              isMandatory ? LucideIcons.alertTriangle : LucideIcons.send,
               color: isMandatory ? AppUi.error : AppUi.bluePrimary,
             ),
             const SizedBox(width: 12),
@@ -622,7 +766,10 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
             children: [
               Text(
                 'Are you sure you want to publish version $version to production?',
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
               ),
               const SizedBox(height: 12),
               if (isMandatory)
@@ -631,17 +778,28 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                   decoration: BoxDecoration(
                     color: AppUi.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppUi.error.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: AppUi.error.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(LucideIcons.shieldAlert, color: AppUi.error, size: 20),
+                      const Icon(
+                        LucideIcons.shieldAlert,
+                        color: AppUi.error,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'MANDATORY UPDATE ENFORCEMENT: Any active user on a version older than v$minVer will be immediately blocked by the routing guard and forced to install this update before accessing the application.',
-                          style: const TextStyle(color: AppUi.error, fontSize: 12, height: 1.4, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            color: AppUi.error,
+                            fontSize: 12,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -653,7 +811,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                   decoration: BoxDecoration(
                     color: AppUi.bluePrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppUi.bluePrimary.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: AppUi.bluePrimary.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: const Text(
                     'This release is OPTIONAL. Users will be gently prompted to update when starting the app or viewing announcements, but will not be locked out.',
@@ -670,7 +830,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isMandatory ? AppUi.error : const Color(0xFF10B981),
+              backgroundColor: isMandatory
+                  ? AppUi.error
+                  : const Color(0xFF10B981),
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -686,26 +848,41 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         await api.publishAppRelease(r['id']);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Version $version successfully published to production!')),
+          SnackBar(
+            content: Text(
+              'Version $version successfully published to production!',
+            ),
+          ),
         );
         _loadReleases();
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to publish release: $e'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Failed to publish release: $e'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     }
   }
 
-  Future<void> _confirmActivateRelease(Map<String, dynamic> r) async {
+  Future<void> _confirmActivateRelease(
+    BuildContext context,
+    Map<String, dynamic> r,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Set Active Release'),
-        content: Text('Set version ${r['version']} as the active release for platform ${r['platform']}?'),
+        content: Text(
+          'Set version ${r['version']} as the active release for platform ${r['platform']}?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Set Active'),
@@ -729,16 +906,24 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
     }
   }
 
-  Future<void> _confirmDeleteRelease(String id) async {
+  Future<void> _confirmDeleteRelease(BuildContext context, String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Release Draft'),
-        content: const Text('Are you sure you want to permanently delete this release draft?'),
+        content: const Text(
+          'Are you sure you want to permanently delete this release draft?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppUi.error, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppUi.error,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -755,38 +940,68 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete draft: $e'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Failed to delete draft: $e'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     }
   }
 
-  Future<void> _openReleaseForm({Map<String, dynamic>? existing}) async {
+  Future<void> _openReleaseForm(
+    BuildContext context, {
+    Map<String, dynamic>? existing,
+  }) async {
     final isEdit = existing != null;
-    final platformCtl = TextEditingController(text: existing?['platform']?.toString() ?? 'android');
-    final channelCtl = TextEditingController(text: existing?['channel']?.toString() ?? 'official_apk');
-    final versionCtl = TextEditingController(text: existing?['version']?.toString() ?? '1.0.1');
-    final buildCtl = TextEditingController(text: existing?['build_number']?.toString() ?? '2');
-    final minVersionCtl = TextEditingController(text: existing?['min_supported_version']?.toString() ?? '1.0.0');
-    final minBuildCtl = TextEditingController(text: existing?['min_supported_build']?.toString() ?? '1');
-    final titleCtl = TextEditingController(text: existing?['title']?.toString() ?? 'eRefill Release Update');
+    final platformCtl = TextEditingController(
+      text: existing?['platform']?.toString() ?? 'android',
+    );
+    final channelCtl = TextEditingController(
+      text: existing?['channel']?.toString() ?? 'official_apk',
+    );
+    final versionCtl = TextEditingController(
+      text: existing?['version']?.toString() ?? '1.0.1',
+    );
+    final buildCtl = TextEditingController(
+      text: existing?['build_number']?.toString() ?? '2',
+    );
+    final minVersionCtl = TextEditingController(
+      text: existing?['min_supported_version']?.toString() ?? '1.0.0',
+    );
+    final minBuildCtl = TextEditingController(
+      text: existing?['min_supported_build']?.toString() ?? '1',
+    );
+    final titleCtl = TextEditingController(
+      text: existing?['title']?.toString() ?? 'eRefill Release Update',
+    );
     final notesCtl = TextEditingController(
-      text: existing?['release_notes']?.toString() ??
+      text:
+          existing?['release_notes']?.toString() ??
           '- Performance improvements\n- Enhanced delivery fee calculation\n- Security updates',
     );
-    final updateTypeCtl = TextEditingController(text: existing?['update_type']?.toString() ?? 'optional');
+    final updateTypeCtl = TextEditingController(
+      text: existing?['update_type']?.toString() ?? 'optional',
+    );
     final urlCtl = TextEditingController(
-      text: existing?['download_url']?.toString() ??
+      text:
+          existing?['download_url']?.toString() ??
           'https://erefill-landing.pages.dev/downloads/eRefill.apk',
     );
-    final checksumCtl = TextEditingController(text: existing?['checksum_sha256']?.toString() ?? '');
+    final checksumCtl = TextEditingController(
+      text: existing?['checksum_sha256']?.toString() ?? '',
+    );
 
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           return AlertDialog(
-            title: Text(isEdit ? 'Edit Release Details' : 'Create New Application Release'),
+            title: Text(
+              isEdit
+                  ? 'Edit Release Details'
+                  : 'Create New Application Release',
+            ),
             content: SizedBox(
               width: 580,
               child: SingleChildScrollView(
@@ -799,14 +1014,26 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: platformCtl.text,
-                            decoration: const InputDecoration(labelText: 'Platform'),
+                            decoration: const InputDecoration(
+                              labelText: 'Platform',
+                            ),
                             items: const [
-                              DropdownMenuItem(value: 'android', child: Text('Android')),
-                              DropdownMenuItem(value: 'ios', child: Text('iOS')),
-                              DropdownMenuItem(value: 'web', child: Text('Web')),
+                              DropdownMenuItem(
+                                value: 'android',
+                                child: Text('Android'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'ios',
+                                child: Text('iOS'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'web',
+                                child: Text('Web'),
+                              ),
                             ],
                             onChanged: (v) {
-                              if (v != null) setDialogState(() => platformCtl.text = v);
+                              if (v != null)
+                                setDialogState(() => platformCtl.text = v);
                             },
                           ),
                         ),
@@ -814,14 +1041,26 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: channelCtl.text,
-                            decoration: const InputDecoration(labelText: 'Distribution Channel'),
+                            decoration: const InputDecoration(
+                              labelText: 'Distribution Channel',
+                            ),
                             items: const [
-                              DropdownMenuItem(value: 'official_apk', child: Text('Official APK')),
-                              DropdownMenuItem(value: 'google_play', child: Text('Google Play')),
-                              DropdownMenuItem(value: 'web_deployment', child: Text('Web Deployment')),
+                              DropdownMenuItem(
+                                value: 'official_apk',
+                                child: Text('Official APK'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'google_play',
+                                child: Text('Google Play'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'web_deployment',
+                                child: Text('Web Deployment'),
+                              ),
                             ],
                             onChanged: (v) {
-                              if (v != null) setDialogState(() => channelCtl.text = v);
+                              if (v != null)
+                                setDialogState(() => channelCtl.text = v);
                             },
                           ),
                         ),
@@ -880,19 +1119,26 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
                       initialValue: updateTypeCtl.text,
-                      decoration: const InputDecoration(labelText: 'Update Enforcement Type'),
+                      decoration: const InputDecoration(
+                        labelText: 'Update Enforcement Type',
+                      ),
                       items: const [
                         DropdownMenuItem(
                           value: 'optional',
-                          child: Text('Optional (Dismissible dialog, standard flow)'),
+                          child: Text(
+                            'Optional (Dismissible dialog, standard flow)',
+                          ),
                         ),
                         DropdownMenuItem(
                           value: 'mandatory',
-                          child: Text('Mandatory (Locks previous versions, non-dismissible)'),
+                          child: Text(
+                            'Mandatory (Locks previous versions, non-dismissible)',
+                          ),
                         ),
                       ],
                       onChanged: (v) {
-                        if (v != null) setDialogState(() => updateTypeCtl.text = v);
+                        if (v != null)
+                          setDialogState(() => updateTypeCtl.text = v);
                       },
                     ),
                     const SizedBox(height: 14),
@@ -900,7 +1146,8 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       controller: titleCtl,
                       decoration: const InputDecoration(
                         labelText: 'Release Title',
-                        hintText: 'e.g. Critical Security & Delivery System Update',
+                        hintText:
+                            'e.g. Critical Security & Delivery System Update',
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -908,14 +1155,16 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       controller: urlCtl,
                       decoration: const InputDecoration(
                         labelText: 'Direct Download URL (HTTPS)',
-                        hintText: 'https://erefill-landing.pages.dev/downloads/eRefill.apk',
+                        hintText:
+                            'https://erefill-landing.pages.dev/downloads/eRefill.apk',
                       ),
                     ),
                     const SizedBox(height: 14),
                     TextField(
                       controller: checksumCtl,
                       decoration: const InputDecoration(
-                        labelText: 'Cryptographic SHA-256 Checksum (Optional for verification)',
+                        labelText:
+                            'Cryptographic SHA-256 Checksum (Optional for verification)',
                         hintText: 'e.g. 8f4b5a2e...',
                       ),
                     ),
@@ -925,7 +1174,8 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                       maxLines: 4,
                       decoration: const InputDecoration(
                         labelText: 'Release Notes (Markdown / Bullet points)',
-                        hintText: 'Highlight new features and security fixes...',
+                        hintText:
+                            'Highlight new features and security fixes...',
                       ),
                     ),
                   ],
@@ -933,9 +1183,15 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppUi.bluePrimary, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppUi.bluePrimary,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: Text(isEdit ? 'Save Changes' : 'Create Release Draft'),
               ),
@@ -959,7 +1215,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
           'release_notes': notesCtl.text.trim(),
           'update_type': updateTypeCtl.text.trim(),
           'download_url': urlCtl.text.trim(),
-          'checksum_sha256': checksumCtl.text.trim().isEmpty ? null : checksumCtl.text.trim(),
+          'checksum_sha256': checksumCtl.text.trim().isEmpty
+              ? null
+              : checksumCtl.text.trim(),
         };
 
         if (isEdit) {
@@ -972,19 +1230,24 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isEdit ? 'Release updated' : 'Release draft created')),
+          SnackBar(
+            content: Text(isEdit ? 'Release updated' : 'Release draft created'),
+          ),
         );
         _loadReleases();
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save release: $e'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Failed to save release: $e'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     }
   }
 
-  Future<void> _openAuditLogsModal() async {
+  Future<void> _openAuditLogsModal(BuildContext context) async {
     showDialog<void>(
       context: context,
       builder: (ctx) => FutureBuilder<List<Map<String, dynamic>>>(
@@ -1005,70 +1268,87 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               child: snapshot.connectionState == ConnectionState.waiting
                   ? const Center(child: CircularProgressIndicator())
                   : logs.isEmpty
-                      ? const Center(child: Text('No audit logs recorded yet.'))
-                      : ListView.separated(
-                          itemCount: logs.length,
-                          separatorBuilder: (_, _) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final log = logs[index];
-                            final action = log['action']?.toString() ?? 'ACTION';
-                            final adminEmail = log['admin_email']?.toString() ?? 'System';
-                            final createdAt = log['created_at'] != null
-                                ? DateFormat('MMM d, yyyy · HH:mm:ss').format(DateTime.parse(log['created_at'].toString()))
-                                : '';
-                            final details = log['details']?.toString() ?? '{}';
+                  ? const Center(child: Text('No audit logs recorded yet.'))
+                  : ListView.separated(
+                      itemCount: logs.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final log = logs[index];
+                        final action = log['action']?.toString() ?? 'ACTION';
+                        final adminEmail =
+                            log['admin_email']?.toString() ?? 'System';
+                        final createdAt = log['created_at'] != null
+                            ? DateFormat('MMM d, yyyy · HH:mm:ss').format(
+                                DateTime.parse(log['created_at'].toString()),
+                              )
+                            : '';
+                        final details = log['details']?.toString() ?? '{}';
 
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          action,
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppUi.bluePrimary,
-                                          ),
-                                        ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppUi.bluePrimary.withValues(
+                                        alpha: 0.12,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        adminEmail,
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      action,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppUi.bluePrimary,
                                       ),
-                                      const Spacer(),
-                                      Text(
-                                        createdAt,
-                                        style: TextStyle(fontSize: 11, color: AppUi.textSecondaryOf(context)),
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    details,
+                                    adminEmail,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    createdAt,
                                     style: TextStyle(
-                                      fontFamily: 'monospace',
                                       fontSize: 11,
                                       color: AppUi.textSecondaryOf(context),
                                     ),
                                   ),
                                 ],
                               ),
-                            );
-                          },
-                        ),
+                              const SizedBox(height: 6),
+                              Text(
+                                details,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11,
+                                  color: AppUi.textSecondaryOf(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
             ],
           );
         },
@@ -1076,18 +1356,27 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
     );
   }
 
-  void _openPreviewModal(Map<String, dynamic>? active) {
+  void _openPreviewModal(BuildContext context, Map<String, dynamic>? active) {
     final policy = AppUpdatePolicy.preview(
       latestVersion: active?['version']?.toString() ?? '1.1.0',
       latestBuild: active != null ? (active['build_number'] as num).toInt() : 2,
-      minSupportedVersion: active?['min_supported_version']?.toString() ?? '1.0.0',
-      minSupportedBuild: active != null ? (active['min_supported_build'] as num).toInt() : 1,
-      title: active?['title']?.toString() ?? 'Mandatory Security & Delivery Update',
-      releaseNotes: active?['release_notes']?.toString() ??
+      minSupportedVersion:
+          active?['min_supported_version']?.toString() ?? '1.0.0',
+      minSupportedBuild: active != null
+          ? (active['min_supported_build'] as num).toInt()
+          : 1,
+      title:
+          active?['title']?.toString() ??
+          'Mandatory Security & Delivery Update',
+      releaseNotes:
+          active?['release_notes']?.toString() ??
           '- Centralized delivery fee calculation\n- Enhanced real-time notification reliability\n- Critical system security patch',
-      downloadUrl: active?['download_url']?.toString() ?? 'https://erefill-landing.pages.dev/downloads/eRefill.apk',
+      downloadUrl:
+          active?['download_url']?.toString() ??
+          'https://erefill-landing.pages.dev/downloads/eRefill.apk',
       checksumSha256: active?['checksum_sha256']?.toString(),
-      isMandatory: (active?['update_type']?.toString() ?? 'mandatory') == 'mandatory',
+      isMandatory:
+          (active?['update_type']?.toString() ?? 'mandatory') == 'mandatory',
     );
 
     showDialog<void>(
@@ -1105,11 +1394,21 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               ),
               const SizedBox(height: 20),
               ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 tileColor: AppUi.error.withValues(alpha: 0.08),
-                leading: const Icon(LucideIcons.shieldAlert, color: AppUi.error),
-                title: const Text('Preview Mandatory Update Screen', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Full-screen non-dismissible lockout modal'),
+                leading: const Icon(
+                  LucideIcons.shieldAlert,
+                  color: AppUi.error,
+                ),
+                title: const Text(
+                  'Preview Mandatory Update Screen',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Full-screen non-dismissible lockout modal',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   Navigator.of(context).push(
@@ -1130,10 +1429,15 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 tileColor: AppUi.bluePrimary.withValues(alpha: 0.08),
                 leading: const Icon(LucideIcons.info, color: AppUi.bluePrimary),
-                title: const Text('Preview Optional Update Dialog', style: TextStyle(fontWeight: FontWeight.w700)),
+                title: const Text(
+                  'Preview Optional Update Dialog',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 subtitle: const Text('Dismissible in-app modal prompt'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -1144,7 +1448,10 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );

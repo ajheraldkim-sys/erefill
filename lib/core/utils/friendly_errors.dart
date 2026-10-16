@@ -38,6 +38,24 @@ class FriendlyErrors {
     if (lower.contains('timeout')) {
       return 'The request took too long. Please try again.';
     }
+    if (lower.contains('google sign-in was cancelled') ||
+        lower.contains('google sign in was cancelled') ||
+        lower.contains('google sign in cancelled')) {
+      return 'Google sign-in was cancelled.';
+    }
+    if (lower.contains('apiexception 10') ||
+        lower.contains('developer_error') ||
+        lower.contains('sha-1')) {
+      return 'Google Sign-In configuration error (ApiException 10). The Android SHA-1 fingerprint is not registered in Google Cloud Console for package com.erefill.app.';
+    }
+    if (lower.contains('apiexception 12500')) {
+      return 'Google Sign-In failed (ApiException 12500). Please check OAuth consent screen configuration or Google Play Services.';
+    }
+    if (lower.contains('google authentication failed:') ||
+        lower.contains('google sign-in misconfigured') ||
+        lower.contains('google sign-in configuration error')) {
+      return raw.replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+    }
 
     final cleaned = raw
         .replaceFirst(RegExp(r'^Exception:\s*'), '')

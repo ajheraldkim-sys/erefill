@@ -170,7 +170,8 @@ class UserProvider extends ChangeNotifier {
               'username':
                   meta['username'] ??
                   'user_${userId.length >= 8 ? userId.substring(0, 8) : userId}',
-              'full_name': meta['full_name'] ?? 'New User',
+              'full_name': meta['full_name'] ?? meta['name'] ?? 'New User',
+              'avatar_url': meta['avatar_url'] ?? meta['picture'],
               'first_name': meta['first_name'],
               'last_name': meta['last_name'],
               'mi': meta['mi'],

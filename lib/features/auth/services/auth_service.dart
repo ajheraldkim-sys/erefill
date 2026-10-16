@@ -10,7 +10,7 @@ class AuthService {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
         serverClientId:
-            '998147956925-t1iuu6ncqirbg342u9ob7n6bi0bdi518.apps.googleusercontent.com', // Your NEW Web Client ID
+            '998147956925-t1iuu6ncqirbg342u9ob7n6bi0bdi518.apps.googleusercontent.com', // Web Client ID
         scopes: ['email', 'profile'],
       );
 
@@ -22,7 +22,7 @@ class AuthService {
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
-        throw 'Google sign in cancelled';
+        throw 'Google sign-in was cancelled.';
       }
 
       final GoogleSignInAuthentication googleAuth =
@@ -32,7 +32,7 @@ class AuthService {
       final accessToken = googleAuth.accessToken;
 
       if (idToken == null) {
-        throw 'No ID Token found from Google';
+        throw 'No ID Token found from Google. Ensure the Web Client ID is properly configured.';
       }
 
       await _supabase.auth.signInWithIdToken(
@@ -40,7 +40,24 @@ class AuthService {
         idToken: idToken,
         accessToken: accessToken,
       );
+    } on AuthException catch (e) {
+      debugPrint('[AuthService] Supabase Google Auth error: ${e.message} (code: ${e.statusCode})');
+      throw 'Google authentication failed: ${e.message}';
     } catch (e) {
+      final err = e.toString();
+      debugPrint('[AuthService] Google Sign In error: $err');
+      if (err.contains('ApiException: 10') || err.contains('10:')) {
+        throw 'Google Sign-In configuration error (ApiException 10). Android SHA-1 fingerprint is not registered in Google Cloud Console for package com.erefill.app.';
+      }
+      if (err.contains('ApiException: 12500') || err.contains('12500:')) {
+        throw 'Google Sign-In failed (ApiException 12500). Check Google Play Services or OAuth consent screen test user status.';
+      }
+      if (err.contains('ApiException: 7') || err.contains('network_error')) {
+        throw 'Google Sign-In network error. Please check your internet connection.';
+      }
+      if (err.contains('cancelled') || err.contains('Google sign-in was cancelled')) {
+        throw 'Google sign-in was cancelled.';
+      }
       throw 'Google sign in failed: $e';
     }
   }
