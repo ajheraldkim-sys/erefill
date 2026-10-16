@@ -778,14 +778,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Order #$shortId',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppUi.textPrimaryOf(context),
+                    Expanded(
+                      child: Text(
+                        'Order #$shortId',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppUi.textPrimaryOf(context),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     OrderStatusBadge(status: status),
                   ],
                 ),
@@ -1882,15 +1887,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 children: [
                                   Row(
                                     children: [
-                                      Text(
-                                        'Order #$shortId',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                          color: AppUi.textPrimaryOf(context),
+                                      Flexible(
+                                        child: Text(
+                                          'Order #$shortId',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 14,
+                                            color: AppUi.textPrimaryOf(context),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: 6),
                                       Text(
                                         '• $date',
                                         style: TextStyle(
@@ -1921,6 +1930,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                       fontSize: 11,
                                       color: AppUi.textSecondaryOf(context),
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -2117,12 +2128,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      u['full_name'] ?? 'Unnamed',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 14,
-                                        color: AppUi.textPrimaryOf(context),
+                                    Flexible(
+                                      child: Text(
+                                        u['full_name'] ?? 'Unnamed',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          color: AppUi.textPrimaryOf(context),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
@@ -2153,6 +2168,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     fontSize: 11,
                                     color: AppUi.textSecondaryOf(context),
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 if (isSuspended)
                                   Text(
