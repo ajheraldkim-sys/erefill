@@ -38,6 +38,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     ('card', 'Credit / debit card'),
   ];
   List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+  double _systemDeliveryRate = 10.0;
 
   @override
   void initState() {
@@ -67,14 +68,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       final profile = results[0];
       final settings = results[1];
 
+      try {
+        final delivCfg = await client.rpc('get_delivery_fee_config');
+        if (delivCfg is Map && delivCfg['rate_per_km'] != null) {
+          _systemDeliveryRate = (delivCfg['rate_per_km'] as num).toDouble();
+        }
+      } catch (_) {}
+
       if (mounted) {
         _stationNameController.text = profile?['station_name'] ?? '';
         _phoneController.text = profile?['phone'] ?? '';
         _emailController.text =
             profile?['email'] ?? currentAuthUser?.email ?? user?.email ?? '';
-        _deliveryFeeController.text =
-            (settings?['base_delivery_fee'] as num?)?.toStringAsFixed(2) ??
-            '25.00';
         _priceController.text =
             (settings?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
             (profile?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
@@ -125,7 +130,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
     try {
       final radius = int.tryParse(_radiusController.text) ?? 5;
-      final baseFee = double.tryParse(_deliveryFeeController.text) ?? 25.0;
       final price = double.tryParse(_priceController.text) ?? 15.0;
       final commission = double.tryParse(_commissionController.text) ?? 0.0;
 
@@ -137,7 +141,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       }, userId: userId);
 
       await _service.updateSettings(userId, {
-        'base_delivery_fee': baseFee,
         'price_per_gallon': price,
         'service_radius_km': radius,
         'enabled_payment_methods': _enabledPaymentMethods,
@@ -313,17 +316,73 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               ),
                             ),
                             AppUi.vGapMd,
-                            AppFormField(
-                              controller: _deliveryFeeController,
-                              label: 'Base Delivery Fee (₱)',
-                              prefixIcon: Icons.local_shipping_outlined,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true,
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppUi.blueSoft,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppUi.bluePrimary.withValues(alpha: 0.25),
+                                ),
                               ),
-                              compact: true,
-                              validator: (value) => _validateNumber(
-                                value,
-                                'Base delivery fee',
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.verified_outlined,
+                                    color: AppUi.bluePrimary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'Delivery Fee Policy',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppUi.bluePrimary,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: const Text(
+                                                'Centralized',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Active delivery rate is ₱${_systemDeliveryRate.toStringAsFixed(2)}/km configured centrally by the Administrator. Station owners cannot modify delivery rates.',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            height: 1.35,
+                                            color: AppUi.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             AppUi.vGapMd,

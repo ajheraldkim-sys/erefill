@@ -99,7 +99,7 @@ VALUES
   ('avatars', 'avatars', true, 5242880, ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp']::text[]),
   ('product_images', 'product_images', true, 5242880, ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp']::text[]),
   ('chat_attachments', 'chat_attachments', false, 10485760, NULL),
-  ('delivery_proofs', 'delivery_proofs', false, 10485760, NULL),
+  ('delivery_proofs', 'delivery_proofs', false, 10485760, ARRAY['image/jpeg', 'image/png']::text[]),
   ('payment_proofs', 'payment_proofs', false, 10485760, NULL)
 ON CONFLICT (id) DO UPDATE SET
   public = EXCLUDED.public,
@@ -142,13 +142,60 @@ CREATE POLICY "Allow users to delete own files" ON storage.objects
   USING (bucket_id = 'chat_attachments');
 
 DROP POLICY IF EXISTS "Public can view delivery proofs" ON storage.objects;
-CREATE POLICY "Public can view delivery proofs" ON storage.objects
-  FOR SELECT USING (bucket_id = 'delivery_proofs');
-
 DROP POLICY IF EXISTS "Riders can upload delivery proofs" ON storage.objects;
-CREATE POLICY "Riders can upload delivery proofs" ON storage.objects
+DROP POLICY IF EXISTS "Authorized users can view delivery proofs" ON storage.objects;
+DROP POLICY IF EXISTS "Assigned riders can upload delivery proofs" ON storage.objects;
+DROP POLICY IF EXISTS "Assigned riders can replace pending delivery proofs" ON storage.objects;
+CREATE POLICY "Authorized users can view delivery proofs" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'delivery_proofs'
+    AND (
+      public.is_admin()
+      OR EXISTS (
+        SELECT 1
+        FROM public.orders o
+        WHERE o.id::text = (storage.foldername(name))[1]
+          AND auth.uid() IN (o.customer_id, o.owner_id, o.assigned_rider_id)
+      )
+    )
+  );
+
+CREATE POLICY "Assigned riders can upload delivery proofs" ON storage.objects
   FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'delivery_proofs');
+  WITH CHECK (
+    bucket_id = 'delivery_proofs'
+    AND EXISTS (
+      SELECT 1
+      FROM public.orders o
+      WHERE o.id::text = (storage.foldername(name))[1]
+        AND o.assigned_rider_id = auth.uid()
+        AND o.status = 'out_for_delivery'
+    )
+  );
+
+CREATE POLICY "Assigned riders can replace pending delivery proofs" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (
+    bucket_id = 'delivery_proofs'
+    AND EXISTS (
+      SELECT 1
+      FROM public.orders o
+      WHERE o.id::text = (storage.foldername(name))[1]
+        AND o.assigned_rider_id = auth.uid()
+        AND o.status = 'out_for_delivery'
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'delivery_proofs'
+    AND EXISTS (
+      SELECT 1
+      FROM public.orders o
+      WHERE o.id::text = (storage.foldername(name))[1]
+        AND o.assigned_rider_id = auth.uid()
+        AND o.status = 'out_for_delivery'
+    )
+  );
 
 DROP POLICY IF EXISTS "Authenticated users can upload payment proofs" ON storage.objects;
 CREATE POLICY "Authenticated users can upload payment proofs" ON storage.objects

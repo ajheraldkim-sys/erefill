@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:signature/signature.dart';
 import 'package:url_launcher/url_launcher.dart' as url;
+import 'package:path_provider/path_provider.dart';
 import 'package:erefill/features/chat/services/chat_service.dart';
 import 'package:erefill/features/chat/models/chat_room.dart';
 import 'package:provider/provider.dart';
@@ -355,7 +356,7 @@ class _RiderDashboardState extends State<RiderDashboard>
         supabase
             .from('orders')
             .select('''
-              id, status, created_at, customer_id, total_amount, items, subtotal, payment_method, payment_status,
+              id, status, created_at, customer_id, total_amount, items, subtotal, delivery_fee, station_name, payment_method, payment_status,
               customer:profiles!orders_customer_id_fkey(full_name, complete_address, phone, barangay, latitude, longitude)
             ''')
             .eq('assigned_rider_id', myId)
@@ -409,12 +410,25 @@ class _RiderDashboardState extends State<RiderDashboard>
       };
       activeResult = activeResult
           .where((order) {
-            return queuedByOrder[order['id']?.toString()]?.status !=
-                'delivered';
+            final queued = queuedByOrder[order['id']?.toString()];
+            return queued == null ||
+                queued.status != 'delivered' ||
+                !hasRequiredDeliveryEvidence(
+                  photoPath: queued.localPhotoPath,
+                  signaturePath: queued.localSignaturePath,
+                );
           })
           .map((order) {
             final queued = queuedByOrder[order['id']?.toString()];
-            return queued == null ? order : {...order, 'status': queued.status};
+            if (queued == null ||
+                (queued.status == 'delivered' &&
+                    !hasRequiredDeliveryEvidence(
+                      photoPath: queued.localPhotoPath,
+                      signaturePath: queued.localSignaturePath,
+                    ))) {
+              return order;
+            }
+            return {...order, 'status': queued.status};
           })
           .toList();
       _pendingOfflineCount = queuedUpdates.length;
@@ -695,8 +709,31 @@ class _RiderDashboardState extends State<RiderDashboard>
 
   Future<void> _confirmDeliveryWithProof(String orderId) async {
     final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppUi.surfaceOf(context),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take delivery photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose delivery photo'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
     final image = await picker.pickImage(
-      source: ImageSource.camera,
+      source: source,
       imageQuality: 70,
       maxWidth: 1000,
     );
@@ -704,10 +741,13 @@ class _RiderDashboardState extends State<RiderDashboard>
     if (image == null) return;
     if (!mounted) return;
 
-    // 1. Optional: Capture Customer Signature
-    String? signaturePath;
+    // A delivery is not complete until the recipient has signed.
     final Uint8List? sigData = await _showSignatureDialog();
     if (!mounted) return;
+    if (sigData == null || sigData.isEmpty) {
+      _showError('A recipient signature is required to complete delivery.');
+      return;
+    }
 
     // 2. Capture Empty Gallons & Note
     var suggestedEmpty = 0;
@@ -725,16 +765,54 @@ class _RiderDashboardState extends State<RiderDashboard>
 
     if (!mounted) return;
 
+    Map<String, dynamic>? orderData;
+    for (final order in _myActiveOrders) {
+      if (order['id']?.toString() == orderId) {
+        orderData = order;
+        break;
+      }
+    }
     final completionSheetResult = await showDeliveryCompletionSheet(
       context,
       suggestedEmptyGallons: suggestedEmpty,
+      orderSummary: orderData,
     );
     if (!mounted) return;
-    final completion =
-        completionSheetResult ??
-        DeliveryCompletionDetails(emptyGallonsReturned: suggestedEmpty);
+    if (completionSheetResult == null) return;
+    final completion = completionSheetResult;
+
+    final timestamp = DateTime.now().microsecondsSinceEpoch;
+    final photoExtension = image.path.split('.').last.toLowerCase();
+    if (!{'jpg', 'jpeg', 'png'}.contains(photoExtension)) {
+      _showError('Choose a JPEG or PNG delivery photo.');
+      return;
+    }
+    late final File localPhoto;
+    late final File localSignature;
+    try {
+      final evidenceDirectory = await getApplicationSupportDirectory();
+      final localDirectory = Directory(
+        '${evidenceDirectory.path}${Platform.pathSeparator}delivery-proof-queue',
+      );
+      await localDirectory.create(recursive: true);
+      localPhoto = await File(image.path).copy(
+        '${localDirectory.path}${Platform.pathSeparator}${orderId}_$timestamp.$photoExtension',
+      );
+      localSignature = File(
+        '${localDirectory.path}${Platform.pathSeparator}${orderId}_$timestamp-signature.png',
+      );
+      await localSignature.writeAsBytes(sigData, flush: true);
+    } catch (error) {
+      if (mounted) {
+        _showError('Could not securely save delivery evidence: $error');
+      }
+      return;
+    }
+    String? photoPath;
+    String? signaturePath;
 
     // 3. Show non-dismissible progress indicator during upload and verification
+    if (!mounted) return;
     var progressShown = true;
     showDialog(
       context: context,
@@ -742,7 +820,7 @@ class _RiderDashboardState extends State<RiderDashboard>
       builder: (ctx) => PopScope(
         canPop: false,
         child: Dialog(
-          backgroundColor: AppUi.surfaceOf(context),
+          backgroundColor: AppUi.surfaceOf(ctx),
           shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -759,7 +837,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                   'Finalizing delivery...',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: AppUi.textPrimaryOf(context),
+                    color: AppUi.textPrimaryOf(ctx),
                   ),
                 ),
               ],
@@ -774,25 +852,26 @@ class _RiderDashboardState extends State<RiderDashboard>
       final position = await _locationService.getCurrentPosition();
 
       // 5. Upload Photo Proof
-      final file = File(image.path);
-      if (!file.existsSync()) {
+      if (!localPhoto.existsSync() || !localSignature.existsSync()) {
         throw StateError('The delivery photo is no longer available.');
       }
-      final fileName =
-          '${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final photoPath = 'proofs/$orderId/$fileName';
-      await supabase.storage.from('delivery_proofs').upload(photoPath, file);
-
-      // 6. Upload Signature Proof (if captured)
-      if (sigData != null) {
-        final sigName =
-            'sig_${orderId}_${DateTime.now().millisecondsSinceEpoch}.png';
-        final sigPath = 'proofs/$orderId/$sigName';
-        await supabase.storage
-            .from('delivery_proofs')
-            .uploadBinary(sigPath, sigData);
-        signaturePath = sigPath;
+      if (await localPhoto.length() > 10 * 1024 * 1024 ||
+          await localSignature.length() > 10 * 1024 * 1024) {
+        throw StateError('Delivery evidence must be smaller than 10 MB.');
       }
+      final contentType = photoExtension == 'png' ? 'image/png' : 'image/jpeg';
+      photoPath = '$orderId/proof_$timestamp.$photoExtension';
+      signaturePath = '$orderId/signature_$timestamp.png';
+      await supabase.storage.from('delivery_proofs').upload(
+        photoPath,
+        localPhoto,
+        fileOptions: FileOptions(contentType: contentType, upsert: true),
+      );
+      await supabase.storage.from('delivery_proofs').upload(
+        signaturePath,
+        localSignature,
+        fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
+      );
 
       // 7. Completion must be confirmed by the proof-aware server RPC.
       final response = await supabase.rpc(
@@ -829,6 +908,7 @@ class _RiderDashboardState extends State<RiderDashboard>
       if (mounted) {
         _showSuccess('Delivery verified and completed.');
       }
+      await _removeLocalDeliveryProof(localPhoto, localSignature);
     } catch (e) {
       if (mounted && progressShown) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -841,6 +921,7 @@ class _RiderDashboardState extends State<RiderDashboard>
             'Could not verify delivery completion: ${e.toString().replaceFirst('Exception: ', '')}',
           );
         }
+        await _removeLocalDeliveryProof(localPhoto, localSignature);
         return;
       }
       try {
@@ -848,7 +929,8 @@ class _RiderDashboardState extends State<RiderDashboard>
           QueuedDelivery(
             orderId: orderId,
             status: 'delivered',
-            localPhotoPath: image.path,
+            localPhotoPath: localPhoto.path,
+            localSignaturePath: localSignature.path,
             deliveryNote: completion.deliveryNote,
             emptyGallonsReturned: completion.emptyGallonsReturned,
           ),
@@ -872,6 +954,16 @@ class _RiderDashboardState extends State<RiderDashboard>
       }
     } finally {
       await _loadRiderData();
+    }
+  }
+
+  Future<void> _removeLocalDeliveryProof(File photo, File signature) async {
+    for (final file in [photo, signature]) {
+      try {
+        if (await file.exists()) await file.delete();
+      } catch (error) {
+        debugPrint('Could not remove temporary delivery evidence: $error');
+      }
     }
   }
 
@@ -902,12 +994,10 @@ class _RiderDashboardState extends State<RiderDashboard>
                   'Customer Signature',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                TextButton(
+                IconButton(
+                  tooltip: 'Cancel signature',
                   onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Skip / No Sig',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
@@ -951,10 +1041,16 @@ class _RiderDashboardState extends State<RiderDashboard>
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      if (controller.isNotEmpty) {
-                        final data = await controller.toPngBytes();
-                        if (context.mounted) Navigator.pop(context, data);
+                      if (controller.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('The recipient signature is required.'),
+                          ),
+                        );
+                        return;
                       }
+                      final data = await controller.toPngBytes();
+                      if (context.mounted) Navigator.pop(context, data);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppUi.bluePrimary,

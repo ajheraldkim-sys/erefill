@@ -41,7 +41,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   int _waterOptionsLoadGeneration = 0;
   int _quantity = 1;
   double? _pricePerGallon;
-  double? _baseDeliveryFee;
   String? _waterType;
   bool _isFav = false;
   bool _isPlacingOrder = false;
@@ -74,7 +73,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       _ratingCounts = cached.ratingCounts;
       _reviews = cached.reviews;
       _pricePerGallon = cached.pricePerGallon;
-      _baseDeliveryFee = cached.baseDeliveryFee;
       _waterType = cached.waterType;
       if (cached.profileData != null) {
         _stationData = {..._stationData, ...cached.profileData!};
@@ -86,8 +84,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       _pricePerGallon = (_stationData['price_per_gallon'] as num?)?.toDouble() ??
           StationPriceHelpers.priceForStation(_stationData);
       _waterType = _stationData['primary_water_type']?.toString();
-      _baseDeliveryFee =
-          (_stationData['base_delivery_fee'] as num?)?.toDouble() ?? 25.0;
       if (ownerId != null) _resolveSelectedProduct(ownerId);
       // Immediately allow instant user interaction with display fallback product (0ms)
       _isLoadingPurified = false;
@@ -311,7 +307,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     setState(() {
       _isLoadingPurified = false;
       _pricePerGallon = bundle.pricePerGallon;
-      _baseDeliveryFee = bundle.baseDeliveryFee;
       _waterType = bundle.waterType;
       _ratingCounts = bundle.ratingCounts;
       _reviews = bundle.reviews;
@@ -1152,11 +1147,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
           ],
 
           // Delivery Fee
-          Text(
-            _baseDeliveryFee != null && _baseDeliveryFee! > 0
-                ? '₱${_baseDeliveryFee!.toStringAsFixed(0)} delivery'
-                : 'Free delivery',
-            style: const TextStyle(
+          const Text(
+            'Distance-based delivery',
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppUi.bluePrimary,

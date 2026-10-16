@@ -74,6 +74,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
   // Payment methods
   List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+  double _systemDeliveryRate = 10.0;
 
   final Map<String, List<String>> _municipalityData =
       AppConstants.municipalityData;
@@ -298,10 +299,18 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
       final profile = await profileFuture;
       final settings = await settingsFuture;
+      Map<String, dynamic>? delivCfg;
+      try {
+        final res = await supabase.rpc('get_delivery_fee_config');
+        if (res is Map) delivCfg = Map<String, dynamic>.from(res);
+      } catch (_) {}
 
       if (!mounted) return;
 
       setState(() {
+        if (delivCfg != null && delivCfg['rate_per_km'] != null) {
+          _systemDeliveryRate = (delivCfg['rate_per_km'] as num).toDouble();
+        }
         if (profile != null) {
           _avatarUrl = profile['avatar_url'] ?? '';
           _coverPhotoUrl = profile['station_photo_url'] ?? '';
@@ -995,17 +1004,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     if (user == null) return false;
 
     final price = double.tryParse(_priceController.text.trim());
-    final fee = double.tryParse(_deliveryFeeController.text.trim());
     final commission =
         double.tryParse(_commissionController.text.trim()) ?? 0.0;
     final radius = int.tryParse(_radiusController.text.trim());
 
     if (price == null || price < 0) {
       _showMessage('Please enter a valid price per gallon.', isError: true);
-      return false;
-    }
-    if (fee == null || fee < 0) {
-      _showMessage('Please enter a valid delivery fee.', isError: true);
       return false;
     }
     if (radius == null || radius <= 0) {
@@ -1017,7 +1021,6 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     try {
       await _ownerSettingsService.updateSettings(user.id, {
         'price_per_gallon': price,
-        'base_delivery_fee': fee,
         'service_radius_km': radius,
       });
 
@@ -1153,12 +1156,72 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           compact: true,
         ),
         AppUi.vGapMd,
-        AppFormField(
-          label: 'Base Delivery Fee (₱)',
-          controller: _deliveryFeeController,
-          prefixIcon: Icons.local_shipping_outlined,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          compact: true,
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppUi.blueSoft,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppUi.bluePrimary.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.verified_outlined,
+                color: AppUi.bluePrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Delivery Fee Policy',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppUi.bluePrimary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Centralized',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Active delivery rate is ₱${_systemDeliveryRate.toStringAsFixed(2)}/km (Admin-Controlled). Delivery fees are calculated automatically by the system based on customer distance.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppUi.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         AppUi.vGapLg,
         const AppFormSectionHeader(

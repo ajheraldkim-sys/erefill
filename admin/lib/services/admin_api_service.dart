@@ -308,6 +308,162 @@ class AdminApiService {
     }
   }
 
+  // --- Centralized Delivery Fee Management ---
+
+  Future<Map<String, dynamic>> getDeliveryFeeConfig() async {
+    try {
+      final result = await _client.rpc('admin_get_delivery_fee_config');
+      final map = _asMap(result);
+      if (map.isNotEmpty) return map;
+    } catch (_) {}
+
+    try {
+      final result = await _client.rpc('get_delivery_fee_config');
+      final map = _asMap(result);
+      if (map.isNotEmpty) return map;
+    } catch (_) {}
+
+    try {
+      final row = await _client
+          .from('system_config')
+          .select('value, updated_at, updated_by')
+          .eq('key', 'delivery_fee_config')
+          .maybeSingle();
+      if (row != null && row['value'] != null) {
+        final val = row['value'];
+        Map<String, dynamic> parsed;
+        if (val is Map) {
+          parsed = Map<String, dynamic>.from(val);
+        } else if (val is String) {
+          parsed = Map<String, dynamic>.from(jsonDecode(val));
+        } else {
+          parsed = {};
+        }
+        parsed['updated_at'] ??= row['updated_at'];
+        parsed['updated_by'] ??= row['updated_by'];
+        return parsed;
+      }
+    } catch (_) {}
+
+    return {
+      'rate_per_km': 10.0,
+      'minimum_fee': 20.0,
+      'min_billable_distance_km': 1.0,
+      'rounding_rule': 'exact',
+      'enabled': true,
+    };
+  }
+
+  Future<Map<String, dynamic>> setDeliveryFeeConfig({
+    required double ratePerKm,
+    required double minimumFee,
+    required double minBillableDistanceKm,
+    required String roundingRule,
+    required bool enabled,
+    String? reason,
+  }) async {
+    try {
+      final result = await _client.rpc(
+        'admin_set_delivery_fee_config',
+        params: {
+          'p_rate_per_km': ratePerKm,
+          'p_minimum_fee': minimumFee,
+          'p_min_billable_distance_km': minBillableDistanceKm,
+          'p_rounding_rule': roundingRule,
+          'p_enabled': enabled,
+          'p_reason': reason,
+        },
+      );
+      final map = _asMap(result);
+      if (map.isNotEmpty) return map;
+    } catch (_) {}
+
+    final user = _client.auth.currentUser;
+    final payload = {
+      'rate_per_km': ratePerKm,
+      'minimum_fee': minimumFee,
+      'min_billable_distance_km': minBillableDistanceKm,
+      'rounding_rule': roundingRule,
+      'enabled': enabled,
+      'reason': reason,
+      'updated_at': DateTime.now().toIso8601String(),
+      'updated_by': user?.id,
+      'updated_by_email': user?.email,
+    };
+    try {
+      await _client.from('system_config').upsert({
+        'key': 'delivery_fee_config',
+        'value': payload,
+        'updated_at': DateTime.now().toIso8601String(),
+        'updated_by': user?.id,
+      });
+      if (user?.id != null) {
+        await _client.from('audit_logs').insert({
+          'user_id': user!.id,
+          'action': 'set_delivery_fee_config',
+          'entity_type': 'config',
+          'entity_id': 'delivery_fee_config',
+          'details': payload,
+        });
+      }
+    } catch (e) {
+      debugPrint('setDeliveryFeeConfig fallback error: $e');
+    }
+    return payload;
+  }
+
+  Future<List<Map<String, dynamic>>> getDeliveryFeeHistory({int limit = 20}) async {
+    try {
+      final result = await _client.rpc(
+        'admin_get_delivery_fee_history',
+        params: {'p_limit': limit},
+      );
+      if (result is List) {
+        return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+
+    try {
+      final rows = await _client
+          .from('audit_logs')
+          .select('id, user_id, details, created_at')
+          .eq('action', 'set_delivery_fee_config')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (e) {
+      debugPrint('getDeliveryFeeHistory fallback error: $e');
+      return [];
+    }
+  }
+
+  Future<double> previewDeliveryFee(double distanceKm) async {
+    try {
+      final result = await _client.rpc(
+        'calculate_delivery_fee',
+        params: {'p_distance_km': distanceKm},
+      );
+      return safeDouble(result);
+    } catch (_) {
+      final cfg = await getDeliveryFeeConfig();
+      final enabled = cfg['enabled'] != false;
+      if (!enabled) return 0.0;
+      final rate = safeDouble(cfg['rate_per_km'], fallback: 10.0);
+      final minFee = safeDouble(cfg['minimum_fee'], fallback: 20.0);
+      final minDist = safeDouble(cfg['min_billable_distance_km'], fallback: 1.0);
+      final rule = (cfg['rounding_rule'] ?? 'exact').toString();
+      double dist = distanceKm < minDist ? minDist : distanceKm;
+      if (rule == 'ceil') {
+        dist = dist.ceilToDouble();
+      } else if (rule == 'round') {
+        dist = dist.roundToDouble();
+      }
+      double fee = dist * rate;
+      if (minFee > 0 && fee < minFee) fee = minFee;
+      return double.parse(fee.toStringAsFixed(2));
+    }
+  }
+
   // --- Regions, Stations & Orders ---
 
   Future<List<Map<String, dynamic>>> listRegions() async {

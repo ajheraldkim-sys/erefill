@@ -14,6 +14,7 @@ import 'models/chat_room.dart';
 import 'models/quick_reply.dart';
 import 'services/chat_service.dart';
 import 'utils/chat_identity_resolver.dart';
+import 'widgets/delivery_receipt_message.dart';
 import '../../core/services/notification_service.dart';
 
 /// Enhanced ChatScreen with room-based architecture
@@ -797,6 +798,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildSystemMessage(Message msg) {
+    final receipt = msg.metadata['delivery_receipt'];
+    if (receipt is Map) {
+      return DeliveryReceiptMessage(
+        snapshot: Map<String, dynamic>.from(receipt),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
       alignment: Alignment.center,

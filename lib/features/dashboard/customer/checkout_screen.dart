@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -56,7 +57,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _customerProfile;
   List<Map<String, dynamic>> _savedAddresses = [];
   String? _selectedAddressId;
-  double _deliveryFee = 25.0;
+  double _deliveryFee = 20.0;
+  double _deliveryDistanceKm = 1.0;
+  double _deliveryRatePerKm = 10.0;
+  double _deliveryMinFee = 20.0;
+  double _deliveryMinDistance = 1.0;
+  String _deliveryRoundingRule = 'exact';
+  bool _deliveryFeeEnabled = true;
+  Map<String, dynamic>? _deliveryFeeConfig;
+  double? _stationLat;
+  double? _stationLng;
+  RealtimeChannel? _configRealtimeChannel;
   Map<String, dynamic>? _platformFeeConfig;
   String? _pricingSetupError;
   String? _paymentMethodsError;
@@ -72,11 +83,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    _stationLat = (widget.station['latitude'] as num?)?.toDouble() ??
+        (widget.station['lat'] as num?)?.toDouble();
+    _stationLng = (widget.station['longitude'] as num?)?.toDouble() ??
+        (widget.station['lng'] as num?)?.toDouble();
+    _setupConfigRealtimeChannel();
     _loadInitialData();
+  }
+
+  void _setupConfigRealtimeChannel() {
+    try {
+      _configRealtimeChannel = supabase
+          .channel('public:checkout_system_config')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'system_config',
+            callback: (payload) {
+              final key = payload.newRecord['key'] ?? payload.oldRecord['key'];
+              if (key == 'delivery_fee_config') {
+                _loadStationSettings();
+              } else if (key == 'platform_fee') {
+                _loadPlatformFeeConfig();
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Realtime config channel subscription failed: $e');
+    }
   }
 
   @override
   void dispose() {
+    final channel = _configRealtimeChannel;
+    if (channel != null) {
+      supabase.removeChannel(channel);
+    }
     _notesController.dispose();
     super.dispose();
   }
@@ -145,21 +188,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw StateError('Station ID is missing.');
       }
 
-      final settings = await supabase
-          .from('owner_settings')
-          .select('base_delivery_fee')
-          .eq('owner_id', ownerId)
-          .maybeSingle();
+      // Ensure station coordinates are available
+      if (_stationLat == null || _stationLng == null) {
+        final stationProfile = await supabase
+            .from('profiles')
+            .select('latitude, longitude')
+            .eq('id', ownerId)
+            .maybeSingle();
+        if (stationProfile != null) {
+          _stationLat = (stationProfile['latitude'] as num?)?.toDouble();
+          _stationLng = (stationProfile['longitude'] as num?)?.toDouble();
+        }
+      }
+
+      final cfg = await supabase.rpc('get_delivery_fee_config');
+      if (cfg is! Map) {
+        throw StateError('Delivery fee configuration was invalid.');
+      }
 
       if (mounted) {
         setState(() {
-          _deliveryFee =
-              (settings?['base_delivery_fee'] as num?)?.toDouble() ?? 0;
+          _deliveryFeeConfig = Map<String, dynamic>.from(cfg);
+          _deliveryFeeEnabled = _deliveryFeeConfig?['enabled'] != false;
+          _deliveryRatePerKm =
+              (_deliveryFeeConfig?['rate_per_km'] as num?)?.toDouble() ?? 10.0;
+          _deliveryMinFee =
+              (_deliveryFeeConfig?['minimum_fee'] as num?)?.toDouble() ?? 20.0;
+          _deliveryMinDistance =
+              (_deliveryFeeConfig?['min_billable_distance_km'] as num?)?.toDouble() ?? 1.0;
+          _deliveryRoundingRule =
+              (_deliveryFeeConfig?['rounding_rule'] ?? 'exact').toString();
           _stationSettingsLoaded = true;
         });
+        _recalculateDeliveryFee();
       }
     } catch (e) {
-      debugPrint('Error loading station settings: $e');
+      debugPrint('Error loading delivery fee settings: $e');
       if (mounted) {
         setState(() {
           _stationSettingsLoaded = false;
@@ -167,6 +231,53 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               'Delivery fees could not be verified. Retry before placing your order.';
         });
       }
+    }
+  }
+
+  void _recalculateDeliveryFee() {
+    final customerLat = (_customerProfile?['latitude'] as num?)?.toDouble();
+    final customerLng = (_customerProfile?['longitude'] as num?)?.toDouble();
+    final stationLat = _stationLat ??
+        (widget.station['latitude'] as num?)?.toDouble() ??
+        (widget.station['lat'] as num?)?.toDouble();
+    final stationLng = _stationLng ??
+        (widget.station['longitude'] as num?)?.toDouble() ??
+        (widget.station['lng'] as num?)?.toDouble();
+
+    double distance = _deliveryDistanceKm;
+    if (customerLat != null &&
+        customerLng != null &&
+        stationLat != null &&
+        stationLng != null &&
+        customerLat != 0 &&
+        customerLng != 0 &&
+        stationLat != 0 &&
+        stationLng != 0) {
+      final meters = Geolocator.distanceBetween(
+        stationLat,
+        stationLng,
+        customerLat,
+        customerLng,
+      );
+      distance = meters / 1000.0;
+      distance = (distance * 100).roundToDouble() / 100.0;
+      if (distance < 0.1) distance = 0.1;
+    }
+
+    final calculated = CheckoutRules.calculateDeliveryFee(
+      distanceKm: distance,
+      enabled: _deliveryFeeEnabled,
+      ratePerKm: _deliveryRatePerKm,
+      minimumFee: _deliveryMinFee,
+      minBillableDistanceKm: _deliveryMinDistance,
+      roundingRule: _deliveryRoundingRule,
+    );
+
+    if (mounted) {
+      setState(() {
+        _deliveryDistanceKm = distance;
+        _deliveryFee = calculated;
+      });
     }
   }
 
@@ -398,6 +509,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _customerProfile?['landmark']?.toString() ?? '';
         }
       });
+      _recalculateDeliveryFee();
       await _refreshStationAvailability();
     } catch (e) {
       debugPrint('Error loading customer location: $e');
@@ -492,9 +604,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }
         } else {
           _stationAvailabilityMessage = null;
+          if (availability['distance'] is num) {
+            _deliveryDistanceKm = (availability['distance'] as num).toDouble();
+          }
         }
         _checkingStationAvailability = false;
       });
+      _recalculateDeliveryFee();
     } catch (e) {
       debugPrint('Station availability check failed: $e');
       if (!mounted || requestId != _availabilityRequestId) return;
@@ -743,6 +859,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'voucher_id': _appliedVoucher?.id,
         'subtotal': cart.totalAmount,
         'delivery_fee': _deliveryFee,
+        'delivery_distance_km': _deliveryDistanceKm,
+        'delivery_rate_per_km': _deliveryRatePerKm,
         'total_amount': totalAmount,
         'payment_method': paymentMethod,
         'payment_proof_url': null,
@@ -2155,16 +2273,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             '\u20B1${cart.totalAmount.toStringAsFixed(2)}',
           ),
           const SizedBox(height: 10),
+          _summaryRow(
+            context,
+            'Delivery distance',
+            '${_deliveryDistanceKm.toStringAsFixed(1)} km',
+          ),
+          const SizedBox(height: 10),
+          _summaryRow(
+            context,
+            'Delivery rate',
+            '\u20B1${_deliveryRatePerKm.toStringAsFixed(2)}/km',
+          ),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Delivery fee',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: AppUi.textSecondaryOf(context),
-                  fontWeight: FontWeight.w500,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Delivery fee',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: AppUi.textSecondaryOf(context),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  GestureDetector(
+                    onTap: () => _showDeliveryFeeInfoDialog(context),
+                    child: const Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: AppUi.textMuted,
+                    ),
+                  ),
+                ],
               ),
               isFreeDelivery
                   ? const Text(
@@ -2501,6 +2645,96 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  void _showDeliveryFeeInfoDialog(BuildContext context) {
+    final dist = _deliveryDistanceKm;
+    final rate = _deliveryRatePerKm;
+    final minFee = _deliveryMinFee;
+    final rounding = _deliveryRoundingRule;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(
+              Icons.local_shipping_outlined,
+              color: AppUi.bluePrimary,
+              size: 20,
+            ),
+            SizedBox(width: 8),
+            Text('Delivery Fee Breakdown', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Delivery rates are managed centrally by the Administrator across all stations for fair and transparent pricing.',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppUi.blueSoft,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• Route Distance: ${dist.toStringAsFixed(2)} km',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    '• Centralized Rate: ₱${rate.toStringAsFixed(2)} / km',
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                  if (minFee > 0)
+                    Text(
+                      '• Minimum Delivery Fee: ₱${minFee.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  if (rounding == 'ceil')
+                    const Text(
+                      '• Rounding Rule: Round up to next whole km',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    )
+                  else if (rounding == 'round')
+                    const Text(
+                      '• Rounding Rule: Round to nearest whole km',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    )
+                  else
+                    const Text(
+                      '• Calculation: Exact proportional distance',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  const Divider(height: 16),
+                  Text(
+                    'Final Delivery Fee: ₱${_deliveryFee.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.bluePrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showServiceFeeInfoDialog(BuildContext context) {
     showDialog<void>(
       context: context,
@@ -2595,6 +2829,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _customerProfile = deliveryProfile;
       _checkoutHint = null;
     });
+    _recalculateDeliveryFee();
     _refreshStationAvailability();
   }
 }

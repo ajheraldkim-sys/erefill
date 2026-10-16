@@ -34,17 +34,33 @@ class ReceiptService {
     required Map<String, dynamic> order,
     List<Map<String, dynamic>> items = const [],
     Map<String, dynamic>? station,
+    Map<String, dynamic>? deliveryReceipt,
+    Uint8List? deliveryPhoto,
+    Uint8List? recipientSignature,
   }) async {
     final pdf = pw.Document();
 
     final orderId = (order['id'] ?? '').toString();
     final shortId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
-    final createdAt = _formatDate(order['created_at']);
-    final status = (order['status'] ?? 'pending').toString().toUpperCase();
+    final createdAt = _formatDate(
+      deliveryReceipt?['delivered_at'] ?? order['created_at'],
+    );
+    final status =
+        (deliveryReceipt?['delivery_status'] ?? order['status'] ?? 'pending')
+            .toString()
+            .toUpperCase();
+    final receiptNumber =
+        deliveryReceipt?['receipt_number']?.toString() ?? shortId;
+    final riderName = deliveryReceipt?['rider_name']?.toString();
 
     // Customer snapshot
     final customerName = (order['customer_name'] ?? order['customer']?['full_name'] ?? 'Customer').toString();
-    final customerAddress = (order['customer_address'] ?? order['address'] ?? 'Delivery Address').toString();
+    final customerAddress =
+        (deliveryReceipt?['delivery_address'] ??
+                order['customer_address'] ??
+                order['address'] ??
+                'Delivery Address')
+            .toString();
     final customerPhone = (order['customer_phone'] ?? order['phone'] ?? '').toString();
     final barangay = (order['customer_barangay'] ?? '').toString();
 
@@ -138,7 +154,7 @@ class ReceiptService {
                           ),
                         ),
                         pw.Text(
-                          '#$shortId',
+                          '#$receiptNumber',
                           style: pw.TextStyle(
                             fontSize: 11,
                             fontWeight: pw.FontWeight.bold,
@@ -153,6 +169,42 @@ class ReceiptService {
               pw.SizedBox(height: 20),
               pw.Divider(color: PdfColors.grey300, thickness: 1),
               pw.SizedBox(height: 12),
+
+              if (deliveryReceipt != null) ...[
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#F0FDF4'),
+                    border: pw.Border.all(color: PdfColor.fromHex('#BBF7D0')),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'DELIVERY COMPLETED',
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColor.fromHex('#166534'),
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Delivered at: $createdAt',
+                        style: const pw.TextStyle(fontSize: 9),
+                      ),
+                      if (riderName != null && riderName.isNotEmpty)
+                        pw.Text(
+                          'Rider: $riderName',
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 12),
+              ],
 
               // Station & Customer Details
               pw.Row(
@@ -402,6 +454,46 @@ class ReceiptService {
                             ),
                           ],
                         ),
+                        if (deliveryReceipt != null) ...[
+                          pw.SizedBox(height: 8),
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text(
+                                'Amount Paid:',
+                                style: const pw.TextStyle(
+                                  fontSize: 10,
+                                  color: PdfColors.grey700,
+                                ),
+                              ),
+                              pw.Text(
+                                'PHP ${((deliveryReceipt['amount_paid'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                                style: const pw.TextStyle(fontSize: 10),
+                              ),
+                            ],
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text(
+                                'Outstanding Balance:',
+                                style: const pw.TextStyle(
+                                  fontSize: 10,
+                                  color: PdfColors.grey700,
+                                ),
+                              ),
+                              pw.Text(
+                                'PHP ${((deliveryReceipt['outstanding_balance'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                                style: pw.TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.amber800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -445,6 +537,77 @@ class ReceiptService {
         },
       ),
     );
+
+    if (deliveryPhoto != null || recipientSignature != null) {
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'Delivery Evidence',
+                style: pw.TextStyle(
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColor.fromHex('#1E3A8A'),
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Receipt $receiptNumber | Order #$shortId',
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
+              ),
+              pw.SizedBox(height: 18),
+              if (deliveryPhoto != null) ...[
+                pw.Text(
+                  'Delivery Photo',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  height: 330,
+                  width: double.infinity,
+                  alignment: pw.Alignment.center,
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey300),
+                  ),
+                  child: pw.Image(
+                    pw.MemoryImage(deliveryPhoto),
+                    fit: pw.BoxFit.contain,
+                  ),
+                ),
+                pw.SizedBox(height: 18),
+              ],
+              if (recipientSignature != null) ...[
+                pw.Text(
+                  'Recipient Signature',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  height: 120,
+                  width: double.infinity,
+                  alignment: pw.Alignment.centerLeft,
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey300),
+                  ),
+                  child: pw.Image(
+                    pw.MemoryImage(recipientSignature),
+                    fit: pw.BoxFit.contain,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
 
     return pdf.save();
   }

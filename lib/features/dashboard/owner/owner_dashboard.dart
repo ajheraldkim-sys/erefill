@@ -174,9 +174,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         _hasOrderableProduct = (productResponse as List).isNotEmpty;
       });
 
-      if (_baseDeliveryFee > 0 &&
-          _pricePerGallon > 0 &&
-          !_hasOrderableProduct) {
+      if (_pricePerGallon > 0 && !_hasOrderableProduct) {
         try {
           final syncedProduct = await supabase.rpc(
             'sync_owner_default_product',
@@ -236,7 +234,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       (ownerProfile?['barangay']?.toString().trim().isNotEmpty ?? false);
 
   bool get _stationHasPricing =>
-      _baseDeliveryFee > 0 && _pricePerGallon > 0 && _hasOrderableProduct;
+      _pricePerGallon > 0 && _hasOrderableProduct;
 
   bool get _stationSetupReady =>
       _stationHasName &&

@@ -256,10 +256,11 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
-                      controller: _deliveryFee,
-                      keyboardType: TextInputType.number,
+                      initialValue: 'Centralized Rate',
+                      readOnly: true,
                       decoration: const InputDecoration(
-                        labelText: 'Base Delivery Fee (₱)',
+                        labelText: 'Delivery Fee',
+                        helperText: 'Admin-Controlled Rate/km',
                         isDense: true,
                         border: OutlineInputBorder(),
                       ),

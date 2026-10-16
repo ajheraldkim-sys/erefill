@@ -397,9 +397,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       _profile['station_description']?.toString() ?? '—',
                     ),
                     const Divider(height: 20),
-                    AdminDetailRow(
-                      'Base Delivery Fee',
-                      formatPeso(_settings['base_delivery_fee']),
+                    const AdminDetailRow(
+                      'Delivery Fee Policy',
+                      'Centralized Rate per km',
                     ),
                     AdminDetailRow(
                       'Price per Gallon',
@@ -1118,7 +1118,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
   late TextEditingController _address;
   late TextEditingController _lat;
   late TextEditingController _lng;
-  late TextEditingController _deliveryFee;
   late TextEditingController _pricePerGallon;
   late TextEditingController _radius;
   late TextEditingController _maxOrders;
@@ -1151,9 +1150,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
     );
     _lat = TextEditingController(text: p['latitude']?.toString() ?? '');
     _lng = TextEditingController(text: p['longitude']?.toString() ?? '');
-    _deliveryFee = TextEditingController(
-      text: s['base_delivery_fee']?.toString() ?? '',
-    );
     _pricePerGallon = TextEditingController(
       text: s['price_per_gallon']?.toString() ?? '',
     );
@@ -1176,7 +1172,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
     _address.dispose();
     _lat.dispose();
     _lng.dispose();
-    _deliveryFee.dispose();
     _pricePerGallon.dispose();
     _radius.dispose();
     _maxOrders.dispose();
@@ -1218,7 +1213,7 @@ class _StationEditDialogState extends State<_StationEditDialog> {
         completeAddress: _address.text.trim(),
         latitude: _parseDouble(_lat.text),
         longitude: _parseDouble(_lng.text),
-        baseDeliveryFee: _parseDouble(_deliveryFee.text),
+        baseDeliveryFee: null,
         pricePerGallon: _parseDouble(_pricePerGallon.text),
         serviceRadiusKm: _parseDouble(_radius.text),
         maxConcurrentOrders: _parseInt(_maxOrders.text),
@@ -1357,13 +1352,12 @@ class _StationEditDialogState extends State<_StationEditDialog> {
           ),
           AppUi.vGapMd,
           fieldPair(
-            AdminTextField(
-              controller: _deliveryFee,
-              label: 'Base delivery fee (₱)',
+            const AdminTextField(
+              initialValue: 'Centralized Rate',
+              label: 'Delivery fee policy',
               icon: LucideIcons.truck,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+              readOnly: true,
+              hint: 'Admin-controlled rate per km applied system-wide',
             ),
             AdminTextField(
               controller: _pricePerGallon,

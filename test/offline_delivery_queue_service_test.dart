@@ -22,6 +22,7 @@ void main() {
             orderId: 'order-1',
             status: 'delivered',
             localPhotoPath: r'C:\proofs\delivery.jpg',
+            localSignaturePath: r'C:\proofs\signature.png',
             deliveryNote: 'Left at the door',
             createdAt: createdAt,
           ),
@@ -38,6 +39,10 @@ void main() {
 
         expect(pending, hasLength(1));
         expect(pending.single.localPhotoPath, r'C:\proofs\delivery.jpg');
+        expect(
+          pending.single.localSignaturePath,
+          r'C:\proofs\signature.png',
+        );
         expect(pending.single.deliveryNote, 'Left at the door');
         expect(pending.single.emptyGallonsReturned, 2);
         expect(pending.single.createdAt, createdAt);

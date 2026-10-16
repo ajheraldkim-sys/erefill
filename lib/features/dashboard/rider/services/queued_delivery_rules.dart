@@ -14,3 +14,12 @@ bool isRetryableNetworkError(Object error) {
       message.contains('failed host lookup') ||
       message.contains('clientexception');
 }
+
+bool hasRequiredDeliveryEvidence({
+  required String? photoPath,
+  required String? signaturePath,
+}) =>
+    photoPath != null &&
+    photoPath.trim().isNotEmpty &&
+    signaturePath != null &&
+    signaturePath.trim().isNotEmpty;

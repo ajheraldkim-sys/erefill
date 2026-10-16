@@ -18,6 +18,27 @@ void main() {
       );
     });
 
+    test('delivery confirmation requires both photo and signature paths', () {
+      expect(
+        hasRequiredDeliveryEvidence(
+          photoPath: r'C:\proofs\delivery.jpg',
+          signaturePath: r'C:\proofs\signature.png',
+        ),
+        isTrue,
+      );
+      expect(
+        hasRequiredDeliveryEvidence(
+          photoPath: r'C:\proofs\delivery.jpg',
+          signaturePath: null,
+        ),
+        isFalse,
+      );
+      expect(
+        hasRequiredDeliveryEvidence(photoPath: ' ', signaturePath: 'proof.png'),
+        isFalse,
+      );
+    });
+
     test('only likely transport errors are queued for retry', () {
       expect(isRetryableNetworkError(Exception('SocketException')), isTrue);
       expect(isRetryableNetworkError(Exception('request timeout')), isTrue);

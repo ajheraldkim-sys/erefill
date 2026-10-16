@@ -64,7 +64,7 @@ class SignupRoleScreen extends StatelessWidget {
               _premiumRoleCard(
                 context: context,
                 title: 'Station Owner',
-                subtitle: 'Manage delivery fees, riders, and customer orders.',
+                subtitle: 'Manage water products, riders, and customer orders.',
                 icon: Icons.storefront_rounded,
                 color: AppUi.bluePrimary,
                 onTap: () => context.openOwnerSignup(),

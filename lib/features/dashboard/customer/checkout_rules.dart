@@ -147,6 +147,42 @@ class CheckoutRules {
     return methods;
   }
 
+  static double billableDistance({
+    required double distanceKm,
+    required double minBillableDistanceKm,
+    required String roundingRule,
+  }) {
+    double dist = distanceKm < minBillableDistanceKm ? minBillableDistanceKm : distanceKm;
+    final rule = roundingRule.toLowerCase().trim();
+    if (rule == 'ceil' || rule == 'round_up') {
+      dist = dist.ceilToDouble();
+    } else if (rule == 'round' || rule == 'round_nearest') {
+      dist = dist.roundToDouble();
+    }
+    return dist;
+  }
+
+  static double calculateDeliveryFee({
+    required double distanceKm,
+    bool enabled = true,
+    required double ratePerKm,
+    double minimumFee = 0.0,
+    double minBillableDistanceKm = 0.0,
+    String roundingRule = 'exact',
+  }) {
+    if (!enabled || ratePerKm <= 0) return 0.0;
+    final dist = billableDistance(
+      distanceKm: distanceKm,
+      minBillableDistanceKm: minBillableDistanceKm,
+      roundingRule: roundingRule,
+    );
+    double fee = dist * ratePerKm;
+    if (minimumFee > 0 && fee < minimumFee) {
+      fee = minimumFee;
+    }
+    return double.parse(fee.toStringAsFixed(2));
+  }
+
   static double calculatePlatformFee({
     required double subtotal,
     required double deliveryFee,

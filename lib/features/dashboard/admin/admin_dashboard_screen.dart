@@ -55,6 +55,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   String? _systemConfigError;
   int _settingsSubTab = 0;
 
+  // Centralized Delivery Fee States
+  bool _deliveryFeeEnabled = true;
+  double _deliveryRatePerKm = 10.0;
+  double _deliveryMinFee = 20.0;
+  double _deliveryMinDistance = 1.0;
+  String _deliveryRoundingRule = 'exact';
+  String? _deliveryFeeUpdatedAt;
+  String? _deliveryFeeUpdatedBy;
+  double _simulatedDeliveryDistance = 3.5;
+  bool _savingDeliveryFee = false;
+
   RealtimeChannel? _realtimeChannel;
   Timer? _realtimeDebounce;
   int _unreadNotifications = 0;
@@ -289,11 +300,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       var maintenanceMode = _maintenanceMode;
       var platformFeePercent = _platformFeePercent;
       var platformFeeFixed = _platformFeeFixed;
+      var deliveryFeeEnabled = _deliveryFeeEnabled;
+      var deliveryRatePerKm = _deliveryRatePerKm;
+      var deliveryMinFee = _deliveryMinFee;
+      var deliveryMinDistance = _deliveryMinDistance;
+      var deliveryRoundingRule = _deliveryRoundingRule;
+      String? deliveryFeeUpdatedAt = _deliveryFeeUpdatedAt;
+      String? deliveryFeeUpdatedBy = _deliveryFeeUpdatedBy;
       try {
         final configRes = await supabase
             .from('system_config')
             .select('key, value')
-            .inFilter('key', ['maintenance_mode', 'platform_fee']);
+            .inFilter('key', ['maintenance_mode', 'platform_fee', 'delivery_fee_config']);
         for (final row in configRes) {
           if (row['key'] == 'maintenance_mode') {
             maintenanceConfigFound = true;
@@ -302,6 +320,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             final map = row['value'] as Map;
             platformFeePercent = (map['percent'] as num?)?.toDouble() ?? 5.0;
             platformFeeFixed = (map['fixed'] as num?)?.toDouble() ?? 2.0;
+          } else if (row['key'] == 'delivery_fee_config' && row['value'] is Map) {
+            final map = row['value'] as Map;
+            deliveryFeeEnabled = map['enabled'] != false;
+            deliveryRatePerKm = (map['rate_per_km'] as num?)?.toDouble() ?? 10.0;
+            deliveryMinFee = (map['minimum_fee'] as num?)?.toDouble() ?? 20.0;
+            deliveryMinDistance =
+                (map['min_billable_distance_km'] as num?)?.toDouble() ?? 1.0;
+            deliveryRoundingRule =
+                (map['rounding_rule'] ?? 'exact').toString();
+            deliveryFeeUpdatedAt = map['updated_at']?.toString();
+            deliveryFeeUpdatedBy =
+                map['updated_by_email']?.toString() ?? map['updated_by']?.toString();
           }
         }
         if (!maintenanceConfigFound) {
@@ -334,6 +364,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         _maintenanceMode = maintenanceMode;
         _platformFeePercent = platformFeePercent;
         _platformFeeFixed = platformFeeFixed;
+        _deliveryFeeEnabled = deliveryFeeEnabled;
+        _deliveryRatePerKm = deliveryRatePerKm;
+        _deliveryMinFee = deliveryMinFee;
+        _deliveryMinDistance = deliveryMinDistance;
+        _deliveryRoundingRule = deliveryRoundingRule;
+        _deliveryFeeUpdatedAt = deliveryFeeUpdatedAt;
+        _deliveryFeeUpdatedBy = deliveryFeeUpdatedBy;
         _systemConfigLoaded = true;
         _systemConfigError = systemConfigError;
         _hasFreshMetrics = true;
@@ -1296,6 +1333,81 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         );
       }
     }
+  }
+
+  Future<void> _saveDeliveryFee() async {
+    setState(() => _savingDeliveryFee = true);
+    HapticFeedback.lightImpact();
+    try {
+      final user = supabase.auth.currentUser;
+      final payload = {
+        'rate_per_km': _deliveryRatePerKm,
+        'minimum_fee': _deliveryMinFee,
+        'min_billable_distance_km': _deliveryMinDistance,
+        'rounding_rule': _deliveryRoundingRule,
+        'enabled': _deliveryFeeEnabled,
+        'reason': 'Updated delivery fee configuration from mobile admin',
+        'updated_at': DateTime.now().toIso8601String(),
+        'updated_by': user?.id,
+        'updated_by_email': user?.email,
+      };
+
+      try {
+        await supabase.rpc('admin_set_delivery_fee_config', params: {
+          'p_rate_per_km': _deliveryRatePerKm,
+          'p_minimum_fee': _deliveryMinFee,
+          'p_min_billable_distance_km': _deliveryMinDistance,
+          'p_rounding_rule': _deliveryRoundingRule,
+          'p_enabled': _deliveryFeeEnabled,
+          'p_reason': 'Updated delivery fee from mobile admin',
+        });
+      } catch (_) {
+        await _setSystemConfigValue(
+          'delivery_fee_config',
+          payload,
+          reason: 'Updated delivery fee configuration',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _deliveryFeeUpdatedAt = DateTime.now().toIso8601String();
+          _deliveryFeeUpdatedBy = user?.email ?? 'Admin';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Delivery fee policy saved and synchronized successfully.'),
+            backgroundColor: AppUi.accentGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save delivery fee settings: $e'),
+            backgroundColor: AppUi.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _savingDeliveryFee = false);
+    }
+  }
+
+  double _calculateSimulatedFee(double dist) {
+    if (!_deliveryFeeEnabled) return 0.0;
+    double d = dist < _deliveryMinDistance ? _deliveryMinDistance : dist;
+    if (_deliveryRoundingRule == 'ceil') {
+      d = d.ceilToDouble();
+    } else if (_deliveryRoundingRule == 'round') {
+      d = d.roundToDouble();
+    }
+    double fee = d * _deliveryRatePerKm;
+    if (_deliveryMinFee > 0 && fee < _deliveryMinFee) {
+      fee = _deliveryMinFee;
+    }
+    return double.parse(fee.toStringAsFixed(2));
   }
 
   Future<void> _toggleMaintenanceMode(bool value) async {
@@ -3758,6 +3870,313 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   onPressed: _savePlatformFees,
                   icon: const Icon(Icons.save_rounded, size: 18),
                   label: const Text('Save Service Fee Settings'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppUi.surfaceOf(context),
+            borderRadius: AppUi.radiusLg,
+            border: Border.all(color: AppUi.borderOf(context)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        color: AppUi.bluePrimary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Centralized Delivery Fee',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: AppUi.textPrimaryOf(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppUi.bluePrimary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'Admin Only',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.bluePrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Global rate per kilometer across all stations. Water station owners cannot customize or override delivery rates.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppUi.textSecondaryOf(context),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Enable Distance-Based Delivery Fee',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                ),
+                subtitle: Text(
+                  _deliveryFeeEnabled
+                      ? 'Active. Orders calculate delivery fee per kilometer.'
+                      : 'Disabled. Free delivery applied system-wide (₱0.00).',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
+                value: _deliveryFeeEnabled,
+                activeThumbColor: AppUi.bluePrimary,
+                onChanged: (val) => setState(() => _deliveryFeeEnabled = val),
+              ),
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Rate per Kilometer:',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                  Text(
+                    '₱${_deliveryRatePerKm.toStringAsFixed(1)}/km',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.bluePrimary,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: _deliveryRatePerKm.clamp(1.0, 50.0),
+                min: 1.0,
+                max: 50.0,
+                divisions: 49,
+                activeColor: AppUi.bluePrimary,
+                label: '₱${_deliveryRatePerKm.toStringAsFixed(1)}/km',
+                onChanged: (v) => setState(() => _deliveryRatePerKm = v),
+              ),
+              Wrap(
+                spacing: 6,
+                children: [8.0, 10.0, 12.0, 15.0, 20.0].map((preset) {
+                  final isSel = (_deliveryRatePerKm - preset).abs() < 0.1;
+                  return ChoiceChip(
+                    label: Text('₱${preset.toInt()}/km'),
+                    selected: isSel,
+                    onSelected: (_) =>
+                        setState(() => _deliveryRatePerKm = preset),
+                    selectedColor: AppUi.bluePrimary.withValues(alpha: 0.2),
+                    labelStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                      color: isSel
+                          ? AppUi.bluePrimary
+                          : AppUi.textPrimaryOf(context),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Minimum Delivery Fee:',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                  Text(
+                    _deliveryMinFee > 0
+                        ? '₱${_deliveryMinFee.toStringAsFixed(0)}'
+                        : '₱0 (None)',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.bluePrimary,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: _deliveryMinFee.clamp(0.0, 50.0),
+                min: 0.0,
+                max: 50.0,
+                divisions: 50,
+                activeColor: AppUi.bluePrimary,
+                label: '₱${_deliveryMinFee.toStringAsFixed(0)}',
+                onChanged: (v) => setState(() => _deliveryMinFee = v),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Minimum Billable Distance:',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                  Text(
+                    '${_deliveryMinDistance.toStringAsFixed(1)} km',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.bluePrimary,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: _deliveryMinDistance.clamp(0.5, 5.0),
+                min: 0.5,
+                max: 5.0,
+                divisions: 9,
+                activeColor: AppUi.bluePrimary,
+                label: '${_deliveryMinDistance.toStringAsFixed(1)} km',
+                onChanged: (v) => setState(() => _deliveryMinDistance = v),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Distance Rounding Rule:',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Exact / Proportional'),
+                    selected: _deliveryRoundingRule == 'exact',
+                    onSelected: (_) =>
+                        setState(() => _deliveryRoundingRule = 'exact'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Round Up (Ceil)'),
+                    selected: _deliveryRoundingRule == 'ceil',
+                    onSelected: (_) =>
+                        setState(() => _deliveryRoundingRule = 'ceil'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Round Nearest'),
+                    selected: _deliveryRoundingRule == 'round',
+                    onSelected: (_) =>
+                        setState(() => _deliveryRoundingRule = 'round'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppUi.blueSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppUi.bluePrimary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Test Distance: ${_simulatedDeliveryDistance.toStringAsFixed(1)} km',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppUi.bluePrimary,
+                          ),
+                        ),
+                        Text(
+                          'Fee: ₱${_calculateSimulatedFee(_simulatedDeliveryDistance).toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppUi.bluePrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: _simulatedDeliveryDistance.clamp(0.5, 20.0),
+                      min: 0.5,
+                      max: 20.0,
+                      divisions: 39,
+                      activeColor: AppUi.bluePrimary,
+                      onChanged: (v) =>
+                          setState(() => _simulatedDeliveryDistance = v),
+                    ),
+                    Text(
+                      'Sample calculations at ₱${_deliveryRatePerKm.toStringAsFixed(1)}/km:\n'
+                      '• 1.0 km → ₱${_calculateSimulatedFee(1.0).toStringAsFixed(2)}\n'
+                      '• 2.0 km → ₱${_calculateSimulatedFee(2.0).toStringAsFixed(2)}\n'
+                      '• 3.5 km → ₱${_calculateSimulatedFee(3.5).toStringAsFixed(2)}\n'
+                      '• 5.0 km → ₱${_calculateSimulatedFee(5.0).toStringAsFixed(2)}\n'
+                      '• 10.0 km → ₱${_calculateSimulatedFee(10.0).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.4,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_deliveryFeeUpdatedAt != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'Last updated: ${_deliveryFeeUpdatedAt!.length >= 16 ? _deliveryFeeUpdatedAt!.substring(0, 16) : _deliveryFeeUpdatedAt!} ${_deliveryFeeUpdatedBy != null ? "by $_deliveryFeeUpdatedBy" : ""}',
+                    style:
+                        const TextStyle(fontSize: 11, color: AppUi.textMuted),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppUi.bluePrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _savingDeliveryFee ? null : _saveDeliveryFee,
+                  icon: _savingDeliveryFee
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Save Delivery Fee Settings'),
                 ),
               ),
             ],

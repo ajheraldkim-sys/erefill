@@ -60,6 +60,113 @@ void main() {
         270.75,
       );
     });
+
+    test('calculates centralized delivery fee for standard distance matrix', () {
+      const rate = 10.0;
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 1.0,
+          ratePerKm: rate,
+          minimumFee: 0,
+        ),
+        10.0,
+      );
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 2.0,
+          ratePerKm: rate,
+          minimumFee: 0,
+        ),
+        20.0,
+      );
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 3.5,
+          ratePerKm: rate,
+          minimumFee: 0,
+          roundingRule: 'exact',
+        ),
+        35.0,
+      );
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 5.0,
+          ratePerKm: rate,
+          minimumFee: 0,
+        ),
+        50.0,
+      );
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 10.0,
+          ratePerKm: rate,
+          minimumFee: 0,
+        ),
+        100.0,
+      );
+    });
+
+    test('enforces minimum delivery fee and minimum billable distance', () {
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 0.5,
+          ratePerKm: 10,
+          minimumFee: 25,
+          minBillableDistanceKm: 1.0,
+        ),
+        25.0,
+      );
+
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 0.4,
+          ratePerKm: 15,
+          minimumFee: 10,
+          minBillableDistanceKm: 1.5,
+        ),
+        22.5, // 1.5 km * 15 = 22.50
+      );
+    });
+
+    test('applies ceil and round rounding rules accurately', () {
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 3.2,
+          ratePerKm: 10,
+          roundingRule: 'ceil',
+        ),
+        40.0, // ceil(3.2) = 4 * 10
+      );
+
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 3.4,
+          ratePerKm: 10,
+          roundingRule: 'round',
+        ),
+        30.0, // round(3.4) = 3 * 10
+      );
+
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 3.6,
+          ratePerKm: 10,
+          roundingRule: 'round',
+        ),
+        40.0, // round(3.6) = 4 * 10
+      );
+    });
+
+    test('returns 0 when centralized delivery fee is disabled', () {
+      expect(
+        CheckoutRules.calculateDeliveryFee(
+          distanceKm: 5.0,
+          ratePerKm: 10,
+          enabled: false,
+        ),
+        0.0,
+      );
+    });
   });
 
   group('checkout preflight', () {

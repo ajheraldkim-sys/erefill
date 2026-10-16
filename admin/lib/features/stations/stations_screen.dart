@@ -441,7 +441,7 @@ class _StationsScreenState extends State<StationsScreen> {
                 AdminDetailRow('Phone', _selected!['phone']?.toString() ?? '—'),
                 AdminDetailRow(
                   'Delivery Fee',
-                  formatPeso(_selected!['base_delivery_fee']),
+                  'Centralized Rate',
                 ),
                 AdminDetailRow(
                   'Rate / Gal',
@@ -631,9 +631,9 @@ class _StationsScreenState extends State<StationsScreen> {
                                     color: AppUi.textSecondaryOf(context),
                                   ),
                                 ),
-                                Text(
-                                  formatPeso(s['base_delivery_fee']),
-                                  style: const TextStyle(
+                                const Text(
+                                  'Centralized',
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -788,7 +788,7 @@ class _StationsScreenState extends State<StationsScreen> {
                       color: adminStatusColor(context, status),
                     ),
                   ),
-                  DataCell(Text(formatPeso(s['base_delivery_fee']))),
+                  const DataCell(Text('Centralized')),
                   DataCell(Text(formatPeso(s['price_per_gallon']))),
                   DataCell(Text('${s['rider_count'] ?? 0}')),
                   DataCell(

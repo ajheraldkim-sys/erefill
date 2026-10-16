@@ -192,38 +192,81 @@ class OfflineDeliveryQueueService {
             continue;
           }
 
+          final currentOrder = await client
+              .from('orders')
+              .select('status')
+              .eq('id', delivery.orderId)
+              .maybeSingle();
+          if (currentOrder?['status'] == 'delivered') {
+            final receipt = await client
+                .from('delivery_receipts')
+                .select('id')
+                .eq('order_id', delivery.orderId)
+                .maybeSingle();
+            if (receipt == null) {
+              throw StateError(
+                'Order is already delivered but has no verified receipt. Contact support.',
+              );
+            }
+            await removeDelivery(delivery.orderId);
+            await _removeLocalProof(delivery);
+            syncedCount++;
+            continue;
+          }
+
+          if (!hasRequiredDeliveryEvidence(
+            photoPath: delivery.localPhotoPath,
+            signaturePath: delivery.localSignaturePath,
+          )) {
+            throw StateError(
+              'A delivery photo and recipient signature are required. Reopen the order to capture both.',
+            );
+          }
+
           String? remotePhotoPath;
           String? remoteSignaturePath;
 
-          // 1. Upload local photo proof if it exists
-          if (delivery.localPhotoPath != null) {
-            final photoFile = File(delivery.localPhotoPath!);
-            if (!photoFile.existsSync()) {
-              throw StateError('Saved delivery photo is no longer available.');
-            }
-            final fileName =
-                '${delivery.orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-            remotePhotoPath = 'proofs/${delivery.orderId}/$fileName';
-            await client.storage
-                .from('delivery_proofs')
-                .upload(remotePhotoPath, photoFile);
+          final photoFile = File(delivery.localPhotoPath!);
+          if (!photoFile.existsSync()) {
+            throw StateError('Saved delivery photo is no longer available.');
           }
-
-          // 2. Upload local signature proof if it exists
-          if (delivery.localSignaturePath != null) {
-            final sigFile = File(delivery.localSignaturePath!);
-            if (!sigFile.existsSync()) {
-              throw StateError(
-                'Saved delivery signature is no longer available.',
-              );
-            }
-            final sigName =
-                'sig_${delivery.orderId}_${DateTime.now().millisecondsSinceEpoch}.png';
-            remoteSignaturePath = 'proofs/${delivery.orderId}/$sigName';
-            await client.storage
-                .from('delivery_proofs')
-                .upload(remoteSignaturePath, sigFile);
+          final signatureFile = File(delivery.localSignaturePath!);
+          if (!signatureFile.existsSync()) {
+            throw StateError(
+              'Saved delivery signature is no longer available.',
+            );
           }
+          if (await photoFile.length() > 10 * 1024 * 1024 ||
+              await signatureFile.length() > 10 * 1024 * 1024) {
+            throw StateError('Delivery evidence must be smaller than 10 MB.');
+          }
+          final photoExtension = photoFile.path.split('.').last.toLowerCase();
+          if (!{'jpg', 'jpeg', 'png'}.contains(photoExtension)) {
+            throw StateError('Saved delivery photo must be a JPEG or PNG.');
+          }
+          if (!signatureFile.path.toLowerCase().endsWith('.png')) {
+            throw StateError('Saved recipient signature must be a PNG.');
+          }
+          remotePhotoPath =
+              '${delivery.orderId}/proof_${photoFile.uri.pathSegments.last}';
+          remoteSignaturePath =
+              '${delivery.orderId}/signature_${signatureFile.uri.pathSegments.last}';
+          await client.storage.from('delivery_proofs').upload(
+            remotePhotoPath,
+            photoFile,
+            fileOptions: FileOptions(
+              contentType: photoExtension == 'png' ? 'image/png' : 'image/jpeg',
+              upsert: true,
+            ),
+          );
+          await client.storage.from('delivery_proofs').upload(
+            remoteSignaturePath,
+            signatureFile,
+            fileOptions: const FileOptions(
+              contentType: 'image/png',
+              upsert: true,
+            ),
+          );
 
           final response = await client.rpc(
             'confirm_delivery_safely',
@@ -248,6 +291,7 @@ class OfflineDeliveryQueueService {
 
           // Remove from queue after successful sync
           await removeDelivery(delivery.orderId);
+          await _removeLocalProof(delivery);
           syncedCount++;
         } catch (e) {
           debugPrint(
@@ -262,6 +306,21 @@ class OfflineDeliveryQueueService {
       return syncedCount;
     } finally {
       _isSyncing = false;
+    }
+  }
+
+  Future<void> _removeLocalProof(QueuedDelivery delivery) async {
+    for (final path in [
+      delivery.localPhotoPath,
+      delivery.localSignaturePath,
+    ]) {
+      if (path == null) continue;
+      try {
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      } catch (error) {
+        debugPrint('[OfflineDeliveryQueue] Could not remove local proof: $error');
+      }
     }
   }
 }
