@@ -315,6 +315,31 @@ SET search_path = public
 AS $$
 BEGIN
   IF OLD.metadata ? 'delivery_receipt_id' THEN
+    IF TG_OP = 'UPDATE' THEN
+      IF ROW(
+           NEW.room_id,
+           NEW.sender_id,
+           NEW.content,
+           NEW.message_type,
+           NEW.metadata,
+           NEW.reply_to,
+           NEW.created_at,
+           NEW.deleted_at
+         ) IS NOT DISTINCT FROM ROW(
+           OLD.room_id,
+           OLD.sender_id,
+           OLD.content,
+           OLD.message_type,
+           OLD.metadata,
+           OLD.reply_to,
+           OLD.created_at,
+           OLD.deleted_at
+         )
+      THEN
+        RETURN NEW;
+      END IF;
+    END IF;
+
     IF auth.role() IS DISTINCT FROM 'service_role'
        AND NOT public.is_admin() THEN
       RAISE EXCEPTION 'Delivery receipt messages cannot be changed or deleted.';
@@ -397,7 +422,7 @@ BEGIN
     END IF;
 
     IF NEW.message_type = 'image' THEN
-      v_body := 'Photo message';
+      v_body := '📷 Photo message';
     ELSIF NEW.message_type = 'quick_reply' THEN
       v_body := coalesce(NEW.content, 'Quick response');
     ELSE
