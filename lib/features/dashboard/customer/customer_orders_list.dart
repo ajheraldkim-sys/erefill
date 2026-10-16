@@ -16,6 +16,7 @@ import '../../../core/services/offline_order_sync_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import 'package:flutter/services.dart';
 import 'review_modal.dart';
+import 'widgets/customer_orders_load_notice.dart';
 import '../../subscriptions/widgets/customer_subscriptions_tab.dart';
 
 class CustomerOrdersList extends StatefulWidget {
@@ -31,6 +32,8 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
   final supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _myOrders = [];
   bool _isLoading = true;
+  bool _isFetchingOrders = false;
+  bool _ordersFetchFailed = false;
   RealtimeChannel? _ordersChannel;
   Timer? _pollingTimer;
   final Map<String, RealtimeChannel> _riderChannels = {};
@@ -44,9 +47,13 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
     WidgetsBinding.instance.addObserver(this);
     final userId = supabase.auth.currentUser?.id;
     if (userId != null) {
-      final mem = LocalDataCache.instance.getMemory<List<dynamic>>('customer_orders_$userId');
+      final mem = LocalDataCache.instance.getMemory<List<dynamic>>(
+        'customer_orders_$userId',
+      );
       if (mem != null && mem.isNotEmpty) {
-        _myOrders = mem.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _myOrders = mem
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         _isLoading = false;
       }
     }
@@ -58,7 +65,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
 
   void _startOrdersPollingTimer() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       final hasActiveOrders = _myOrders.any(
         (o) => o['status'] != 'delivered' && o['status'] != 'cancelled',
@@ -83,10 +90,14 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
   Future<void> _loadCachedOrders() async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
-    final cached = await LocalDataCache.instance.get<List<dynamic>>('customer_orders_$userId');
+    final cached = await LocalDataCache.instance.get<List<dynamic>>(
+      'customer_orders_$userId',
+    );
     if (cached != null && cached.isNotEmpty && mounted) {
       setState(() {
-        _myOrders = cached.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _myOrders = cached
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         _isLoading = false; // Zero waiting time for returning customers
       });
     }
@@ -161,12 +172,14 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
   }
 
   Future<void> _fetchOrders() async {
+    if (_isFetchingOrders) return;
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
 
+    _isFetchingOrders = true;
     try {
       final rows = await supabase
           .from('orders')
@@ -191,8 +204,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
       }
 
       final onlineOrders = List<Map<String, dynamic>>.from(rows);
-      final offlineOrders =
-          await OfflineOrderSyncService().getOfflineOrders();
+      final offlineOrders = await OfflineOrderSyncService().getOfflineOrders();
 
       final onlineIds = onlineOrders.map((o) => o['id']).toSet();
       final pendingOffline = offlineOrders
@@ -207,18 +219,22 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
       setState(() {
         _myOrders = fullOrders;
         _isLoading = false;
+        _ordersFetchFailed = false;
       });
       _syncRiderLocationSubscriptions();
       LocalDataCache.instance.set('customer_orders_$userId', fullOrders);
     } catch (e) {
-      debugPrint('Online orders fetch error, loading from local SQLite and disk cache: $e');
-      final offlineOrders =
-          await OfflineOrderSyncService().getOfflineOrders();
+      debugPrint(
+        'Online orders fetch error, loading from local SQLite and disk cache: $e',
+      );
+      final offlineOrders = await OfflineOrderSyncService().getOfflineOrders();
       final cached = await LocalDataCache.instance.get<List<dynamic>>(
         'customer_orders_$userId',
       );
       final cachedList = cached != null
-          ? cached.map((item) => Map<String, dynamic>.from(item as Map)).toList()
+          ? cached
+                .map((item) => Map<String, dynamic>.from(item as Map))
+                .toList()
           : <Map<String, dynamic>>[];
 
       final cachedIds = cachedList.map((o) => o['id']).toSet();
@@ -231,7 +247,10 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
       setState(() {
         _myOrders = combined.isNotEmpty ? combined : offlineOrders;
         _isLoading = false;
+        _ordersFetchFailed = true;
       });
+    } finally {
+      _isFetchingOrders = false;
     }
   }
 
@@ -255,12 +274,6 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
             column: 'customer_id',
             value: userId,
           ),
-          callback: (_) => _fetchOrders(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'order_items',
           callback: (_) => _fetchOrders(),
         )
         .subscribe((status, [error]) {
@@ -393,21 +406,47 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                     child: currentList.isEmpty
                         ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
-                            children: [
-                              SizedBox(
-                                height: MediaQuery.of(context).size.height * 0.45,
-                                child: _buildEmptyState(),
-                              ),
-                            ],
+                            padding: AppUi.pagePadding.copyWith(
+                              top: 12,
+                              bottom: 96,
+                            ),
+                            children: _ordersFetchFailed
+                                ? [
+                                    CustomerOrdersLoadNotice(
+                                      hasSavedOrders: _myOrders.isNotEmpty,
+                                      onRetry: _fetchOrders,
+                                    ),
+                                  ]
+                                : [
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.of(context).size.height *
+                                          0.45,
+                                      child: _buildEmptyState(),
+                                    ),
+                                  ],
                           )
                         : ListView.builder(
                             physics: const AlwaysScrollableScrollPhysics(
                               parent: BouncingScrollPhysics(),
                             ),
-                            padding: AppUi.pagePadding.copyWith(top: 12, bottom: 96),
-                            itemCount: currentList.length,
+                            padding: AppUi.pagePadding.copyWith(
+                              top: 12,
+                              bottom: 96,
+                            ),
+                            itemCount:
+                                currentList.length +
+                                (_ordersFetchFailed ? 1 : 0),
                             itemBuilder: (context, index) {
-                              final order = currentList[index];
+                              if (_ordersFetchFailed && index == 0) {
+                                return CustomerOrdersLoadNotice(
+                                  hasSavedOrders: _myOrders.isNotEmpty,
+                                  onRetry: _fetchOrders,
+                                );
+                              }
+                              final order =
+                                  currentList[index -
+                                      (_ordersFetchFailed ? 1 : 0)];
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: _buildOrderCard(order),
@@ -429,10 +468,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
             ? Colors.white.withValues(alpha: 0.08)
             : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(
-          color: AppUi.borderOf(context),
-          width: 0.8,
-        ),
+        border: Border.all(color: AppUi.borderOf(context), width: 0.8),
       ),
       child: Row(
         children: [
@@ -490,8 +526,8 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                       color: selected
                           ? AppUi.blueSoft
                           : (isDark
-                              ? Colors.white.withValues(alpha: 0.12)
-                              : Colors.black.withValues(alpha: 0.06)),
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.06)),
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Text(
@@ -538,16 +574,11 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
         bottomAction = Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.35),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

@@ -38,7 +38,9 @@ import 'package:erefill/core/services/external_navigation_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 import 'services/location_service.dart';
 import 'services/order_cache_service.dart';
+import 'package:erefill/features/settings/account_security_screen.dart';
 import 'services/offline_delivery_queue_service.dart';
+import 'services/queued_delivery_rules.dart';
 import '../../payouts/widgets/rider_payout_sheet.dart';
 
 import 'rider_history_screen.dart';
@@ -91,6 +93,7 @@ class _RiderDashboardState extends State<RiderDashboard>
   final _orderCache = OrderCacheService();
   int _pendingOfflineCount = 0;
   bool _isSyncingOffline = false;
+  String? _offlineSyncError;
   RealtimeChannel? _ordersChannel;
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
   Timer? _riderPollingTimer;
@@ -158,7 +161,8 @@ class _RiderDashboardState extends State<RiderDashboard>
       };
       _isLoading = false;
     } else if (myId != null) {
-      final cachedProf = LocalDataCache.instance.getMemory<Map<String, dynamic>>('rider_profile_$myId');
+      final cachedProf = LocalDataCache.instance
+          .getMemory<Map<String, dynamic>>('rider_profile_$myId');
       if (cachedProf != null) {
         _profile = cachedProf;
         _isLoading = false;
@@ -166,7 +170,8 @@ class _RiderDashboardState extends State<RiderDashboard>
     }
 
     if (myId != null) {
-      final cachedStats = LocalDataCache.instance.getMemory<Map<String, dynamic>>('rider_stats_$myId');
+      final cachedStats = LocalDataCache.instance
+          .getMemory<Map<String, dynamic>>('rider_stats_$myId');
       if (cachedStats != null) {
         _completedDeliveries = (cachedStats['completed'] as num?)?.toInt() ?? 0;
         _totalEarnings = (cachedStats['earnings'] as num?)?.toDouble() ?? 0.0;
@@ -274,9 +279,20 @@ class _RiderDashboardState extends State<RiderDashboard>
       final pending = await OfflineDeliveryQueueService()
           .getPendingDeliveries();
       if (mounted) {
-        setState(() => _pendingOfflineCount = pending.length);
+        setState(() {
+          _pendingOfflineCount = pending.length;
+          if (pending.isEmpty) _offlineSyncError = null;
+        });
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not inspect queued deliveries: $error');
+      if (mounted) {
+        setState(
+          () => _offlineSyncError =
+              'Saved delivery updates could not be checked on this device.',
+        );
+      }
+    }
   }
 
   Future<void> _syncOfflineQueue() async {
@@ -286,6 +302,13 @@ class _RiderDashboardState extends State<RiderDashboard>
       final synced = await OfflineDeliveryQueueService()
           .syncPendingDeliveries();
       await _checkOfflineQueue();
+      if (mounted) {
+        setState(() {
+          _offlineSyncError = _pendingOfflineCount > 0
+              ? '$_pendingOfflineCount delivery update${_pendingOfflineCount == 1 ? '' : 's'} still need attention.'
+              : null;
+        });
+      }
       if (synced > 0) {
         await _loadRiderData();
         if (mounted) {
@@ -294,6 +317,12 @@ class _RiderDashboardState extends State<RiderDashboard>
       }
     } catch (e) {
       debugPrint('Sync offline error: $e');
+      if (mounted) {
+        setState(
+          () => _offlineSyncError =
+              'Sync failed. Your saved delivery updates are still on this device.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSyncingOffline = false);
     }
@@ -356,19 +385,44 @@ class _RiderDashboardState extends State<RiderDashboard>
         return sum + fee;
       });
     } catch (e) {
-      debugPrint("Warning: Error loading rider data: $e. Checking offline caches...");
+      debugPrint(
+        "Warning: Error loading rider data: $e. Checking offline caches...",
+      );
       final cachedActive = await _orderCache.getCachedActiveOrders();
       if (cachedActive.isNotEmpty) {
         activeResult = cachedActive;
       } else if (_myActiveOrders.isNotEmpty) {
         activeResult = _myActiveOrders;
       }
-      final cachedProfile = await LocalDataCache.instance.get<Map<String, dynamic>>(
-        'rider_profile_$myId',
-      );
+      final cachedProfile = await LocalDataCache.instance
+          .get<Map<String, dynamic>>('rider_profile_$myId');
       if (cachedProfile != null) {
         profileResult = cachedProfile;
       }
+    }
+
+    try {
+      final queuedUpdates = await OfflineDeliveryQueueService()
+          .getPendingDeliveries();
+      final queuedByOrder = {
+        for (final update in queuedUpdates) update.orderId: update,
+      };
+      activeResult = activeResult
+          .where((order) {
+            return queuedByOrder[order['id']?.toString()]?.status !=
+                'delivered';
+          })
+          .map((order) {
+            final queued = queuedByOrder[order['id']?.toString()];
+            return queued == null ? order : {...order, 'status': queued.status};
+          })
+          .toList();
+      _pendingOfflineCount = queuedUpdates.length;
+      if (queuedUpdates.isEmpty) _offlineSyncError = null;
+    } catch (error) {
+      debugPrint('Could not reconcile queued rider updates: $error');
+      _offlineSyncError =
+          'Saved delivery updates could not be checked on this device.';
     }
 
     if (!mounted) return;
@@ -576,6 +630,9 @@ class _RiderDashboardState extends State<RiderDashboard>
     HapticFeedback.mediumImpact();
     // Optimistic UI Update
     final index = _myActiveOrders.indexWhere((o) => o['id'] == orderId);
+    final originalStatus = index == -1
+        ? null
+        : _myActiveOrders[index]['status']?.toString();
     if (index != -1) {
       _myActiveOrders[index]['status'] = newStatus;
       setState(() {});
@@ -596,6 +653,17 @@ class _RiderDashboardState extends State<RiderDashboard>
         _showSuccess('Status updated to ${newStatus.replaceAll('_', ' ')}');
       }
     } catch (e) {
+      if (!isRetryableNetworkError(e)) {
+        _restoreRiderOrderStatus(orderId, originalStatus);
+        await _loadRiderData();
+        if (mounted) {
+          _showError(
+            'Could not update delivery status: ${e.toString().replaceFirst('Exception: ', '')}',
+          );
+        }
+        return;
+      }
+
       try {
         await OfflineDeliveryQueueService().enqueueDelivery(
           QueuedDelivery(orderId: orderId, status: newStatus),
@@ -606,11 +674,23 @@ class _RiderDashboardState extends State<RiderDashboard>
             'Status updated offline. Will sync automatically when online.',
           );
         }
-      } catch (_) {
+      } catch (queueError) {
+        _restoreRiderOrderStatus(orderId, originalStatus);
         await _loadRiderData(); // Revert on failure
-        if (mounted) _showError('Failed: $e');
+        if (mounted) {
+          _showError(
+            'Could not save this update offline: ${queueError.toString().replaceFirst('Exception: ', '')}',
+          );
+        }
       }
     }
+  }
+
+  void _restoreRiderOrderStatus(String orderId, String? status) {
+    if (status == null) return;
+    final index = _myActiveOrders.indexWhere((order) => order['id'] == orderId);
+    if (index == -1) return;
+    setState(() => _myActiveOrders[index]['status'] = status);
   }
 
   Future<void> _confirmDeliveryWithProof(String orderId) async {
@@ -695,76 +775,44 @@ class _RiderDashboardState extends State<RiderDashboard>
 
       // 5. Upload Photo Proof
       final file = File(image.path);
+      if (!file.existsSync()) {
+        throw StateError('The delivery photo is no longer available.');
+      }
       final fileName =
           '${orderId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final photoPath = 'proofs/$orderId/$fileName';
-
-      try {
-        await supabase.storage.from('delivery_proofs').upload(photoPath, file);
-      } catch (uploadErr) {
-        debugPrint('Warning: Photo proof storage upload skipped: $uploadErr');
-      }
+      await supabase.storage.from('delivery_proofs').upload(photoPath, file);
 
       // 6. Upload Signature Proof (if captured)
       if (sigData != null) {
         final sigName =
             'sig_${orderId}_${DateTime.now().millisecondsSinceEpoch}.png';
         final sigPath = 'proofs/$orderId/$sigName';
-        try {
-          await supabase.storage
-              .from('delivery_proofs')
-              .uploadBinary(sigPath, sigData);
-          signaturePath = sigPath;
-        } catch (sigErr) {
-          debugPrint('Warning: Signature storage upload skipped: $sigErr');
-        }
+        await supabase.storage
+            .from('delivery_proofs')
+            .uploadBinary(sigPath, sigData);
+        signaturePath = sigPath;
       }
 
-      // 7. Finalize Order with full proof-of-delivery metadata via server RPC or fallback transition
-      bool serverConfirmed = false;
-      try {
-        final response = await supabase.rpc(
-          'confirm_delivery_safely',
-          params: {
-            'p_order_id': orderId,
-            'p_lat': position?.latitude,
-            'p_lng': position?.longitude,
-            'p_photo_url': photoPath,
-            'p_signature_url': signaturePath,
-            'p_delivery_note': completion.deliveryNote,
-            'p_empty_gallons_returned': completion.emptyGallonsReturned,
-          },
+      // 7. Completion must be confirmed by the proof-aware server RPC.
+      final response = await supabase.rpc(
+        'confirm_delivery_safely',
+        params: {
+          'p_order_id': orderId,
+          'p_lat': position?.latitude,
+          'p_lng': position?.longitude,
+          'p_photo_url': photoPath,
+          'p_signature_url': signaturePath,
+          'p_delivery_note': completion.deliveryNote,
+          'p_empty_gallons_returned': completion.emptyGallonsReturned,
+        },
+      );
+      final result = _safeMap(response);
+      if (result?['success'] != true) {
+        throw StateError(
+          result?['message']?.toString() ??
+              'Delivery confirmation was rejected by the server.',
         );
-        final result = _safeMap(response) ?? <String, dynamic>{};
-        if (result['success'] == true) {
-          serverConfirmed = true;
-        }
-      } catch (rpcErr) {
-        debugPrint(
-          'confirm_delivery_safely RPC unavailable, applying direct transition: $rpcErr',
-        );
-      }
-
-      if (!serverConfirmed) {
-        final transitionResult = await SafeSupabase.transitionOrderStatus(
-          orderId: orderId,
-          newStatus: 'delivered',
-        );
-        if (transitionResult['success'] != true) {
-          throw StateError(
-            transitionResult['message']?.toString() ??
-                'Delivery completion was rejected.',
-          );
-        }
-        try {
-          await supabase
-              .from('orders')
-              .update({
-                'delivery_note': completion.deliveryNote,
-                'empty_gallons_returned': completion.emptyGallonsReturned,
-              })
-              .eq('id', orderId);
-        } catch (_) {}
       }
 
       // Dismiss progress dialog
@@ -786,6 +834,15 @@ class _RiderDashboardState extends State<RiderDashboard>
         Navigator.of(context, rootNavigator: true).pop();
         progressShown = false;
       }
+      if (!isRetryableNetworkError(e)) {
+        await _loadRiderData();
+        if (mounted) {
+          _showError(
+            'Could not verify delivery completion: ${e.toString().replaceFirst('Exception: ', '')}',
+          );
+        }
+        return;
+      }
       try {
         await OfflineDeliveryQueueService().enqueueDelivery(
           QueuedDelivery(
@@ -805,8 +862,13 @@ class _RiderDashboardState extends State<RiderDashboard>
             'Saved offline! Delivery will sync automatically when online.',
           );
         }
-      } catch (_) {
-        if (mounted) _showError('Could not complete delivery: $e');
+      } catch (queueError) {
+        await _loadRiderData();
+        if (mounted) {
+          _showError(
+            'Could not save delivery offline: ${queueError.toString().replaceFirst('Exception: ', '')}',
+          );
+        }
       }
     } finally {
       await _loadRiderData();
@@ -1167,7 +1229,10 @@ class _RiderDashboardState extends State<RiderDashboard>
             actions: [
               IconButton(
                 onPressed: _loadRiderData,
-                icon: Icon(Icons.refresh_rounded, color: AppUi.textPrimaryOf(context)),
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: AppUi.textPrimaryOf(context),
+                ),
                 tooltip: 'Refresh dispatch',
               ),
             ],
@@ -1205,7 +1270,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                               ),
                             ],
                           ),
-                          if (_pendingOfflineCount > 0) ...[
+                          if (_pendingOfflineCount > 0 ||
+                              _offlineSyncError != null) ...[
                             const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -1229,7 +1295,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      '$_pendingOfflineCount ${_pendingOfflineCount == 1 ? "delivery" : "deliveries"} waiting to sync',
+                                      _offlineSyncError ??
+                                          '$_pendingOfflineCount ${_pendingOfflineCount == 1 ? "delivery" : "deliveries"} waiting to sync',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
@@ -1369,7 +1436,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: isOutForDelivery
-                        ? OrderStatusColors.getColor('out_for_delivery').withValues(alpha: 0.12)
+                        ? OrderStatusColors.getColor(
+                            'out_for_delivery',
+                          ).withValues(alpha: 0.12)
                         : AppUi.chipBgOf(context),
                     shape: BoxShape.circle,
                   ),
@@ -1699,9 +1768,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                         height: 24,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: i <= currentStep
-                              ? statusColor
-                              : Colors.white,
+                          color: i <= currentStep ? statusColor : Colors.white,
                           border: Border.all(
                             color: i <= currentStep
                                 ? statusColor
@@ -1711,9 +1778,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                           boxShadow: i == currentStep
                               ? [
                                   BoxShadow(
-                                    color: statusColor.withValues(
-                                      alpha: 0.25,
-                                    ),
+                                    color: statusColor.withValues(alpha: 0.25),
                                     blurRadius: 6,
                                     spreadRadius: 1,
                                   ),
@@ -1750,9 +1815,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       fontWeight: i == currentStep
                           ? FontWeight.w800
                           : FontWeight.w600,
-                      color: i <= currentStep
-                          ? statusColor
-                          : AppUi.textMuted,
+                      color: i <= currentStep ? statusColor : AppUi.textMuted,
                     ),
                   ),
                 ],
@@ -2337,6 +2400,20 @@ class _RiderDashboardState extends State<RiderDashboard>
                         AccountGroup(
                           children: [
                             AccountNavTile(
+                              icon: Icons.shield_outlined,
+                              title: 'Account security',
+                              subtitle:
+                                  'Password and Gmail binding controls',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const AccountSecurityScreen(
+                                        role: 'rider',
+                                      ),
+                                ),
+                              ),
+                            ),
+                            AccountNavTile(
                               icon: Icons.logout_rounded,
                               iconColor: const Color(0xFFEF4444),
                               title: 'Sign out',
@@ -2706,8 +2783,9 @@ class _RiderHomeOverview extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: (isOnline ? AppUi.accentGreen : Colors.black)
-                .withValues(alpha: 0.04),
+            color: (isOnline ? AppUi.accentGreen : Colors.black).withValues(
+              alpha: 0.04,
+            ),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2843,7 +2921,9 @@ class _RiderHomeOverview extends StatelessWidget {
                                     label: 'Completed',
                                     value: '$completedCount',
                                     icon: Icons.check_circle_rounded,
-                                    color: OrderStatusColors.getColor('completed'),
+                                    color: OrderStatusColors.getColor(
+                                      'completed',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -2856,7 +2936,9 @@ class _RiderHomeOverview extends StatelessWidget {
                                     label: 'Active jobs',
                                     value: '${activeOrders.length}',
                                     icon: Icons.local_shipping_rounded,
-                                    color: OrderStatusColors.getColor('out_for_delivery'),
+                                    color: OrderStatusColors.getColor(
+                                      'out_for_delivery',
+                                    ),
                                     onTap: () => onNavigate(1),
                                   ),
                                 ),
@@ -2867,7 +2949,9 @@ class _RiderHomeOverview extends StatelessWidget {
                                     value:
                                         '${activeOrders.where((o) => o['status'] == 'assigned_to_rider').length}',
                                     icon: Icons.inventory_2_outlined,
-                                    color: OrderStatusColors.getColor('ready_for_pickup'),
+                                    color: OrderStatusColors.getColor(
+                                      'ready_for_pickup',
+                                    ),
                                     onTap: () => onNavigate(1),
                                   ),
                                 ),

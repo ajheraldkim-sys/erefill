@@ -1,4 +1,5 @@
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/widgets/shadcn_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,13 +45,20 @@ Color adminDestructiveButtonForeground(BuildContext context) {
 
 Color adminStatusColor(BuildContext context, String status) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  return switch (status) {
-    'open' || 'delivered' || 'processed' =>
-      isDark ? const Color(0xFF56D6A6) : AppUi.accentGreen,
-    'busy' || 'pending' || 'processing' =>
-      isDark ? const Color(0xFFFBBF24) : AppUi.warningFg,
-    'maintenance' || 'cancelled' || 'failed' =>
-      adminSemanticErrorColor(context),
+  final s = status.toLowerCase().replaceAll(' ', '_');
+  return switch (s) {
+    'delivered' || 'completed' || 'open' || 'processed' =>
+      isDark ? const Color(0xFF10B981) : AppColors.statusDelivered,
+    'out_for_delivery' || 'on_the_way' || 'in_transit' =>
+      isDark ? const Color(0xFFFB923C) : AppColors.statusOutForDelivery,
+    'preparing' || 'in_preparation' =>
+      isDark ? const Color(0xFFA78BFA) : AppColors.statusPreparing,
+    'accepted' =>
+      isDark ? const Color(0xFF60A5FA) : AppColors.statusAccepted,
+    'pending' || 'pending_verification' || 'busy' || 'processing' =>
+      isDark ? const Color(0xFFFBBF24) : AppColors.statusPending,
+    'cancelled' || 'failed' || 'rejected' || 'suspended' || 'maintenance' =>
+      isDark ? const Color(0xFFF87171) : AppColors.statusCancelled,
     _ => isDark ? AppUi.accentCyan : AppUi.bluePrimary,
   };
 }

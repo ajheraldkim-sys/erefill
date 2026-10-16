@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -12,6 +14,7 @@ import '../../../core/widgets/map_tiles.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import 'widgets/payment_method_selector.dart';
+import 'widgets/payment_brand_mark.dart';
 import '../../../models/cart_model.dart';
 import 'checkout_rules.dart';
 import '../../../core/routing/app_navigation.dart';
@@ -42,6 +45,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool _isBootstrapping = true;
   bool _isSubmitting = false;
+  bool _isLoadingCheckoutConfiguration = false;
+  bool _stationSettingsLoaded = false;
+  bool _platformFeeConfigLoaded = false;
+  bool _paymentMethodsLoaded = false;
+  String? _orderAttemptFingerprint;
+  String? _orderAttemptKey;
   String _paymentMethod = 'cod';
   List<CheckoutPaymentOption> _paymentMethods = [];
   Map<String, dynamic>? _customerProfile;
@@ -49,6 +58,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _selectedAddressId;
   double _deliveryFee = 25.0;
   Map<String, dynamic>? _platformFeeConfig;
+  String? _pricingSetupError;
+  String? _paymentMethodsError;
   String? _checkoutHint;
   String? _stationAvailabilityMessage;
   bool _checkingStationAvailability = false;
@@ -88,10 +99,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _loadPaymentMethods() async {
-    final ownerId = widget.station['id']?.toString();
-    if (ownerId == null || ownerId.isEmpty) return;
-
     try {
+      final ownerId = widget.station['id']?.toString();
+      if (ownerId == null || ownerId.isEmpty) {
+        throw StateError('Station ID is missing.');
+      }
       final response = await supabase.rpc(
         'get_station_available_payment_methods',
         params: {'p_owner_id': ownerId},
@@ -106,6 +118,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (!mounted) return;
       setState(() {
         _paymentMethods = options;
+        _paymentMethodsLoaded = true;
+        _paymentMethodsError = null;
         if (!CheckoutRules.isPaymentAvailable(_paymentMethod, options)) {
           _paymentMethod = availableOptions.isEmpty
               ? ''
@@ -113,14 +127,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       });
     } catch (e) {
-      debugPrint('Error loading payment methods: $e. Defaulting to Cash on Delivery (COD).');
+      debugPrint('Error loading payment methods: $e');
       if (!mounted) return;
-      final fallbackOptions = CheckoutRules.normalizePaymentOptions([
-        {'method': 'cod', 'available': true}
-      ]);
       setState(() {
-        _paymentMethods = fallbackOptions;
-        _paymentMethod = 'cod';
+        _paymentMethods = [];
+        _paymentMethodsLoaded = false;
+        _paymentMethodsError =
+            'Station payment options could not be verified. Retry before placing your order.';
       });
     }
   }
@@ -128,7 +141,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _loadStationSettings() async {
     try {
       final ownerId = widget.station['id']?.toString();
-      if (ownerId == null) return;
+      if (ownerId == null || ownerId.isEmpty) {
+        throw StateError('Station ID is missing.');
+      }
 
       final settings = await supabase
           .from('owner_settings')
@@ -136,38 +151,87 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           .eq('owner_id', ownerId)
           .maybeSingle();
 
-      if (settings != null && mounted) {
+      if (mounted) {
         setState(() {
           _deliveryFee =
-              (settings['base_delivery_fee'] as num?)?.toDouble() ?? 25.0;
+              (settings?['base_delivery_fee'] as num?)?.toDouble() ?? 0;
+          _stationSettingsLoaded = true;
         });
       }
     } catch (e) {
       debugPrint('Error loading station settings: $e');
+      if (mounted) {
+        setState(() {
+          _stationSettingsLoaded = false;
+          _pricingSetupError =
+              'Delivery fees could not be verified. Retry before placing your order.';
+        });
+      }
     }
   }
 
   Future<void> _loadPlatformFeeConfig() async {
     try {
       final cfg = await supabase.rpc('get_platform_fee_config');
+      if (cfg is! Map) {
+        throw StateError('Platform fee configuration response was invalid.');
+      }
       if (!mounted) return;
       setState(() {
-        _platformFeeConfig = Map<String, dynamic>.from(cfg as Map);
+        _platformFeeConfig = Map<String, dynamic>.from(cfg);
+        _platformFeeConfigLoaded = true;
       });
     } catch (e) {
       debugPrint('Platform fee config unavailable: $e');
+      if (mounted) {
+        setState(() {
+          _platformFeeConfigLoaded = false;
+          _pricingSetupError =
+              'Order fees could not be verified. Retry before placing your order.';
+        });
+      }
     }
+  }
+
+  Future<void> _retryCheckoutConfiguration() async {
+    if (_isLoadingCheckoutConfiguration) return;
+    setState(() {
+      _isLoadingCheckoutConfiguration = true;
+      _pricingSetupError = null;
+      _paymentMethodsError = null;
+      _stationSettingsLoaded = false;
+      _platformFeeConfigLoaded = false;
+      _paymentMethodsLoaded = false;
+    });
+    await Future.wait([
+      _loadStationSettings(),
+      _loadPlatformFeeConfig(),
+      _loadPaymentMethods(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      if (_stationSettingsLoaded &&
+          _platformFeeConfigLoaded &&
+          _paymentMethodsLoaded) {
+        _pricingSetupError = null;
+        _paymentMethodsError = null;
+      } else if (!_stationSettingsLoaded || !_platformFeeConfigLoaded) {
+        _pricingSetupError ??=
+            'Order fees could not be verified. Retry before placing your order.';
+      }
+      _isLoadingCheckoutConfiguration = false;
+    });
   }
 
   double _platformFeeFor(double subtotal) {
     final cfg = _platformFeeConfig;
-    if (cfg == null || cfg['enabled'] != true) return 0;
-    final percent = (cfg['percent'] as num?)?.toDouble() ?? 0;
-    final fixed = (cfg['fixed'] as num?)?.toDouble() ?? 0;
-    final base = subtotal + _deliveryFee;
-    final fee = (base * percent / 100) + fixed;
-    if (fee <= 0) return 0;
-    return double.parse(fee.toStringAsFixed(2));
+    return CheckoutRules.calculatePlatformFee(
+      subtotal: subtotal,
+      deliveryFee: _deliveryFee,
+      enabled: cfg?['enabled'] == true,
+      percent: (cfg?['percent'] as num?)?.toDouble() ?? 0,
+      fixed: (cfg?['fixed'] as num?)?.toDouble() ?? 0,
+    );
   }
 
   Future<void> _loadLoyaltyVouchers() async {
@@ -200,11 +264,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 Row(
                   children: const [
-                    Icon(Icons.local_offer_rounded, color: AppUi.bluePrimary, size: 20),
+                    Icon(
+                      Icons.local_offer_rounded,
+                      color: AppUi.bluePrimary,
+                      size: 20,
+                    ),
                     SizedBox(width: 8),
                     Text(
                       'Select Reward Voucher',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ],
                 ),
@@ -235,12 +306,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.grey.withValues(alpha: 0.2),
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                          backgroundColor: const Color(
+                            0xFF10B981,
+                          ).withValues(alpha: 0.1),
                           child: const Icon(
                             Icons.check_rounded,
                             color: Color(0xFF10B981),
@@ -249,11 +324,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         title: Text(
                           v.title,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
                         subtitle: Text(
                           v.description,
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
                         ),
                         trailing: Text(
                           v.isDeliveryDiscount
@@ -284,10 +365,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (customerId == null) return;
 
     try {
-      final profile = await ProfileQueryHelpers.fetchProfile(
-        supabase,
-        customerId,
-      ) ?? <String, dynamic>{};
+      final profile =
+          await ProfileQueryHelpers.fetchProfile(supabase, customerId) ??
+          <String, dynamic>{};
 
       List<Map<String, dynamic>> addresses = [];
       try {
@@ -389,19 +469,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         if (availability['status'] != 'OK') {
           if (availability['status'] == 'OUT_OF_ZONE') {
-            final stationTown = (widget.station['town'] ?? widget.station['municipality'] ?? '').toString().trim();
-            final customerTown = _customerProfile?['town']?.toString().trim() ?? '';
+            final stationTown =
+                (widget.station['town'] ?? widget.station['municipality'] ?? '')
+                    .toString()
+                    .trim();
+            final customerTown =
+                _customerProfile?['town']?.toString().trim() ?? '';
             if (stationTown.isNotEmpty &&
                 customerTown.isNotEmpty &&
                 stationTown.toLowerCase() != customerTown.toLowerCase()) {
               _stationAvailabilityMessage =
                   'This station is located in $stationTown and cannot deliver to $customerTown (outside delivery radius). Please select a station in $customerTown or change your delivery address.';
             } else {
-              _stationAvailabilityMessage = availability['message']?.toString() ??
+              _stationAvailabilityMessage =
+                  availability['message']?.toString() ??
                   'You are outside the service area of this station.';
             }
           } else {
-            _stationAvailabilityMessage = availability['message']?.toString() ??
+            _stationAvailabilityMessage =
+                availability['message']?.toString() ??
                 'This station is not available for your location right now.';
           }
         } else {
@@ -446,6 +532,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   List<CheckoutPaymentOption> get _selectablePaymentMethods {
+    if (!_paymentMethodsLoaded) return const [];
     return CheckoutRules.selectableMethods(_paymentMethods);
   }
 
@@ -502,6 +589,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _confirmOrder(CartProvider cart) async {
     if (_isBootstrapping || _isSubmitting) return;
+    if (_pricingSetupError != null ||
+        !_stationSettingsLoaded ||
+        !_platformFeeConfigLoaded) {
+      _setCheckoutHint(
+        _pricingSetupError ??
+            'Order fees are still being verified. Retry before placing your order.',
+      );
+      return;
+    }
+    if (!_paymentMethodsLoaded) {
+      _setCheckoutHint(
+        _paymentMethodsError ??
+            'Station payment options are still being verified. Retry before placing your order.',
+      );
+      return;
+    }
 
     final customerId = supabase.auth.currentUser?.id;
     final isStationOpen = (widget.station['is_open'] as bool?) ?? true;
@@ -562,20 +665,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final voucherDiscount = _appliedVoucher != null
         ? (_appliedVoucher!.isDeliveryDiscount
-            ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
-            : _appliedVoucher!.discountAmount)
+              ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
+              : _appliedVoucher!.discountAmount)
         : 0.0;
 
-    final totalAmount = (cart.totalAmount +
-            _deliveryFee +
-            _platformFeeFor(cart.totalAmount) -
-            voucherDiscount)
-        .clamp(0.0, double.infinity);
+    var totalAmount = CheckoutRules.calculateOrderTotal(
+      subtotal: cart.totalAmount,
+      deliveryFee: _deliveryFee,
+      platformFee: _platformFeeFor(cart.totalAmount),
+      voucherDiscount: voucherDiscount,
+    );
 
     final paymentMethod =
         CheckoutRules.isPaymentAvailable(_paymentMethod, _paymentMethods)
-            ? _paymentMethod
-            : null;
+        ? _paymentMethod
+        : null;
 
     final itemsData = cart.items.values
         .map(
@@ -587,6 +691,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         )
         .toList();
 
+    final sortedItems = [...itemsData]
+      ..sort(
+        (a, b) =>
+            a['product_id']!.toString().compareTo(b['product_id']!.toString()),
+      );
+    final requestFingerprint = jsonEncode({
+      'customer_id': customerId,
+      'station_id': widget.station['id'],
+      'payment_method': paymentMethod,
+      'address': completeAddress,
+      'barangay': _customerProfile?['barangay'],
+      'town': _customerProfile?['town'],
+      'landmark': _customerProfile?['landmark'],
+      'latitude': customerLat,
+      'longitude': customerLng,
+      'notes': _notesController.text.trim(),
+      'voucher_id': _appliedVoucher?.id,
+      'items': sortedItems,
+    });
+    if (_orderAttemptFingerprint != requestFingerprint) {
+      _orderAttemptFingerprint = requestFingerprint;
+      _orderAttemptKey = const Uuid().v4();
+    }
+
     setState(() {
       _isSubmitting = true;
       _checkoutHint = null;
@@ -597,7 +725,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       final notesText = _appliedVoucher != null
-          ? '${_notesController.text.trim()} [Voucher: ${_appliedVoucher!.code} -₱${voucherDiscount.toStringAsFixed(2)}]'.trim()
+          ? '${_notesController.text.trim()} [Voucher: ${_appliedVoucher!.code} -₱${voucherDiscount.toStringAsFixed(2)}]'
+                .trim()
           : _notesController.text.trim();
 
       final orderData = {
@@ -610,7 +739,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'customer_barangay': _customerProfile?['barangay'],
         'customer_municipality': _customerProfile?['town'],
         'customer_landmark': _customerProfile?['landmark'],
-        'idempotency_key': const Uuid().v4(),
+        'idempotency_key': _orderAttemptKey,
+        'voucher_id': _appliedVoucher?.id,
         'subtotal': cart.totalAmount,
         'delivery_fee': _deliveryFee,
         'total_amount': totalAmount,
@@ -634,6 +764,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (orderId == null || orderId.isEmpty) {
         throw StateError('Order creation failed: missing order ID.');
       }
+      final serverTotal = orderMap['total_amount'];
+      if (serverTotal is num) {
+        totalAmount = serverTotal.toDouble();
+      }
 
       if (CheckoutRules.isOnlinePayment(paymentMethod)) {
         try {
@@ -642,7 +776,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             paymentMethod: paymentMethod,
           );
           if (!mounted) return;
-          final launched = await PaymentLaunchService.launchCheckoutUrl(checkoutUrl);
+          final launched = await PaymentLaunchService.launchCheckoutUrl(
+            checkoutUrl,
+          );
           if (!mounted) return;
           if (!launched) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -680,12 +816,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       cart.clearCart();
-      if (_appliedVoucher != null && customerId != null && customerId.isNotEmpty) {
-        _loyaltyService.markVoucherUsed(
-          voucherId: _appliedVoucher!.id,
-          userId: customerId,
-        );
-      }
       if (customerId != null && customerId.isNotEmpty) {
         _loyaltyService.earnPointsForOrder(
           userId: customerId,
@@ -700,7 +830,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           .single();
 
       if (!mounted) return;
-      final shortId = orderId.length >= 8 ? orderId.substring(0, 8).toUpperCase() : orderId;
+      final shortId = orderId.length >= 8
+          ? orderId.substring(0, 8).toUpperCase()
+          : orderId;
       await RefillLottie.showOrderSuccessDialog(
         context,
         orderNumber: shortId,
@@ -712,7 +844,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       debugPrint('Checkout submission failed: $e');
       final errStr = e.toString().toLowerCase();
-      final isOfflineLikely = errStr.contains('socket') ||
+      final isOfflineLikely =
+          errStr.contains('socket') ||
           errStr.contains('network') ||
           errStr.contains('timeout') ||
           errStr.contains('connection') ||
@@ -729,6 +862,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
       if (!CheckoutRules.isOnlinePayment(selectedPayment) && isOfflineLikely) {
+        if (_appliedVoucher != null) {
+          if (mounted) {
+            _setCheckoutHint(
+              'Reward vouchers need an online connection to validate. Reconnect and retry checkout to keep this voucher on your order.',
+            );
+          }
+          return;
+        }
         try {
           final userId = supabase.auth.currentUser?.id ?? '';
           final queuedId = await OfflineOrderSyncService().queueOfflineOrder(
@@ -742,16 +883,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             platformFee: _platformFeeFor(cart.totalAmount),
             deliveryAddress: completeAddress,
             paymentMethod: selectedPayment,
+            idempotencyKey: _orderAttemptKey,
             notes: _notesController.text.trim(),
           );
 
           cart.clearCart();
-          if (_appliedVoucher != null && userId.isNotEmpty) {
-            _loyaltyService.markVoucherUsed(
-              voucherId: _appliedVoucher!.id,
-              userId: userId,
-            );
-          }
           if (userId.isNotEmpty) {
             _loyaltyService.earnPointsForOrder(
               userId: userId,
@@ -777,10 +913,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               'subtotal': cart.totalAmount,
               'delivery_fee': _deliveryFee,
               'payment_method': paymentMethod,
-              'status': 'pending',
+              'status': 'pending_sync',
+              'is_offline_queued': true,
               'created_at': DateTime.now().toIso8601String(),
               'items': itemsData,
-              'is_offline_queued': true,
             });
             return;
           }
@@ -802,7 +938,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required String paymentMethod,
     bool forceNewCheckout = false,
   }) async {
-    final normalizedMethod = paymentMethod.trim().toLowerCase().replaceAll('paymaya', 'maya');
+    final normalizedMethod = paymentMethod.trim().toLowerCase().replaceAll(
+      'paymaya',
+      'maya',
+    );
     try {
       final response = await supabase.functions.invoke(
         'create-payment-checkout',
@@ -824,7 +963,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
       }
       if (response.status != 200) {
-        throw Exception('Payment gateway server returned status ${response.status}.');
+        throw Exception(
+          'Payment gateway server returned status ${response.status}.',
+        );
       }
       throw Exception('Payment checkout session was not created.');
     } on FunctionException catch (fe) {
@@ -869,7 +1010,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               cart.clearCart();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Payment verified! Tracking your refill order.'),
+                  content: Text(
+                    'Payment verified! Tracking your refill order.',
+                  ),
                   backgroundColor: AppUi.accentGreen,
                   duration: Duration(seconds: 4),
                 ),
@@ -901,7 +1044,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!mounted) return;
     final message = FriendlyErrors.message(
       error,
-      fallback: 'Online payment could not be processed. Retry payment to continue your order.',
+      fallback:
+          'Online payment could not be processed. Retry payment to continue your order.',
     );
 
     await showDialog<void>(
@@ -912,7 +1056,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: const [
             Icon(Icons.error_outline, color: Colors.redAccent),
             SizedBox(width: 8),
-            Text('Payment Notice', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Payment Notice',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Text(message),
@@ -928,7 +1075,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppUi.bluePrimary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () async {
               Navigator.of(dialogCtx).pop();
@@ -960,7 +1109,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         paymentMethod: paymentMethod,
       );
       if (!mounted) return;
-      final launched = await PaymentLaunchService.launchCheckoutUrl(checkoutUrl);
+      final launched = await PaymentLaunchService.launchCheckoutUrl(
+        checkoutUrl,
+      );
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1001,22 +1152,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final platformFee = _platformFeeFor(cart.totalAmount);
     final voucherDiscount = _appliedVoucher != null
         ? (_appliedVoucher!.isDeliveryDiscount
-            ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
-            : _appliedVoucher!.discountAmount)
+              ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
+              : _appliedVoucher!.discountAmount)
         : 0.0;
-    final totalWithDelivery = (cart.totalAmount +
-            _deliveryFee +
-            platformFee -
-            voucherDiscount)
-        .clamp(0.0, double.infinity);
+    final totalWithDelivery = CheckoutRules.calculateOrderTotal(
+      subtotal: cart.totalAmount,
+      deliveryFee: _deliveryFee,
+      platformFee: platformFee,
+      voucherDiscount: voucherDiscount,
+    );
     final textTheme = Theme.of(context).textTheme;
     final profileReady = CheckoutRules.isDeliveryProfileReady(_customerProfile);
     final deliveryIssue = CheckoutRules.deliveryProfileIssue(_customerProfile);
     final bannerMessage =
         _checkoutHint ??
-        (_checkingStationAvailability
-            ? 'Checking station availability…'
-            : deliveryIssue ?? _stationAvailabilityMessage);
+        (_pricingSetupError ??
+            _paymentMethodsError ??
+            (_checkingStationAvailability
+                ? 'Checking station availability…'
+                : deliveryIssue ?? _stationAvailabilityMessage));
     final stationName =
         widget.station['station_name']?.toString() ??
         widget.station['name']?.toString() ??
@@ -1099,6 +1253,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   // Alert Banner (if any)
                   if (bannerMessage != null) ...[
                     _checkoutBanner(bannerMessage),
+                    if (_pricingSetupError != null ||
+                        _paymentMethodsError != null) ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _isLoadingCheckoutConfiguration
+                              ? null
+                              : _retryCheckoutConfiguration,
+                          child: Text(
+                            _isLoadingCheckoutConfiguration
+                                ? 'Retrying…'
+                                : 'Retry checkout setup',
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                   ],
 
@@ -1138,6 +1308,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               canSubmit:
                   cart.totalItems > 0 &&
                   !_isSubmitting &&
+                  _pricingSetupError == null &&
+                  _stationSettingsLoaded &&
+                  _platformFeeConfigLoaded &&
+                  _paymentMethodsLoaded &&
                   !_checkingStationAvailability &&
                   _stationAvailabilityMessage == null,
               onConfirm: () => _confirmOrder(cart),
@@ -1369,8 +1543,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   profileReady
                       ? (_customerProfile?['complete_address'] ??
-                              'No address provided')
-                          .toString()
+                                'No address provided')
+                            .toString()
                       : 'Add your delivery address to continue',
                   style: TextStyle(
                     fontSize: 13,
@@ -1512,8 +1686,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         alignment: Alignment.center,
-                        child: item.imageUrl != null &&
-                                item.imageUrl!.isNotEmpty
+                        child:
+                            item.imageUrl != null && item.imageUrl!.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: CachedNetworkImage(
@@ -1521,11 +1695,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   width: 52,
                                   height: 52,
                                   fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) => const Icon(
-                                    Icons.water_drop_outlined,
-                                    color: AppUi.bluePrimary,
-                                    size: 26,
-                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(
+                                        Icons.water_drop_outlined,
+                                        color: AppUi.bluePrimary,
+                                        size: 26,
+                                      ),
                                 ),
                               )
                             : const Icon(
@@ -1751,11 +1926,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           _appliedVoucher != null
                               ? (_appliedVoucher!.isDeliveryDiscount
-                                  ? 'Free delivery discount applied'
-                                  : '-\u20B1${voucherDiscount.toStringAsFixed(0)} discount applied')
+                                    ? 'Free delivery discount applied'
+                                    : '-\u20B1${voucherDiscount.toStringAsFixed(0)} discount applied')
                               : (_availableVouchers.isEmpty
-                                  ? 'No vouchers available for this order'
-                                  : '${_availableVouchers.length} available for this order'),
+                                    ? 'No vouchers available for this order'
+                                    : '${_availableVouchers.length} available for this order'),
                           style: TextStyle(
                             fontSize: 12,
                             color: AppUi.textSecondaryOf(context),
@@ -1953,7 +2128,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     double voucherDiscount,
     double totalWithDelivery,
   ) {
-    final isFreeDelivery = _deliveryFee == 0 ||
+    final isFreeDelivery =
+        _deliveryFee == 0 ||
         (_appliedVoucher != null && _appliedVoucher!.isDeliveryDiscount);
 
     return Container(
@@ -2162,74 +2338,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _paymentBrandBadge(String method) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return switch (method) {
-      'gcash' => Container(
-          width: 44,
-          height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFF007DFE),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'GCash',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-      'maya' => Container(
-          width: 44,
-          height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFF00D166),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'Maya',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-      'card' => Container(
-          width: 44,
-          height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E3A8A),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: const Icon(
-            Icons.credit_card_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      _ => Container(
-          width: 44,
-          height: 32,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppUi.borderOf(context)),
-          ),
-          alignment: Alignment.center,
-          child: const Icon(
-            Icons.payments_outlined,
-            color: Color(0xFF16A34A),
-            size: 20,
-          ),
-        ),
-    };
+    return PaymentBrandMark(method: method, width: 58, height: 36);
   }
 
   String _paymentSubtitle(String method) {
@@ -2310,9 +2419,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
@@ -2557,9 +2664,9 @@ class _CheckoutBottomBar extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF88BA3A),
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFF88BA3A).withValues(
-                    alpha: 0.35,
-                  ),
+                  disabledBackgroundColor: const Color(
+                    0xFF88BA3A,
+                  ).withValues(alpha: 0.35),
                   padding: const EdgeInsets.symmetric(horizontal: 28),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(26),
@@ -2614,7 +2721,8 @@ class _PaymentVerificationModal extends StatefulWidget {
   });
 
   @override
-  State<_PaymentVerificationModal> createState() => _PaymentVerificationModalState();
+  State<_PaymentVerificationModal> createState() =>
+      _PaymentVerificationModalState();
 }
 
 class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
@@ -2645,13 +2753,17 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
           ),
           callback: (payload) {
             final newRecord = payload.newRecord;
-            final status = (newRecord['payment_status'] ?? '').toString().toLowerCase();
+            final status = (newRecord['payment_status'] ?? '')
+                .toString()
+                .toLowerCase();
             if (mounted) {
               setState(() {
                 _paymentStatus = status;
               });
             }
-            if (status == 'success' || status == 'paid' || status == 'succeeded') {
+            if (status == 'success' ||
+                status == 'paid' ||
+                status == 'succeeded') {
               widget.onPaymentSuccess(newRecord);
             }
           },
@@ -2685,14 +2797,13 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
         try {
           final verifyRes = await _supabase.functions.invoke(
             'create-payment-checkout',
-            body: {
-              'action': 'verify',
-              'order_id': widget.orderId,
-            },
+            body: {'action': 'verify', 'order_id': widget.orderId},
           );
           final vData = verifyRes.data;
           if (vData is Map && vData['payment_status'] != null) {
-            final verifiedStatus = vData['payment_status'].toString().toLowerCase();
+            final verifiedStatus = vData['payment_status']
+                .toString()
+                .toLowerCase();
             if (verifiedStatus == 'success' || verifiedStatus == 'paid') {
               record = await _supabase
                   .from('orders')
@@ -2735,7 +2846,12 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(FriendlyErrors.message(e, fallback: 'Could not check payment status.')),
+            content: Text(
+              FriendlyErrors.message(
+                e,
+                fallback: 'Could not check payment status.',
+              ),
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -2753,7 +2869,10 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
     }
 
     try {
-      final normalizedMethod = widget.paymentMethod.trim().toLowerCase().replaceAll('paymaya', 'maya');
+      final normalizedMethod = widget.paymentMethod
+          .trim()
+          .toLowerCase()
+          .replaceAll('paymaya', 'maya');
       final response = await _supabase.functions.invoke(
         'create-payment-checkout',
         body: {
@@ -2785,17 +2904,19 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
           : fe.reasonPhrase ?? 'Could not reopen payment checkout.';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Colors.redAccent,
-          ),
+          SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(FriendlyErrors.message(e, fallback: 'Could not reopen payment checkout.')),
+            content: Text(
+              FriendlyErrors.message(
+                e,
+                fallback: 'Could not reopen payment checkout.',
+              ),
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -2836,7 +2957,9 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                color: isDark
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFCBD5E1),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -2897,7 +3020,11 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (_paymentStatus == 'failed') ...[
-                      const Icon(Icons.cancel, color: Colors.redAccent, size: 24),
+                      const Icon(
+                        Icons.cancel,
+                        color: Colors.redAccent,
+                        size: 24,
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'Payment Unsuccessful',
@@ -2913,7 +3040,9 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppUi.bluePrimary),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppUi.bluePrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),

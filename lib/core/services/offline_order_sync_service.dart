@@ -76,29 +76,30 @@ class OfflineOrderSyncService {
   /// Starts listening to global network changes to automatically trigger sync.
   void initializeConnectivityListener() {
     _connectivitySubscription?.cancel();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
-      (List<ConnectivityResult> results) {
-        final hasConnection = results.contains(ConnectivityResult.mobile) ||
-            results.contains(ConnectivityResult.wifi) ||
-            results.contains(ConnectivityResult.ethernet);
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
+      final hasConnection =
+          results.contains(ConnectivityResult.mobile) ||
+          results.contains(ConnectivityResult.wifi) ||
+          results.contains(ConnectivityResult.ethernet);
 
-        if (hasConnection && !_isSyncing) {
-          debugPrint(
-            '🌐 Network connection active: Triggering offline order synchronization...',
-          );
-          syncPendingOrders();
-          // Also process owner/customer action queue and rider delivery queue
-          final client = Supabase.instance.client;
-          OfflineQueueService.processQueue(client).catchError((e) {
-            debugPrint('OfflineQueueService sync error: $e');
-          });
-          OfflineDeliveryQueueService().syncPendingDeliveries().catchError((e) {
-            debugPrint('OfflineDeliveryQueueService sync error: $e');
-            return 0;
-          });
-        }
-      },
-    );
+      if (hasConnection && !_isSyncing) {
+        debugPrint(
+          '🌐 Network connection active: Triggering offline order synchronization...',
+        );
+        syncPendingOrders();
+        // Also process owner/customer action queue and rider delivery queue
+        final client = Supabase.instance.client;
+        OfflineQueueService.processQueue(client).catchError((e) {
+          debugPrint('OfflineQueueService sync error: $e');
+        });
+        OfflineDeliveryQueueService().syncPendingDeliveries().catchError((e) {
+          debugPrint('OfflineDeliveryQueueService sync error: $e');
+          return 0;
+        });
+      }
+    });
   }
 
   /// Queues an order locally in SQLite with a unique client-side UUID.
@@ -116,34 +117,31 @@ class OfflineOrderSyncService {
     required double platformFee,
     required String deliveryAddress,
     required String paymentMethod,
+    String? idempotencyKey,
     String? notes,
   }) async {
     final localDatabase = await db;
-    final orderId = _uuid.v4();
+    final orderId = idempotencyKey ?? _uuid.v4();
     final nowIso = DateTime.now().toIso8601String();
     final itemsJson = jsonEncode(items);
 
-    await localDatabase.insert(
-      tableOfflineOrders,
-      {
-        'id': orderId,
-        'customer_id': customerId,
-        'station_id': stationId,
-        'station_name': stationName,
-        'items_json': itemsJson,
-        'total_amount': totalAmount,
-        'subtotal': subtotal,
-        'delivery_fee': deliveryFee,
-        'platform_fee': platformFee,
-        'delivery_address': deliveryAddress,
-        'payment_method': paymentMethod,
-        'notes': notes,
-        'status': 'pending_sync',
-        'created_at': nowIso,
-        'error_message': null,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await localDatabase.insert(tableOfflineOrders, {
+      'id': orderId,
+      'customer_id': customerId,
+      'station_id': stationId,
+      'station_name': stationName,
+      'items_json': itemsJson,
+      'total_amount': totalAmount,
+      'subtotal': subtotal,
+      'delivery_fee': deliveryFee,
+      'platform_fee': platformFee,
+      'delivery_address': deliveryAddress,
+      'payment_method': paymentMethod,
+      'notes': notes,
+      'status': 'pending_sync',
+      'created_at': nowIso,
+      'error_message': null,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     debugPrint('📦 Offline order queued locally in SQLite: $orderId');
 
@@ -176,7 +174,9 @@ class OfflineOrderSyncService {
         return;
       }
 
-      debugPrint('🔄 Synchronizing ${pendingRows.length} offline orders to Supabase...');
+      debugPrint(
+        '🔄 Synchronizing ${pendingRows.length} offline orders to Supabase...',
+      );
 
       for (final row in pendingRows) {
         final orderId = row['id'] as String;
@@ -193,72 +193,27 @@ class OfflineOrderSyncService {
         final notes = row['notes'] as String?;
 
         try {
-          // Attempt atomic RPC if available, otherwise direct insert
-          try {
-            final orderData = {
-              'id': orderId,
-              'customer_id': customerId,
-              'owner_id': stationId,
-              'station_name': stationName,
-              'customer_address': deliveryAddress,
-              'delivery_address': deliveryAddress,
-              'idempotency_key': orderId,
-              'subtotal': subtotal,
-              'delivery_fee': deliveryFee,
-              'platform_fee': platformFee,
-              'total_amount': totalAmount,
-              'payment_method': paymentMethod,
-              'notes': notes,
-              'status': 'pending',
-              'created_at': row['created_at'],
-            };
-            await supabase.rpc(
-              'create_order_atomic',
-              params: {
-                'p_order_data': orderData,
-                'p_items_data': items,
-              },
-            );
-          } catch (_) {
-            // Direct insertion fallback
-            await supabase.from('orders').insert({
-              'id': orderId,
-              'customer_id': customerId,
-              'owner_id': stationId,
-              'station_id': stationId,
-              'station_name': stationName,
-              'items': items,
-              'subtotal': subtotal,
-              'delivery_fee': deliveryFee,
-              'platform_fee': platformFee,
-              'total_amount': totalAmount,
-              'delivery_address': deliveryAddress,
-              'customer_address': deliveryAddress,
-              'payment_method': paymentMethod,
-              'notes': notes,
-              'status': 'pending',
-              'created_at': row['created_at'],
-            });
-
-            // Populate order_items in fallback if items are present
-            if (items.isNotEmpty) {
-              final orderItems = items.map((it) {
-                final itemMap = Map<String, dynamic>.from(it as Map);
-                final unitPrice = ((itemMap['price'] ?? itemMap['unit_price'] ?? 0.0) as num).toDouble();
-                final qty = ((itemMap['quantity'] ?? 1) as num).toInt();
-                return {
-                  'order_id': orderId,
-                  'product_name': itemMap['name'] ?? itemMap['product_name'] ?? 'Refill Item',
-                  'quantity': qty,
-                  'price_at_purchase': unitPrice,
-                  'subtotal': unitPrice * qty,
-                };
-              }).toList();
-              try {
-                await supabase.from('order_items').insert(orderItems);
-              } catch (_) {}
-            }
-          }
+          final orderData = {
+            'id': orderId,
+            'customer_id': customerId,
+            'owner_id': stationId,
+            'station_name': stationName,
+            'idempotency_key': orderId,
+            'customer_address': deliveryAddress,
+            'delivery_address': deliveryAddress,
+            'subtotal': subtotal,
+            'delivery_fee': deliveryFee,
+            'platform_fee': platformFee,
+            'total_amount': totalAmount,
+            'payment_method': paymentMethod,
+            'notes': notes,
+            'status': 'pending',
+            'created_at': row['created_at'],
+          };
+          await supabase.rpc(
+            'create_order_atomic',
+            params: {'p_order_data': orderData, 'p_items_data': items},
+          );
 
           // Mark as successfully synchronized
           await localDatabase.update(
@@ -270,13 +225,26 @@ class OfflineOrderSyncService {
           debugPrint('✅ Offline order successfully synced to cloud: $orderId');
         } on PostgrestException catch (pe) {
           if (pe.code == '23505') {
-            // Already created on cloud, mark synced
-            await localDatabase.update(
-              tableOfflineOrders,
-              {'status': 'synced'},
-              where: 'id = ?',
-              whereArgs: [orderId],
-            );
+            final existingOrder = await supabase
+                .from('orders')
+                .select('id')
+                .eq('idempotency_key', orderId)
+                .maybeSingle();
+            if (existingOrder != null) {
+              await localDatabase.update(
+                tableOfflineOrders,
+                {'status': 'synced'},
+                where: 'id = ?',
+                whereArgs: [orderId],
+              );
+            } else {
+              await localDatabase.update(
+                tableOfflineOrders,
+                {'status': 'failed', 'error_message': pe.message},
+                where: 'id = ?',
+                whereArgs: [orderId],
+              );
+            }
           } else {
             debugPrint('⚠️ Sync rejected for order $orderId: ${pe.message}');
             await localDatabase.update(
@@ -303,13 +271,43 @@ class OfflineOrderSyncService {
   Future<List<Map<String, dynamic>>> getOfflineOrders() async {
     try {
       final localDatabase = await db;
-      return await localDatabase.query(
+      final rows = await localDatabase.query(
         tableOfflineOrders,
         orderBy: 'created_at DESC',
       );
+      return rows.map((row) {
+        final status = row['status']?.toString();
+        return {
+          ...row,
+          'items': jsonDecode(row['items_json'] as String) as List<dynamic>,
+          'is_offline_queued': status == 'pending_sync' || status == 'failed',
+          'offline_sync_failed': status == 'failed',
+          'status': status == 'failed' ? 'pending_sync' : status,
+        };
+      }).toList();
     } catch (_) {
       return [];
     }
+  }
+
+  Future<bool> retryOrderSync(String orderId) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) {
+      throw StateError('Sign in again before retrying this order.');
+    }
+
+    final localDatabase = await db;
+    final updated = await localDatabase.update(
+      tableOfflineOrders,
+      {'status': 'pending_sync', 'error_message': null},
+      where: 'id = ? AND customer_id = ? AND status IN (?, ?)',
+      whereArgs: [orderId, userId, 'pending_sync', 'failed'],
+    );
+    if (updated == 0) return false;
+
+    unawaited(_notifyPendingCount());
+    await syncPendingOrders();
+    return true;
   }
 
   /// Count of pending un-synchronized orders.
@@ -332,4 +330,3 @@ class OfflineOrderSyncService {
     _pendingCountController.close();
   }
 }
-

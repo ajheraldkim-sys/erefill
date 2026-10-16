@@ -15,10 +15,13 @@ eRefill is a Flutter and Supabase app for water refilling stations. It supports 
 1. Install Flutter.
 2. Run `flutter pub get`.
 3. Configure Supabase in `lib/core/constants.dart`.
-4. Apply database migrations from `supabase/migrations`.
+4. Ensure the base application schema is installed in Supabase; the scripts below assume its tables already exist.
 5. Apply `supabase/scripts/remote_catchup.sql` in the Supabase SQL Editor when using the repository's catch-up schema path.
-6. Deploy the Supabase Edge Functions in `supabase/functions`.
-7. Run the app with `flutter run`.
+6. Apply `supabase/scripts/loyalty_and_referrals.sql` to install customer vouchers and loyalty tables.
+7. If using subscription orders, apply `supabase/scripts/auto_generate_subscription_orders.sql` before the checkout pricing script; it changes the order idempotency column to text and replaces the order-creation function.
+8. Apply `supabase/scripts/fix_customer_checkout_pricing.sql` last. It makes checkout fees and vouchers server-authoritative and makes order retries idempotent.
+9. Deploy the Supabase Edge Functions in `supabase/functions`.
+10. Run the app with `flutter run`.
 
 ### Realtime and notifications
 

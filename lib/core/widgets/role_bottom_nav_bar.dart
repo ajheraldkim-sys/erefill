@@ -32,6 +32,9 @@ class RoleBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isCompact = width < 380;
+    final isVeryCompact = width < 340;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = AppUi.surfaceOf(context);
     final indicatorColor = isDark
@@ -41,11 +44,16 @@ class RoleBottomNavBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        padding: EdgeInsets.fromLTRB(
+          isCompact ? 8 : 16,
+          isCompact ? 6 : 8,
+          isCompact ? 8 : 16,
+          isCompact ? 6 : 12,
+        ),
         child: Container(
           decoration: BoxDecoration(
             color: surfaceColor,
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(isCompact ? 24 : 30),
             border: Border.all(color: AppUi.borderOf(context)),
             boxShadow: [
               BoxShadow(
@@ -55,7 +63,9 @@ class RoleBottomNavBar extends StatelessWidget {
                 offset: const Offset(0, 4),
               ),
               BoxShadow(
-                color: AppUi.bluePrimary.withValues(alpha: isDark ? 0.12 : 0.04),
+                color: AppUi.bluePrimary.withValues(
+                  alpha: isDark ? 0.12 : 0.04,
+                ),
                 blurRadius: 10,
                 spreadRadius: -2,
                 offset: const Offset(0, 2),
@@ -86,7 +96,7 @@ class RoleBottomNavBar extends StatelessWidget {
                     color: selected
                         ? AppUi.bluePrimary
                         : AppUi.textSecondaryOf(context),
-                    fontSize: 11,
+                    fontSize: isVeryCompact ? 9 : (isCompact ? 10 : 11),
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                   );
                 }),
@@ -99,7 +109,7 @@ class RoleBottomNavBar extends StatelessWidget {
                   }
                   onTap(index);
                 },
-                height: 64,
+                height: isVeryCompact ? 58 : (isCompact ? 60 : 64),
                 elevation: 0,
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
@@ -143,10 +153,7 @@ class _ActiveNavIcon extends StatelessWidget {
       duration: const Duration(milliseconds: 350),
       curve: Curves.elasticOut,
       builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
+        return Transform.scale(scale: scale, child: child);
       },
       child: _NavIcon(icon: icon, badgeCount: badgeCount),
     );
@@ -161,7 +168,10 @@ class _NavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = Icon(icon, size: 22);
+    final child = Icon(
+      icon,
+      size: MediaQuery.sizeOf(context).width < 380 ? 20 : 22,
+    );
 
     if (badgeCount <= 0) return child;
 

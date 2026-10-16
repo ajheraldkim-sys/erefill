@@ -31,22 +31,28 @@ class OrderDetailScreen extends StatefulWidget {
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
-class _OrderDetailScreenState extends State<OrderDetailScreen> {
+class _OrderDetailScreenState extends State<OrderDetailScreen>
+    with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
   final _chatService = ChatService();
   RealtimeChannel? _orderChannel;
   Timer? _orderPollingTimer;
+  Timer? _reconnectTimer;
   Map<String, dynamic>? _currentOrder;
   Map<String, dynamic>? _riderProfile;
   List<Map<String, dynamic>>? _orderItems;
   bool _hasReviewed = false;
   bool _isLoadingOrder = false;
+  bool _isRefreshingOrder = false;
+  bool _isAppForeground = true;
   String? _loadError;
+  String? _refreshError;
   bool _isRetryingPayment = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.order != null) {
       _currentOrder = widget.order;
       final id = _currentOrder?['id']?.toString();
@@ -56,6 +62,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _bootstrapOrderData();
     } else if (widget.orderId != null) {
       _loadOrderById(widget.orderId!);
+    }
+  }
+
+  Future<void> _retryOfflineOrderSync() async {
+    final orderId = _currentOrder?['id']?.toString();
+    if (orderId == null || _isRefreshingOrder) return;
+    setState(() {
+      _isRefreshingOrder = true;
+      _refreshError = null;
+    });
+    var orderWasQueued = false;
+    try {
+      orderWasQueued = await OfflineOrderSyncService().retryOrderSync(orderId);
+    } catch (e) {
+      debugPrint('Offline order retry failed: $e');
+      if (mounted) {
+        setState(() {
+          _refreshError =
+              'Could not retry this order. Check your connection and try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshingOrder = false);
+    }
+    if (!mounted) return;
+    if (orderWasQueued) {
+      await _refreshOrderState();
+    } else {
+      setState(() {
+        _refreshError =
+            'This order is no longer in the local queue. Refresh order status.';
+      });
     }
   }
 
@@ -91,7 +129,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return;
       }
       final offlineList = await OfflineOrderSyncService().getOfflineOrders();
-      final offlineMatches = offlineList.where((o) => o['id'] == orderId).toList();
+      final offlineMatches = offlineList
+          .where((o) => o['id'] == orderId)
+          .toList();
       if (offlineMatches.isNotEmpty && mounted) {
         setState(() {
           _currentOrder = offlineMatches.first;
@@ -189,10 +229,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final orderId = _currentOrder?['id'] ?? widget.orderId;
     if (orderId == null) return;
 
+    final isQueuedLocally =
+        _currentOrder?['is_offline_queued'] == true ||
+        _currentOrder?['status'] == 'pending_sync';
+    if (isQueuedLocally) {
+      _startOrderPollingTimer();
+      return;
+    }
+
     if (_orderChannel != null) {
       supabase.removeChannel(_orderChannel!);
       _orderChannel = null;
     }
+    _reconnectTimer?.cancel();
 
     _orderChannel = supabase
         .channel('public:orders:$orderId')
@@ -212,18 +261,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         .subscribe((status, [error]) {
           if (status == RealtimeSubscribeStatus.channelError ||
               status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _subscribeToOrderUpdates();
+            _reconnectTimer?.cancel();
+            _reconnectTimer = Timer(const Duration(seconds: 3), () {
+              if (mounted && _isAppForeground) _subscribeToOrderUpdates();
             });
           }
         });
 
-    _startOrderPollingTimer();
+    if (_isAppForeground) _startOrderPollingTimer();
   }
 
   void _startOrderPollingTimer() {
+    if (!_isAppForeground) return;
     _orderPollingTimer?.cancel();
-    _orderPollingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _orderPollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       final status = _currentOrder?['status']?.toString();
       if (status != 'delivered' && status != 'cancelled') {
@@ -234,21 +285,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _refreshOrderState() async {
     final orderId = _currentOrder?['id'] ?? widget.orderId;
-    if (orderId == null) return;
+    if (orderId == null || _isRefreshingOrder || !_isAppForeground) return;
+    _isRefreshingOrder = true;
     try {
+      final currentOrder = _currentOrder;
+      final isQueuedLocally =
+          currentOrder?['is_offline_queued'] == true ||
+          currentOrder?['status'] == 'pending_sync';
+      if (isQueuedLocally) {
+        final offlineOrders = await OfflineOrderSyncService()
+            .getOfflineOrders();
+        final localOrder = offlineOrders
+            .where((item) => item['id']?.toString() == orderId.toString())
+            .firstOrNull;
+
+        if (localOrder != null && localOrder['status'] == 'pending_sync') {
+          if (mounted) {
+            setState(() {
+              _currentOrder = {...?currentOrder, ...localOrder};
+              _refreshError = null;
+            });
+          }
+          return;
+        }
+        if (localOrder?['status'] == 'synced' && mounted) {
+          setState(() {
+            _currentOrder = {
+              ...?currentOrder,
+              'status': 'pending',
+              'is_offline_queued': false,
+              'offline_sync_failed': false,
+            };
+          });
+          HapticFeedback.heavyImpact();
+          _showStatusNotification('pending');
+        }
+      }
+
       final updated = await supabase
           .from('orders')
           .select()
           .eq('id', orderId)
           .maybeSingle();
-      if (updated != null && mounted) {
+      if (!mounted) return;
+      if (updated == null) {
+        setState(() {
+          _refreshError = 'The latest order status could not be found.';
+        });
+        return;
+      }
+      if (mounted) {
         final oldStatus = _currentOrder?['status'];
         final newStatus = updated['status'] as String?;
         final oldRiderId = _currentOrder?['assigned_rider_id'];
         final newRiderId = updated['assigned_rider_id'];
 
         setState(() {
-          _currentOrder = {...(_currentOrder ?? {}), ...updated};
+          _currentOrder = {
+            ...(_currentOrder ?? {}),
+            ...updated,
+            'is_offline_queued': false,
+            'offline_sync_failed': false,
+          };
+          _refreshError = null;
         });
 
         if (newRiderId != null && oldRiderId == null) {
@@ -262,12 +361,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error polling order state: $e');
+      if (mounted) {
+        setState(() {
+          _refreshError =
+              'Could not refresh order updates. Check your connection and retry.';
+        });
+      }
+    } finally {
+      _isRefreshingOrder = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppForeground = state == AppLifecycleState.resumed;
+    if (_isAppForeground) {
+      _refreshOrderState();
+      _subscribeToOrderUpdates();
+    } else {
+      _orderPollingTimer?.cancel();
+      _orderPollingTimer = null;
+      _reconnectTimer?.cancel();
+      _reconnectTimer = null;
     }
   }
 
   void _showStatusNotification(String status) {
     String message;
     switch (status) {
+      case 'pending':
+        message = 'Your offline order was sent to the station.';
+        break;
       case 'accepted':
         message = 'Station has accepted your order!';
         break;
@@ -327,7 +451,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _orderPollingTimer?.cancel();
+    _reconnectTimer?.cancel();
     if (_orderChannel != null) {
       supabase.removeChannel(_orderChannel!);
     }
@@ -355,7 +481,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             .eq('id', orderId)
             .maybeSingle();
       } catch (e) {
-        debugPrint('[OrderDetail] Order reload before payment retry failed: $e');
+        debugPrint(
+          '[OrderDetail] Order reload before payment retry failed: $e',
+        );
       }
 
       final activeOrder = latestOrder ?? _currentOrder ?? order;
@@ -363,8 +491,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         setState(() => _currentOrder = {...?_currentOrder, ...latestOrder!});
       }
 
-      final paymentStatus = (activeOrder['payment_status'] ?? 'pending').toString().toLowerCase();
-      final orderStatus = (activeOrder['status'] ?? 'pending').toString().toLowerCase();
+      final paymentStatus = (activeOrder['payment_status'] ?? 'pending')
+          .toString()
+          .toLowerCase();
+      final orderStatus = (activeOrder['status'] ?? 'pending')
+          .toString()
+          .toLowerCase();
 
       // If already paid
       if (paymentStatus == 'success' || paymentStatus == 'paid') {
@@ -383,7 +515,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('This order is $orderStatus and is no longer eligible for payment.'),
+            content: Text(
+              'This order is $orderStatus and is no longer eligible for payment.',
+            ),
             backgroundColor: AppColors.uiError,
           ),
         );
@@ -391,19 +525,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
 
       // 2. Check for an existing valid checkout URL if payment is still pending/processing
-      final existingCheckoutUrl = (activeOrder['payment_checkout_url'] ??
-              order['payment_checkout_url'] ??
-              _currentOrder?['payment_checkout_url'])
-          ?.toString()
-          .trim();
+      final existingCheckoutUrl =
+          (activeOrder['payment_checkout_url'] ??
+                  order['payment_checkout_url'] ??
+                  _currentOrder?['payment_checkout_url'])
+              ?.toString()
+              .trim();
 
       final isFailedState = {'failed', 'expired'}.contains(paymentStatus);
       if (existingCheckoutUrl != null &&
           existingCheckoutUrl.isNotEmpty &&
           !isFailedState &&
-          (existingCheckoutUrl.startsWith('http://') || existingCheckoutUrl.startsWith('https://'))) {
-        debugPrint('[OrderDetail] Launching existing checkout URL: $existingCheckoutUrl');
-        final launched = await PaymentLaunchService.launchCheckoutUrl(existingCheckoutUrl);
+          (existingCheckoutUrl.startsWith('http://') ||
+              existingCheckoutUrl.startsWith('https://'))) {
+        debugPrint(
+          '[OrderDetail] Launching existing checkout URL: $existingCheckoutUrl',
+        );
+        final launched = await PaymentLaunchService.launchCheckoutUrl(
+          existingCheckoutUrl,
+        );
         if (launched) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -418,8 +558,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       }
 
       // 3. If no existing URL or launch failed, create or refresh via edge function
-      final rawMethod = (activeOrder['payment_method'] ?? order['payment_method'] ?? '').toString();
-      final normalizedMethod = rawMethod.trim().toLowerCase().replaceAll('paymaya', 'maya');
+      final rawMethod =
+          (activeOrder['payment_method'] ?? order['payment_method'] ?? '')
+              .toString();
+      final normalizedMethod = rawMethod.trim().toLowerCase().replaceAll(
+        'paymaya',
+        'maya',
+      );
 
       final response = await supabase.functions.invoke(
         'create-payment-checkout',
@@ -433,7 +578,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
 
       final data = response.data;
-      final checkoutUrl = data is Map ? data['checkout_url']?.toString().trim() : null;
+      final checkoutUrl = data is Map
+          ? data['checkout_url']?.toString().trim()
+          : null;
       if (checkoutUrl == null || checkoutUrl.isEmpty) {
         throw Exception('Payment checkout session could not be established.');
       }
@@ -447,15 +594,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         });
       }
 
-      final launched = await PaymentLaunchService.launchCheckoutUrl(checkoutUrl);
+      final launched = await PaymentLaunchService.launchCheckoutUrl(
+        checkoutUrl,
+      );
       if (!launched) {
-        throw Exception('Unable to open checkout in browser. Please check your browser or app settings.');
+        throw Exception(
+          'Unable to open checkout in browser. Please check your browser or app settings.',
+        );
       }
     } catch (e) {
       debugPrint('[OrderDetail] Payment retry failed: $e');
       if (!mounted) return;
 
-      String errorMessage = 'Could not reopen payment checkout. Please try again.';
+      String errorMessage =
+          'Could not reopen payment checkout. Please try again.';
       if (e is FunctionException) {
         final details = e.details;
         if (details is Map && details['error'] != null) {
@@ -549,7 +701,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         newStatus: 'cancelled',
       );
       if (res['success'] != true) {
-        throw StateError(res['message']?.toString() ?? 'Order cancellation could not be applied.');
+        throw StateError(
+          res['message']?.toString() ??
+              'Order cancellation could not be applied.',
+        );
       }
 
       if (mounted) {
@@ -593,6 +748,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         body: AxoEmptyState(
           title: _loadError ?? 'Order not found',
           message: 'Return home and open the order from your history.',
+          actionLabel: _loadError == null ? null : 'Retry',
+          onAction: _loadError == null
+              ? null
+              : () {
+                  final orderId = widget.orderId ?? order?['id']?.toString();
+                  if (orderId != null && orderId.isNotEmpty) {
+                    _loadOrderById(orderId);
+                  }
+                },
         ),
       );
     }
@@ -641,11 +805,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_refreshError != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppUi.warningBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppUi.warningFg.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.wifi_off_rounded,
+                      color: AppUi.warningFg,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _refreshError!,
+                        style: const TextStyle(
+                          color: AppUi.warningFg,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _isRefreshingOrder ? null : _refreshOrderState,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: isDark ? AppUi.surfaceRaisedOf(context) : AppUi.surfaceOf(context),
+                color: isDark
+                    ? AppUi.surfaceRaisedOf(context)
+                    : AppUi.surfaceOf(context),
                 borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 border: Border.all(color: AppUi.borderOf(context)),
                 boxShadow: [
@@ -672,20 +878,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         child: status == 'delivered'
                             ? const RefillLottie.success(width: 44, height: 44)
                             : (status == 'delivering' ||
-                                    status == 'assigned_to_rider' ||
-                                    status == 'out_for_delivery')
-                                ? const RefillLottie.rider(width: 48, height: 48)
-                                : (status == 'preparing' ||
-                                        status == 'ready_for_pickup')
-                                    ? const RefillLottie.waterDrop(
-                                        width: 40,
-                                        height: 40,
-                                      )
-                                    : const Icon(
-                                        Icons.local_shipping_rounded,
-                                        color: AppUi.bluePrimary,
-                                        size: 24,
-                                      ),
+                                  status == 'assigned_to_rider' ||
+                                  status == 'out_for_delivery')
+                            ? const RefillLottie.rider(width: 48, height: 48)
+                            : (status == 'preparing' ||
+                                  status == 'ready_for_pickup')
+                            ? const RefillLottie.waterDrop(
+                                width: 40,
+                                height: 40,
+                              )
+                            : const Icon(
+                                Icons.local_shipping_rounded,
+                                color: AppUi.bluePrimary,
+                                size: 24,
+                              ),
                       ),
                     ),
                   ),
@@ -728,6 +934,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ],
               ),
             ),
+            if (order['is_offline_queued'] == true ||
+                status == 'pending_sync') ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: AppUi.warningBg,
+                  borderRadius: AppUi.cardRadius,
+                  border: Border.all(
+                    color: AppUi.warningFg.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      order['offline_sync_failed'] == true
+                          ? Icons.cloud_off_rounded
+                          : Icons.cloud_upload_outlined,
+                      color: AppUi.warningFg,
+                      size: 19,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        order['offline_sync_failed'] == true
+                            ? 'This order has not reached the station. Check your connection, then retry.'
+                            : 'Saved on this device. The station has not received the order yet.',
+                        style: const TextStyle(
+                          color: AppUi.warningFg,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _isRefreshingOrder
+                          ? null
+                          : _retryOfflineOrderSync,
+                      child: Text(_isRefreshingOrder ? 'Sending…' : 'Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             if (status == 'cancelled') ...[
               const SizedBox(height: 8),
               Container(
@@ -775,7 +1028,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const SizedBox(height: 10),
             _buildDeliveryInfo(order),
             const SizedBox(height: 10),
-            RefillOrderStatusTimeline(status: status),
+            if (status == 'pending_sync')
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Order progress starts after the station receives your order.',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              RefillOrderStatusTimeline(status: status),
             if (status == 'pending') ...[
               const SizedBox(height: 10),
               SizedBox(
@@ -798,8 +1060,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     side: BorderSide(
                       color: AppColors.statusCancelled.withValues(alpha: 0.3),
                     ),
-                    backgroundColor:
-                        AppColors.statusCancelled.withValues(alpha: 0.08),
+                    backgroundColor: AppColors.statusCancelled.withValues(
+                      alpha: 0.08,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.cardRadius,
                     ),
@@ -1352,11 +1615,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     // 4. Totals
                     Builder(
                       builder: (context) {
-                        final subtotal = (order['subtotal'] as num?)?.toDouble() ?? 0.0;
-                        final deliveryFee = (order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
-                        final totalAmount = (order['total_amount'] as num?)?.toDouble() ?? (subtotal + deliveryFee);
-                        final explicitFee = (order['platform_fee'] as num?)?.toDouble();
-                        final serviceFee = explicitFee ??
+                        final subtotal =
+                            (order['subtotal'] as num?)?.toDouble() ?? 0.0;
+                        final deliveryFee =
+                            (order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+                        final totalAmount =
+                            (order['total_amount'] as num?)?.toDouble() ??
+                            (subtotal + deliveryFee);
+                        final explicitFee = (order['platform_fee'] as num?)
+                            ?.toDouble();
+                        final serviceFee =
+                            explicitFee ??
                             ((totalAmount - (subtotal + deliveryFee)) > 0.01
                                 ? (totalAmount - (subtotal + deliveryFee))
                                 : 0.0);
@@ -1409,7 +1678,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             if (serviceFee > 0) ...[
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
@@ -1437,7 +1707,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                                   SizedBox(width: 8),
                                                   Text(
                                                     'What is this fee?',
-                                                    style: TextStyle(fontSize: 16),
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                    ),
                                                   ),
                                                 ],
                                               ),
@@ -1450,7 +1722,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                               ),
                                               actions: [
                                                 TextButton(
-                                                  onPressed: () => Navigator.pop(ctx),
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx),
                                                   child: const Text('Got it'),
                                                 ),
                                               ],
@@ -1781,17 +2054,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-          content: Text(
-            FriendlyErrors.message(
-              e,
-              fallback: 'Unable to open station chat right now. Please try again.',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              FriendlyErrors.message(
+                e,
+                fallback:
+                    'Unable to open station chat right now. Please try again.',
+              ),
             ),
+            backgroundColor: AppUi.error,
           ),
-          backgroundColor: AppUi.error,
-        ));
+        );
       }
     }
   }
@@ -1830,17 +2104,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-          content: Text(
-            FriendlyErrors.message(
-              e,
-              fallback: 'Unable to open rider chat right now. Please try again.',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              FriendlyErrors.message(
+                e,
+                fallback:
+                    'Unable to open rider chat right now. Please try again.',
+              ),
             ),
+            backgroundColor: AppUi.error,
           ),
-          backgroundColor: AppUi.error,
-        ));
+        );
       }
     }
   }

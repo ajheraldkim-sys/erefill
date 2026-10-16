@@ -16,8 +16,7 @@ class AppConstants {
   static const String supabaseUrl = 'https://ormmjxtbwosnraijphra.supabase.co';
   static const String supabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ybW1qeHRid29zbnJhaWpwaHJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MTgxOTQsImV4cCI6MjA4OTM5NDE5NH0.s_A7c1BEFyKRLnq8Fzw_YRCOmyQLm7uPqN7vzKxLGzo';
-  static const String paymongoPublicKey =
-      'pk_test_1zYhxAz8T8ceWW9wXeLM9cMb';
+  static const String paymongoPublicKey = 'pk_test_1zYhxAz8T8ceWW9wXeLM9cMb';
 
   static const List<String> defaultPuroks = [
     'Purok 1',
@@ -66,17 +65,18 @@ class AppConstants {
     'Madrid': [
       'Bagsac',
       'Bayogo',
-      'Linibonan',
       'Magsaysay',
       'Manga',
-      'Panubigan',
-      'Patong',
+      'Panayogon',
+      'Patong Patong',
       'Quirino',
+      'San Antonio',
       'San Juan',
       'San Roque',
       'San Vicente',
+      'Songkit',
       'Union',
-      'Urbiztondo',
+      'Linibonan',
     ],
   };
 
@@ -103,17 +103,18 @@ class AppConstants {
     'Madrid': {
       'Bagsac': defaultPuroks,
       'Bayogo': defaultPuroks,
-      'Linibonan': defaultPuroks,
       'Magsaysay': defaultPuroks,
       'Manga': defaultPuroks,
-      'Panubigan': defaultPuroks,
-      'Patong': defaultPuroks,
+      'Panayogon': defaultPuroks,
+      'Patong Patong': defaultPuroks,
       'Quirino': defaultPuroks,
+      'San Antonio': defaultPuroks,
       'San Juan': defaultPuroks,
       'San Roque': defaultPuroks,
       'San Vicente': defaultPuroks,
+      'Songkit': defaultPuroks,
       'Union': defaultPuroks,
-      'Urbiztondo': defaultPuroks,
+      'Linibonan': defaultPuroks,
     },
   };
 }
@@ -360,8 +361,8 @@ class AppUi {
     String hint, {
     Widget? prefixIcon,
   }) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      return InputDecoration(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InputDecoration(
       hintText: hint,
       prefixIcon: prefixIcon,
       labelText: hint,

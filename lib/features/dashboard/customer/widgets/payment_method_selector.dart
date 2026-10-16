@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:erefill/core/constants.dart';
 
 import '../checkout_rules.dart';
+import 'payment_brand_mark.dart';
 
 class PaymentMethodSelector extends StatelessWidget {
   final String selectedMethod;
@@ -64,9 +65,10 @@ class PaymentMethodSelector extends StatelessWidget {
     final isSelected = selectedMethod == id;
     final isAvailable = option.available;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandColor = _brandColor(id);
 
     final bg = isSelected
-        ? AppUi.blueSoft
+        ? brandColor.withValues(alpha: isDark ? 0.2 : 0.1)
         : isAvailable
         ? (isDark
               ? Colors.white.withValues(alpha: 0.04)
@@ -76,99 +78,103 @@ class PaymentMethodSelector extends StatelessWidget {
               : const Color(0xFFF1F5F9));
 
     final borderColor = isSelected
-        ? AppUi.bluePrimary
+        ? brandColor
         : isAvailable
         ? AppUi.dividerOf(context).withValues(alpha: 0.6)
         : Colors.transparent;
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: isAvailable ? () => onSelected(id) : null,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderColor, width: isSelected ? 1.5 : 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppUi.bluePrimary.withValues(alpha: 0.12)
-                          : isAvailable
-                          ? (isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.white)
-                          : Colors.transparent,
-                      shape: BoxShape.circle,
+      child: Semantics(
+        button: true,
+        enabled: isAvailable,
+        selected: isSelected,
+        label: option.label,
+        hint: isAvailable ? _helperText(id) : (option.reason ?? 'Unavailable'),
+        child: InkWell(
+          onTap: isAvailable ? () => onSelected(id) : null,
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: borderColor,
+                width: isSelected ? 1.5 : 1,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: brandColor.withValues(alpha: 0.12),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Opacity(
+                      opacity: isAvailable ? 1 : 0.45,
+                      child: PaymentBrandMark(
+                        method: id,
+                        width: 58,
+                        height: 34,
+                      ),
                     ),
-                    child: Icon(
-                      _iconFor(id),
-                      size: 17,
-                      color: isSelected
-                          ? AppUi.bluePrimary
-                          : isAvailable
-                          ? AppUi.textPrimaryOf(context)
-                          : AppUi.textDisabled,
-                    ),
+                    if (isSelected)
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: brandColor,
+                        size: 18,
+                      )
+                    else if (isAvailable)
+                      Icon(
+                        Icons.radio_button_unchecked_rounded,
+                        color: AppUi.textMuted.withValues(alpha: 0.35),
+                        size: 18,
+                      )
+                    else
+                      const SizedBox(width: 18),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  option.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isAvailable
+                        ? AppUi.textPrimaryOf(context)
+                        : AppUi.textMuted,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                    fontSize: 13,
                   ),
-                  if (isSelected)
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: AppUi.bluePrimary,
-                      size: 18,
-                    )
-                  else if (isAvailable)
-                    Icon(
-                      Icons.radio_button_unchecked_rounded,
-                      color: AppUi.textMuted.withValues(alpha: 0.35),
-                      size: 18,
-                    )
-                  else
-                    const SizedBox(width: 18),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                option.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isAvailable
-                      ? AppUi.textPrimaryOf(context)
-                      : AppUi.textMuted,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
-                  fontSize: 13,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                isAvailable
-                    ? _helperText(id)
-                    : (option.reason ?? 'Unavailable'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isAvailable
-                      ? AppUi.textSecondaryOf(context)
-                      : AppUi.textMuted,
-                  fontSize: 10.5,
-                  height: 1.25,
+                const SizedBox(height: 2),
+                Text(
+                  isAvailable
+                      ? _helperText(id)
+                      : (option.reason ?? 'Unavailable'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isAvailable
+                        ? AppUi.textSecondaryOf(context)
+                        : AppUi.textMuted,
+                    fontSize: 10.5,
+                    height: 1.25,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -184,12 +190,12 @@ class PaymentMethodSelector extends StatelessWidget {
     };
   }
 
-  IconData _iconFor(String id) {
+  Color _brandColor(String id) {
     return switch (id) {
-      'gcash' => Icons.account_balance_wallet_outlined,
-      'maya' => Icons.account_balance_outlined,
-      'card' => Icons.credit_card_rounded,
-      _ => Icons.payments_outlined,
+      'gcash' => const Color(0xFF007DFE),
+      'maya' => const Color(0xFF00A86B),
+      'card' => const Color(0xFF1E3A8A),
+      _ => const Color(0xFFB45309),
     };
   }
 }

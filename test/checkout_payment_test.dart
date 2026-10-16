@@ -10,6 +10,58 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('checkout quote calculations', () {
+    test('calculates the platform percentage on subtotal plus delivery', () {
+      expect(
+        CheckoutRules.calculatePlatformFee(
+          subtotal: 250,
+          deliveryFee: 25,
+          enabled: true,
+          percent: 5,
+          fixed: 2,
+        ),
+        15.75,
+      );
+    });
+
+    test('does not charge a disabled platform fee', () {
+      expect(
+        CheckoutRules.calculatePlatformFee(
+          subtotal: 250,
+          deliveryFee: 25,
+          enabled: false,
+          percent: 5,
+          fixed: 2,
+        ),
+        0,
+      );
+    });
+
+    test('caps a voucher discount at zero total', () {
+      expect(
+        CheckoutRules.calculateOrderTotal(
+          subtotal: 20,
+          deliveryFee: 10,
+          platformFee: 2,
+          voucherDiscount: 50,
+        ),
+        0,
+      );
+    });
+
+    test('calculates the quote using all server-priced components', () {
+      expect(
+        CheckoutRules.calculateOrderTotal(
+          subtotal: 250,
+          deliveryFee: 25,
+          platformFee: 15.75,
+          voucherDiscount: 20,
+        ),
+        270.75,
+      );
+    });
+  });
+
   group('checkout preflight', () {
     test('blocks empty refill orders before checkout', () {
       final result = CheckoutRules.validate(
@@ -108,10 +160,7 @@ void main() {
       expect(selected['longitude'], 125.88);
       expect(CheckoutRules.deliveryProfileIssue(selected), isNull);
 
-      final mismatchedPinTown = {
-        ...selected,
-        'map_pin_town': 'Cantilan',
-      };
+      final mismatchedPinTown = {...selected, 'map_pin_town': 'Cantilan'};
       expect(
         CheckoutRules.deliveryProfileIssue(mismatchedPinTown),
         'Confirm this address on the map before using it for delivery.',
@@ -186,22 +235,38 @@ void main() {
       expect(find.text('GCash'), findsOneWidget);
       expect(find.text('Maya'), findsOneWidget);
       expect(find.text('Not set up by this station'), findsNWidgets(2));
+      expect(find.bySemanticsLabel('GCash logo'), findsOneWidget);
+      expect(find.bySemanticsLabel('Maya logo'), findsOneWidget);
     });
 
-    test('standardPaymentMethods contains cod, gcash, maya, and card all available', () {
-      final methods = CheckoutRules.standardPaymentMethods;
-      expect(methods, hasLength(4));
-      expect(methods.map((m) => m.type).toList(), ['cod', 'gcash', 'maya', 'card']);
-      for (final m in methods) {
-        expect(m.available, isTrue, reason: '${m.type} should be available by default');
-      }
-      expect(CheckoutRules.isPaymentAvailable('cod', methods), isTrue);
-      expect(CheckoutRules.isPaymentAvailable('gcash', methods), isTrue);
-      expect(CheckoutRules.isPaymentAvailable('maya', methods), isTrue);
-      expect(CheckoutRules.isPaymentAvailable('card', methods), isTrue);
-    });
+    test(
+      'standardPaymentMethods contains cod, gcash, maya, and card all available',
+      () {
+        final methods = CheckoutRules.standardPaymentMethods;
+        expect(methods, hasLength(4));
+        expect(methods.map((m) => m.type).toList(), [
+          'cod',
+          'gcash',
+          'maya',
+          'card',
+        ]);
+        for (final m in methods) {
+          expect(
+            m.available,
+            isTrue,
+            reason: '${m.type} should be available by default',
+          );
+        }
+        expect(CheckoutRules.isPaymentAvailable('cod', methods), isTrue);
+        expect(CheckoutRules.isPaymentAvailable('gcash', methods), isTrue);
+        expect(CheckoutRules.isPaymentAvailable('maya', methods), isTrue);
+        expect(CheckoutRules.isPaymentAvailable('card', methods), isTrue);
+      },
+    );
 
-    testWidgets('renders all 4 payment methods and allows selection', (tester) async {
+    testWidgets('renders all 4 payment methods and allows selection', (
+      tester,
+    ) async {
       String selected = 'cod';
       await tester.pumpWidget(
         MaterialApp(
@@ -223,6 +288,8 @@ void main() {
       expect(find.text('GCash'), findsOneWidget);
       expect(find.text('Maya'), findsOneWidget);
       expect(find.text('Credit/Debit Card'), findsOneWidget);
+      expect(find.bySemanticsLabel('Visa logo'), findsOneWidget);
+      expect(find.bySemanticsLabel('Mastercard logo'), findsOneWidget);
 
       await tester.tap(find.text('GCash'));
       await tester.pumpAndSettle();
@@ -328,27 +395,28 @@ void main() {
       expect(payTapped, isTrue);
     });
 
-    testWidgets('shows loading spinner when isLoading is true and disables tap', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: PaymentStatusBanner(
-              order: const {
-                'payment_method': 'gcash',
-                'payment_status': 'pending',
-              },
-              isLoading: true,
-              onRetry: () {},
+    testWidgets(
+      'shows loading spinner when isLoading is true and disables tap',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: PaymentStatusBanner(
+                order: const {
+                  'payment_method': 'gcash',
+                  'payment_status': 'pending',
+                },
+                isLoading: true,
+                onRetry: () {},
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Pay now'), findsNothing);
-    });
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.text('Pay now'), findsNothing);
+      },
+    );
 
     testWidgets('does not render for cash on delivery orders', (tester) async {
       await tester.pumpWidget(
@@ -408,51 +476,53 @@ void main() {
   });
 
   group('payment status clarity in cards', () {
-    testWidgets('RiderActiveDeliveryCard displays PAID ONLINE for paid orders', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: RiderActiveDeliveryCard(
-              order: {
-                'id': 'test-1',
-                'status': 'out_for_delivery',
-                'total_amount': 150.0,
-                'payment_method': 'gcash',
-                'payment_status': 'success',
-              },
+    testWidgets(
+      'RiderActiveDeliveryCard displays PAID ONLINE for paid orders',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: RiderActiveDeliveryCard(
+                order: {
+                  'id': 'test-1',
+                  'status': 'out_for_delivery',
+                  'total_amount': 150.0,
+                  'payment_method': 'gcash',
+                  'payment_status': 'success',
+                },
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('PAID ONLINE'), findsOneWidget);
-      expect(find.text('COLLECT CASH'), findsNothing);
-    });
+        expect(find.text('PAID ONLINE'), findsOneWidget);
+        expect(find.text('COLLECT CASH'), findsNothing);
+      },
+    );
 
-    testWidgets('RiderActiveDeliveryCard displays COLLECT CASH for cod orders', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: RiderActiveDeliveryCard(
-              order: {
-                'id': 'test-2',
-                'status': 'out_for_delivery',
-                'total_amount': 200.0,
-                'payment_method': 'cod',
-                'payment_status': 'pending',
-              },
+    testWidgets(
+      'RiderActiveDeliveryCard displays COLLECT CASH for cod orders',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: RiderActiveDeliveryCard(
+                order: {
+                  'id': 'test-2',
+                  'status': 'out_for_delivery',
+                  'total_amount': 200.0,
+                  'payment_method': 'cod',
+                  'payment_status': 'pending',
+                },
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('COLLECT CASH'), findsOneWidget);
-      expect(find.text('PAID ONLINE'), findsNothing);
-    });
+        expect(find.text('COLLECT CASH'), findsOneWidget);
+        expect(find.text('PAID ONLINE'), findsNothing);
+      },
+    );
 
     testWidgets(
       'ActiveOrderCard displays awaiting online payment for pending online orders',

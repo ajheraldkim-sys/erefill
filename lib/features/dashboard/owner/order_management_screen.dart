@@ -16,6 +16,7 @@ import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/offline_queue_service.dart';
 import 'package:erefill/core/widgets/press_bounce.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
+import 'owner_order_queue.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -39,6 +40,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   StreamController<List<Map<String, dynamic>>>? _ordersStreamController;
   List<Map<String, dynamic>>? _cachedOrders;
   Timer? _pollingTimer;
+  bool _isRefreshingOrders = false;
+  String? _ordersLoadError;
 
   static const List<String> _statusFilters = [
     'all',
@@ -66,9 +69,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
     final ownerId = supabase.auth.currentUser?.id;
     if (ownerId != null) {
-      final cached = LocalDataCache.instance.getMemory<List<dynamic>>('owner_orders_$ownerId');
+      final cached = LocalDataCache.instance.getMemory<List<dynamic>>(
+        'owner_orders_$ownerId',
+      );
       if (cached != null && cached.isNotEmpty) {
-        _cachedOrders = cached.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _cachedOrders = cached
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
       }
     }
 
@@ -80,11 +87,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   Future<void> _loadDiskCache() async {
     final ownerId = supabase.auth.currentUser?.id;
     if (ownerId == null) return;
-    final cached = await LocalDataCache.instance.get<List<dynamic>>('owner_orders_$ownerId');
+    final cached = await LocalDataCache.instance.get<List<dynamic>>(
+      'owner_orders_$ownerId',
+    );
     if (cached != null && cached.isNotEmpty && mounted) {
-      final list = cached.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final list = cached
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
       _cachedOrders = list;
-      if (_ordersStreamController != null && !_ordersStreamController!.isClosed) {
+      if (_ordersStreamController != null &&
+          !_ordersStreamController!.isClosed) {
         _ordersStreamController!.add(list);
       }
       setState(() {});
@@ -104,18 +116,34 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
   Future<void> _refreshOrders() async {
     final ownerId = supabase.auth.currentUser?.id;
-    if (ownerId == null) return;
+    if (ownerId == null || _isRefreshingOrders) return;
 
-    final data = await _fetchOrdersWithCustomers(ownerId);
-    _cachedOrders = data;
-    if (mounted) {
-      if (_ordersStreamController != null && !_ordersStreamController!.isClosed) {
-        _ordersStreamController!.add(data);
+    _isRefreshingOrders = true;
+    if (mounted) setState(() {});
+    try {
+      final data = await _fetchOrdersWithCustomers(ownerId);
+      _cachedOrders = data;
+      _ordersLoadError = null;
+      if (mounted) {
+        if (_ordersStreamController != null &&
+            !_ordersStreamController!.isClosed) {
+          _ordersStreamController!.add(data);
+        }
+        setState(() {});
       }
-      setState(() {});
+      LocalDataCache.instance.set('owner_orders_$ownerId', data);
+      LocalDataCache.instance.invalidate('owner_overview_$ownerId');
+    } catch (error) {
+      debugPrint('Error refreshing owner orders: $error');
+      _ordersLoadError = FriendlyErrors.message(
+        error,
+        fallback: 'Could not refresh orders. Check your connection and retry.',
+      );
+      if (mounted) setState(() {});
+    } finally {
+      _isRefreshingOrders = false;
+      if (mounted) setState(() {});
     }
-    LocalDataCache.instance.set('owner_orders_$ownerId', data);
-    LocalDataCache.instance.invalidate('owner_overview_$ownerId');
   }
 
   @override
@@ -372,12 +400,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     String? cancelReason,
   }) async {
     HapticFeedback.lightImpact();
+    Map<String, dynamic>? originalOrder;
 
     // Optimistically update local state for instant UI response
     if (_cachedOrders != null) {
-      final index = _cachedOrders!.indexWhere((o) => o['id']?.toString() == orderId);
+      final index = _cachedOrders!.indexWhere(
+        (o) => o['id']?.toString() == orderId,
+      );
       if (index != -1) {
         final updatedList = List<Map<String, dynamic>>.from(_cachedOrders!);
+        originalOrder = Map<String, dynamic>.from(updatedList[index]);
         final updatedOrder = Map<String, dynamic>.from(updatedList[index]);
         updatedOrder['status'] = newStatus;
         if (cancelReason != null && cancelReason.isNotEmpty) {
@@ -428,7 +460,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     } catch (e) {
       debugPrint('Error updating order status: $e');
       final errStr = e.toString().toLowerCase();
-      final isOffline = errStr.contains('socket') ||
+      final isOffline =
+          errStr.contains('socket') ||
           errStr.contains('network') ||
           errStr.contains('timeout') ||
           errStr.contains('connection') ||
@@ -468,6 +501,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         }
       }
 
+      _restoreOptimisticOrder(orderId, originalOrder);
+      await _refreshOrders();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -481,6 +516,27 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         ),
       );
     }
+  }
+
+  void _restoreOptimisticOrder(
+    String orderId,
+    Map<String, dynamic>? originalOrder,
+  ) {
+    final orders = _cachedOrders;
+    if (orders == null || originalOrder == null) return;
+
+    final index = orders.indexWhere(
+      (order) => order['id']?.toString() == orderId,
+    );
+    if (index == -1) return;
+
+    final restored = List<Map<String, dynamic>>.from(orders)
+      ..[index] = originalOrder;
+    _cachedOrders = restored;
+    if (_ordersStreamController != null && !_ordersStreamController!.isClosed) {
+      _ordersStreamController!.add(restored);
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _showDeclineOrderDialog(String orderId) async {
@@ -985,17 +1041,24 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                               ],
                             ),
                             const Divider(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Text(
-                                  'Payment Status',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppUi.textSecondary,
+                                const Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Payment Status',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppUi.textSecondary,
+                                    ),
                                   ),
                                 ),
-                                _buildPaymentDetailPill(order),
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: _buildPaymentDetailPill(order),
+                                ),
                               ],
                             ),
                           ],
@@ -1346,10 +1409,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                   ),
                                   elevation: 0,
                                 ),
-                                icon: const Icon(
-                                  Icons.arrow_forward,
-                                  size: 18,
-                                ),
+                                icon: const Icon(Icons.arrow_forward, size: 18),
                                 label: const Text(
                                   'Start Preparing',
                                   style: TextStyle(
@@ -1373,9 +1433,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _statusColor('ready_for_pickup'),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 16,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: AppUi.cardRadius,
                               ),
@@ -1638,6 +1696,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       ),
       child: Text(
         label,
+        maxLines: 2,
+        textAlign: TextAlign.right,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w900,
@@ -1665,8 +1726,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     final payment = (order['payment_method'] ?? 'COD').toString().toUpperCase();
 
     final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '');
-    final minutesAgo = createdAt != null ? DateTime.now().difference(createdAt).inMinutes : 0;
-    final isSlaUrgent = (rawStatus == 'pending' || rawStatus == 'in_prep') && minutesAgo >= 15;
+    final minutesAgo = createdAt != null
+        ? DateTime.now().difference(createdAt).inMinutes
+        : 0;
+    final isSlaUrgent =
+        (rawStatus == 'pending' || rawStatus == 'in_prep') && minutesAgo >= 15;
 
     return RepaintBoundary(
       child: PressBounce(
@@ -1722,7 +1786,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         if (isSlaUrgent) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEF4444),
                               borderRadius: BorderRadius.circular(8),
@@ -1730,7 +1797,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.alarm_rounded, color: Colors.white, size: 12),
+                                const Icon(
+                                  Icons.alarm_rounded,
+                                  color: Colors.white,
+                                  size: 12,
+                                ),
                                 const SizedBox(width: 3),
                                 Text(
                                   '${minutesAgo}m',
@@ -2020,7 +2091,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
       return mapRawOrders(raw);
     } catch (e) {
-      debugPrint('Primary joined order fetch failed, attempting resilient fallbacks: $e');
+      debugPrint(
+        'Primary joined order fetch failed, attempting resilient fallbacks: $e',
+      );
     }
 
     // 2. Fallback Attempt A: Simple direct select on orders without foreign key join
@@ -2062,9 +2135,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       return mapRawOrders(active);
     } catch (e) {
       debugPrint('Broad orders fetch failed: $e');
+      rethrow;
     }
-
-    return [];
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
@@ -2082,9 +2154,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       stream: _ordersStreamController?.stream,
       initialData: _cachedOrders,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData &&
-            _cachedOrders == null) {
+        if (_isRefreshingOrders && !snapshot.hasData && _cachedOrders == null) {
           return Scaffold(
             backgroundColor: AppUi.pageBgOf(context),
             body: SafeArea(
@@ -2115,7 +2185,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
           );
         }
 
-        final allOrders = snapshot.data ?? [];
+        final allOrders = prioritizeOwnerOrders(snapshot.data ?? []);
 
         final incoming = allOrders
             .where(
@@ -2245,10 +2315,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         color: AppUi.textSecondary,
                       ),
                       filled: true,
-                      fillColor:
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.white,
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(99),
                         borderSide: BorderSide(color: AppUi.borderOf(context)),
@@ -2278,8 +2347,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                     tabAlignment: TabAlignment.start,
                     indicatorSize: TabBarIndicatorSize.label,
                     indicator: const UnderlineTabIndicator(
-                      borderSide:
-                          BorderSide(width: 3, color: AppUi.bluePrimary),
+                      borderSide: BorderSide(
+                        width: 3,
+                        color: AppUi.bluePrimary,
+                      ),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     labelColor: AppUi.bluePrimary,
@@ -2297,9 +2368,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         .toList(),
                   ),
                 ),
+              if (_ordersLoadError != null && allOrders.isNotEmpty)
+                _buildStaleOrdersBanner(),
               Expanded(
-                child: snapshot.hasError
-                    ? Center(child: Text('Error: ${snapshot.error}'))
+                child: _ordersLoadError != null && allOrders.isEmpty
+                    ? _buildOrdersLoadError()
                     : _isKanbanView
                     ? _buildKanbanPipeline(
                         incoming.where(_matchesOrderSearch).toList(),
@@ -2339,6 +2412,70 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     );
   }
 
+  Widget _buildStaleOrdersBanner() {
+    return Material(
+      color: AppColors.uiWarningBg,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_rounded, color: AppColors.uiWarning),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Showing saved orders. The latest refresh failed.',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+              ),
+            ),
+            TextButton(
+              onPressed: _isRefreshingOrders ? null : _refreshOrders,
+              child: _isRefreshingOrders
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrdersLoadError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: AppUi.textMuted,
+              size: 44,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _ordersLoadError ?? 'Orders could not be loaded.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppUi.textPrimaryOf(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _isRefreshingOrders ? null : _refreshOrders,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildKanbanPipeline(List<Map<String, dynamic>> orders) {
     final stages = [
       {
@@ -2354,9 +2491,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         'color': OrderStatusColors.getColor('preparing'),
         'filter': (Map<String, dynamic> o) {
           final s = (o['status'] ?? '').toString();
-          return s == 'accepted' ||
-              s == 'preparing' ||
-              s == 'ready_for_pickup';
+          return s == 'accepted' || s == 'preparing' || s == 'ready_for_pickup';
         },
       },
       {

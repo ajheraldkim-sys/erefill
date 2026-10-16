@@ -52,6 +52,7 @@ dependencies:
   shadcn_flutter_material: ^0.0.54
   flutter_local_notifications: ^22.3.1
   flutter_displaymode: ^0.7.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -86,3 +87,4 @@ flutter:
     - assets/icon/
     - assets/images/
     - assets/fonts/
+    - assets/payment/

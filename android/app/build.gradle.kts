@@ -48,6 +48,33 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.let { output ->
+                if (variant.buildType.name == "release") {
+                    output.outputFileName = "eRefill.apk"
+                }
+            }
+        }
+    }
+}
+
+tasks.matching { it.name.contains("assembleRelease", ignoreCase = true) }.configureEach {
+    doLast {
+        val flutterApkDir = file("${project.layout.buildDirectory.get()}/outputs/flutter-apk")
+        val appRelease = file("$flutterApkDir/app-release.apk")
+        val eRefill = file("$flutterApkDir/eRefill.apk")
+        if (appRelease.exists()) {
+            appRelease.copyTo(eRefill, overwrite = true)
+        }
+        val apkReleaseDir = file("${project.layout.buildDirectory.get()}/outputs/apk/release")
+        val apkFile = file("$apkReleaseDir/eRefill.apk")
+        if (apkFile.exists() && !eRefill.exists()) {
+            apkFile.copyTo(eRefill, overwrite = true)
+        }
+    }
 }
 
 dependencies {

@@ -3,9 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/utils/app_haptics.dart';
+import 'package:erefill/features/dashboard/admin/utils/admin_csv_export.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_live_map_view.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_moderation_view.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_broadcast_dialog.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_audit_log_view.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_payment_failures_view.dart';
+import 'package:erefill/features/dashboard/admin/views/admin_create_dialogs.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -55,7 +64,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadDiskCache();
     _loadAllData();
   }
@@ -537,6 +546,589 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     }
   }
 
+  Future<void> _changeUserRole(Map<String, dynamic> u) async {
+    final userId = u['id']?.toString() ?? '';
+    final currentRole = (u['role'] ?? 'customer').toString().toLowerCase();
+    String selectedRole = currentRole;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Change Role for ${u['full_name'] ?? "User"}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select the new access role:'),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: selectedRole,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'customer', child: Text('Customer')),
+                  DropdownMenuItem(
+                    value: 'owner',
+                    child: Text('Station Owner'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'rider',
+                    child: Text('Delivery Rider'),
+                  ),
+                  DropdownMenuItem(value: 'admin', child: Text('System Admin')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => selectedRole = v);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppUi.bluePrimary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Update Role'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      AppHaptics.medium();
+      await supabase
+          .from('profiles')
+          .update({
+            'role': selectedRole,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', userId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('User role updated to ${selectedRole.toUpperCase()}'),
+          backgroundColor: AppColors.statusDelivered,
+        ),
+      );
+      _loadAllData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update role: $e'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _resetUserPassword(Map<String, dynamic> u) async {
+    final email = u['email']?.toString() ?? '';
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User has no registered email.'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Send Password Reset?'),
+        content: Text('Send a password recovery link to $email?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppUi.bluePrimary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      AppHaptics.medium();
+      await supabase.auth.resetPasswordForEmail(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reset password link sent to $email'),
+          backgroundColor: AppColors.statusDelivered,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send reset link: $e'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _reassignRider(String orderId) async {
+    final riders = _users
+        .where(
+          (u) =>
+              u['role']?.toString().toLowerCase() == 'rider' &&
+              u['is_suspended'] != true,
+        )
+        .toList();
+
+    if (riders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active riders registered in system.'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+      return;
+    }
+
+    String? selectedRiderId = riders.first['id']?.toString();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Assign / Reassign Rider'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select delivery rider for this order:'),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: selectedRiderId,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: riders.map((r) {
+                  final isOnline = r['is_online'] == true;
+                  return DropdownMenuItem<String>(
+                    value: r['id']?.toString(),
+                    child: Text(
+                      '${r['full_name'] ?? "Rider"} (${isOnline ? "🟢 Online" : "⚪ Offline"})',
+                    ),
+                  );
+                }).toList(),
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => selectedRiderId = v);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppUi.bluePrimary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Assign Rider'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || selectedRiderId == null || !mounted) return;
+    try {
+      AppHaptics.medium();
+      await supabase
+          .from('orders')
+          .update({
+            'rider_id': selectedRiderId,
+            'assigned_rider_id': selectedRiderId,
+            'status': 'accepted',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', orderId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Rider assigned successfully!'),
+          backgroundColor: AppColors.statusDelivered,
+        ),
+      );
+      _loadAllData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to assign rider: $e'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _markOrderDelivered(String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark Order as Delivered?'),
+        content: Text(
+          'Force update status of Order #${orderId.substring(0, 8)} to DELIVERED?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.statusDelivered,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm Delivered'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      AppHaptics.medium();
+      await supabase
+          .from('orders')
+          .update({
+            'status': 'delivered',
+            'payment_status': 'paid',
+            'delivered_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', orderId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order marked as DELIVERED.'),
+          backgroundColor: AppColors.statusDelivered,
+        ),
+      );
+      _loadAllData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update status: $e'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _rejectStation(
+    String stationId,
+    String? ownerId,
+    String name,
+  ) async {
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Reject "$name"?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter compliance rejection feedback for the station owner:',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Rejection Reason *',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppUi.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reject Station'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    try {
+      AppHaptics.medium();
+      await supabase
+          .from('water_refill_stations')
+          .update({
+            'status': 'rejected',
+            'is_accepting_orders': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', stationId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Station "$name" rejected with feedback.'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+      _loadAllData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reject station: $e'),
+          backgroundColor: AppUi.error,
+        ),
+      );
+    }
+  }
+
+  void _exportOrdersCsv() {
+    AppHaptics.medium();
+    final headers = [
+      'Order ID',
+      'Date',
+      'Customer',
+      'Station',
+      'Total Amount',
+      'Status',
+      'Payment Method',
+      'Payment Status',
+    ];
+    final rows = _orders
+        .map(
+          (o) => [
+            o['id']?.toString() ?? '',
+            (o['created_at']?.toString() ?? '').split('T').first,
+            o['customer_name']?.toString() ?? '',
+            o['station_name']?.toString() ?? '',
+            '₱${o['total_amount'] ?? 0}',
+            o['status']?.toString() ?? '',
+            o['payment_method']?.toString() ?? '',
+            o['payment_status']?.toString() ?? '',
+          ],
+        )
+        .toList();
+
+    final csv = AdminCsvExport.build(headers, rows);
+    AdminCsvExport.copyToClipboard(csv);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '📊 Orders CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
+        ),
+        backgroundColor: AppColors.statusDelivered,
+      ),
+    );
+  }
+
+  void _exportStationsCsv() {
+    AppHaptics.medium();
+    final headers = [
+      'Station ID',
+      'Station Name',
+      'Address',
+      'Town',
+      'Status',
+      'Accepting Orders',
+      'Price/Gallon',
+      'Base Delivery Fee',
+      'Rating',
+    ];
+    final rows = _stations
+        .map(
+          (s) => [
+            s['id']?.toString() ?? '',
+            s['name']?.toString() ?? '',
+            s['address']?.toString() ?? '',
+            s['town']?.toString() ?? '',
+            s['status']?.toString() ?? '',
+            s['is_accepting_orders'] == true ? 'YES' : 'NO',
+            '₱${s['price_per_gallon'] ?? 0}',
+            '₱${s['base_delivery_fee'] ?? 0}',
+            '${s['rating'] ?? "N/A"}',
+          ],
+        )
+        .toList();
+
+    final csv = AdminCsvExport.build(headers, rows);
+    AdminCsvExport.copyToClipboard(csv);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '📊 Stations CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
+        ),
+        backgroundColor: AppColors.statusDelivered,
+      ),
+    );
+  }
+
+  void _exportUsersCsv() {
+    AppHaptics.medium();
+    final headers = [
+      'User ID',
+      'Full Name',
+      'Role',
+      'Email',
+      'Phone',
+      'Town',
+      'Suspended',
+      'Joined Date',
+    ];
+    final rows = _users
+        .map(
+          (u) => [
+            u['id']?.toString() ?? '',
+            u['full_name']?.toString() ?? '',
+            u['role']?.toString() ?? '',
+            u['email']?.toString() ?? '',
+            u['phone']?.toString() ?? '',
+            u['town']?.toString() ?? '',
+            u['is_suspended'] == true ? 'YES' : 'NO',
+            (u['created_at']?.toString() ?? '').split('T').first,
+          ],
+        )
+        .toList();
+
+    final csv = AdminCsvExport.build(headers, rows);
+    AdminCsvExport.copyToClipboard(csv);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '📊 Users CSV copied to clipboard! Paste directly into Excel or Google Sheets.',
+        ),
+        backgroundColor: AppColors.statusDelivered,
+      ),
+    );
+  }
+
+  void _showExportReportsSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.download_rounded, color: AppUi.bluePrimary),
+                const SizedBox(width: 8),
+                Text(
+                  'Export Marketplace Reports (CSV)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(
+                Icons.receipt_long_rounded,
+                color: AppUi.bluePrimary,
+              ),
+              title: const Text(
+                'Export Orders CSV',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                '${_orders.length} orders with revenue & payment status',
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportOrdersCsv();
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.storefront_rounded,
+                color: Color(0xFF087E8B),
+              ),
+              title: const Text(
+                'Export Water Stations CSV',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                '${_stations.length} stations with compliance & pricing',
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportStationsCsv();
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.people_alt_rounded,
+                color: Color(0xFFEC4899),
+              ),
+              title: const Text(
+                'Export Users & Riders CSV',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                '${_users.length} accounts with roles & contact details',
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _exportUsersCsv();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _setSystemConfigValue(
     String key,
     dynamic value, {
@@ -939,21 +1531,96 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                if (isCancellable)
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppUi.error,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    if (customerPhone != 'N/A' && customerPhone.isNotEmpty) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: const Icon(Icons.phone_rounded, size: 16),
+                          label: const Text('Call Customer'),
+                          onPressed: () async {
+                            final uri = Uri.parse('tel:$customerPhone');
+                            if (await canLaunchUrl(uri)) await launchUrl(uri);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppUi.bluePrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: const Icon(Icons.two_wheeler_rounded, size: 16),
+                        label: const Text('Assign Rider'),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _reassignRider(orderId);
+                        },
+                      ),
                     ),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _cancelOrderAsAdmin(orderId);
-                    },
-                    icon: const Icon(Icons.cancel_outlined, size: 18),
-                    label: const Text('Cancel Order as Administrator'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (status != 'delivered' && status != 'cancelled')
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.statusDelivered,
+                        side: const BorderSide(
+                          color: AppColors.statusDelivered,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 16,
+                      ),
+                      label: const Text('Force Mark Delivered'),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _markOrderDelivered(orderId);
+                      },
+                    ),
                   ),
+                if (isCancellable) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppUi.error,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _cancelOrderAsAdmin(orderId);
+                      },
+                      icon: const Icon(Icons.cancel_outlined, size: 16),
+                      label: const Text('Cancel Order as Administrator'),
+                    ),
+                  ),
+                ],
               ],
             );
           },
@@ -1025,12 +1692,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       ),
                     ),
                     const SizedBox(width: 5),
-                    Text(
-                      configStatus,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: configColor,
+                    Flexible(
+                      child: Text(
+                        configStatus,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: configColor,
+                        ),
                       ),
                     ),
                   ],
@@ -1055,12 +1726,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: false,
+          isScrollable: true,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
           labelColor: AppUi.bluePrimary,
           unselectedLabelColor: AppUi.textMuted,
           indicatorColor: AppUi.bluePrimary,
           indicatorWeight: 3,
-          labelPadding: EdgeInsets.zero,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
@@ -1084,56 +1755,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               text: 'Orders',
             ),
             const Tab(
-              icon: Icon(Icons.tune_rounded, size: 20),
-              text: 'Settings',
+              icon: Icon(Icons.two_wheeler_rounded, size: 20),
+              text: 'Fleet',
             ),
+            const Tab(icon: Icon(Icons.tune_rounded, size: 20), text: 'System'),
           ],
         ),
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppUi.bluePrimary),
-            )
-          : _error != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      color: AppUi.error,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppUi.textPrimaryOf(context),
-                        fontWeight: FontWeight.w600,
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppUi.bluePrimary),
+              )
+            : _error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: AppUi.error,
+                        size: 48,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _loadAllData,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppUi.textPrimaryOf(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _loadAllData,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
+              )
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildCommandCenterTab(context),
+                  _buildStationsTab(context),
+                  _buildOrdersTab(context),
+                  const AdminLiveMapView(),
+                  _buildSettingsTab(context),
+                ],
               ),
-            )
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCommandCenterTab(context),
-                _buildStationsTab(context),
-                _buildOrdersTab(context),
-                _buildSettingsTab(context),
-              ],
-            ),
+      ),
     );
   }
 
@@ -1288,12 +1964,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
           // Bento KPI Grid
           GridView.count(
-            crossAxisCount: 2,
+            crossAxisCount: MediaQuery.sizeOf(context).width < 380 ? 1 : 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.35,
+            childAspectRatio: MediaQuery.sizeOf(context).width < 380
+                ? 2.4
+                : 1.35,
             children: [
               _buildKpiCard(
                 context,
@@ -1340,7 +2018,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          _buildQuickOperationsHub(context),
+
+          const SizedBox(height: 16),
 
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -1480,6 +2162,192 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
+  Widget _buildQuickOperationsHub(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: AppUi.radiusLg,
+        border: Border.all(color: AppUi.borderOf(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppUi.blueSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.bolt_rounded,
+                  color: AppUi.bluePrimary,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Quick Operations Hub',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: AppUi.textPrimaryOf(context),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          GridView.count(
+            crossAxisCount: MediaQuery.sizeOf(context).width < 600
+                ? 2
+                : (MediaQuery.sizeOf(context).width < 1000 ? 3 : 4),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: MediaQuery.sizeOf(context).width < 600
+                ? 1.4
+                : 0.85,
+            children: [
+              _buildOpAction(
+                icon: Icons.two_wheeler_rounded,
+                label: 'Fleet Map',
+                color: const Color(0xFF087E8B),
+                onTap: () {
+                  AppHaptics.light();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AdminLiveMapView()),
+                  );
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.gavel_rounded,
+                label: 'Disputes',
+                color: const Color(0xFFF59E0B),
+                onTap: () {
+                  AppHaptics.light();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminModerationView(),
+                    ),
+                  );
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.campaign_rounded,
+                label: 'Broadcast',
+                color: AppUi.bluePrimary,
+                onTap: () {
+                  AppHaptics.light();
+                  showAdminBroadcastDialog(context);
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.add_business_rounded,
+                label: 'Add Station',
+                color: const Color(0xFF10B981),
+                onTap: () async {
+                  AppHaptics.light();
+                  final created = await showCreateStationSheet(context);
+                  if (created == true) _loadAllData();
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.person_add_rounded,
+                label: 'Add User',
+                color: const Color(0xFF8B5CF6),
+                onTap: () async {
+                  AppHaptics.light();
+                  final created = await showCreateUserSheet(context);
+                  if (created == true) _loadAllData();
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.shield_rounded,
+                label: 'Audit Log',
+                color: const Color(0xFF64748B),
+                onTap: () {
+                  AppHaptics.light();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminAuditLogView(),
+                    ),
+                  );
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.credit_card_off_rounded,
+                label: 'Pay Fails',
+                color: AppUi.error,
+                onTap: () {
+                  AppHaptics.light();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminPaymentFailuresView(),
+                    ),
+                  );
+                },
+              ),
+              _buildOpAction(
+                icon: Icons.file_download_rounded,
+                label: 'Export CSV',
+                color: const Color(0xFF0F71C3),
+                onTap: () {
+                  AppHaptics.light();
+                  _showExportReportsSheet();
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOpAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppUi.textPrimaryOf(context),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ─── 2. Stations Moderation Tab ─────────────────────────────────────────────
 
   Widget _buildStationsTab(BuildContext context) {
@@ -1510,6 +2378,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           color: AppUi.surfaceOf(context),
           child: Column(
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppUi.bluePrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_business_rounded, size: 18),
+                      label: const Text(
+                        'Onboard Station',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      onPressed: () async {
+                        AppHaptics.light();
+                        final created = await showCreateStationSheet(context);
+                        if (created == true) _loadAllData();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text(
+                      'Export CSV',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onPressed: _exportStationsCsv,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               TextField(
                 decoration: InputDecoration(
                   hintText: 'Search station by name or municipality…',
@@ -1699,10 +2618,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              if (isPending)
+                              if (isPending) ...[
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppUi.error,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  onPressed: () => _rejectStation(
+                                    s['id'].toString(),
+                                    s['owner_id']?.toString(),
+                                    s['name'] ?? '',
+                                  ),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Reject'),
+                                ),
+                                const SizedBox(width: 8),
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppUi.bluePrimary,
+                                    backgroundColor: AppColors.statusDelivered,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -1715,12 +2654,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     s['name'] ?? '',
                                   ),
                                   icon: const Icon(
-                                    Icons.verified_outlined,
+                                    Icons.verified_rounded,
                                     size: 16,
                                   ),
-                                  label: const Text('Approve Station'),
-                                )
-                              else ...[
+                                  label: const Text('Approve'),
+                                ),
+                              ] else ...[
                                 TextButton.icon(
                                   style: TextButton.styleFrom(
                                     foregroundColor: isSuspended
@@ -1782,6 +2721,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           color: AppUi.surfaceOf(context),
           child: Column(
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${filtered.length} Orders Loaded',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text(
+                      'Export CSV',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onPressed: _exportOrdersCsv,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               TextField(
                 decoration: InputDecoration(
                   hintText: 'Search by Order ID, station, or customer…',
@@ -1984,13 +2958,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   segments: [
                     const ButtonSegment<int>(
                       value: 0,
-                      label: Text('Platform Fees'),
+                      label: Text('Fees'),
                       icon: Icon(Icons.tune_rounded, size: 16),
                     ),
                     ButtonSegment<int>(
                       value: 1,
                       label: Text('Users (${_users.length})'),
                       icon: const Icon(Icons.people_outline_rounded, size: 16),
+                    ),
+                    const ButtonSegment<int>(
+                      value: 2,
+                      label: Text('Operations'),
+                      icon: Icon(Icons.settings_suggest_rounded, size: 16),
                     ),
                   ],
                   selected: {_settingsSubTab},
@@ -2004,7 +2983,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         Expanded(
           child: _settingsSubTab == 0
               ? _buildEconomicsContent(context)
-              : _buildUsersContent(context),
+              : _settingsSubTab == 1
+              ? _buildUsersContent(context)
+              : _buildOperationsToolsContent(context),
         ),
       ],
     );
@@ -2030,10 +3011,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           color: AppUi.surfaceOf(context),
           child: Column(
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppUi.bluePrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.person_add_rounded, size: 18),
+                      label: const Text(
+                        'Register User',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      onPressed: () async {
+                        AppHaptics.light();
+                        final created = await showCreateUserSheet(context);
+                        if (created == true) _loadAllData();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text(
+                      'Export CSV',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onPressed: _exportUsersCsv,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               TextField(
                 decoration: InputDecoration(
                   hintText: 'Search users by name, phone, or email…',
@@ -2183,17 +3215,69 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               ],
                             ),
                           ),
-                          IconButton(
-                            tooltip: isSuspended ? 'Reactivate' : 'Suspend',
-                            icon: Icon(
-                              isSuspended
-                                  ? Icons.lock_open_rounded
-                                  : Icons.lock_person_rounded,
-                              color: isSuspended
-                                  ? AppUi.accentGreen
-                                  : AppUi.error,
-                            ),
-                            onPressed: () => _toggleUserSuspension(u),
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert_rounded, size: 20),
+                            onSelected: (val) {
+                              if (val == 'suspend') {
+                                _toggleUserSuspension(u);
+                              } else if (val == 'role') {
+                                _changeUserRole(u);
+                              } else if (val == 'reset') {
+                                _resetUserPassword(u);
+                              }
+                            },
+                            itemBuilder: (ctx) => [
+                              const PopupMenuItem(
+                                value: 'role',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.badge_rounded,
+                                      size: 18,
+                                      color: AppUi.bluePrimary,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Change Role'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'reset',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.lock_reset_rounded,
+                                      size: 18,
+                                      color: Color(0xFFF59E0B),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Reset Password'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'suspend',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isSuspended
+                                          ? Icons.lock_open_rounded
+                                          : Icons.lock_person_rounded,
+                                      size: 18,
+                                      color: isSuspended
+                                          ? AppUi.accentGreen
+                                          : AppUi.error,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isSuspended
+                                          ? 'Reactivate User'
+                                          : 'Suspend Account',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -2423,6 +3507,195 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOperationsToolsContent(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildOpToolTile(
+          icon: Icons.two_wheeler_rounded,
+          iconColor: const Color(0xFF087E8B),
+          title: 'Live Fleet Dispatch Map',
+          subtitle:
+              'Real-time rider GPS tracking, active deliveries, and direct dispatch.',
+          badge: '${_users.where((u) => u['role'] == 'rider').length} Riders',
+          onTap: () {
+            AppHaptics.light();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminLiveMapView()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildOpToolTile(
+          icon: Icons.gavel_rounded,
+          iconColor: const Color(0xFFF59E0B),
+          title: 'Customer Disputes & Moderation',
+          subtitle:
+              'Resolve order disputes, review customer feedback, and moderate ratings.',
+          badge: 'Disputes & Reviews',
+          onTap: () {
+            AppHaptics.light();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminModerationView()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildOpToolTile(
+          icon: Icons.campaign_rounded,
+          iconColor: AppUi.bluePrimary,
+          title: 'Broadcast Push Alerts',
+          subtitle:
+              'Send high-priority notifications to all customers, riders, or station owners.',
+          badge: 'Broadcast',
+          onTap: () {
+            AppHaptics.light();
+            showAdminBroadcastDialog(context);
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildOpToolTile(
+          icon: Icons.shield_rounded,
+          iconColor: const Color(0xFF64748B),
+          title: 'System Audit Trail',
+          subtitle:
+              'Immutable record of administrative actions, compliance updates, and security events.',
+          badge: 'Audit Logs',
+          onTap: () {
+            AppHaptics.light();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminAuditLogView()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildOpToolTile(
+          icon: Icons.credit_card_off_rounded,
+          iconColor: AppUi.error,
+          title: 'Payment Failures & Reconciliation',
+          subtitle:
+              'Inspect failed transactions and reconcile payment gateway discrepancies.',
+          badge: 'Reconciliation',
+          onTap: () {
+            AppHaptics.light();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AdminPaymentFailuresView(),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildOpToolTile(
+          icon: Icons.file_download_rounded,
+          iconColor: const Color(0xFF10B981),
+          title: 'Export Marketplace Data (CSV)',
+          subtitle:
+              'Generate and copy full CSV data sheets for orders, users, and water stations.',
+          badge: 'CSV Reports',
+          onTap: () {
+            AppHaptics.light();
+            _showExportReportsSheet();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOpToolTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required String badge,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: AppUi.radiusLg,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppUi.surfaceOf(context),
+          borderRadius: AppUi.radiusLg,
+          border: Border.all(color: AppUi.borderOf(context)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: iconColor.withValues(alpha: 0.2)),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppUi.textPrimaryOf(context),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: iconColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: iconColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, color: AppUi.textMuted, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

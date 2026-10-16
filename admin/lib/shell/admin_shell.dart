@@ -55,35 +55,37 @@ class _AdminShellState extends State<AdminShell> {
           onToggle: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
           onSignOut: () => context.read<AdminAuthProvider>().signOut(),
         );
-        final content = Column(
-          children: [
-            _AdminTopBar(
-              section: _section,
-              displayName: widget.displayName,
-              onRefresh: _refreshCurrent,
-              compact: compact,
-              onMenu: compact
-                  ? () => _scaffoldKey.currentState?.openDrawer()
-                  : null,
-            ),
-            Expanded(
-              child: IndexedStack(
-                index: _section.index,
-                children: [
-                  for (final section in AdminSection.values)
-                    if (_visitedSections.contains(section))
-                      KeyedSubtree(
-                        key: ValueKey(
-                          '${section.name}-${_refreshKeys[section] ?? 0}',
-                        ),
-                        child: _bodyFor(section),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                ],
+        final content = SafeArea(
+          child: Column(
+            children: [
+              _AdminTopBar(
+                section: _section,
+                displayName: widget.displayName,
+                onRefresh: _refreshCurrent,
+                compact: compact,
+                onMenu: compact
+                    ? () => _scaffoldKey.currentState?.openDrawer()
+                    : null,
               ),
-            ),
-          ],
+              Expanded(
+                child: IndexedStack(
+                  index: _section.index,
+                  children: [
+                    for (final section in AdminSection.values)
+                      if (_visitedSections.contains(section))
+                        KeyedSubtree(
+                          key: ValueKey(
+                            '${section.name}-${_refreshKeys[section] ?? 0}',
+                          ),
+                          child: _bodyFor(section),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                  ],
+                ),
+              ),
+            ],
+          ),
         );
 
         if (compact) {
@@ -184,7 +186,7 @@ class _AdminSidebar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF065A60), Color(0xFF0F172A)],
+          colors: [Color(0xFF0F71C3), Color(0xFF087E8B), Color(0xFF0B132B)],
         ),
         boxShadow: [
           BoxShadow(color: Color(0x22000000), blurRadius: 24, offset: Offset(4, 0)),
@@ -353,12 +355,12 @@ class _AdminTopBar extends StatelessWidget {
   final VoidCallback? onMenu;
 
   String get _title => switch (section) {
-        AdminSection.dashboard => 'Dashboard',
-        AdminSection.stations => 'Water Stations',
-        AdminSection.orders => 'Refill Orders',
-        AdminSection.users => 'Users & Accounts',
-        AdminSection.settings => 'System Settings',
-      };
+    AdminSection.dashboard => 'Dashboard',
+    AdminSection.stations => 'Water Stations',
+    AdminSection.orders => 'Refill Orders',
+    AdminSection.users => 'Users & Accounts',
+    AdminSection.settings => 'System Settings',
+  };
 
   @override
   Widget build(BuildContext context) {

@@ -21,8 +21,10 @@ class AppColors {
   static const Color statusReady = Color(0xFF0F766E);          // Deep Teal (ready for delivery/pickup)
   static const Color statusOutForDelivery = Color(0xFF4338CA); // Indigo
   static const Color statusCompleted = Color(0xFF16803D);      // Emerald Green (delivered)
+  static const Color statusDelivered = statusCompleted;        // Direct semantic alias
   static const Color statusCancelled = Color(0xFFDC2626);      // Premium Red
   static const Color statusRejected = Color(0xFF991B1B);       // Deep Crimson
+  static const Color statusAccepted = statusConfirmed;        // Direct semantic alias
   static const Color statusNeutral = Color(0xFF64748B);        // Slate fallback
 
   // ── 3. UI STATE COLORS (System feedback, separate from order status)

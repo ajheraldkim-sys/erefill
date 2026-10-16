@@ -56,16 +56,8 @@ class CheckoutRules {
       label: 'Cash on Delivery',
       available: true,
     ),
-    CheckoutPaymentOption(
-      type: 'gcash',
-      label: 'GCash',
-      available: true,
-    ),
-    CheckoutPaymentOption(
-      type: 'maya',
-      label: 'Maya',
-      available: true,
-    ),
+    CheckoutPaymentOption(type: 'gcash', label: 'GCash', available: true),
+    CheckoutPaymentOption(type: 'maya', label: 'Maya', available: true),
     CheckoutPaymentOption(
       type: 'card',
       label: 'Credit/Debit Card',
@@ -81,9 +73,12 @@ class CheckoutRules {
   /// confirms them. Cash-on-delivery orders are trackable immediately.
   static bool canTrackOrder(Map<String, dynamic> order) {
     if (!isOnlinePayment(order['payment_method']?.toString())) return true;
-    return const {'success', 'paid', 'succeeded', 'completed'}.contains(
-      order['payment_status']?.toString().trim().toLowerCase(),
-    );
+    return const {
+      'success',
+      'paid',
+      'succeeded',
+      'completed',
+    }.contains(order['payment_status']?.toString().trim().toLowerCase());
   }
 
   static String paymentLabel(String? method) {
@@ -150,6 +145,29 @@ class CheckoutRules {
       return [cashPaymentOption, ...methods];
     }
     return methods;
+  }
+
+  static double calculatePlatformFee({
+    required double subtotal,
+    required double deliveryFee,
+    required bool enabled,
+    required double percent,
+    required double fixed,
+  }) {
+    if (!enabled) return 0;
+    final fee = ((subtotal + deliveryFee) * percent / 100) + fixed;
+    return fee <= 0 ? 0 : double.parse(fee.toStringAsFixed(2));
+  }
+
+  static double calculateOrderTotal({
+    required double subtotal,
+    required double deliveryFee,
+    required double platformFee,
+    required double voucherDiscount,
+  }) {
+    return (subtotal + deliveryFee + platformFee - voucherDiscount)
+        .clamp(0.0, double.infinity)
+        .toDouble();
   }
 
   static CheckoutPreflightResult validate({
