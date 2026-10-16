@@ -1,8 +1,50 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val signingProperties = Properties()
+val signingPropertiesFile = rootProject.file("key.properties")
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.inputStream().use(signingProperties::load)
+}
+
+fun signingValue(property: String, environmentVariable: String): String? =
+    signingProperties.getProperty(property)?.takeIf(String::isNotBlank)
+        ?: System.getenv(environmentVariable)?.takeIf(String::isNotBlank)
+
+val releaseStoreFile = signingValue("storeFile", "EREFILL_KEYSTORE_PATH")
+val releaseStorePassword = signingValue("storePassword", "EREFILL_STORE_PASSWORD")
+val releaseKeyAlias = signingValue("keyAlias", "EREFILL_KEY_ALIAS")
+val releaseKeyPassword = signingValue("keyPassword", "EREFILL_KEY_PASSWORD")
+val releaseSigningConfigured = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
+val validateReleaseSigning = tasks.register("validateReleaseSigning") {
+    doLast {
+        if (!releaseSigningConfigured) {
+            throw GradleException(
+                "Release signing is not configured. Set the EREFILL_* signing " +
+                    "environment variables or add ignored android/key.properties.",
+            )
+        }
+    }
+}
+
+tasks.matching {
+    it.name == "preReleaseBuild" ||
+        it.name == "assembleRelease" ||
+        it.name == "bundleRelease"
+}.configureEach {
+    dependsOn(validateReleaseSigning)
 }
 
 android {
@@ -33,19 +75,20 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = "erefill"
-            keyPassword = "erefill123"
-            storeFile = file("erefill_keystore.jks")
-            storePassword = "erefill123"
+            if (releaseSigningConfigured) {
+                storeFile = file(requireNotNull(releaseStoreFile))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
         }
     }
 
     buildTypes {
-        debug {
-            signingConfig = signingConfigs.getByName("release")
-        }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
