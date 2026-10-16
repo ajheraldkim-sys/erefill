@@ -13,6 +13,11 @@ class AuthService {
         scopes: ['email', 'profile'],
       );
 
+      // Always clear any cached Google session so the account chooser dialog is presented
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
@@ -143,7 +148,13 @@ class AuthService {
   }
 
   // 3. LOGOUT
-  Future<void> signOut() => _supabase.auth.signOut();
+  Future<void> signOut() async {
+    try {
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+    } catch (_) {}
+    await _supabase.auth.signOut();
+  }
 
   // 4. FORGOT PASSWORD
   Future<void> sendPasswordResetEmail(String email) async {

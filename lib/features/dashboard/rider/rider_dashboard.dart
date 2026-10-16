@@ -28,6 +28,8 @@ import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import '../../../core/constants.dart';
 import 'package:erefill/core/widgets/delivery_completion_sheet.dart';
+import 'package:erefill/core/utils/app_haptics.dart';
+import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import '../customer/checkout_rules.dart';
 
 import '../../chat/inbox_screen.dart';
@@ -458,16 +460,12 @@ class _RiderDashboardState extends State<RiderDashboard>
                 oldStatus != 'assigned_to_rider');
 
             if (isNewlyAssigned || isStatusAssigned) {
-              HapticFeedback.heavyImpact();
+              AppHaptics.orderAlert();
               _showNewJobAlert(newRecord);
             }
 
             // 3. Refresh ALL Data for accuracy
-            _loadRiderData().then((_) {
-              if (isNewlyAssigned || isStatusAssigned) {
-                HapticFeedback.vibrate();
-              }
-            });
+            _loadRiderData();
           },
         )
         .subscribe((status, [error]) {
@@ -2451,7 +2449,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                                 try {
                                   await _locationService.stopTracking();
                                   await supabase.rpc('delete_user_account');
-                                  await supabase.auth.signOut();
+                                  await supabase.auth.signOut(
+                                    scope: SignOutScope.local,
+                                  );
                                   if (context.mounted) {
                                     context.resetToAuth();
                                   }
@@ -2801,6 +2801,7 @@ class _RiderHomeOverview extends StatelessWidget {
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
+                        const OfflineSyncStatusPill(),
                         _buildOnlineStatusCard(context, isOnline),
                         AppUi.vGapMd,
                         if (active != null) ...[

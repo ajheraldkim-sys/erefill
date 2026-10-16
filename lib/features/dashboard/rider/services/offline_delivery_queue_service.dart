@@ -60,7 +60,18 @@ class QueuedDelivery {
 class OfflineDeliveryQueueService {
   static final OfflineDeliveryQueueService _instance = OfflineDeliveryQueueService._internal();
   factory OfflineDeliveryQueueService() => _instance;
-  OfflineDeliveryQueueService._internal();
+  static OfflineDeliveryQueueService get instance => _instance;
+
+  Future<int> Function()? onSyncTriggered;
+
+  OfflineDeliveryQueueService._internal() {
+    onSyncTriggered = syncPendingDeliveries;
+  }
+
+  Future<int> getPendingCount() async {
+    final list = await getPendingDeliveries();
+    return list.length;
+  }
 
   static const String _queueKeyPrefix = 'offline_delivery_queue_';
 

@@ -31,6 +31,16 @@ delivery while the app is backgrounded or terminated requires a configured
 push provider (Firebase Cloud Messaging/APNs) and a server-side sender, which
 this repository does not currently configure.
 
+### Profile recovery
+
+When repairing users whose profile rows are missing, apply
+[`supabase/scripts/fix_missing_profiles_and_addresses.sql`](./supabase/scripts/fix_missing_profiles_and_addresses.sql)
+in the Supabase SQL Editor. Self-service profile creation only permits the
+customer, owner, and rider signup roles; admin roles and rider-to-owner
+associations cannot be supplied through Auth user metadata. Admin roles require
+trusted provisioning, and rider associations are created through the
+server-validated owner workflow.
+
 ## Payment Setup
 
 The app uses a server-side PayMongo Checkout flow for GCash, Maya, and card payments. Do not put PayMongo secret keys in Flutter code.
@@ -134,6 +144,18 @@ Operational checklist before accepting orders:
 - Order totals must be calculated by database RPCs, not trusted from Flutter.
 - Order status transitions should be controlled by RPCs.
 - RLS policies should be tested for customer, owner, rider, anonymous, and service-role access.
+
+### Account email verification
+
+Email changes use Supabase Auth's native email-change verification. Configure
+the Supabase **Authentication > Email Templates > Change Email** template to
+include `{{ .Token }}` so users receive the six-digit code expected by the app.
+If resending a new-account confirmation, the **Confirm signup** template must
+also include `{{ .Token }}`. With secure email changes enabled, users may need
+to confirm both the new address and their current address.
+After deploying the updated app, apply
+`supabase/scripts/gmail_verification_otp.sql` to remove the legacy client-visible
+OTP implementation and keep `profiles.email` synchronized with Auth.
 
 ## Quality Checks
 

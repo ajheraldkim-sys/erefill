@@ -13,8 +13,8 @@ import '../../../core/water_types.dart';
 import '../../../core/widgets/brand/hero_header.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/auth_dialogs.dart';
+import '../../../core/widgets/refill_components.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
-import '../../../core/widgets/animations/animated_favorite_button.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/services/station_data_cache.dart';
 import '../../../core/widgets/map_tiles.dart';
@@ -22,7 +22,6 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/utils/station_orderability.dart';
 import '../../../core/utils/station_price_helpers.dart';
-import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/services/local_data_cache.dart';
 
 class StationListScreen extends StatefulWidget {
@@ -720,27 +719,16 @@ class _StationListScreenState extends State<StationListScreen> {
   }
 
   Widget _buildStationListTile(dynamic s) {
-    final stationName = s['station_name']?.toString().trim().isNotEmpty == true
-        ? s['station_name'].toString()
-        : s['full_name']?.toString() ?? 'Water Station';
-    final barangay = s['barangay']?.toString() ?? '';
-    final town = s['town']?.toString() ?? '';
-    final location = [
-      barangay,
-      town,
-    ].where((part) => part.isNotEmpty).join(', ');
-    final isOpen = (s['is_open'] as bool?) ?? true;
-    final availability =
-        s['station_availability']?.toString() ?? (isOpen ? 'open' : 'closed');
-    final price = _priceFor(s);
-    final avgRating = (s['average_rating'] as num?)?.toDouble() ?? 0.0;
-    final reviewCount = (s['review_count'] as num?)?.toInt() ?? 0;
-    final lat = (s['latitude'] as num?)?.toDouble();
-    final lng = (s['longitude'] as num?)?.toDouble();
-    final waterType = s['primary_water_type']?.toString();
-    final stationId = s['id']?.toString() ?? '';
+    final station = Map<String, dynamic>.from(s as Map);
+    final stationId = station['id']?.toString() ?? '';
     final isFavorite = _favoriteStationIds.contains(stationId);
     var distanceStr = '';
+    final lat =
+        (station['latitude'] as num?)?.toDouble() ??
+        (station['lat'] as num?)?.toDouble();
+    final lng =
+        (station['longitude'] as num?)?.toDouble() ??
+        (station['lng'] as num?)?.toDouble();
     if (_currentPosition != null && lat != null && lng != null) {
       final meters = Geolocator.distanceBetween(
         _currentPosition!.latitude,
@@ -751,206 +739,13 @@ class _StationListScreenState extends State<StationListScreen> {
       distanceStr = '${(meters / 1000).toStringAsFixed(1)} km';
     }
 
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: () => _openStationDetails(s),
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppUi.borderOf(context)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 168,
-                width: double.infinity,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _stationCover(s),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x35000000), Colors.transparent],
-                          stops: [0, 0.45],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: AvailabilityBadge(availability: availability),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Material(
-                        color: AppUi.surfaceOf(context).withValues(alpha: 0.94),
-                        shape: const CircleBorder(),
-                        child: AnimatedFavoriteButton(
-                          isFavorite: isFavorite,
-                          onToggle: stationId.isEmpty
-                              ? null
-                              : (_) => _toggleFav(stationId),
-                          size: 21,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            stationName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 17,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppUi.blueSoft,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                price > 0
-                                    ? '₱${price.toStringAsFixed(0)}'
-                                    : '—',
-                                style: const TextStyle(
-                                  color: AppUi.bluePrimary,
-                                  fontSize: 20,
-                                  height: 1,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              const Text(
-                                'per gallon',
-                                style: TextStyle(
-                                  color: AppUi.textSecondary,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 7),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_outlined,
-                          size: 15,
-                          color: AppUi.textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            location.isEmpty
-                                ? 'Location not provided'
-                                : location,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppUi.captionText.copyWith(
-                              color: AppUi.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 8,
-                      children: [
-                        _stationInfo(
-                          Icons.star_rounded,
-                          reviewCount > 0
-                              ? '${avgRating.toStringAsFixed(1)} · $reviewCount reviews'
-                              : 'New station',
-                          iconColor: const Color(0xFFF59E0B),
-                        ),
-                        if (distanceStr.isNotEmpty)
-                          _stationInfo(Icons.near_me_outlined, distanceStr),
-                        if (waterType != null && waterType.trim().isNotEmpty)
-                          _stationInfo(
-                            Icons.water_drop_outlined,
-                            WaterTypes.byName(waterType).name,
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _stationInfo(
-    IconData icon,
-    String label, {
-    Color iconColor = AppUi.textSecondary,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: iconColor),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppUi.textSecondary,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _stationCover(dynamic station) {
-    final photoUrl = station['station_photo_url']?.toString();
-    return AppCachedImage(
-      imageUrl: photoUrl,
-      width: double.infinity,
-      height: double.infinity,
-      fit: BoxFit.cover,
-      memCacheWidth: 600,
-      memCacheHeight: 400,
-      fallbackIcon: Icons.water_drop_rounded,
+    return StationCard(
+      station: _stationForDisplay(station),
+      onTap: () => _openStationDetails(station),
+      showFavorite: true,
+      isFavorite: isFavorite,
+      onFavoriteToggle: stationId.isEmpty ? null : () => _toggleFav(stationId),
+      distanceLabel: distanceStr,
     );
   }
 

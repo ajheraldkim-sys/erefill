@@ -6,6 +6,7 @@ class AppColors {
   // ── 1. BRAND COLORS (Primary brand identity & actions) ──────────
   static const Color brandPrimary = Color(0xFF0F71C3);
   static const Color brandPrimaryDark = Color(0xFF0C5BA0);
+  static const Color brandSecondary = Color(0xFF087E8B);
   static const Color brandSoft = Color(0xFFE8F3FC);
   static const Color brandBorder = Color(0xFFBAD7F2);
   static const Color brandPale = Color(0xFFF1F7FD);

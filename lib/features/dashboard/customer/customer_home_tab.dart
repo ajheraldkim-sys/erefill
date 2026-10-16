@@ -24,6 +24,9 @@ import '../../../core/services/station_data_cache.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/widgets/app_cached_image.dart';
+import '../../../core/utils/app_haptics.dart';
+import '../../../core/widgets/live_order_progress_tracker.dart';
+import '../../../core/widgets/offline_sync_status_pill.dart';
 
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
@@ -1404,7 +1407,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
             child: InkWell(
               borderRadius: BorderRadius.circular(99),
               onTap: () {
-                HapticFeedback.selectionClick();
+                AppHaptics.selection();
                 setState(() => _selectedCategory = filterKey);
               },
               child: AnimatedContainer(
@@ -1521,11 +1524,17 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
+                        const OfflineSyncStatusPill(),
                         if (_activeOrder != null) ...[
-                          ActiveOrderCard(
-                            order: _activeOrder!,
-                            onTap: () =>
+                          LiveOrderProgressTracker(
+                            status: _activeOrder!['status']?.toString() ?? 'pending',
+                            stationName: (_activeOrder!['profiles'] as Map<String, dynamic>?)?['station_name'] ??
+                                _activeOrder!['station_name']?.toString() ??
+                                'Water Station',
+                            riderName: (_activeOrder!['rider'] as Map<String, dynamic>?)?['full_name']?.toString(),
+                            onTrackMap: () =>
                                 context.openOrderTracker(_activeOrder!),
+                            onChat: () => context.openInbox(),
                           ),
                           AppUi.vGapMd,
                         ],

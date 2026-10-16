@@ -18,6 +18,8 @@ import '../../../core/widgets/app_form_fields.dart';
 import '../../loyalty/widgets/loyalty_rewards_sheet.dart';
 import '../../account/saved_addresses_screen.dart';
 import '../../../core/services/local_data_cache.dart';
+import '../../auth/widgets/gmail_binding_card.dart';
+import '../../settings/account_security_screen.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
@@ -167,10 +169,12 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         return;
       }
 
-      final profileData = await ProfileQueryHelpers.fetchProfile(
+      final cachedProfile = context.read<UserProvider>().user?.toJson();
+      final fetchedProfile = await ProfileQueryHelpers.fetchProfile(
         supabase,
         user.id,
       );
+      final profileData = fetchedProfile ?? cachedProfile ?? {};
 
       if (mounted) {
         setState(() {
@@ -1067,7 +1071,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                 setSheetState(() => isDeleting = true);
                                 try {
                                   await supabase.rpc('delete_user_account');
-                                  await supabase.auth.signOut();
+                                  await supabase.auth.signOut(
+                                    scope: SignOutScope.local,
+                                  );
                                   if (context.mounted) {
                                     context.resetToAuth();
                                   }
@@ -1233,6 +1239,75 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               title: 'Help & customer support',
                               subtitle: 'Hotline, FAQs, and app info',
                               onTap: _showHelpSupportSheet,
+                            ),
+                          ],
+                        ),
+                        const AccountSectionLabel('Security & Verification'),
+                        AccountGroup(
+                          children: [
+                            AccountNavTile(
+                              icon: Icons.mark_email_unread_rounded,
+                              title: 'Email & account security',
+                              subtitle: 'Manage email verification and password security',
+                              onTap: () {
+                                showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (ctx) => Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                                    ),
+                                    child: SingleChildScrollView(
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: AppUi.pageBgOf(ctx),
+                                          borderRadius: const BorderRadius.vertical(
+                                            top: Radius.circular(24),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Center(
+                                              child: Container(
+                                                width: 40,
+                                                height: 4,
+                                                margin: const EdgeInsets.only(bottom: 16),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.withValues(alpha: 0.4),
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                            ),
+                                            GmailBindingCard(
+                                              onVerified: () {
+                                                if (ctx.mounted) Navigator.pop(ctx);
+                                                _loadProfileData();
+                                              },
+                                            ),
+                                            const SizedBox(height: 24),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            AccountNavTile(
+                              icon: Icons.lock_reset_rounded,
+                              title: 'Password & Security',
+                              subtitle: 'Change password or manage credentials',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AccountSecurityScreen(role: 'customer'),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),

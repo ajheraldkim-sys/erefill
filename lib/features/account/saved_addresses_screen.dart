@@ -13,6 +13,7 @@ import '../../core/widgets/erefill_header.dart';
 import '../../core/widgets/map_tiles.dart';
 import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/app_form_fields.dart';
+import '../../core/utils/profile_query_helpers.dart';
 
 /// Launch context for saved-addresses route (`extra` map).
 class SavedAddressLaunchContext {
@@ -123,6 +124,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
         if (address.isNotEmpty) {
           try {
+            await ProfileQueryHelpers.ensureProfileExists(supabase, userId: customerId);
+
             final payload = <String, dynamic>{
               'customer_id': customerId,
               'label': 'Home',
@@ -549,6 +552,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
               }
 
               try {
+                await ProfileQueryHelpers.ensureProfileExists(supabase, userId: customerId);
                 await executeSave(payload);
               } catch (e) {
                 // If map_pin_town column is missing on remote Supabase, retry without it
@@ -581,8 +585,17 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
             } catch (e) {
               debugPrint('Error saving address: $e');
               if (mounted) {
+                final isFkError = e.toString().contains('23503') ||
+                    e.toString().contains('customer_addresses_customer_id_fkey') ||
+                    e.toString().contains('Key is not present in table "profiles"');
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Could not save address: $e')),
+                  SnackBar(
+                    content: Text(
+                      isFkError
+                          ? 'Account profile record is initializing. Please re-open or try again in a moment.'
+                          : 'Could not save address: $e',
+                    ),
+                  ),
                 );
               }
             } finally {

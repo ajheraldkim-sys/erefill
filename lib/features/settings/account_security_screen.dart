@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/widgets/app_form_fields.dart';
+import '../auth/widgets/gmail_binding_card.dart';
 
 class AccountSecurityScreen extends StatefulWidget {
   const AccountSecurityScreen({super.key, required this.role});
@@ -137,32 +138,20 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       ),
     );
 
-    if (shouldDelete != true) return;
+    if (!mounted || shouldDelete != true) {
+      confirmationController.dispose();
+      return;
+    }
 
     setState(() => _isDeleting = true);
     HapticFeedback.heavyImpact();
 
     try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user != null) {
-        // 1. Mark profile status as deleted / deactivated
-        try {
-          await Supabase.instance.client
-              .from('profiles')
-              .update({'is_active': false, 'status': 'deleted'})
-              .eq('id', user.id);
-        } catch (_) {}
-
-        // 2. Sign out
-        await Supabase.instance.client.auth.signOut();
-      }
+      final client = Supabase.instance.client;
+      await client.rpc('delete_user_account');
+      await client.auth.signOut(scope: SignOutScope.local);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account has been scheduled for permanent deletion.'),
-        ),
-      );
       context.go(AppRoutes.login);
     } catch (e) {
       debugPrint('Error deleting account: $e');
@@ -175,6 +164,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
         );
       }
     } finally {
+      confirmationController.dispose();
       if (mounted) setState(() => _isDeleting = false);
     }
   }
@@ -197,6 +187,8 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
           padding: AppUi.pagePadding,
           child: Column(
             children: [
+              const GmailBindingCard(),
+              const SizedBox(height: 20),
               Form(
                 key: _formKey,
                 child: Container(

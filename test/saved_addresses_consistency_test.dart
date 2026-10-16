@@ -89,6 +89,13 @@ void main() {
       );
     });
 
+    test('missing profile is blocked with address prompt', () {
+      expect(
+        CheckoutRules.deliveryProfileIssue(null),
+        equals('Add your delivery address below to continue.'),
+      );
+    });
+
     test('CheckoutRules.useSavedAddress overwrites profile location with saved address', () {
       final profile = {
         'id': 'cust-123',
@@ -145,4 +152,3 @@ void main() {
     });
   });
 }
-

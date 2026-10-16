@@ -21,6 +21,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   bool _loading = true;
   String? _error;
+  String? _dataRefreshError;
+  bool _hasFreshMetrics = false;
 
   // Platform Metrics
   Map<String, dynamic> _stats = {};
@@ -40,10 +42,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   double _platformFeePercent = 5.0;
   double _platformFeeFixed = 2.0;
   bool _maintenanceMode = false;
+  bool _systemConfigLoaded = false;
+  String? _systemConfigError;
   int _settingsSubTab = 0;
 
-  final currencyFormat =
-      NumberFormat.currency(locale: 'en_PH', symbol: '₱', decimalDigits: 2);
+  final currencyFormat = NumberFormat.currency(
+    locale: 'en_PH',
+    symbol: '₱',
+    decimalDigits: 2,
+  );
 
   @override
   void initState() {
@@ -54,13 +61,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Future<void> _loadDiskCache() async {
-    final cached = await LocalDataCache.instance.get<Map<String, dynamic>>('admin_dashboard_cache');
+    final cached = await LocalDataCache.instance.get<Map<String, dynamic>>(
+      'admin_dashboard_cache',
+    );
     if (cached != null && mounted) {
       setState(() {
-        _users = List<Map<String, dynamic>>.from(cached['users'] as List? ?? const []);
-        _stations = List<Map<String, dynamic>>.from(cached['stations'] as List? ?? const []);
-        _orders = List<Map<String, dynamic>>.from(cached['orders'] as List? ?? const []);
+        _users = List<Map<String, dynamic>>.from(
+          cached['users'] as List? ?? const [],
+        );
+        _stations = List<Map<String, dynamic>>.from(
+          cached['stations'] as List? ?? const [],
+        );
+        _orders = List<Map<String, dynamic>>.from(
+          cached['orders'] as List? ?? const [],
+        );
         _stats = Map<String, dynamic>.from(cached['stats'] as Map? ?? const {});
+        _hasFreshMetrics = false;
+        _systemConfigLoaded = false;
+        _systemConfigError = null;
         _loading = false; // Zero waiting time for admins!
       });
     }
@@ -77,22 +95,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     if (_users.isEmpty && _stations.isEmpty) {
       setState(() {
         _loading = true;
-        _error = null;
       });
     }
+    setState(() {
+      _error = null;
+      _dataRefreshError = null;
+      _hasFreshMetrics = false;
+      _systemConfigLoaded = false;
+      _systemConfigError = null;
+    });
 
     try {
       // 1. Fetch Profiles
       final profilesRes = await supabase
           .from('profiles')
-          .select('id, full_name, email, phone, role, is_suspended, suspended_reason, created_at')
+          .select(
+            'id, full_name, email, phone, role, is_suspended, suspended_reason, created_at',
+          )
           .order('created_at', ascending: false);
       final profilesList = List<Map<String, dynamic>>.from(profilesRes);
 
       // 2. Fetch Stations
       final stationsRes = await supabase
           .from('water_refill_stations')
-          .select('id, owner_id, name, address, town, is_accepting_orders, status, rating, price_per_gallon, base_delivery_fee, created_at')
+          .select(
+            'id, owner_id, name, address, town, is_accepting_orders, status, rating, price_per_gallon, base_delivery_fee, created_at',
+          )
           .order('created_at', ascending: false);
       final stationsList = List<Map<String, dynamic>>.from(stationsRes);
 
@@ -108,6 +136,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           .order('created_at', ascending: false)
           .limit(100);
       final ordersList = List<Map<String, dynamic>>.from(ordersRes);
+
+      final usersCountResponse = await supabase
+          .from('profiles')
+          .select('id')
+          .count();
+      final stationsCountResponse = await supabase
+          .from('water_refill_stations')
+          .select('id')
+          .count();
+      final ordersCountResponse = await supabase
+          .from('orders')
+          .select('id')
+          .count();
 
       // Aggregate Stats
       int customers = 0;
@@ -150,7 +191,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         }
       }
 
-      // Read System Config if present
+      String? systemConfigError;
+      var maintenanceConfigFound = false;
+      var maintenanceMode = _maintenanceMode;
+      var platformFeePercent = _platformFeePercent;
+      var platformFeeFixed = _platformFeeFixed;
       try {
         final configRes = await supabase
             .from('system_config')
@@ -158,16 +203,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             .inFilter('key', ['maintenance_mode', 'platform_fee']);
         for (final row in configRes) {
           if (row['key'] == 'maintenance_mode') {
-            _maintenanceMode = row['value'] == true || row['value'] == 'true';
+            maintenanceConfigFound = true;
+            maintenanceMode = row['value'] == true || row['value'] == 'true';
           } else if (row['key'] == 'platform_fee' && row['value'] is Map) {
             final map = row['value'] as Map;
-            _platformFeePercent =
-                (map['percent'] as num?)?.toDouble() ?? 5.0;
-            _platformFeeFixed =
-                (map['fixed'] as num?)?.toDouble() ?? 2.0;
+            platformFeePercent = (map['percent'] as num?)?.toDouble() ?? 5.0;
+            platformFeeFixed = (map['fixed'] as num?)?.toDouble() ?? 2.0;
           }
         }
-      } catch (_) {}
+        if (!maintenanceConfigFound) {
+          throw StateError('Maintenance mode configuration is missing.');
+        }
+      } catch (e) {
+        systemConfigError = e.toString();
+        debugPrint('Admin system configuration load failed: $e');
+      }
 
       if (!mounted) return;
       setState(() {
@@ -179,15 +229,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           'owners': owners,
           'riders': riders,
           'admins': admins,
-          'total_users': profilesList.length,
-          'stations_count': stationsList.length,
+          'total_users': usersCountResponse.count,
+          'stations_count': stationsCountResponse.count,
           'open_stations': openStations,
           'pending_stations': pendingStations,
           'suspended_stations': suspendedStations,
-          'orders_count': ordersList.length,
+          'orders_count': ordersCountResponse.count,
           'total_gmv': totalGmv,
           'today_gmv': todayGmv,
         };
+        _maintenanceMode = maintenanceMode;
+        _platformFeePercent = platformFeePercent;
+        _platformFeeFixed = platformFeeFixed;
+        _systemConfigLoaded = true;
+        _systemConfigError = systemConfigError;
+        _hasFreshMetrics = true;
         _loading = false;
       });
 
@@ -200,7 +256,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load admin telemetry: $e';
+        _dataRefreshError = e.toString();
+        _hasFreshMetrics = false;
+        _error = _users.isEmpty && _stations.isEmpty && _orders.isEmpty
+            ? 'Failed to load admin telemetry: $e'
+            : null;
         _loading = false;
       });
     }
@@ -209,7 +269,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   // --- Actions ---
 
   Future<void> _approveStation(
-      String stationId, String? ownerId, String stationName) async {
+    String stationId,
+    String? ownerId,
+    String stationName,
+  ) async {
     HapticFeedback.mediumImpact();
     final confirm = await showDialog<bool>(
       context: context,
@@ -239,25 +302,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     try {
       final nowIso = DateTime.now().toIso8601String();
-      await supabase.from('water_refill_stations').update({
-        'status': 'active',
-        'is_accepting_orders': true,
-        'updated_at': nowIso,
-      }).eq('id', stationId);
+      await supabase
+          .from('water_refill_stations')
+          .update({
+            'status': 'active',
+            'is_accepting_orders': true,
+            'updated_at': nowIso,
+          })
+          .eq('id', stationId);
 
       if (ownerId != null && ownerId.isNotEmpty) {
-        await supabase.from('profiles').update({
-          'is_suspended': false,
-          'station_availability': 'open',
-          'is_open': true,
-          'updated_at': nowIso,
-        }).eq('id', ownerId);
+        await supabase
+            .from('profiles')
+            .update({
+              'is_suspended': false,
+              'station_availability': 'open',
+              'is_open': true,
+              'updated_at': nowIso,
+            })
+            .eq('id', ownerId);
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Station "$stationName" has been verified and approved.'),
+            content: Text(
+              'Station "$stationName" has been verified and approved.',
+            ),
             backgroundColor: AppUi.accentGreen,
           ),
         );
@@ -275,8 +346,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     }
   }
 
-  Future<void> _toggleSuspendStation(String stationId, String? ownerId,
-      String stationName, bool currentlySuspended) async {
+  Future<void> _toggleSuspendStation(
+    String stationId,
+    String? ownerId,
+    String stationName,
+    bool currentlySuspended,
+  ) async {
     HapticFeedback.mediumImpact();
     final newStatus = currentlySuspended ? 'active' : 'suspended';
     final actionName = currentlySuspended ? 'Reactivate' : 'Suspend';
@@ -285,9 +360,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('$actionName Station'),
-        content: Text(
-          'Are you sure you want to $actionName "$stationName"?',
-        ),
+        content: Text('Are you sure you want to $actionName "$stationName"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -295,8 +368,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  currentlySuspended ? AppUi.bluePrimary : AppUi.error,
+              backgroundColor: currentlySuspended
+                  ? AppUi.bluePrimary
+                  : AppUi.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -310,30 +384,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     try {
       final nowIso = DateTime.now().toIso8601String();
-      await supabase.from('water_refill_stations').update({
-        'status': newStatus,
-        'is_accepting_orders': currentlySuspended ? true : false,
-        'updated_at': nowIso,
-      }).eq('id', stationId);
+      await supabase
+          .from('water_refill_stations')
+          .update({
+            'status': newStatus,
+            'is_accepting_orders': currentlySuspended ? true : false,
+            'updated_at': nowIso,
+          })
+          .eq('id', stationId);
 
       if (ownerId != null && ownerId.isNotEmpty) {
-        await supabase.from('profiles').update({
-          'is_suspended': !currentlySuspended,
-          'suspended_reason': !currentlySuspended
-              ? 'Station suspended by administrator'
-              : null,
-          'station_availability': currentlySuspended ? 'open' : 'suspended',
-          'is_open': currentlySuspended,
-          'updated_at': nowIso,
-        }).eq('id', ownerId);
+        await supabase
+            .from('profiles')
+            .update({
+              'is_suspended': !currentlySuspended,
+              'suspended_reason': !currentlySuspended
+                  ? 'Station suspended by administrator'
+                  : null,
+              'station_availability': currentlySuspended ? 'open' : 'suspended',
+              'is_open': currentlySuspended,
+              'updated_at': nowIso,
+            })
+            .eq('id', ownerId);
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Station "$stationName" is now $newStatus.'),
-            backgroundColor:
-                currentlySuspended ? AppUi.accentGreen : AppUi.error,
+            backgroundColor: currentlySuspended
+                ? AppUi.accentGreen
+                : AppUi.error,
           ),
         );
         _loadAllData();
@@ -408,22 +489,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     try {
       final nowIso = DateTime.now().toIso8601String();
-      await supabase.from('profiles').update({
-        'is_suspended': !isSuspended,
-        'suspended_reason': !isSuspended
-            ? (reason.isEmpty ? 'Suspended by admin' : reason)
-            : null,
-        'updated_at': nowIso,
-      }).eq('id', userId);
+      await supabase
+          .from('profiles')
+          .update({
+            'is_suspended': !isSuspended,
+            'suspended_reason': !isSuspended
+                ? (reason.isEmpty ? 'Suspended by admin' : reason)
+                : null,
+            'updated_at': nowIso,
+          })
+          .eq('id', userId);
 
       // If user is a station owner, keep water_refill_stations synchronized
       if (role == 'owner') {
         try {
-          await supabase.from('water_refill_stations').update({
-            'status': !isSuspended ? 'suspended' : 'active',
-            'is_accepting_orders': isSuspended,
-            'updated_at': nowIso,
-          }).eq('owner_id', userId);
+          await supabase
+              .from('water_refill_stations')
+              .update({
+                'status': !isSuspended ? 'suspended' : 'active',
+                'is_accepting_orders': isSuspended,
+                'updated_at': nowIso,
+              })
+              .eq('owner_id', userId);
         } catch (_) {}
       }
 
@@ -456,21 +543,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     String? reason,
   }) async {
     try {
-      await supabase.rpc('admin_set_system_config', params: {
-        'p_key': key,
-        'p_value': value,
-        'p_reason': reason ?? 'Updated from admin dashboard',
-      });
+      await supabase.rpc(
+        'admin_set_system_config',
+        params: {
+          'p_key': key,
+          'p_value': value,
+          'p_reason': reason ?? 'Updated from admin dashboard',
+        },
+      );
       return;
     } catch (_) {}
 
     final nowIso = DateTime.now().toIso8601String();
     final updated = await supabase
         .from('system_config')
-        .update({
-          'value': value,
-          'updated_at': nowIso,
-        })
+        .update({'value': value, 'updated_at': nowIso})
         .eq('key', key)
         .select('key');
 
@@ -601,15 +688,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     try {
       try {
-        await supabase.rpc('admin_cancel_order', params: {
-          'p_order_id': orderId,
-          'p_reason': 'Cancelled by Admin',
-        });
+        await supabase.rpc(
+          'admin_cancel_order',
+          params: {'p_order_id': orderId, 'p_reason': 'Cancelled by Admin'},
+        );
       } catch (_) {
-        await supabase.from('orders').update({
-          'status': 'cancelled',
-          'updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', orderId);
+        await supabase
+            .from('orders')
+            .update({
+              'status': 'cancelled',
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', orderId);
       }
 
       if (mounted) {
@@ -653,9 +743,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final notes = o['notes']?.toString() ?? '';
     final stationName = o['station_name']?.toString() ?? 'Water Station';
     final date = (o['created_at']?.toString() ?? '').split('T').first;
-    final isCancellable = status == 'pending' ||
-        status == 'accepted' ||
-        status == 'preparing';
+    final isCancellable =
+        status == 'pending' || status == 'accepted' || status == 'preparing';
 
     showModalBottomSheet<void>(
       context: context,
@@ -714,21 +803,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text('• Name: $customerName',
-                    style: TextStyle(
-                        fontSize: 13, color: AppUi.textSecondaryOf(context))),
-                Text('• Phone: $customerPhone',
-                    style: TextStyle(
-                        fontSize: 13, color: AppUi.textSecondaryOf(context))),
-                Text('• Address: $customerAddress',
-                    style: TextStyle(
-                        fontSize: 13, color: AppUi.textSecondaryOf(context))),
+                Text(
+                  '• Name: $customerName',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
+                Text(
+                  '• Phone: $customerPhone',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
+                Text(
+                  '• Address: $customerAddress',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
                 if (notes.isNotEmpty)
-                  Text('• Delivery Notes: $notes',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontStyle: FontStyle.italic,
-                          color: AppUi.textSecondaryOf(context))),
+                  Text(
+                    '• Delivery Notes: $notes',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                  ),
                 const Divider(height: 24),
                 Text(
                   'Items Ordered (${items.length})',
@@ -740,12 +844,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
                 const SizedBox(height: 6),
                 if (items.isEmpty)
-                  Text('No item details recorded',
-                      style: TextStyle(fontSize: 12, color: AppUi.textMuted))
+                  Text(
+                    'No item details recorded',
+                    style: TextStyle(fontSize: 12, color: AppUi.textMuted),
+                  )
                 else
                   ...items.map((it) {
                     final itemMap = it is Map ? it : {};
-                    final name = itemMap['product_name'] ??
+                    final name =
+                        itemMap['product_name'] ??
                         itemMap['name'] ??
                         'Refill Water';
                     final qty = itemMap['quantity'] ?? 1;
@@ -754,10 +861,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('$qty × $name',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppUi.textSecondaryOf(context))),
+                          Text(
+                            '$qty × $name',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppUi.textSecondaryOf(context),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -766,44 +876,62 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Subtotal',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AppUi.textSecondaryOf(context))),
-                    Text(currencyFormat.format(subtotal),
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AppUi.textPrimaryOf(context))),
+                    Text(
+                      'Subtotal',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                    Text(
+                      currencyFormat.format(subtotal),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Delivery Fee',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AppUi.textSecondaryOf(context))),
-                    Text(currencyFormat.format(deliveryFee),
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AppUi.textPrimaryOf(context))),
+                    Text(
+                      'Delivery Fee',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                    Text(
+                      currencyFormat.format(deliveryFee),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total Amount',
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppUi.textPrimaryOf(context))),
-                    Text(currencyFormat.format(amt),
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppUi.bluePrimary)),
+                    Text(
+                      'Total Amount',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
+                    Text(
+                      currencyFormat.format(amt),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppUi.bluePrimary,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -833,6 +961,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    late final String configStatus;
+    late final Color configColor;
+    if (_systemConfigError != null) {
+      configStatus = 'Config unavailable';
+      configColor = AppUi.error;
+    } else if (!_systemConfigLoaded) {
+      configStatus = 'Checking configuration';
+      configColor = AppUi.textMuted;
+    } else if (_maintenanceMode) {
+      configStatus = 'Maintenance Mode';
+      configColor = AppUi.warningFg;
+    } else {
+      configStatus = 'Telemetry Active';
+      configColor = AppUi.accentGreen;
+    }
+
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
       appBar: AppBar(
@@ -871,23 +1015,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       width: 7,
                       height: 7,
                       decoration: BoxDecoration(
-                        color: _maintenanceMode
-                            ? AppUi.warningFg
-                            : AppUi.accentGreen,
+                        color: configColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      _maintenanceMode
-                          ? 'Maintenance Mode'
-                          : 'Telemetry Active',
+                      configStatus,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: _maintenanceMode
-                            ? AppUi.warningFg
-                            : AppUi.accentGreen,
+                        color: configColor,
                       ),
                     ),
                   ],
@@ -918,19 +1056,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           indicatorColor: AppUi.bluePrimary,
           indicatorWeight: 3,
           labelPadding: EdgeInsets.zero,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
           tabs: [
-            const Tab(icon: Icon(Icons.space_dashboard_rounded, size: 20), text: 'Overview'),
+            const Tab(
+              icon: Icon(Icons.space_dashboard_rounded, size: 20),
+              text: 'Overview',
+            ),
             Tab(
               icon: Badge(
-                isLabelVisible: ((_stats['pending_stations'] as num?)?.toInt() ?? 0) > 0,
+                isLabelVisible:
+                    ((_stats['pending_stations'] as num?)?.toInt() ?? 0) > 0,
                 label: Text('${_stats['pending_stations'] ?? 0}'),
                 child: const Icon(Icons.storefront_rounded, size: 20),
               ),
               text: 'Stations',
             ),
-            const Tab(icon: Icon(Icons.receipt_long_rounded, size: 20), text: 'Orders'),
-            const Tab(icon: Icon(Icons.tune_rounded, size: 20), text: 'Settings'),
+            const Tab(
+              icon: Icon(Icons.receipt_long_rounded, size: 20),
+              text: 'Orders',
+            ),
+            const Tab(
+              icon: Icon(Icons.tune_rounded, size: 20),
+              text: 'Settings',
+            ),
           ],
         ),
       ),
@@ -939,42 +1090,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               child: CircularProgressIndicator(color: AppUi.bluePrimary),
             )
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline_rounded,
-                            color: AppUi.error, size: 48),
-                        const SizedBox(height: 16),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppUi.textPrimaryOf(context),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _loadAllData,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabController,
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildCommandCenterTab(context),
-                    _buildStationsTab(context),
-                    _buildOrdersTab(context),
-                    _buildSettingsTab(context),
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: AppUi.error,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppUi.textPrimaryOf(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _loadAllData,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
+                    ),
                   ],
                 ),
+              ),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildCommandCenterTab(context),
+                _buildStationsTab(context),
+                _buildOrdersTab(context),
+                _buildSettingsTab(context),
+              ],
+            ),
     );
   }
 
@@ -1017,6 +1171,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ),
             ),
 
+          if (_dataRefreshError != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppUi.warningBg,
+                borderRadius: AppUi.radiusLg,
+                border: Border.all(color: AppUi.warningFg),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.sync_problem_rounded, color: AppUi.warningFg),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Refresh failed. The information on this screen may be out of date.',
+                      style: TextStyle(
+                        color: AppUi.warningFg,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (_systemConfigError != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppUi.warningBg,
+                borderRadius: AppUi.radiusLg,
+                border: Border.all(color: AppUi.warningFg),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.sync_problem_rounded, color: AppUi.warningFg),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'System settings could not be verified. Refresh before relying on maintenance or platform fee settings.',
+                      style: TextStyle(
+                        color: AppUi.warningFg,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           if (pendingCount > 0)
             Container(
               margin: const EdgeInsets.only(bottom: 16),
@@ -1028,8 +1236,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.verified_user_rounded,
-                      color: AppColors.uiWarning, size: 28),
+                  const Icon(
+                    Icons.verified_user_rounded,
+                    color: AppColors.uiWarning,
+                    size: 28,
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -1059,7 +1270,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       backgroundColor: AppColors.uiWarning,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                     ),
                     onPressed: () => _tabController.animateTo(1),
                     child: const Text('Review Now'),
@@ -1079,34 +1292,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             children: [
               _buildKpiCard(
                 context,
-                title: 'Platform Gross GMV',
-                value: currencyFormat.format(gmv),
-                subtitle: 'Today: ${currencyFormat.format(todayGmv)}',
+                title: 'Recent Delivered GMV',
+                value: _hasFreshMetrics ? currencyFormat.format(gmv) : '—',
+                subtitle: _hasFreshMetrics
+                    ? 'Latest ${_orders.length} orders · today in sample: ${currencyFormat.format(todayGmv)}'
+                    : 'Refreshing recent order metrics',
                 icon: Icons.payments_rounded,
                 color: AppUi.bluePrimary,
               ),
               _buildKpiCard(
                 context,
                 title: 'Total System Orders',
-                value: '${_stats['orders_count'] ?? 0}',
-                subtitle: 'Across all refill stations',
+                value: _hasFreshMetrics
+                    ? '${_stats['orders_count'] ?? 0}'
+                    : '—',
+                subtitle: 'Latest ${_orders.length} shown below',
                 icon: Icons.receipt_long_rounded,
                 color: const Color(0xFF6366F1),
               ),
               _buildKpiCard(
                 context,
                 title: 'Water Refill Stations',
-                value: '${_stats['stations_count'] ?? 0}',
-                subtitle: '${_stats['open_stations'] ?? 0} currently open',
+                value: _hasFreshMetrics
+                    ? '${_stats['stations_count'] ?? 0}'
+                    : '—',
+                subtitle: _hasFreshMetrics
+                    ? '${_stats['open_stations'] ?? 0} open in loaded stations'
+                    : 'Refreshing station metrics',
                 icon: Icons.store_mall_directory_rounded,
                 color: AppUi.accentGreen,
               ),
               _buildKpiCard(
                 context,
                 title: 'Active Community',
-                value: '${_stats['total_users'] ?? 0}',
-                subtitle:
-                    '${_stats['customers'] ?? 0} buyers • ${_stats['riders'] ?? 0} riders',
+                value: _hasFreshMetrics ? '${_stats['total_users'] ?? 0}' : '—',
+                subtitle: _hasFreshMetrics
+                    ? '${_stats['customers'] ?? 0} buyers • ${_stats['riders'] ?? 0} riders in loaded profiles'
+                    : 'Refreshing community metrics',
                 icon: Icons.people_alt_rounded,
                 color: const Color(0xFFEC4899),
               ),
@@ -1128,8 +1350,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   _maintenanceMode
                       ? Icons.build_circle_rounded
                       : Icons.check_circle_rounded,
-                  color:
-                      _maintenanceMode ? AppUi.warningFg : AppUi.accentGreen,
+                  color: _maintenanceMode ? AppUi.warningFg : AppUi.accentGreen,
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -1260,7 +1481,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final filtered = _stations.where((s) {
       final name = (s['name'] ?? '').toString().toLowerCase();
       final town = (s['town'] ?? '').toString().toLowerCase();
-      final matchSearch = _stationSearch.isEmpty ||
+      final matchSearch =
+          _stationSearch.isEmpty ||
           name.contains(_stationSearch.toLowerCase()) ||
           town.contains(_stationSearch.toLowerCase());
 
@@ -1306,10 +1528,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       setState(() => _stationFilter = v);
                     }),
                     const SizedBox(width: 8),
-                    _filterChip('Pending Review ⚠️', 'pending', _stationFilter,
-                        (v) {
-                      setState(() => _stationFilter = v);
-                    }),
+                    _filterChip(
+                      'Pending Review ⚠️',
+                      'pending',
+                      _stationFilter,
+                      (v) {
+                        setState(() => _stationFilter = v);
+                      },
+                    ),
                     const SizedBox(width: 8),
                     _filterChip('Open Now', 'open', _stationFilter, (v) {
                       setState(() => _stationFilter = v);
@@ -1340,7 +1566,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (ctx, idx) {
                     final s = filtered[idx];
-                    final isPending = s['status'] == 'pending' ||
+                    final isPending =
+                        s['status'] == 'pending' ||
                         s['status'] == 'pending_verification';
                     final isSuspended = s['status'] == 'suspended';
                     final isOpen = s['is_accepting_orders'] == true;
@@ -1375,7 +1602,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               if (isPending)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.uiWarningBg,
                                     borderRadius: BorderRadius.circular(6),
@@ -1392,13 +1621,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               else
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: isSuspended
                                         ? AppColors.uiErrorBg
                                         : (isOpen
-                                            ? AppColors.brandSoft
-                                            : AppUi.borderOf(context).withValues(alpha: 0.3)),
+                                              ? AppColors.brandSoft
+                                              : AppUi.borderOf(
+                                                  context,
+                                                ).withValues(alpha: 0.3)),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -1409,8 +1642,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                       color: isSuspended
                                           ? AppColors.statusCancelled
                                           : (isOpen
-                                              ? AppColors.brandPrimary
-                                              : AppUi.textSecondaryOf(context)),
+                                                ? AppColors.brandPrimary
+                                                : AppUi.textSecondaryOf(
+                                                    context,
+                                                  )),
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1421,8 +1656,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              Icon(Icons.location_on_outlined,
-                                  size: 14, color: AppUi.textMuted),
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: AppUi.textMuted,
+                              ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
@@ -1436,8 +1674,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 ),
                               ),
                               if (s['rating'] != null) ...[
-                                const Icon(Icons.star_rounded,
-                                    color: Color(0xFFF59E0B), size: 14),
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: Color(0xFFF59E0B),
+                                  size: 14,
+                                ),
                                 const SizedBox(width: 2),
                                 Text(
                                   '${s['rating']}',
@@ -1459,7 +1700,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     backgroundColor: AppUi.bluePrimary,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                   ),
                                   onPressed: () => _approveStation(
                                     s['id'].toString(),
@@ -1467,8 +1710,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     s['name'] ?? '',
                                   ),
                                   icon: const Icon(
-                                      Icons.verified_outlined,
-                                      size: 16),
+                                    Icons.verified_outlined,
+                                    size: 16,
+                                  ),
                                   label: const Text('Approve Station'),
                                 )
                               else ...[
@@ -1491,7 +1735,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     size: 16,
                                   ),
                                   label: Text(
-                                      isSuspended ? 'Reactivate' : 'Suspend'),
+                                    isSuspended ? 'Reactivate' : 'Suspend',
+                                  ),
                                 ),
                               ],
                             ],
@@ -1514,7 +1759,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       final station = (o['station_name'] ?? '').toString().toLowerCase();
       final customer = (o['customer_name'] ?? '').toString().toLowerCase();
       final q = _orderSearch.trim().toLowerCase();
-      final matchSearch = q.isEmpty ||
+      final matchSearch =
+          q.isEmpty ||
           id.contains(q) ||
           station.contains(q) ||
           customer.contains(q);
@@ -1562,9 +1808,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       setState(() => _orderFilter = v);
                     }),
                     const SizedBox(width: 8),
-                    _filterChip('Delivering', 'out_for_delivery', _orderFilter, (v) {
-                      setState(() => _orderFilter = v);
-                    }),
+                    _filterChip(
+                      'Delivering',
+                      'out_for_delivery',
+                      _orderFilter,
+                      (v) {
+                        setState(() => _orderFilter = v);
+                      },
+                    ),
                     const SizedBox(width: 8),
                     _filterChip('Delivered', 'delivered', _orderFilter, (v) {
                       setState(() => _orderFilter = v);
@@ -1594,13 +1845,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   itemBuilder: (ctx, idx) {
                     final o = filtered[idx];
                     final rawId = o['id']?.toString() ?? '';
-                    final shortId =
-                        rawId.length >= 8 ? rawId.substring(0, 8) : rawId;
+                    final shortId = rawId.length >= 8
+                        ? rawId.substring(0, 8)
+                        : rawId;
                     final status = o['status']?.toString() ?? 'pending';
                     final amt = o['total_amount'] is num
                         ? (o['total_amount'] as num).toDouble()
-                        : (double.tryParse(o['total_amount']?.toString() ?? '') ??
-                            0.0);
+                        : (double.tryParse(
+                                o['total_amount']?.toString() ?? '',
+                              ) ??
+                              0.0);
                     final paymentMethod =
                         o['payment_method']?.toString().toUpperCase() ?? 'COD';
                     final date = (o['created_at']?.toString() ?? '')
@@ -1688,8 +1942,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               ],
                             ),
                             const SizedBox(width: 4),
-                            Icon(Icons.chevron_right_rounded,
-                                size: 18, color: AppUi.textMuted),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: AppUi.textMuted,
+                            ),
                           ],
                         ),
                       ),
@@ -1747,7 +2004,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       final name = (u['full_name'] ?? '').toString().toLowerCase();
       final email = (u['email'] ?? '').toString().toLowerCase();
       final phone = (u['phone'] ?? '').toString().toLowerCase();
-      final matchSearch = _userSearch.isEmpty ||
+      final matchSearch =
+          _userSearch.isEmpty ||
           name.contains(_userSearch.toLowerCase()) ||
           email.contains(_userSearch.toLowerCase()) ||
           phone.contains(_userSearch.toLowerCase());
@@ -1870,7 +2128,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     const SizedBox(width: 6),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: AppUi.blueSoft,
                                         borderRadius: BorderRadius.circular(4),
@@ -1944,7 +2204,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             children: [
               Row(
                 children: [
-                  const Icon(Icons.receipt_long_rounded, color: AppUi.bluePrimary),
+                  const Icon(
+                    Icons.receipt_long_rounded,
+                    color: AppUi.bluePrimary,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'App Service Fee',
@@ -1968,12 +2231,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Percentage Fee:',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  Text('${_platformFeePercent.toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppUi.bluePrimary)),
+                  const Text(
+                    'Percentage Fee:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    '${_platformFeePercent.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.bluePrimary,
+                    ),
+                  ),
                 ],
               ),
               Slider(
@@ -1989,12 +2257,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Fixed Fee per order:',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  Text(currencyFormat.format(_platformFeeFixed),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppUi.bluePrimary)),
+                  const Text(
+                    'Fixed Fee per order:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    currencyFormat.format(_platformFeeFixed),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppUi.bluePrimary,
+                    ),
+                  ),
                 ],
               ),
               Slider(
@@ -2045,7 +2318,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         const sampleBase = sampleOrder + sampleDelivery;
                         final sampleFee =
                             (sampleBase * _platformFeePercent / 100) +
-                                _platformFeeFixed;
+                            _platformFeeFixed;
                         final sampleTotal = sampleBase + sampleFee;
                         return Text(
                           'On a sample ₱100 refill + ₱25 delivery order:\n'
@@ -2095,8 +2368,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.build_circle_rounded,
-                        color: AppUi.bluePrimary),
+                    const Icon(
+                      Icons.build_circle_rounded,
+                      color: AppUi.bluePrimary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'System Guard & Maintenance',
@@ -2113,8 +2388,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   color: Colors.transparent,
                   child: SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Maintenance Mode',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    title: const Text(
+                      'Maintenance Mode',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                     subtitle: const Text(
                       'Blocks customers from creating new orders while system updates or upgrades are ongoing.',
                       style: TextStyle(fontSize: 12),
@@ -2132,8 +2409,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  Widget _filterChip(String label, String value, String current,
-      ValueChanged<String> onSelected) {
+  Widget _filterChip(
+    String label,
+    String value,
+    String current,
+    ValueChanged<String> onSelected,
+  ) {
     final selected = current == value;
     return ChoiceChip(
       label: Text(label),

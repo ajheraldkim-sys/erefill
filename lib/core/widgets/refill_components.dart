@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../constants.dart';
 import '../water_types.dart';
+import 'app_cached_image.dart';
 import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
@@ -141,6 +142,7 @@ class StationCard extends StatelessWidget {
   final bool showFavorite;
   final bool isFavorite;
   final VoidCallback? onFavoriteToggle;
+  final String? distanceLabel;
 
   const StationCard({
     super.key,
@@ -150,6 +152,7 @@ class StationCard extends StatelessWidget {
     this.showFavorite = false,
     this.isFavorite = false,
     this.onFavoriteToggle,
+    this.distanceLabel,
   });
 
   String get _name {
@@ -165,7 +168,9 @@ class StationCard extends StatelessWidget {
   }
 
   Widget _buildGridCard(BuildContext context) {
-    final barangay = station['barangay']?.toString() ?? 'Near you';
+    final barangay = station['barangay']?.toString() ?? '';
+    final town = station['town']?.toString() ?? '';
+    final location = [barangay, town].where((part) => part.isNotEmpty).join(', ');
     final rating = (station['average_rating'] as num?)?.toDouble() ?? 0.0;
     final price = (station['price_per_gallon'] as num?)?.toDouble();
     final availability =
@@ -199,18 +204,14 @@ class StationCard extends StatelessWidget {
                           top: Radius.circular(AppUi.radiusCard),
                         ),
                       ),
-                      child: photoUrl != null && photoUrl.isNotEmpty
-                          ? Image.network(
-                              photoUrl,
-                              fit: BoxFit.cover,
-                              // Cards are small; decoding the source image at
-                              // its full camera resolution wastes memory while
-                              // scrolling through a station list.
-                              cacheWidth: 480,
-                              filterQuality: FilterQuality.low,
-                              errorBuilder: (_, _, _) => _placeholderIcon(),
-                            )
-                          : _placeholderIcon(),
+                      child: AppCachedImage(
+                        imageUrl: photoUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 480,
+                        memCacheHeight: 480,
+                        placeholder: _placeholderIcon(),
+                        errorWidget: _placeholderIcon(),
+                      ),
                     ),
                     Positioned(
                       top: 8,
@@ -258,10 +259,12 @@ class StationCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      barangay,
+                      location.isEmpty ? 'Location unavailable' : location,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppUi.captionText,
+                      style: AppUi.captionText.copyWith(
+                        color: AppUi.textSecondaryOf(context),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -274,14 +277,22 @@ class StationCard extends StatelessWidget {
                             color: AppUi.textSecondaryOf(context),
                           ),
                         ),
-                        if (price != null) ...[
+                        if (price != null && price > 0) ...[
                           const Spacer(),
                           Text(
-                            '₱${price.toStringAsFixed(0)}/gal',
+                            '₱${_formatPrice(price)}/gal',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 11,
                               color: AppUi.bluePrimary,
+                            ),
+                          ),
+                        ] else ...[
+                          const Spacer(),
+                          Text(
+                            'Price not listed',
+                            style: AppUi.captionText.copyWith(
+                              color: AppUi.textSecondaryOf(context),
                             ),
                           ),
                         ],
@@ -302,9 +313,12 @@ class StationCard extends StatelessWidget {
     final town = station['town']?.toString() ?? '';
     final location = [barangay, town].where((s) => s.isNotEmpty).join(', ');
     final rating = (station['average_rating'] as num?)?.toDouble() ?? 0.0;
+    final reviewCount = (station['review_count'] as num?)?.toInt() ?? 0;
+    final price = (station['price_per_gallon'] as num?)?.toDouble();
     final availability =
         station['station_availability']?.toString() ??
         ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
+    final photoUrl = station['station_photo_url']?.toString();
 
     return Material(
       color: AppUi.surfaceOf(context),
@@ -313,56 +327,115 @@ class StationCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppUi.cardRadius,
         child: Container(
-          padding: AppUi.cardPadding,
+          padding: const EdgeInsets.all(12),
           decoration: AppUi.cardDecorationOf(context),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 68,
+                  height: 68,
+                  child: AppCachedImage(
+                    imageUrl: photoUrl,
+                    width: 68,
+                    height: 68,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 180,
+                    memCacheHeight: 180,
+                    fallbackIcon: Icons.water_drop_rounded,
+                  ),
                 ),
-                child: const Icon(Icons.water_drop_rounded, color: AppUi.bluePrimary),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_name, style: AppUi.sectionTitle),
-                    if (location.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(location, style: AppUi.captionText),
-                    ],
-                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        StationAvailabilityBadge(availability: availability),
-                        const SizedBox(width: 8),
-                        Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
-                        const SizedBox(width: 2),
-                        Text(
-                          rating > 0 ? rating.toStringAsFixed(1) : 'New station',
-                          style: AppUi.captionText,
+                        Expanded(
+                          child: Text(
+                            _name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppUi.sectionTitle,
+                          ),
                         ),
+                        if (showFavorite)
+                          IconButton(
+                            tooltip: isFavorite
+                                ? 'Remove favorite'
+                                : 'Add favorite',
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 36,
+                              height: 36,
+                            ),
+                            padding: EdgeInsets.zero,
+                            onPressed: onFavoriteToggle,
+                            icon: Icon(
+                              isFavorite
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              size: 20,
+                              color: isFavorite
+                                  ? AppUi.error
+                                  : AppUi.textSecondaryOf(context),
+                            ),
+                          ),
                       ],
+                    ),
+                    if (location.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        location,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppUi.captionText.copyWith(
+                          color: AppUi.textSecondaryOf(context),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StationAvailabilityBadge(availability: availability),
+                        _StationCardMeta(
+                          icon: Icons.star_rounded,
+                          label: reviewCount > 0
+                              ? '${rating.toStringAsFixed(1)} · $reviewCount reviews'
+                              : 'New station',
+                          iconColor: const Color(0xFFF59E0B),
+                        ),
+                        if (distanceLabel != null &&
+                            distanceLabel!.isNotEmpty)
+                          _StationCardMeta(
+                            icon: Icons.near_me_outlined,
+                            label: distanceLabel!,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      price != null && price > 0
+                          ? '₱${_formatPrice(price)} / gallon'
+                          : 'Price not listed',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: price != null && price > 0
+                                ? AppUi.bluePrimary
+                                : AppUi.textSecondaryOf(context),
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                   ],
                 ),
               ),
-              if (showFavorite)
-                IconButton(
-                  onPressed: onFavoriteToggle,
-                  icon: Icon(
-                    isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    color: isFavorite
-                        ? AppUi.error
-                        : AppUi.textSecondaryOf(context),
-                  ),
-                )
-              else
+              if (!showFavorite)
                 Icon(
                   Icons.chevron_right_rounded,
                   color: AppUi.textSecondaryOf(context),
@@ -372,6 +445,12 @@ class StationCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatPrice(double price) {
+    return price % 1 == 0
+        ? price.toStringAsFixed(0)
+        : price.toStringAsFixed(2);
   }
 
   Widget _placeholderIcon() {
@@ -413,6 +492,39 @@ class StationCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _StationCardMeta extends StatelessWidget {
+  const _StationCardMeta({
+    required this.icon,
+    required this.label,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color: iconColor ?? AppUi.textSecondaryOf(context),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: AppUi.captionText.copyWith(
+            color: AppUi.textSecondaryOf(context),
+          ),
+        ),
+      ],
     );
   }
 }

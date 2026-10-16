@@ -287,7 +287,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final profile = await ProfileQueryHelpers.fetchProfile(
         supabase,
         customerId,
-      );
+      ) ?? <String, dynamic>{};
 
       List<Map<String, dynamic>> addresses = [];
       try {

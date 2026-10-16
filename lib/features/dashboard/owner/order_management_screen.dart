@@ -15,6 +15,7 @@ import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/offline_queue_service.dart';
 import 'package:erefill/core/widgets/press_bounce.dart';
+import 'package:erefill/core/utils/app_haptics.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -150,7 +151,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
             }
 
             if (payload.eventType == PostgresChangeEvent.insert) {
-              HapticFeedback.heavyImpact();
+              AppHaptics.orderAlert();
               if (mounted) {
                 ScaffoldMessenger.of(context).hideCurrentSnackBar();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1663,6 +1664,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     final elapsed = _elapsedLabel(order['created_at']);
     final payment = (order['payment_method'] ?? 'COD').toString().toUpperCase();
 
+    final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '');
+    final minutesAgo = createdAt != null ? DateTime.now().difference(createdAt).inMinutes : 0;
+    final isSlaUrgent = (rawStatus == 'pending' || rawStatus == 'in_prep') && minutesAgo >= 15;
+
     return RepaintBoundary(
       child: PressBounce(
         onTap: () {
@@ -1688,28 +1693,58 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Order ID chip + Status Badge
+                // Top Row: Order ID chip + SLA + Status Badge
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        _shortOrderId(orderId),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 11,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _shortOrderId(orderId),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (isSlaUrgent) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.alarm_rounded, color: Colors.white, size: 12),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${minutesAgo}m',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     OrderStatusChip(
                       status: rawStatus,

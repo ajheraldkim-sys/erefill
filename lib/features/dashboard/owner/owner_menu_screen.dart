@@ -2183,7 +2183,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 setSheetState(() => isDeleting = true);
                                 try {
                                   await supabase.rpc('delete_user_account');
-                                  await supabase.auth.signOut();
+                                  await supabase.auth.signOut(
+                                    scope: SignOutScope.local,
+                                  );
                                   if (context.mounted) {
                                     context.resetToAuth();
                                   }

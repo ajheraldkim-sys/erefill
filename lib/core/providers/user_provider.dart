@@ -55,6 +55,8 @@ class UserProvider extends ChangeNotifier {
           notifyListeners();
         } else if (_profileUserId != session.user.id || _user == null) {
           _fetchAndListenToProfile(session.user.id);
+        } else if (data.event == AuthChangeEvent.userUpdated) {
+          _fetchAndListenToProfile(session.user.id);
         }
       },
       onError: (error) {
@@ -167,9 +169,7 @@ class UserProvider extends ChangeNotifier {
             await _cache.set('user_profile_$userId', synthetic);
 
             // Self-heal: Ensure row is asynchronously persisted to public.profiles
-            unawaited(_supabase
-                .from('profiles')
-                .upsert(synthetic)
+            unawaited(ProfileQueryHelpers.ensureProfileExists(_supabase, userId: userId)
                 .then((_) {})
                 .catchError((e) {
               debugPrint('Self-healing profile upsert safeguard: $e');
