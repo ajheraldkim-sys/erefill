@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -105,45 +106,61 @@ class AuthService {
 
   // 2. LOGIN (Handles Email or Username)
   Future<void> login(String identifier, String password) async {
+    final loginTimer = Stopwatch()..start();
     final cleanIdentifier = identifier.trim();
-    final cleanPassword = password.trim();
 
-    if (cleanIdentifier.isEmpty || cleanPassword.isEmpty) {
+    if (cleanIdentifier.isEmpty || password.isEmpty) {
       throw 'Please enter both username/email and password.';
     }
 
     String email = cleanIdentifier;
 
     if (!cleanIdentifier.contains('@')) {
-      final res = await _supabase
-          .from('profiles')
-          .select('email')
-          .ilike('username', cleanIdentifier)
-          .maybeSingle();
+      final usernameLookupTimer = Stopwatch()..start();
+      try {
+        final res = await _supabase
+            .from('profiles')
+            .select('email')
+            .ilike('username', cleanIdentifier)
+            .maybeSingle();
 
-      if (res != null) {
-        final profileEmail = (res['email'] as String?)?.trim();
-        if (profileEmail == null || profileEmail.isEmpty) {
-          throw 'This username is not linked to an email yet. Please login using your email or contact support.';
+        if (res != null) {
+          final profileEmail = (res['email'] as String?)?.trim();
+          if (profileEmail == null || profileEmail.isEmpty) {
+            throw 'This username is not linked to an email yet. Please login using your email or contact support.';
+          }
+          email = profileEmail;
+        } else if (cleanIdentifier.toLowerCase() == 'admin' ||
+            cleanIdentifier.toLowerCase() == 'platform_admin') {
+          email = 'admin@gmail.com';
+        } else {
+          throw 'Username not found.';
         }
-        email = profileEmail;
-      } else if (cleanIdentifier.toLowerCase() == 'admin' ||
-          cleanIdentifier.toLowerCase() == 'platform_admin') {
-        email = 'admin@gmail.com';
-      } else {
-        throw 'Username not found.';
+      } finally {
+        if (kDebugMode) {
+          debugPrint(
+            'auth.username_lookup_ms=${usernameLookupTimer.elapsedMilliseconds}',
+          );
+        }
       }
     }
 
     try {
-      await _supabase.auth.signInWithPassword(
-        email: email,
-        password: cleanPassword,
-      );
+      final signInTimer = Stopwatch()..start();
+      await _supabase.auth.signInWithPassword(email: email, password: password);
+      if (kDebugMode) {
+        debugPrint(
+          'auth.password_sign_in_ms=${signInTimer.elapsedMilliseconds}',
+        );
+      }
     } on AuthException catch (e) {
       throw e.message;
     } catch (e) {
       throw 'Unable to login right now: $e';
+    } finally {
+      if (kDebugMode) {
+        debugPrint('auth.login_total_ms=${loginTimer.elapsedMilliseconds}');
+      }
     }
   }
 

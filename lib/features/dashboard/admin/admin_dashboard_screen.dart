@@ -55,6 +55,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   String? _systemConfigError;
   int _settingsSubTab = 0;
 
+  RealtimeChannel? _realtimeChannel;
+  Timer? _realtimeDebounce;
+  int _unreadNotifications = 0;
+  final List<Map<String, dynamic>> _liveNotifications = [];
+
   final currencyFormat = NumberFormat.currency(
     locale: 'en_PH',
     symbol: '₱',
@@ -67,6 +72,83 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     _tabController = TabController(length: 5, vsync: this);
     _loadDiskCache();
     _loadAllData();
+    _setupRealtime();
+  }
+
+  void _setupRealtime() {
+    try {
+      _realtimeChannel = supabase.channel('mobile_admin_realtime_events')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'orders',
+          callback: (payload) {
+            final id = payload.newRecord['id']?.toString() ?? '';
+            final shortId = id.length >= 8 ? id.substring(0, 8) : id;
+            final status = payload.newRecord['status']?.toString() ?? 'updated';
+            _onLiveEvent(
+              title: 'Order Status: $status',
+              description: 'Order #$shortId changed status to $status.',
+              icon: Icons.receipt_long_rounded,
+              color: AppUi.bluePrimary,
+            );
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'water_refill_stations',
+          callback: (payload) {
+            final name = payload.newRecord['name']?.toString() ?? 'Station';
+            final status = payload.newRecord['status']?.toString() ?? 'updated';
+            _onLiveEvent(
+              title: 'Station Activity',
+              description: 'Station "$name" status: $status.',
+              icon: Icons.storefront_rounded,
+              color: const Color(0xFF087E8B),
+            );
+          },
+        )
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'disputes',
+          callback: (_) {
+            _onLiveEvent(
+              title: 'Customer Dispute',
+              description: 'A customer dispute was logged or modified.',
+              icon: Icons.gavel_rounded,
+              color: AppUi.warningFg,
+            );
+          },
+        )
+        ..subscribe();
+    } catch (_) {}
+  }
+
+  void _onLiveEvent({
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _liveNotifications.insert(0, {
+        'title': title,
+        'description': description,
+        'time': DateTime.now(),
+        'icon': icon,
+        'color': color,
+        'read': false,
+      });
+      _unreadNotifications++;
+    });
+
+    _realtimeDebounce?.cancel();
+    _realtimeDebounce = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) _loadAllData();
+    });
   }
 
   Future<void> _loadDiskCache() async {
@@ -95,6 +177,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   @override
   void dispose() {
+    _realtimeDebounce?.cancel();
+    _realtimeChannel?.unsubscribe();
     _tabController.dispose();
     super.dispose();
   }
@@ -1629,6 +1713,213 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
+  void _showLiveNotificationsSheet(BuildContext context) {
+    setState(() => _unreadNotifications = 0);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppUi.surfaceOf(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppUi.textMuted.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppUi.blueSoft,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_active_rounded,
+                              color: AppUi.bluePrimary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Real-Time Notifications',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppUi.textPrimaryOf(context),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: AppUi.accentGreen,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    const Text(
+                                      'Supabase Live Feed',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppUi.accentGreen,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.campaign_rounded, size: 16),
+                            label: const Text('Broadcast'),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              showAdminBroadcastDialog(context);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: _liveNotifications.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.notifications_none_rounded,
+                                    size: 48,
+                                    color: AppUi.textMuted.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No real-time events yet',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppUi.textSecondaryOf(context),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'New orders and station updates will stream here automatically.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppUi.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              controller: scrollController,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              itemCount: _liveNotifications.length,
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final n = _liveNotifications[index];
+                                final time = n['time'] as DateTime;
+                                final timeStr = DateFormat(
+                                  'HH:mm:ss',
+                                ).format(time);
+                                final icon =
+                                    n['icon'] as IconData? ??
+                                    Icons.notifications_rounded;
+                                final color =
+                                    n['color'] as Color? ?? AppUi.bluePrimary;
+
+                                return ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  leading: CircleAvatar(
+                                    backgroundColor: color.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    child: Icon(icon, color: color, size: 20),
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          n['title'] as String,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                            color: AppUi.textPrimaryOf(context),
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        timeStr,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppUi.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      n['description'] as String,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppUi.textSecondaryOf(context),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- UI Builders ---
 
   @override
@@ -1711,6 +2002,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Live Notifications',
+            icon: Badge(
+              isLabelVisible: _unreadNotifications > 0,
+              label: Text(
+                _unreadNotifications > 99 ? '99+' : '$_unreadNotifications',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+              child: const Icon(Icons.notifications_rounded),
+            ),
+            onPressed: () => _showLiveNotificationsSheet(context),
+          ),
           IconButton(
             tooltip: 'Refresh Telemetry',
             icon: const Icon(Icons.refresh_rounded),
@@ -2615,75 +2918,79 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                             ],
                           ),
                           const Divider(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              if (isPending) ...[
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppUi.error,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 8,
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                if (isPending) ...[
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppUi.error,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                    onPressed: () => _rejectStation(
+                                      s['id'].toString(),
+                                      s['owner_id']?.toString(),
+                                      s['name'] ?? '',
+                                    ),
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                    ),
+                                    label: const Text('Reject'),
+                                  ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.statusDelivered,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                    onPressed: () => _approveStation(
+                                      s['id'].toString(),
+                                      s['owner_id']?.toString(),
+                                      s['name'] ?? '',
+                                    ),
+                                    icon: const Icon(
+                                      Icons.verified_rounded,
+                                      size: 16,
+                                    ),
+                                    label: const Text('Approve'),
+                                  ),
+                                ] else ...[
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: isSuspended
+                                          ? AppUi.accentGreen
+                                          : AppUi.error,
+                                    ),
+                                    onPressed: () => _toggleSuspendStation(
+                                      s['id'].toString(),
+                                      s['owner_id']?.toString(),
+                                      s['name'] ?? '',
+                                      isSuspended,
+                                    ),
+                                    icon: Icon(
+                                      isSuspended
+                                          ? Icons.check_circle_outline_rounded
+                                          : Icons.block_rounded,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      isSuspended ? 'Reactivate' : 'Suspend',
                                     ),
                                   ),
-                                  onPressed: () => _rejectStation(
-                                    s['id'].toString(),
-                                    s['owner_id']?.toString(),
-                                    s['name'] ?? '',
-                                  ),
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 16,
-                                  ),
-                                  label: const Text('Reject'),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.statusDelivered,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                  ),
-                                  onPressed: () => _approveStation(
-                                    s['id'].toString(),
-                                    s['owner_id']?.toString(),
-                                    s['name'] ?? '',
-                                  ),
-                                  icon: const Icon(
-                                    Icons.verified_rounded,
-                                    size: 16,
-                                  ),
-                                  label: const Text('Approve'),
-                                ),
-                              ] else ...[
-                                TextButton.icon(
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: isSuspended
-                                        ? AppUi.accentGreen
-                                        : AppUi.error,
-                                  ),
-                                  onPressed: () => _toggleSuspendStation(
-                                    s['id'].toString(),
-                                    s['owner_id']?.toString(),
-                                    s['name'] ?? '',
-                                    isSuspended,
-                                  ),
-                                  icon: Icon(
-                                    isSuspended
-                                        ? Icons.check_circle_outline_rounded
-                                        : Icons.block_rounded,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    isSuspended ? 'Reactivate' : 'Suspend',
-                                  ),
-                                ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -2861,7 +3168,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 children: [
                                   Row(
                                     children: [
-                                      Flexible(
+                                      Expanded(
                                         child: Text(
                                           'Order #$shortId',
                                           style: TextStyle(
@@ -2880,6 +3187,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                           fontSize: 11,
                                           color: AppUi.textMuted,
                                         ),
+                                        maxLines: 1,
                                       ),
                                     ],
                                   ),
@@ -3160,7 +3468,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               children: [
                                 Row(
                                   children: [
-                                    Flexible(
+                                    Expanded(
                                       child: Text(
                                         u['full_name'] ?? 'Unnamed',
                                         style: TextStyle(

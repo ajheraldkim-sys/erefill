@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/models/user_model.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
@@ -7,6 +7,13 @@ import 'package:erefill/core/utils/profile_query_helpers.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 
 class UserProvider extends ChangeNotifier {
+  static const _profileColumns =
+      'id,email,username,full_name,first_name,last_name,mi,suffix,phone,'
+      'town,barangay,purok,zip_code,avatar_url,station_photo_url,station_name,'
+      'vehicle_type,license_number,role,average_rating,landmark,complete_address,'
+      'latitude,longitude,lat,lng,preferred_water_type,owner_id,is_suspended,'
+      'suspended_reason,updated_at';
+
   final SupabaseClient _supabase = Supabase.instance.client;
   final LocalDataCache _cache = LocalDataCache.instance;
   UserModel? _user;
@@ -26,12 +33,16 @@ class UserProvider extends ChangeNotifier {
     final currentUserId = _supabase.auth.currentUser?.id;
     if (currentUserId != null) {
       _profileUserId = currentUserId;
-      final mem = _cache.getMemory<Map<String, dynamic>>('user_profile_$currentUserId');
+      final mem = _cache.getMemory<Map<String, dynamic>>(
+        'user_profile_$currentUserId',
+      );
       if (mem != null) {
         _user = UserModel.fromJson(mem);
         _isLoading = false;
       }
-      _cache.get<Map<String, dynamic>>('user_profile_$currentUserId').then((cached) {
+      _cache.get<Map<String, dynamic>>('user_profile_$currentUserId').then((
+        cached,
+      ) {
         if (cached != null && _user == null && !_disposed) {
           _user = UserModel.fromJson(cached);
           _isLoading = false;
@@ -81,7 +92,9 @@ class UserProvider extends ChangeNotifier {
       _profileSub = null;
 
       // 1. Immediately check synchronous in-memory cache (0ms)
-      final mem = _cache.getMemory<Map<String, dynamic>>('user_profile_$userId');
+      final mem = _cache.getMemory<Map<String, dynamic>>(
+        'user_profile_$userId',
+      );
       if (mem != null && !_disposed && generation == _profileLoadGeneration) {
         _user = UserModel.fromJson(mem);
         _isLoading = false;
@@ -89,8 +102,12 @@ class UserProvider extends ChangeNotifier {
       }
 
       // 2. Fallback to disk cache if memory didn't have it
-      final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
-      if (cached != null && !_disposed && generation == _profileLoadGeneration) {
+      final cached = await _cache.get<Map<String, dynamic>>(
+        'user_profile_$userId',
+      );
+      if (cached != null &&
+          !_disposed &&
+          generation == _profileLoadGeneration) {
         _user = UserModel.fromJson(cached);
         _isLoading = false;
         notifyListeners();
@@ -107,11 +124,12 @@ class UserProvider extends ChangeNotifier {
     try {
       Map<String, dynamic>? data;
       // Progressive retry loop up to 4 attempts to tolerate database trigger delay on signup
+      final profileLoadTimer = Stopwatch()..start();
       for (int attempt = 1; attempt <= 4; attempt++) {
         try {
           data = await _supabase
               .from('profiles')
-              .select()
+              .select(_profileColumns)
               .eq('id', userId)
               .maybeSingle();
           if (data != null) break;
@@ -135,7 +153,9 @@ class UserProvider extends ChangeNotifier {
         await _cache.set('user_profile_$userId', data);
       } else {
         // Fallback 1: Local cache
-        final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
+        final cached = await _cache.get<Map<String, dynamic>>(
+          'user_profile_$userId',
+        );
         if (cached != null) {
           _user = UserModel.fromJson(cached);
         } else {
@@ -147,7 +167,8 @@ class UserProvider extends ChangeNotifier {
               'id': userId,
               'email': currentUser.email ?? '',
               'role': meta['role'] ?? 'customer',
-              'username': meta['username'] ??
+              'username':
+                  meta['username'] ??
                   'user_${userId.length >= 8 ? userId.substring(0, 8) : userId}',
               'full_name': meta['full_name'] ?? 'New User',
               'first_name': meta['first_name'],
@@ -169,15 +190,23 @@ class UserProvider extends ChangeNotifier {
             await _cache.set('user_profile_$userId', synthetic);
 
             // Self-heal: Ensure row is asynchronously persisted to public.profiles
-            unawaited(ProfileQueryHelpers.ensureProfileExists(_supabase, userId: userId)
-                .then((_) {})
-                .catchError((e) {
-              debugPrint('Self-healing profile upsert safeguard: $e');
-            }));
+            unawaited(
+              ProfileQueryHelpers.ensureProfileExists(
+                _supabase,
+                userId: userId,
+              ).then((_) {}).catchError((e) {
+                debugPrint('Self-healing profile upsert safeguard: $e');
+              }),
+            );
           }
         }
       }
 
+      if (kDebugMode) {
+        debugPrint(
+          'auth.profile_load_ms=${profileLoadTimer.elapsedMilliseconds} result=${data == null ? 'fallback' : 'loaded'}',
+        );
+      }
       _attachProfileStream(userId);
     } catch (e) {
       if (_disposed || generation != _profileLoadGeneration) return;
@@ -185,7 +214,9 @@ class UserProvider extends ChangeNotifier {
 
       // Network or offline failure: preserve or load cached profile
       if (_user == null) {
-        final cached = await _cache.get<Map<String, dynamic>>('user_profile_$userId');
+        final cached = await _cache.get<Map<String, dynamic>>(
+          'user_profile_$userId',
+        );
         if (cached != null) {
           _user = UserModel.fromJson(cached);
         }
@@ -207,10 +238,7 @@ class UserProvider extends ChangeNotifier {
 
   void _attachProfileStream(String userId) {
     _profileSub ??= SafeSupabase.listen(
-      _supabase
-          .from('profiles')
-          .stream(primaryKey: ['id'])
-          .eq('id', userId),
+      _supabase.from('profiles').stream(primaryKey: ['id']).eq('id', userId),
       (data) {
         if (data.isNotEmpty && _profileUserId == userId && !_disposed) {
           _user = UserModel.fromJson(data.first);
@@ -236,12 +264,16 @@ class UserProvider extends ChangeNotifier {
     if (userId == null) throw Exception("User not authenticated");
     try {
       // 1. Update backend safely
-      await ProfileQueryHelpers.updateProfile(_supabase, updates, userId: userId);
+      await ProfileQueryHelpers.updateProfile(
+        _supabase,
+        updates,
+        userId: userId,
+      );
 
       // 2. Proactive Sync: Don't wait for stream, fetch now
       final data = await _supabase
           .from('profiles')
-          .select()
+          .select(_profileColumns)
           .eq('id', userId)
           .single();
       if (_disposed || _supabase.auth.currentUser?.id != userId) return;

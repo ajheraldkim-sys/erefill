@@ -219,7 +219,10 @@ BEGIN
     items,
     status
   ) VALUES (
-    NULLIF(p_order_data->>'id', '')::uuid,
+    coalesce(
+      NULLIF(p_order_data->>'id', '')::uuid,
+      gen_random_uuid()
+    ),
     v_customer_id,
     v_owner_id,
     coalesce(p_order_data->>'station_name', 'Water Station'),

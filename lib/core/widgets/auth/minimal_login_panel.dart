@@ -20,6 +20,7 @@ class MinimalLoginPanel extends StatefulWidget {
     this.onGuestBrowse,
     this.onForgotPassword,
     this.onCreateAccount,
+    this.onEmailPasswordLogin,
   });
 
   final VoidCallback? onSignedIn;
@@ -30,6 +31,8 @@ class MinimalLoginPanel extends StatefulWidget {
   final VoidCallback? onGuestBrowse;
   final VoidCallback? onForgotPassword;
   final VoidCallback? onCreateAccount;
+  final Future<void> Function(String identifier, String password)?
+  onEmailPasswordLogin;
 
   @override
   State<MinimalLoginPanel> createState() => _MinimalLoginPanelState();
@@ -73,9 +76,9 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
     setState(() => _errorMessage = null);
     if (!_formKey.currentState!.validate()) return;
     await _runAuth(
-      () => AuthService().login(
+      () => (widget.onEmailPasswordLogin ?? AuthService().login)(
         _idController.text.trim(),
-        _passController.text.trim(),
+        _passController.text,
       ),
     );
   }
@@ -332,7 +335,9 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                     foregroundColor: buttonForeground,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                                      borderRadius: BorderRadius.circular(
+                                        AppUi.radiusControl,
+                                      ),
                                     ),
                                   ),
                                   child: _isLoading
@@ -426,8 +431,10 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                           const SizedBox(height: 28),
 
                           // Footer Actions
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
                             children: [
                               Text(
                                 "Don't have an account?",
@@ -602,15 +609,14 @@ class AuthTextField extends StatelessWidget {
       valueListenable: controller,
       builder: (context, value, _) {
         final text = value.text;
-        final isValid = text.isNotEmpty && validator != null && validator!(text) == null;
+        final isValid =
+            text.isNotEmpty && validator != null && validator!(text) == null;
 
         Widget? suffix;
         if (isPassword) {
           suffix = IconButton(
             icon: Icon(
-              obscure
-                  ? Icons.visibility_off_rounded
-                  : Icons.visibility_rounded,
+              obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
               color: AppUi.textSecondaryOf(context),
               size: 22,
             ),
@@ -662,11 +668,7 @@ class AuthTextField extends StatelessWidget {
             fillColor: isDark
                 ? AppUi.darkSurfaceRaised
                 : AppUi.lightSurfaceRaised,
-            prefixIcon: Icon(
-              icon,
-              size: 22,
-              color: primaryAccent,
-            ),
+            prefixIcon: Icon(icon, size: 22, color: primaryAccent),
             suffixIcon: suffix,
             suffixIconConstraints: const BoxConstraints(
               minWidth: 44,
@@ -686,10 +688,7 @@ class AuthTextField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppUi.radiusControl),
-              borderSide: BorderSide(
-                color: primaryAccent,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: primaryAccent, width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppUi.radiusControl),
@@ -742,12 +741,16 @@ class _SocialLoginButton extends StatelessWidget {
           children: [
             icon,
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: AppUi.textPrimaryOf(context),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppUi.textPrimaryOf(context),
+                ),
               ),
             ),
           ],
@@ -797,11 +800,7 @@ class _GooglePainter extends CustomPainter {
     canvas.drawArc(rect, -0.9 * math.pi, 0.9 * math.pi, false, ringPaint);
 
     final cutout = Paint()..color = Colors.white;
-    canvas.drawCircle(
-      Offset(cx + radius * 0.08, cy),
-      radius * 0.58,
-      cutout,
-    );
+    canvas.drawCircle(Offset(cx + radius * 0.08, cy), radius * 0.58, cutout);
 
     final accentBar = Paint()..color = const Color(0xFF4285F4);
     canvas.drawRRect(

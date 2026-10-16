@@ -31,7 +31,7 @@ class LocalDataCache {
           final raw = _prefs!.getString(key);
           if (raw != null) {
             try {
-              _memoryCache[cleanKey] = jsonDecode(raw);
+              _memoryCache.putIfAbsent(cleanKey, () => jsonDecode(raw));
             } catch (_) {}
           }
         }
@@ -52,7 +52,8 @@ class LocalDataCache {
     }
     if (val is List && T == (List<Map<String, dynamic>>)) {
       try {
-        return val.map((e) => Map<String, dynamic>.from(e as Map)).toList() as T;
+        return val.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+            as T;
       } catch (_) {}
     }
     if (val is List && T == (List<dynamic>)) {
@@ -141,7 +142,9 @@ class LocalDataCache {
       // On network failure or slow internet timeout, fallback to disk cache if available
       final cached = await get<T>(key);
       if (cached != null) {
-        debugPrint('LocalDataCache: returned cached fallback for $key due to: $e');
+        debugPrint(
+          'LocalDataCache: returned cached fallback for $key due to: $e',
+        );
         return cached;
       }
       rethrow;
@@ -167,7 +170,10 @@ class LocalDataCache {
       final prefs = _prefs ?? await SharedPreferences.getInstance();
       _prefs = prefs;
       final fullPrefix = '$_prefix$prefix';
-      final keys = prefs.getKeys().where((k) => k.startsWith(fullPrefix)).toList();
+      final keys = prefs
+          .getKeys()
+          .where((k) => k.startsWith(fullPrefix))
+          .toList();
       for (final k in keys) {
         await prefs.remove(k);
       }
@@ -187,4 +193,3 @@ class LocalDataCache {
     } catch (_) {}
   }
 }
-

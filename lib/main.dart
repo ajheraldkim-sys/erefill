@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:erefill/features/settings/customer/user_settings_service.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +34,7 @@ import 'core/services/local_data_cache.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final startupTimer = Stopwatch()..start();
 
   // Configure native Android edge-to-edge system navigation and transparent status bar
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -53,16 +56,21 @@ void main() async {
       anonKey: AppConstants.supabaseAnonKey,
     );
 
-    // Warm up local disk cache so all app screens load instantly (0ms)
-    await LocalDataCache.instance.init();
-
-    // Initialize unified push & in-app notifications
-    await NotificationService.instance.initialize();
-
     runApp(const ERefillApp());
+    unawaited(LocalDataCache.instance.init());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(NotificationService.instance.initialize());
+    });
+    if (kDebugMode) {
+      debugPrint(
+        'startup.supabase_ready_ms=${startupTimer.elapsedMilliseconds}',
+      );
+    }
   } catch (e, stackTrace) {
-    debugPrint('Error initializing app: $e');
-    debugPrint('Stack trace: $stackTrace');
+    if (kDebugMode) {
+      debugPrint('Error initializing app: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
 
     runApp(
       MaterialApp(
@@ -81,7 +89,7 @@ void main() async {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Error: $e',
+                    'Check your connection and try again.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.grey),
                   ),
@@ -212,9 +220,7 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    return const BouncingScrollPhysics(
-      parent: AlwaysScrollableScrollPhysics(),
-    );
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
   }
 
   @override
