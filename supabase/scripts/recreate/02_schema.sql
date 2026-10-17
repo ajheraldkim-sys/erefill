@@ -2574,19 +2574,16 @@ CREATE OR REPLACE FUNCTION "public"."check_station_availability"("p_station_id" 
 DECLARE
     v_station_lat DOUBLE PRECISION;
     v_station_lng DOUBLE PRECISION;
-    v_radius DOUBLE PRECISION;
     v_max_capacity INTEGER;
     v_current_active INTEGER;
     v_distance DOUBLE PRECISION;
 BEGIN
     -- Get Station Location and Settings with Fallbacks
-    -- Uses COALESCE to provide defaults if owner_settings entry is missing
     SELECT 
         p.latitude, 
         p.longitude, 
-        COALESCE(s.service_radius_km, 10.0), 
         COALESCE(s.max_concurrent_orders, 20)
-    INTO v_station_lat, v_station_lng, v_radius, v_max_capacity
+    INTO v_station_lat, v_station_lng, v_max_capacity
     FROM public.profiles p
     LEFT JOIN public.owner_settings s ON s.owner_id = p.id
     WHERE p.id = p_station_id;
@@ -2609,17 +2606,10 @@ BEGIN
         )
     );
 
-    -- 2. Check Service Zone
-    IF v_distance > v_radius THEN
-        RETURN jsonb_build_object(
-            'status', 'OUT_OF_ZONE', 
-            'message', 'You are outside the service area of this station.',
-            'distance', ROUND(v_distance::numeric, 2),
-            'limit', v_radius
-        );
-    END IF;
+    -- Service radius removed: No OUT_OF_ZONE distance limit.
+    -- Distance is returned for distance-based delivery fee calculation.
 
-    -- 3. Check Operational Capacity (Active and Non-Failed orders)
+    -- 2. Check Operational Capacity (Active and Non-Failed orders)
     SELECT COUNT(*) INTO v_current_active
     FROM public.orders
     WHERE owner_id = p_station_id 
@@ -5573,6 +5563,12 @@ CREATE TABLE IF NOT EXISTS "public"."owner_settings" (
     "max_concurrent_orders" integer DEFAULT 20,
     "empty_gallons_stock" integer DEFAULT 0 NOT NULL,
     "enabled_payment_methods" "text"[] DEFAULT ARRAY['cod'::"text", 'gcash'::"text", 'maya'::"text", 'card'::"text"] NOT NULL,
+    "opening_time" "text" DEFAULT '08:00'::"text",
+    "closing_time" "text" DEFAULT '17:00'::"text",
+    "operating_days" "text"[] DEFAULT ARRAY['Monday'::"text", 'Tuesday'::"text", 'Wednesday'::"text", 'Thursday'::"text", 'Friday'::"text", 'Saturday'::"text"],
+    "delivery_ack" boolean DEFAULT true,
+    "setup_completed" boolean DEFAULT false,
+    "setup_completed_at" timestamp with time zone,
     CONSTRAINT "empty_gallons_stock_non_negative" CHECK (("empty_gallons_stock" >= 0))
 );
 

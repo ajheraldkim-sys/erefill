@@ -91,7 +91,7 @@ class RoleSettingsCatalog {
     SettingsSection(
       key: 'delivery',
       title: 'Delivery',
-      description: 'Service radius, fees, rider rules, and scheduling.',
+      description: 'Fees, rider rules, and scheduling.',
       icon: Icons.local_shipping_outlined,
     ),
     SettingsSection(

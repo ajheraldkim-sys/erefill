@@ -195,7 +195,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                                 ? 'Mandatory Gate'
                                 : 'Optional Notice')
                           : 'Standard',
-                      icon: LucideIcons.alertCircle,
+                      icon: LucideIcons.circleAlert,
                       color: active?['update_type'] == 'mandatory'
                           ? const Color(0xFFEF4444)
                           : const Color(0xFFF59E0B),
@@ -343,7 +343,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               child: Column(
                 children: [
                   const Icon(
-                    LucideIcons.alertTriangle,
+                    LucideIcons.triangleAlert,
                     color: AppUi.error,
                     size: 36,
                   ),
@@ -456,7 +456,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isActive ? LucideIcons.checkCircle2 : LucideIcons.package,
+                  isActive ? LucideIcons.circleCheck : LucideIcons.package,
                   color: isActive ? const Color(0xFF10B981) : AppUi.bluePrimary,
                   size: 28,
                 ),
@@ -540,7 +540,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                     IconButton(
                       tooltip: 'Edit release draft',
                       onPressed: () => _openReleaseForm(context, existing: r),
-                      icon: const Icon(LucideIcons.fileEdit, size: 18),
+                      icon: const Icon(LucideIcons.pencil, size: 18),
                     ),
                     IconButton(
                       tooltip: 'Delete release draft',
@@ -751,7 +751,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         title: Row(
           children: [
             Icon(
-              isMandatory ? LucideIcons.alertTriangle : LucideIcons.send,
+              isMandatory ? LucideIcons.triangleAlert : LucideIcons.send,
               color: isMandatory ? AppUi.error : AppUi.bluePrimary,
             ),
             const SizedBox(width: 12),
@@ -1032,8 +1032,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                               ),
                             ],
                             onChanged: (v) {
-                              if (v != null)
+                              if (v != null) {
                                 setDialogState(() => platformCtl.text = v);
+                              }
                             },
                           ),
                         ),
@@ -1059,8 +1060,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                               ),
                             ],
                             onChanged: (v) {
-                              if (v != null)
+                              if (v != null) {
                                 setDialogState(() => channelCtl.text = v);
+                              }
                             },
                           ),
                         ),
@@ -1137,8 +1139,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                         ),
                       ],
                       onChanged: (v) {
-                        if (v != null)
+                        if (v != null) {
                           setDialogState(() => updateTypeCtl.text = v);
+                        }
                       },
                     ),
                     const SizedBox(height: 14),

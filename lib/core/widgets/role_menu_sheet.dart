@@ -44,14 +44,12 @@ void showRoleMenuSheet(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight, maxWidth: 560),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppUi.surfaceOf(sheetContext),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(26),
-                ),
+            child: Material(
+              color: AppUi.surfaceOf(sheetContext),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(26),
               ),
+              clipBehavior: Clip.antiAlias,
               child: SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -130,50 +128,41 @@ void showRoleMenuSheet(
                       const SizedBox(height: 12),
                       const Divider(height: 1),
                       for (final action in actions)
-                        Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            leading: Icon(action.icon),
-                            title: Text(action.title),
-                            subtitle: action.subtitle == null
-                                ? null
-                                : Text(action.subtitle!),
-                            onTap: () {
-                              Navigator.pop(sheetContext);
-                              action.onTap();
-                            },
-                          ),
+                        ListTile(
+                          leading: Icon(action.icon),
+                          title: Text(action.title),
+                          subtitle: action.subtitle == null
+                              ? null
+                              : Text(action.subtitle!),
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            action.onTap();
+                          },
                         ),
                       Consumer<ThemeProvider>(
                         builder: (context, themeProvider, _) =>
-                            Material(
-                              color: Colors.transparent,
-                              child: SwitchListTile.adaptive(
-                                secondary:
-                                    const Icon(Icons.dark_mode_outlined),
-                                title: const Text('Dark mode'),
-                                value: themeProvider.isDarkMode,
-                                onChanged: themeProvider.setDarkMode,
-                              ),
+                            SwitchListTile.adaptive(
+                              secondary:
+                                  const Icon(Icons.dark_mode_outlined),
+                              title: const Text('Dark mode'),
+                              value: themeProvider.isDarkMode,
+                              onChanged: themeProvider.setDarkMode,
                             ),
                       ),
                       const Divider(height: 1),
-                      Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.logout_rounded,
-                            color: AppUi.error,
-                          ),
-                          title: const Text(
-                            'Sign out',
-                            style: TextStyle(color: AppUi.error),
-                          ),
-                          onTap: () {
-                            Navigator.pop(sheetContext);
-                            _confirmSignOut(context);
-                          },
+                      ListTile(
+                        leading: const Icon(
+                          Icons.logout_rounded,
+                          color: AppUi.error,
                         ),
+                        title: const Text(
+                          'Sign out',
+                          style: TextStyle(color: AppUi.error),
+                        ),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          _confirmSignOut(context);
+                        },
                       ),
                     ],
                   ),

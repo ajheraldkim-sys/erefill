@@ -26,6 +26,7 @@ import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:go_router/go_router.dart';
 import 'package:erefill/core/routing/app_routes.dart';
 import 'service_catalog_screen.dart';
+import 'services/station_setup_service.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -37,9 +38,24 @@ class OwnerMenuScreen extends StatefulWidget {
 class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   final supabase = Supabase.instance.client;
   final _ownerSettingsService = OwnerSettingsService();
+  final _setupService = StationSetupService();
+  StationSetupStatus _setupStatus = StationSetupStatus.empty();
   bool _isLoading = true;
   StreamSubscription? _profileSub;
   StreamSubscription? _settingsSub;
+
+  // Operating Schedule
+  String _openingTime = '08:00';
+  String _closingTime = '17:00';
+  List<String> _operatingDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ];
+  bool _isSavingSchedule = false;
 
   // Profile data
   String _avatarUrl = '';
@@ -70,7 +86,6 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   final _priceController = TextEditingController();
   final _deliveryFeeController = TextEditingController();
   final _commissionController = TextEditingController();
-  final _radiusController = TextEditingController();
 
   // Payment methods
   List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
@@ -140,7 +155,6 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     _priceController.dispose();
     _deliveryFeeController.dispose();
     _commissionController.dispose();
-    _radiusController.dispose();
     super.dispose();
   }
 
@@ -188,9 +202,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         _deliveryFeeController.text =
             (settings['base_delivery_fee'] as num).toStringAsFixed(2);
       }
-      if (settings['service_radius_km'] != null) {
-        _radiusController.text =
-            (settings['service_radius_km'] as num).toString();
+      if (settings['opening_time'] != null && settings['opening_time'].toString().isNotEmpty) {
+        _openingTime = settings['opening_time'].toString();
+      }
+      if (settings['closing_time'] != null && settings['closing_time'].toString().isNotEmpty) {
+        _closingTime = settings['closing_time'].toString();
+      }
+      if (settings['operating_days'] is List) {
+        _operatingDays = (settings['operating_days'] as List)
+            .map((e) => e.toString())
+            .toList();
       }
       final configuredMethods = settings['enabled_payment_methods'];
       if (configuredMethods is List) {
@@ -204,6 +225,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         }
       }
     });
+    _refreshSetupStatus();
   }
 
   void _updateProfileFromData(Map<String, dynamic> profile) {
@@ -384,8 +406,17 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           _deliveryFeeController.text =
               (settings['base_delivery_fee'] as num?)?.toStringAsFixed(2) ??
               '25.00';
-          _radiusController.text =
-              (settings['service_radius_km'] as num?)?.toString() ?? '5';
+          if (settings['opening_time'] != null && settings['opening_time'].toString().isNotEmpty) {
+            _openingTime = settings['opening_time'].toString();
+          }
+          if (settings['closing_time'] != null && settings['closing_time'].toString().isNotEmpty) {
+            _closingTime = settings['closing_time'].toString();
+          }
+          if (settings['operating_days'] is List) {
+            _operatingDays = (settings['operating_days'] as List)
+                .map((e) => e.toString())
+                .toList();
+          }
 
           final configuredMethods = settings['enabled_payment_methods'];
           if (configuredMethods is List) {
@@ -403,27 +434,55 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
               (profile?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
               '15.00';
           _deliveryFeeController.text = '25.00';
-          _radiusController.text = '5';
           _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
         }
 
         _isLoading = false;
       });
+      await _refreshSetupStatus();
     } catch (e) {
       debugPrint('Error loading account data: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Future<void> _refreshSetupStatus() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final status = await _setupService.getSetupStatus(user.id);
+      if (mounted) {
+        setState(() {
+          _setupStatus = status;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error refreshing setup status: $e');
+    }
+  }
+
+  String get _operatingScheduleSummary {
+    if (_operatingDays.isEmpty) return 'No schedule set';
+    final count = _operatingDays.length;
+    final daysStr = count == 7
+        ? 'Daily'
+        : count == 6 && !_operatingDays.contains('Sunday')
+            ? 'Mon - Sat'
+            : count == 5 &&
+                    !_operatingDays.contains('Saturday') &&
+                    !_operatingDays.contains('Sunday')
+                ? 'Mon - Fri'
+                : '$count days/wk';
+    return '$_openingTime - $_closingTime · $daysStr';
+  }
+
   double get _currentPricePerGallon =>
       double.tryParse(_priceController.text.trim()) ?? 15.0;
   double get _currentBaseFee =>
       double.tryParse(_deliveryFeeController.text.trim()) ?? 25.0;
-  int get _currentRadiusKm =>
-      int.tryParse(_radiusController.text.trim()) ?? 5;
 
   String get _pricingSummary =>
-      '₱${_currentPricePerGallon.toStringAsFixed(2)}/gal · ₱${_currentBaseFee.toStringAsFixed(2)} delivery · ${_currentRadiusKm}km';
+      '₱${_currentPricePerGallon.toStringAsFixed(2)}/gal · ₱${_currentBaseFee.toStringAsFixed(2)} delivery';
 
   String get _paymentMethodsSummary {
     if (_enabledPaymentMethods.isEmpty) return 'None enabled';
@@ -452,26 +511,6 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     ].where((part) => (part ?? '').trim().isNotEmpty).join(', ');
   }
 
-  bool get _profileIsComplete {
-    return _businessNameController.text.trim().isNotEmpty &&
-        _firstNameController.text.trim().isNotEmpty &&
-        _lastNameController.text.trim().isNotEmpty &&
-        _phoneController.text.trim().isNotEmpty &&
-        _selectedTown != null &&
-        _selectedBarangay != null;
-  }
-
-  String get _profileCompletionMessage {
-    if (_businessNameController.text.trim().isEmpty ||
-        _stationLocationSummary.isEmpty) {
-      return 'Add your station name, address, and map pin.';
-    }
-    if (_firstNameController.text.trim().isEmpty ||
-        _lastNameController.text.trim().isEmpty) {
-      return 'Complete owner details for station verification.';
-    }
-    return 'Complete your station profile for smoother operations.';
-  }
 
   Future<bool> _saveStationDetails() async {
     if (!mounted) return false;
@@ -512,6 +551,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (!mounted) return false;
       final up = context.read<UserProvider>();
       await up.refreshProfile();
+      await _refreshSetupStatus();
       if (mounted) {
         _showMessage('Station details updated successfully.');
       }
@@ -788,6 +828,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (!mounted) return false;
       final up = context.read<UserProvider>();
       await up.refreshProfile();
+      await _refreshSetupStatus();
       if (mounted) {
         _showMessage('Owner details updated successfully.');
       }
@@ -1006,14 +1047,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     final price = double.tryParse(_priceController.text.trim());
     final commission =
         double.tryParse(_commissionController.text.trim()) ?? 0.0;
-    final radius = int.tryParse(_radiusController.text.trim());
 
     if (price == null || price < 0) {
       _showMessage('Please enter a valid price per gallon.', isError: true);
-      return false;
-    }
-    if (radius == null || radius <= 0) {
-      _showMessage('Service radius must be greater than 0 km.', isError: true);
       return false;
     }
 
@@ -1021,7 +1057,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     try {
       await _ownerSettingsService.updateSettings(user.id, {
         'price_per_gallon': price,
-        'service_radius_km': radius,
+        'delivery_ack': true,
       });
 
       await ProfileQueryHelpers.updateProfile(supabase, {
@@ -1041,6 +1077,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (!mounted) return false;
       final up = context.read<UserProvider>();
       await up.refreshProfile();
+      await _refreshSetupStatus();
       if (mounted) {
         _showMessage('Pricing & delivery settings saved successfully.');
       }
@@ -1062,6 +1099,408 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         setState(() => _isSavingPricing = false);
       }
     }
+  }
+
+  TimeOfDay _parseTimeOfDay(String timeStr, {int defaultHour = 8, int defaultMinute = 0}) {
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        return TimeOfDay(
+          hour: int.tryParse(parts[0].trim()) ?? defaultHour,
+          minute: int.tryParse(parts[1].trim()) ?? defaultMinute,
+        );
+      }
+    } catch (_) {}
+    return TimeOfDay(hour: defaultHour, minute: defaultMinute);
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  String _formatTime12Hr(String timeStr) {
+    final tod = _parseTimeOfDay(timeStr);
+    final period = tod.hour >= 12 ? 'PM' : 'AM';
+    final hour12 = tod.hour == 0 ? 12 : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
+    final min = tod.minute.toString().padLeft(2, '0');
+    return '$hour12:$min $period';
+  }
+
+  Future<bool> _saveOperatingSchedule() async {
+    if (!mounted) return false;
+    final user = supabase.auth.currentUser;
+    if (user == null) return false;
+
+    if (_operatingDays.isEmpty) {
+      _showMessage('Please select at least one operating day.', isError: true);
+      return false;
+    }
+
+    setState(() => _isSavingSchedule = true);
+    try {
+      final success = await _setupService.saveOperatingSchedule(
+        ownerId: user.id,
+        openingTime: _openingTime,
+        closingTime: _closingTime,
+        operatingDays: _operatingDays,
+      );
+
+      if (success) {
+        await _refreshSetupStatus();
+        if (mounted) {
+          _showMessage('Operating schedule saved successfully.');
+        }
+        return true;
+      } else {
+        if (mounted) {
+          _showMessage('Failed to save operating schedule.', isError: true);
+        }
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error saving operating schedule: $e');
+      if (mounted) {
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('opening_time') || errStr.contains('schema cache') || errStr.contains('column')) {
+          _showMessage(
+            'Database update required: Run supabase/scripts/station_setup_and_product_management.sql in Supabase SQL Editor.',
+            isError: true,
+          );
+        } else {
+          _showMessage(
+            FriendlyErrors.message(
+              e,
+              fallback: 'Could not save operating schedule.',
+            ),
+            isError: true,
+          );
+        }
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingSchedule = false);
+      }
+    }
+  }
+
+  void _openOperatingScheduleSheet() {
+    const allDays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+          ),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.92,
+            ),
+            decoration: BoxDecoration(
+              color: AppUi.surfaceOf(context),
+              borderRadius: AppUi.radiusSheetTop,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppUi.borderOf(context),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Operating schedule',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppUi.textPrimaryOf(context),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          if (sheetContext.mounted &&
+                              Navigator.canPop(sheetContext)) {
+                            Navigator.pop(sheetContext);
+                          }
+                        },
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const AppFormSectionHeader(
+                          title: 'BUSINESS HOURS',
+                          subtitle: 'Specify opening and closing hours for station operations',
+                        ),
+                        AppUi.vGapMd,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () async {
+                                  final initial = _parseTimeOfDay(_openingTime, defaultHour: 8);
+                                  final picked = await showTimePicker(
+                                    context: sheetContext,
+                                    initialTime: initial,
+                                  );
+                                  if (picked != null) {
+                                    final formatted = _formatTimeOfDay(picked);
+                                    setState(() => _openingTime = formatted);
+                                    setModalState(() {});
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: AppUi.chipBgOf(context),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppUi.borderOf(context)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Opening Time',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppUi.textSecondaryOf(context),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.schedule_rounded,
+                                              size: 18, color: AppUi.bluePrimary),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _formatTime12Hr(_openingTime),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppUi.textPrimaryOf(context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () async {
+                                  final initial = _parseTimeOfDay(_closingTime, defaultHour: 17);
+                                  final picked = await showTimePicker(
+                                    context: sheetContext,
+                                    initialTime: initial,
+                                  );
+                                  if (picked != null) {
+                                    final formatted = _formatTimeOfDay(picked);
+                                    setState(() => _closingTime = formatted);
+                                    setModalState(() {});
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: AppUi.chipBgOf(context),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppUi.borderOf(context)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Closing Time',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppUi.textSecondaryOf(context),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.schedule_rounded,
+                                              size: 18, color: AppUi.bluePrimary),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            _formatTime12Hr(_closingTime),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppUi.textPrimaryOf(context),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        AppUi.vGapLg,
+                        const AppFormSectionHeader(
+                          title: 'OPERATING DAYS',
+                          subtitle: 'Select days when the station accepts orders',
+                        ),
+                        AppUi.vGapSm,
+                        Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _operatingDays = List.from(allDays);
+                                });
+                                setModalState(() {});
+                              },
+                              icon: const Icon(Icons.done_all_rounded, size: 16),
+                              label: const Text('Daily (7 days)', style: TextStyle(fontSize: 12)),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _operatingDays = allDays.take(6).toList();
+                                });
+                                setModalState(() {});
+                              },
+                              icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                              label: const Text('Mon - Sat', style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: allDays.map((day) {
+                            final isSelected = _operatingDays.contains(day);
+                            return FilterChip(
+                              label: Text(day),
+                              selected: isSelected,
+                              showCheckmark: true,
+                              selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
+                              checkmarkColor: AppUi.bluePrimary,
+                              labelStyle: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? AppUi.bluePrimary
+                                      : AppUi.borderOf(context),
+                                ),
+                              ),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    if (!_operatingDays.contains(day)) {
+                                      _operatingDays.add(day);
+                                    }
+                                  } else {
+                                    if (_operatingDays.length > 1) {
+                                      _operatingDays.remove(day);
+                                    } else {
+                                      _showMessage('You must keep at least 1 operating day.', isError: true);
+                                    }
+                                  }
+                                });
+                                setModalState(() {});
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        AppUi.vGapLg,
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppUi.blueSoft,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppUi.bluePrimary.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded,
+                                  color: AppUi.bluePrimary, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Customers will see your station as closed outside these scheduled hours and days.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: AppUi.textPrimaryOf(context),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        AppUi.vGapLg,
+                        AppFormSubmitButton(
+                          text: 'Save Operating Schedule',
+                          icon: Icons.save_outlined,
+                          isLoading: _isSavingSchedule,
+                          onPressed: () async {
+                            final saved = await _saveOperatingSchedule();
+                            if (saved &&
+                                sheetContext.mounted &&
+                                Navigator.canPop(sheetContext)) {
+                              Navigator.pop(sheetContext);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _openPricingDeliverySheet() {
@@ -1226,8 +1665,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         AppUi.vGapLg,
         const AppFormSectionHeader(
           title: 'LOGISTICS & COMMISSIONS',
-          subtitle:
-              'Set rider payout per gallon and maximum delivery service radius',
+          subtitle: 'Set rider payout per gallon',
         ),
         AppUi.vGapMd,
         AppFormField(
@@ -1235,14 +1673,6 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           controller: _commissionController,
           prefixIcon: Icons.two_wheeler_outlined,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          compact: true,
-        ),
-        AppUi.vGapMd,
-        AppFormField(
-          label: 'Service Radius (km)',
-          controller: _radiusController,
-          prefixIcon: Icons.radar_outlined,
-          keyboardType: TextInputType.number,
           compact: true,
         ),
         AppUi.vGapLg,
@@ -1283,6 +1713,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (!mounted) return false;
       final up = context.read<UserProvider>();
       await up.refreshProfile();
+      await _refreshSetupStatus();
       if (mounted) {
         _showMessage('Payment methods updated successfully.');
       }
@@ -1434,9 +1865,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       : AppUi.borderOf(sheetContext),
                 ),
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: SwitchListTile(
+              child: SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 4,
@@ -1496,9 +1925,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                   },
                 ),
               ),
-          ),
-        );
-        }),
+            );
+          }),
         AppUi.vGapLg,
         AppFormSubmitButton(
           text: 'Save Payment Methods',
@@ -1515,8 +1943,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     );
   }
 
-  void _openWaterProductsCatalogPopup() {
-    showModalBottomSheet<void>(
+  Future<void> _openWaterProductsCatalogPopup() async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1528,6 +1956,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         ),
       ),
     );
+    await _refreshSetupStatus();
   }
 
   void _showPayoutAccountSheet() {
@@ -1651,54 +2080,58 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       )
                     else
                       ...accounts.map((acc) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: AppUi.cardDecorationOf(ctx),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Material(
-                            color: Colors.transparent,
+                            color: AppUi.surfaceOf(ctx),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppUi.cardRadius,
+                              side: BorderSide(color: AppUi.borderOf(ctx)),
+                            ),
+                            clipBehavior: Clip.antiAlias,
                             child: ListTile(
-                            leading: Icon(
-                              acc.type == 'gcash'
-                                  ? Icons.phone_android_rounded
-                                  : Icons.account_balance_rounded,
-                              color: AppUi.bluePrimary,
-                            ),
-                            title: Text(
-                              acc.label,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: AppUi.textPrimaryOf(ctx),
+                              leading: Icon(
+                                acc.type == 'gcash'
+                                    ? Icons.phone_android_rounded
+                                    : Icons.account_balance_rounded,
+                                color: AppUi.bluePrimary,
                               ),
-                            ),
-                            subtitle: Text(
-                              '${acc.type.toUpperCase()} · ${acc.maskedValue}',
-                              style: TextStyle(
-                                color: AppUi.textSecondaryOf(ctx),
-                                fontSize: 12,
+                              title: Text(
+                                acc.label,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppUi.textPrimaryOf(ctx),
+                                ),
                               ),
-                            ),
-                            trailing: acc.isDefault
-                                ? Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppUi.bluePrimary.withValues(
-                                        alpha: 0.1,
+                              subtitle: Text(
+                                '${acc.type.toUpperCase()} · ${acc.maskedValue}',
+                                style: TextStyle(
+                                  color: AppUi.textSecondaryOf(ctx),
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: acc.isDefault
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
                                       ),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      'PRIMARY',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppUi.bluePrimary,
+                                      decoration: BoxDecoration(
+                                        color: AppUi.bluePrimary.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
-                                    ),
-                                  )
-                                : null,
+                                      child: const Text(
+                                        'PRIMARY',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppUi.bluePrimary,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
                           ),
                         );
@@ -2010,71 +2443,123 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                   padding: AppUi.pagePadding.copyWith(top: 12),
                   child: Column(
                     children: [
-                      if (!_profileIsComplete) ...[
-                            AccountCompletenessHint(
-                              message: _profileCompletionMessage,
-                              onTap: (_businessNameController.text.trim().isEmpty || _stationLocationSummary.isEmpty)
-                                  ? _openStationDetailsSheet
-                                  : _openOwnerDetailsSheet,
-                            ),
-                          ],
-                          const AccountSectionLabel('Station identity'),
-                          AccountGroup(
-                            children: [
-                              AccountNavTile(
-                                icon: Icons.storefront_outlined,
-                                title: 'Station details',
-                                subtitle: _stationLocationSummary.isEmpty
-                                    ? 'Add station details and map pin'
-                                    : _stationLocationSummary,
-                                onTap: _openStationDetailsSheet,
-                              ),
-                              AccountNavTile(
-                                icon: Icons.person_outline_rounded,
-                                title: 'About owner',
-                                subtitle: _ownerFullName.isEmpty
-                                    ? 'Owner name and personal details'
-                                    : _ownerFullName,
-                                onTap: _openOwnerDetailsSheet,
-                              ),
-                            ],
+                      if (!_setupStatus.isComplete) ...[
+                        AccountCompletenessHint(
+                          message:
+                              '${_setupStatus.completedCount} of 5 required setup sections complete. Complete required sections before opening station.',
+                          onTap: () {
+                            if (!_setupStatus.isProfileComplete) {
+                              _openStationDetailsSheet();
+                            } else if (!_setupStatus.isScheduleComplete) {
+                              _openOperatingScheduleSheet();
+                            } else if (!_setupStatus.isDeliveryComplete) {
+                              _openPricingDeliverySheet();
+                            } else if (!_setupStatus.isPaymentsComplete) {
+                              _openPaymentMethodsSheet();
+                            } else if (!_setupStatus.isProductsComplete) {
+                              _openWaterProductsCatalogPopup();
+                            }
+                          },
+                        ),
+                      ],
+                      const AccountSectionLabel('Station identity'),
+                      AccountGroup(
+                        children: [
+                          AccountNavTile(
+                            icon: Icons.storefront_outlined,
+                            title: 'Station details',
+                            subtitle: _stationLocationSummary.isEmpty
+                                ? 'Add station details and map pin'
+                                : _stationLocationSummary,
+                            badgeText: _setupStatus.profileSection.badgeText,
+                            badgeColor: _setupStatus.profileSection.isComplete
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFEF4444),
+                            badgeBgColor: _setupStatus.profileSection.isComplete
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFEF2F2),
+                            onTap: _openStationDetailsSheet,
                           ),
-
-                          const AccountSectionLabel('Pricing & delivery'),
-                          AccountGroup(
-                            children: [
-                              AccountNavTile(
-                                icon: Icons.local_shipping_outlined,
-                                title: 'Pricing & delivery rules',
-                                subtitle: _pricingSummary,
-                                onTap: _openPricingDeliverySheet,
-                              ),
-                              AccountNavTile(
-                                icon: Icons.payments_outlined,
-                                title: 'Accepted payment methods',
-                                subtitle: _paymentMethodsSummary,
-                                onTap: _openPaymentMethodsSheet,
-                              ),
-                              AccountNavTile(
-                                icon: Icons.account_balance_wallet_outlined,
-                                title: 'Payout destination',
-                                subtitle:
-                                    'GCash & Maya destination for payments',
-                                onTap: _showPayoutAccountSheet,
-                              ),
-                            ],
+                          AccountNavTile(
+                            icon: Icons.schedule_outlined,
+                            title: 'Operating schedule',
+                            subtitle: _operatingScheduleSummary,
+                            badgeText: _setupStatus.scheduleSection.badgeText,
+                            badgeColor: _setupStatus.scheduleSection.isComplete
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFEF4444),
+                            badgeBgColor: _setupStatus.scheduleSection.isComplete
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFEF2F2),
+                            onTap: _openOperatingScheduleSheet,
                           ),
+                          AccountNavTile(
+                            icon: Icons.person_outline_rounded,
+                            title: 'About owner',
+                            subtitle: _ownerFullName.isEmpty
+                                ? 'Owner name and personal details'
+                                : _ownerFullName,
+                            onTap: _openOwnerDetailsSheet,
+                          ),
+                        ],
+                      ),
 
-                          const AccountSectionLabel('Catalog & operations'),
-                          AccountGroup(
-                            children: [
-                              AccountNavTile(
-                                icon: Icons.water_drop_outlined,
-                                title: 'Water products & catalog',
-                                subtitle:
-                                    'Refill sizes, alkalines, and custom prices',
-                                onTap: _openWaterProductsCatalogPopup,
-                              ),
+                      const AccountSectionLabel('Pricing & delivery'),
+                      AccountGroup(
+                        children: [
+                          AccountNavTile(
+                            icon: Icons.local_shipping_outlined,
+                            title: 'Pricing & delivery rules',
+                            subtitle: _pricingSummary,
+                            badgeText: _setupStatus.deliverySection.badgeText,
+                            badgeColor: _setupStatus.deliverySection.isComplete
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFEF4444),
+                            badgeBgColor: _setupStatus.deliverySection.isComplete
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFEF2F2),
+                            onTap: _openPricingDeliverySheet,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.payments_outlined,
+                            title: 'Accepted payment methods',
+                            subtitle: _paymentMethodsSummary,
+                            badgeText: _setupStatus.paymentsSection.badgeText,
+                            badgeColor: _setupStatus.paymentsSection.isComplete
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFEF4444),
+                            badgeBgColor: _setupStatus.paymentsSection.isComplete
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFEF2F2),
+                            onTap: _openPaymentMethodsSheet,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.account_balance_wallet_outlined,
+                            title: 'Payout destination',
+                            subtitle:
+                                'GCash & Maya destination for payments',
+                            onTap: _showPayoutAccountSheet,
+                          ),
+                        ],
+                      ),
+
+                      const AccountSectionLabel('Catalog & operations'),
+                      AccountGroup(
+                        children: [
+                          AccountNavTile(
+                            icon: Icons.water_drop_outlined,
+                            title: 'Water products & catalog',
+                            subtitle:
+                                'Refill sizes, alkalines, and containers',
+                            badgeText: _setupStatus.productsSection.badgeText,
+                            badgeColor: _setupStatus.productsSection.isComplete
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B),
+                            badgeBgColor: _setupStatus.productsSection.isComplete
+                                ? const Color(0xFFECFDF5)
+                                : const Color(0xFFFFFBEB),
+                            onTap: _openWaterProductsCatalogPopup,
+                          ),
                               AccountNavTile(
                                 icon: Icons.inventory_2_outlined,
                                 title: 'Inventory stock',

@@ -116,7 +116,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                           .any((p) => p['id']?.toString() == productId)
                       ? productId
                       : snapshot.products.first['id']?.toString(),
-                  decoration: AppUi.fieldDecoration('Product'),
+                  decoration: AppUi.fieldDecorationOf(context, 'Product'),
                   items: snapshot.products
                       .map(
                         (p) => DropdownMenuItem(
@@ -137,7 +137,8 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
               TextField(
                 controller: gallonsCtrl,
                 keyboardType: TextInputType.number,
-                decoration: AppUi.fieldDecoration(
+                decoration: AppUi.fieldDecorationOf(
+                  context,
                   allowNegative ? 'Gallons (+/-)' : 'Gallons',
                 ),
               ),
@@ -170,7 +171,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
               TextField(
                 controller: notesCtrl,
                 maxLines: 2,
-                decoration: AppUi.fieldDecoration('Notes (optional)'),
+                decoration: AppUi.fieldDecorationOf(context, 'Notes (optional)'),
               ),
               const SizedBox(height: 16),
               FilledButton(

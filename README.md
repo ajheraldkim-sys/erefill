@@ -18,11 +18,14 @@ eRefill is a Flutter and Supabase app for water refilling stations. It supports 
 4. Ensure the base application schema is installed in Supabase; the scripts below assume its tables already exist.
 5. Apply `supabase/scripts/remote_catchup.sql` in the Supabase SQL Editor when using the repository's catch-up schema path.
 6. Apply `supabase/scripts/automated_proof_of_delivery.sql` to install required proof validation, private evidence access, and atomic receipt/chat/notification creation.
-7. Apply `supabase/scripts/loyalty_and_referrals.sql` to install customer vouchers and loyalty tables.
-8. If using subscription orders, apply `supabase/scripts/auto_generate_subscription_orders.sql` before the checkout pricing script; it changes the order idempotency column to text and replaces the order-creation function.
-9. Apply `supabase/scripts/fix_customer_checkout_pricing.sql` last. It makes checkout fees and vouchers server-authoritative and makes order retries idempotent.
-10. Deploy the Supabase Edge Functions in `supabase/functions`.
-11. Run the app with `flutter run`.
+7. Apply `supabase/scripts/app_version_management_system.sql` to create the app release catalog and audit tables. This is required by the App Releases screen and app update checks; without it, Supabase reports that `public.app_releases` is missing.
+8. Apply `supabase/scripts/loyalty_and_referrals.sql` to install customer vouchers and loyalty tables.
+9. If using subscription orders, apply `supabase/scripts/auto_generate_subscription_orders.sql` before the checkout pricing script; it changes the order idempotency column to text and replaces the order-creation function.
+10. Apply `supabase/scripts/fix_customer_checkout_pricing.sql` last. It makes checkout fees and vouchers server-authoritative and makes order retries idempotent.
+11. Deploy the Supabase Edge Functions in `supabase/functions`.
+12. Run the app with `flutter run`.
+
+For an existing Supabase project showing `Could not find the table 'public.app_releases' in the schema cache`, apply `supabase/scripts/app_version_management_system.sql` in the Supabase SQL Editor, then retry the App Releases screen.
 
 ### Realtime and notifications
 

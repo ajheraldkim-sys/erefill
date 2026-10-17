@@ -22,9 +22,11 @@ import '../../chat/inbox_screen.dart';
 import '../../chat/services/chat_service.dart';
 import '../../chat/models/system_notification.dart';
 import 'owner_menu_screen.dart';
+import 'services/station_setup_service.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -35,6 +37,8 @@ class OwnerDashboard extends StatefulWidget {
 
 class _OwnerDashboardState extends State<OwnerDashboard> {
   final supabase = Supabase.instance.client;
+  final _setupService = StationSetupService();
+  StationSetupStatus _setupStatus = StationSetupStatus.empty();
   Map<String, dynamic>? ownerProfile;
   bool _isLoading = true;
   int _selectedIndex = 0;
@@ -145,19 +149,20 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
     _setupStatusLoadInProgress = true;
     try {
-      final ridersResponse = await supabase
+      final statusFuture = _setupService.getSetupStatus(user.id);
+      final ridersResponseFuture = supabase
           .from('profiles')
           .select('id')
           .eq('role', 'rider')
           .eq('owner_id', user.id);
 
-      final settingsResponse = await supabase
+      final settingsResponseFuture = supabase
           .from('owner_settings')
           .select('base_delivery_fee, price_per_gallon')
           .eq('owner_id', user.id)
           .maybeSingle();
 
-      final productResponse = await supabase
+      final productResponseFuture = supabase
           .from('products')
           .select('id')
           .eq('owner_id', user.id)
@@ -165,14 +170,27 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           .gt('price', 0)
           .limit(1);
 
+      final results = await Future.wait<dynamic>(<Future<dynamic>>[
+        statusFuture,
+        ridersResponseFuture,
+        settingsResponseFuture,
+        productResponseFuture,
+      ]);
+
       if (!mounted) return;
+      final status = results[0] as StationSetupStatus;
+      final riders = results[1] as List;
+      final settings = results[2] as Map<String, dynamic>?;
+      final products = results[3] as List;
+
       setState(() {
-        _totalRiders = (ridersResponse as List).length;
+        _setupStatus = status;
+        _totalRiders = riders.length;
         _baseDeliveryFee =
-            (settingsResponse?['base_delivery_fee'] as num?)?.toDouble() ?? 0;
+            (settings?['base_delivery_fee'] as num?)?.toDouble() ?? 0;
         _pricePerGallon =
-            (settingsResponse?['price_per_gallon'] as num?)?.toDouble() ?? 0;
-        _hasOrderableProduct = (productResponse as List).isNotEmpty;
+            (settings?['price_per_gallon'] as num?)?.toDouble() ?? 0;
+        _hasOrderableProduct = products.isNotEmpty || status.isProductsComplete;
       });
 
       if (_pricePerGallon > 0 && !_hasOrderableProduct) {
@@ -197,10 +215,13 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
   Future<void> _setStationAvailability(String availability) async {
     if (_ownerId == null) return;
-    if (availability == 'open' && !_stationSetupReady) {
+    if (availability == 'open' && !_setupStatus.isComplete) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Complete setup before opening the station.'),
+        SnackBar(
+          content: Text(
+            'Cannot open station: ${_setupStatus.completedCount} of 5 required setup sections completed. Missing: ${_setupStatus.missingFields.join(", ")}',
+          ),
+          backgroundColor: const Color(0xFFEF4444),
         ),
       );
       return;
@@ -220,28 +241,22 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       });
     } catch (e) {
       debugPrint('Error toggling status: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(FriendlyErrors.message(e)),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
     }
   }
-
-  bool get _stationHasName =>
-      ownerProfile?['station_name']?.toString().trim().isNotEmpty ?? false;
 
   bool get _stationHasLocation =>
       (ownerProfile?['latitude'] as num?) != null &&
       (ownerProfile?['longitude'] as num?) != null;
 
-  bool get _stationHasTownBarangay =>
-      (ownerProfile?['town']?.toString().trim().isNotEmpty ?? false) &&
-      (ownerProfile?['barangay']?.toString().trim().isNotEmpty ?? false);
-
-  bool get _stationHasPricing =>
-      _pricePerGallon > 0 && _hasOrderableProduct;
-
-  bool get _stationSetupReady =>
-      _stationHasName &&
-      _stationHasLocation &&
-      _stationHasTownBarangay &&
-      _stationHasPricing;
+  bool get _stationSetupReady => _setupStatus.isComplete;
 
   @override
   void dispose() {
@@ -266,6 +281,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         baseDeliveryFee: _baseDeliveryFee,
         pricePerGallon: _pricePerGallon,
         setupReady: _stationSetupReady,
+        setupStatus: _setupStatus,
         hasLocationPin: _stationHasLocation,
         onAvailabilityChanged: _setStationAvailability,
         onViewOrders: () => _changeTab(1),
@@ -395,6 +411,7 @@ class _OwnerHomeOverview extends StatefulWidget {
   final double baseDeliveryFee;
   final double pricePerGallon;
   final bool setupReady;
+  final StationSetupStatus setupStatus;
   final bool hasLocationPin;
   final ValueChanged<String> onAvailabilityChanged;
   final VoidCallback onViewOrders;
@@ -412,6 +429,7 @@ class _OwnerHomeOverview extends StatefulWidget {
     required this.baseDeliveryFee,
     required this.pricePerGallon,
     required this.setupReady,
+    required this.setupStatus,
     required this.hasLocationPin,
     required this.onAvailabilityChanged,
     required this.onViewOrders,
@@ -862,45 +880,51 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
   }
 
   Widget _buildGuidedSetupCard() {
+    final status = widget.setupStatus;
+    final isAllDone = widget.setupReady;
+
     return GuidedSetupCard(
       role: ExperienceRole.owner,
-      title: widget.setupReady ? 'Station is ready' : 'Station setup guide',
-      message: widget.setupReady
-          ? 'You can accept orders, assign riders, and monitor stock from this dashboard.'
-          : 'Complete these basics so customers see accurate prices and delivery details.',
-      actionLabel: widget.setupReady ? null : 'Continue setup',
-      onAction: widget.setupReady ? null : widget.onOpenAccount,
+      title: isAllDone
+          ? 'Station is ready to open'
+          : 'Complete Your Station Setup (${status.percentage}%)',
+      message: isAllDone
+          ? (widget.availability == 'open'
+              ? 'Station is OPEN and actively accepting orders.'
+              : 'Setup is complete! Switch station availability to OPEN when ready.')
+          : '${status.completedCount} of 5 required setup sections completed. Complete remaining sections to open.',
+      actionLabel: isAllDone ? null : 'Continue setup',
+      onAction: isAllDone ? null : widget.onOpenAccount,
       steps: [
         ExperienceStep(
           label: 'Station profile',
-          helper: 'Name and public details customers recognize.',
-          isComplete:
-              widget.stationName != null &&
-              widget.stationName!.trim().isNotEmpty,
+          helper: 'Station name, phone number, municipality, and map pin.',
+          isComplete: status.isProfileComplete,
           onTap: widget.onOpenAccount,
         ),
         ExperienceStep(
-          label: 'Location pin',
-          helper: 'Helps customers and riders find your station.',
-          isComplete: widget.hasLocationPin,
+          label: 'Operating schedule',
+          helper: 'Opening/closing hours and active operating days.',
+          isComplete: status.isScheduleComplete,
           onTap: widget.onOpenAccount,
         ),
         ExperienceStep(
-          label: 'Town and barangay',
-          helper: 'Keeps station discovery local and accurate.',
-          isComplete:
-              (widget.town?.trim().isNotEmpty ?? false) &&
-              (widget.barangay?.trim().isNotEmpty ?? false),
+          label: 'Pricing & delivery rules',
+          helper: 'Base refill price and centralized delivery policy.',
+          isComplete: status.isDeliveryComplete,
           onTap: widget.onOpenAccount,
         ),
         ExperienceStep(
-          label: 'Pricing and refill product',
-          helper: 'Required before accepting customer orders.',
-          isComplete:
-              widget.baseDeliveryFee > 0 &&
-              widget.pricePerGallon > 0 &&
-              widget.hasOrderableProduct,
+          label: 'Products & catalog',
+          helper: 'At least 1 active orderable refill, container, or accessory.',
+          isComplete: status.isProductsComplete,
           onTap: () => context.openOwnerServiceCatalog(),
+        ),
+        ExperienceStep(
+          label: 'Accepted payment methods',
+          helper: 'Cash on delivery, GCash, Maya, or card channels.',
+          isComplete: status.isPaymentsComplete,
+          onTap: widget.onOpenAccount,
         ),
       ],
     );
@@ -972,23 +996,40 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                     const SizedBox(height: 24),
                     TextField(
                       controller: titleController,
-                      decoration: AppUi.fieldDecoration(
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                      decoration: AppUi.fieldDecorationOf(
+                        context,
                         'Alert Title',
                         prefixIcon: const Icon(Icons.label_outline_rounded),
                       ),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: messageController,
+                      onChanged: (_) => setState(() {}),
                       maxLines: 4,
                       maxLength: 160,
-                      decoration: AppUi.fieldDecoration(
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                      decoration: AppUi.fieldDecorationOf(
+                        context,
                         'Type your message...',
                         prefixIcon: const Icon(
                           Icons.chat_bubble_outline_rounded,
                         ),
-                      ).copyWith(alignLabelWithHint: true),
+                      ).copyWith(
+                        alignLabelWithHint: true,
+                        counterStyle: TextStyle(
+                          color: AppUi.textSecondaryOf(context),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -1030,6 +1071,15 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppUi.bluePrimary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor:
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF1E293B)
+                                  : const Color(0xFFE2E8F0),
+                          disabledForegroundColor:
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? const Color(0xFF64748B)
+                                  : const Color(0xFF94A3B8),
                           shape: RoundedRectangleBorder(
                             borderRadius: AppUi.pillRadius,
                           ),

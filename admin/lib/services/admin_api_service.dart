@@ -695,7 +695,6 @@ class AdminApiService {
       return [
         {'key': 'maintenance_mode', 'value': false},
         {'key': 'allow_signups', 'value': true},
-        {'key': 'default_service_radius_km', 'value': 5.0},
       ];
     }
   }
@@ -949,7 +948,6 @@ class AdminApiService {
     double? longitude,
     double? baseDeliveryFee,
     double? pricePerGallon,
-    double? serviceRadiusKm,
     int? maxConcurrentOrders,
     String? reason,
   }) async {
@@ -969,7 +967,6 @@ class AdminApiService {
           'p_longitude': longitude,
           'p_base_delivery_fee': baseDeliveryFee,
           'p_price_per_gallon': pricePerGallon,
-          'p_service_radius_km': serviceRadiusKm,
           'p_max_concurrent_orders': maxConcurrentOrders,
           'p_reason': reason,
         },
@@ -991,9 +988,6 @@ class AdminApiService {
     }
     if (pricePerGallon != null) {
       stationUpdates['price_per_gallon'] = pricePerGallon;
-    }
-    if (serviceRadiusKm != null) {
-      stationUpdates['service_radius_km'] = serviceRadiusKm;
     }
     if (maxConcurrentOrders != null) {
       stationUpdates['max_concurrent_orders'] = maxConcurrentOrders;

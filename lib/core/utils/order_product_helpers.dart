@@ -8,11 +8,12 @@ import '../water_types.dart';
 /// Resolves which station product to use when placing an order.
 abstract final class OrderProductHelpers {
   /// Columns guaranteed on all deployed `products` schemas.
-  static const coreSelectFields = 'id, name, price, category, is_available';
+  static const coreSelectFields =
+      'id, name, price, category, is_available, description, container_size, stock_level';
 
   /// Owner catalog list — avoids optional refill metadata columns.
   static const catalogSelectFields =
-      'id, name, description, price, category, is_available, created_at';
+      'id, name, description, price, category, is_available, created_at, container_size, stock_level, preparation_minutes';
 
   static final _uuidPattern = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',

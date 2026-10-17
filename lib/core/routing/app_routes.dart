@@ -13,6 +13,7 @@ abstract final class AppRoutes {
   static const paymentCallback = '/payment-callback';
   static const stationList = '/stations';
   static const stationDetails = '/stations/details';
+  static const cart = '/cart';
   static const checkout = '/checkout';
   static const orderTrack = '/orders/track';
   static const orderList = '/orders';

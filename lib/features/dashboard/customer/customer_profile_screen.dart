@@ -665,20 +665,20 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             ...WaterTypes.all.map((type) {
               final isSelected =
                   _preferredWaterType.toLowerCase() == type.name.toLowerCase();
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
                   color: isSelected
                       ? AppUi.bluePrimary.withValues(alpha: 0.08)
                       : AppUi.surfaceOf(ctx),
-                  borderRadius: AppUi.cardRadius,
-                  border: Border.all(
-                    color: isSelected ? AppUi.bluePrimary : AppUi.borderOf(ctx),
-                    width: isSelected ? 1.5 : 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppUi.cardRadius,
+                    side: BorderSide(
+                      color: isSelected ? AppUi.bluePrimary : AppUi.borderOf(ctx),
+                      width: isSelected ? 1.5 : 1,
+                    ),
                   ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
+                  clipBehavior: Clip.antiAlias,
                   child: ListTile(
                     leading: Icon(
                       Icons.water_drop_rounded,

@@ -47,9 +47,21 @@ class OwnerSettingsService {
 
     await _cache.set('owner_settings_$ownerId', updates);
 
-    await _client.from('owner_settings').upsert(
-      updates,
-      onConflict: 'owner_id',
-    );
+    try {
+      await _client.from('owner_settings').upsert(
+        updates,
+        onConflict: 'owner_id',
+      );
+    } catch (e) {
+      if (updates.containsKey('delivery_ack') && e.toString().contains('delivery_ack')) {
+        final fallbackUpdates = Map<String, dynamic>.from(updates)..remove('delivery_ack');
+        await _client.from('owner_settings').upsert(
+          fallbackUpdates,
+          onConflict: 'owner_id',
+        );
+        return;
+      }
+      rethrow;
+    }
   }
 }

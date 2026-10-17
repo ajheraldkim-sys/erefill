@@ -152,21 +152,18 @@ class AdminSingleStationMap extends StatelessWidget {
     super.key,
     required this.latitude,
     required this.longitude,
-    this.serviceRadiusKm,
     this.label,
     this.height = 280,
   });
 
   final double latitude;
   final double longitude;
-  final double? serviceRadiusKm;
   final String? label;
   final double height;
 
   @override
   Widget build(BuildContext context) {
     final center = LatLng(latitude, longitude);
-    final radiusM = (serviceRadiusKm ?? 5) * 1000;
     final markerColor = Theme.of(context).colorScheme.primary;
 
     return ClipRRect(
@@ -184,19 +181,6 @@ class AdminSingleStationMap extends StatelessWidget {
               ),
               children: [
                 AppMapTiles.layer(context: context),
-                if (serviceRadiusKm != null)
-                  CircleLayer(
-                    circles: [
-                      CircleMarker(
-                        point: center,
-                        radius: radiusM,
-                        useRadiusInMeter: true,
-                        color: markerColor.withValues(alpha: 0.16),
-                        borderColor: markerColor.withValues(alpha: 0.85),
-                        borderStrokeWidth: 2.5,
-                      ),
-                    ],
-                  ),
                 MarkerLayer(
                   markers: [
                     Marker(

@@ -15,6 +15,10 @@ extension AppNavigation on BuildContext {
     push(AppRoutes.stationDetails, extra: station);
   }
 
+  void openCart([Map<String, dynamic>? station]) {
+    push(AppRoutes.cart, extra: station);
+  }
+
   void openCheckout(Map<String, dynamic> station) {
     push(AppRoutes.checkout, extra: station);
   }

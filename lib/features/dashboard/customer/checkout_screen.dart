@@ -422,44 +422,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(
-                            0xFF10B981,
-                          ).withValues(alpha: 0.1),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: Color(0xFF10B981),
-                            size: 18,
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(
+                              0xFF10B981,
+                            ).withValues(alpha: 0.1),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              color: Color(0xFF10B981),
+                              size: 18,
+                            ),
                           ),
-                        ),
-                        title: Text(
-                          v.title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
+                          title: Text(
+                            v.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        subtitle: Text(
-                          v.description,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
+                          subtitle: Text(
+                            v.description,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
                           ),
-                        ),
-                        trailing: Text(
-                          v.isDeliveryDiscount
-                              ? 'Free Delivery'
-                              : '-\u20B1${v.discountAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF10B981),
+                          trailing: Text(
+                            v.isDeliveryDiscount
+                                ? 'Free Delivery'
+                                : '-\u20B1${v.discountAmount.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF10B981),
+                            ),
                           ),
+                          onTap: () {
+                            setState(() => _appliedVoucher = v);
+                            Navigator.pop(ctx);
+                          },
                         ),
-                        onTap: () {
-                          setState(() => _appliedVoucher = v);
-                          Navigator.pop(ctx);
-                        },
                       ),
                     );
                   },
@@ -579,34 +584,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
       setState(() {
-        if (availability['status'] != 'OK') {
-          if (availability['status'] == 'OUT_OF_ZONE') {
-            final stationTown =
-                (widget.station['town'] ?? widget.station['municipality'] ?? '')
-                    .toString()
-                    .trim();
-            final customerTown =
-                _customerProfile?['town']?.toString().trim() ?? '';
-            if (stationTown.isNotEmpty &&
-                customerTown.isNotEmpty &&
-                stationTown.toLowerCase() != customerTown.toLowerCase()) {
-              _stationAvailabilityMessage =
-                  'This station is located in $stationTown and cannot deliver to $customerTown (outside delivery radius). Please select a station in $customerTown or change your delivery address.';
-            } else {
-              _stationAvailabilityMessage =
-                  availability['message']?.toString() ??
-                  'You are outside the service area of this station.';
-            }
-          } else {
-            _stationAvailabilityMessage =
-                availability['message']?.toString() ??
-                'This station is not available for your location right now.';
-          }
+        if (availability['distance'] is num) {
+          _deliveryDistanceKm = (availability['distance'] as num).toDouble();
+        }
+
+        // Service radius is removed across the app. We never block checkout
+        // due to distance or zone limits, allowing the centralized per-km rate to apply.
+        if (availability['status'] != 'OK' &&
+            availability['status'] != 'OUT_OF_ZONE') {
+          _stationAvailabilityMessage =
+              availability['message']?.toString() ??
+              'This station is not available for your location right now.';
         } else {
           _stationAvailabilityMessage = null;
-          if (availability['distance'] is num) {
-            _deliveryDistanceKm = (availability['distance'] as num).toDouble();
-          }
         }
         _checkingStationAvailability = false;
       });

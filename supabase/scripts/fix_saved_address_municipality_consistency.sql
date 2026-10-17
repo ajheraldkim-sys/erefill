@@ -160,11 +160,8 @@ AS $$
 DECLARE
   station_latitude double precision;
   station_longitude double precision;
-  service_radius double precision;
   max_active_orders integer;
   active_orders integer;
-  distance_km double precision;
-  cosine_argument double precision;
 BEGIN
   IF NEW.customer_latitude IS NULL
      OR NEW.customer_longitude IS NULL
@@ -177,12 +174,10 @@ BEGIN
   SELECT
     station.latitude,
     station.longitude,
-    COALESCE(settings.service_radius_km, 10.0),
     COALESCE(settings.max_concurrent_orders, 20)
   INTO
     station_latitude,
     station_longitude,
-    service_radius,
     max_active_orders
   FROM public.profiles AS station
   LEFT JOIN public.owner_settings AS settings ON settings.owner_id = station.id
@@ -194,15 +189,7 @@ BEGIN
     RAISE EXCEPTION 'This water station is currently closed or unavailable.';
   END IF;
 
-  cosine_argument :=
-    cos(radians(NEW.customer_latitude)) * cos(radians(station_latitude)) *
-    cos(radians(station_longitude) - radians(NEW.customer_longitude)) +
-    sin(radians(NEW.customer_latitude)) * sin(radians(station_latitude));
-  distance_km := 6371 * acos(LEAST(1.0, GREATEST(-1.0, cosine_argument)));
-
-  IF distance_km > service_radius THEN
-    RAISE EXCEPTION 'This station is not available for the selected delivery address.';
-  END IF;
+  -- Service radius removed: No distance threshold check. Delivery fees are applied dynamically per km.
 
   -- Serialize capacity checks per station so two concurrent checkouts cannot
   -- both observe the final available delivery slot.

@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/chat/inbox_screen.dart';
 import '../../features/chat/models/chat_room.dart';
+import '../../features/dashboard/customer/cart_screen.dart';
 import '../../features/dashboard/customer/checkout_screen.dart';
 import '../../features/dashboard/customer/order_detail_screen.dart';
 import '../../features/dashboard/customer/customer_orders_list.dart';
@@ -188,6 +189,10 @@ class AppRouter {
           final station = state.extra as Map<String, dynamic>?;
           if (station == null) return _missingRoute('Station not found');
           return StationDetailsScreen(station: station);
+        }),
+        _pushed(AppRoutes.cart, (context, state) {
+          final station = state.extra as Map<String, dynamic>?;
+          return CartScreen(station: station);
         }),
         _pushed(AppRoutes.checkout, (context, state) {
           final station = state.extra as Map<String, dynamic>?;

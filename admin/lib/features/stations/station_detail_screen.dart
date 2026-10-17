@@ -406,10 +406,6 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       formatPeso(_settings['price_per_gallon']),
                     ),
                     AdminDetailRow(
-                      'Service Radius',
-                      '${_settings['service_radius_km'] ?? 5} km',
-                    ),
-                    AdminDetailRow(
                       'Max Concurrent Orders',
                       '${_settings['max_concurrent_orders'] ?? '—'}',
                     ),
@@ -482,16 +478,13 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                               child: AdminSingleStationMap(
                                 latitude: lat,
                                 longitude: lng,
-                                serviceRadiusKm: safeDouble(
-                                  _settings['service_radius_km'],
-                                ),
                                 label: _profile['station_name']?.toString(),
                               ),
                             ),
                           ),
                           AppUi.vGapSm,
                           Text(
-                            'Lat: $lat · Lng: $lng (${_settings['service_radius_km'] ?? 5} km radius)',
+                            'Lat: $lat · Lng: $lng',
                             style: adminCaptionTextStyle(context),
                           ),
                         ] else
@@ -1119,7 +1112,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
   late TextEditingController _lat;
   late TextEditingController _lng;
   late TextEditingController _pricePerGallon;
-  late TextEditingController _radius;
   late TextEditingController _maxOrders;
   late TextEditingController _reason;
   bool _saving = false;
@@ -1153,9 +1145,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
     _pricePerGallon = TextEditingController(
       text: s['price_per_gallon']?.toString() ?? '',
     );
-    _radius = TextEditingController(
-      text: s['service_radius_km']?.toString() ?? '5',
-    );
     _maxOrders = TextEditingController(
       text: s['max_concurrent_orders']?.toString() ?? '',
     );
@@ -1173,7 +1162,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
     _lat.dispose();
     _lng.dispose();
     _pricePerGallon.dispose();
-    _radius.dispose();
     _maxOrders.dispose();
     _reason.dispose();
     super.dispose();
@@ -1215,7 +1203,6 @@ class _StationEditDialogState extends State<_StationEditDialog> {
         longitude: _parseDouble(_lng.text),
         baseDeliveryFee: null,
         pricePerGallon: _parseDouble(_pricePerGallon.text),
-        serviceRadiusKm: _parseDouble(_radius.text),
         maxConcurrentOrders: _parseInt(_maxOrders.text),
         reason: _reason.text.trim().isEmpty ? null : _reason.text.trim(),
       );
@@ -1369,21 +1356,11 @@ class _StationEditDialogState extends State<_StationEditDialog> {
             ),
           ),
           AppUi.vGapMd,
-          fieldPair(
-            AdminTextField(
-              controller: _radius,
-              label: 'Service radius (km)',
-              icon: LucideIcons.compass,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-            AdminTextField(
-              controller: _maxOrders,
-              label: 'Max concurrent orders',
-              icon: LucideIcons.packageCheck,
-              keyboardType: TextInputType.number,
-            ),
+          AdminTextField(
+            controller: _maxOrders,
+            label: 'Max concurrent orders',
+            icon: LucideIcons.packageCheck,
+            keyboardType: TextInputType.number,
           ),
           AppUi.vGapMd,
           AdminTextField(

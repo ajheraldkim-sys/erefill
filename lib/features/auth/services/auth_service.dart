@@ -10,7 +10,7 @@ class AuthService {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
         serverClientId:
-            '998147956925-t1iuu6ncqirbg342u9ob7n6bi0bdi518.apps.googleusercontent.com', // Web Client ID
+            '998147956925-8o2qu65h0e2s7e12ksddc4a63a8p3rr8.apps.googleusercontent.com', // Web Client ID
         scopes: ['email', 'profile'],
       );
 

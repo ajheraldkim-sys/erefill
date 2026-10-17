@@ -26,7 +26,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   final _deliveryFeeController = TextEditingController();
   final _priceController = TextEditingController();
   final _commissionController = TextEditingController();
-  final _radiusController = TextEditingController();
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -87,8 +86,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
         _commissionController.text =
             (profile?['commission_rate'] as num?)?.toStringAsFixed(2) ??
             '5.00';
-        _radiusController.text =
-            (settings?['service_radius_km'] as num?)?.toString() ?? '5';
         final configuredMethods = settings?['enabled_payment_methods'];
         if (configuredMethods is List) {
           _enabledPaymentMethods = configuredMethods
@@ -129,7 +126,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final radius = int.tryParse(_radiusController.text) ?? 5;
       final price = double.tryParse(_priceController.text) ?? 15.0;
       final commission = double.tryParse(_commissionController.text) ?? 0.0;
 
@@ -142,7 +138,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
       await _service.updateSettings(userId, {
         'price_per_gallon': price,
-        'service_radius_km': radius,
         'enabled_payment_methods': _enabledPaymentMethods,
       });
 
@@ -190,7 +185,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     _deliveryFeeController.dispose();
     _priceController.dispose();
     _commissionController.dispose();
-    _radiusController.dispose();
     super.dispose();
   }
 
@@ -299,7 +293,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           children: [
                             const AppFormSectionHeader(
                               title: 'PRICING & DELIVERY',
-                              subtitle: 'Configure order pricing, rider commissions and radius',
+                              subtitle: 'Configure order pricing and rider commissions',
                             ),
                             AppUi.vGapLg,
                             AppFormField(
@@ -398,23 +392,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                 value,
                                 'Rider commission',
                               ),
-                            ),
-                            AppUi.vGapMd,
-                            AppFormField(
-                              controller: _radiusController,
-                              label: 'Service Radius (km)',
-                              prefixIcon: Icons.radar_outlined,
-                              keyboardType: TextInputType.number,
-                              compact: true,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Service radius is required.';
-                                }
-                                final value = int.tryParse(v.trim());
-                                return (value == null || value <= 0)
-                                    ? 'Enter a valid radius greater than zero.'
-                                    : null;
-                              },
                             ),
                           ],
                         ),

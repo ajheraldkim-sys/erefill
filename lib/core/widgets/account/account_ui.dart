@@ -76,6 +76,10 @@ class AccountNavTile extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? iconColor;
   final Color? titleColor;
+  final String? badgeText;
+  final Color? badgeColor;
+  final Color? badgeBgColor;
+  final Widget? trailing;
 
   const AccountNavTile({
     super.key,
@@ -85,6 +89,10 @@ class AccountNavTile extends StatelessWidget {
     this.onTap,
     this.iconColor,
     this.titleColor,
+    this.badgeText,
+    this.badgeColor,
+    this.badgeBgColor,
+    this.trailing,
   });
 
   @override
@@ -130,12 +138,41 @@ class AccountNavTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onTap != null)
+              if (badgeText != null && badgeText!.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: badgeBgColor ??
+                        (badgeColor ?? AppUi.bluePrimary).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: (badgeColor ?? AppUi.bluePrimary).withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    badgeText!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: badgeColor ?? AppUi.bluePrimary,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing!,
+              ] else if (onTap != null) ...[
+                const SizedBox(width: 6),
                 Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
                   color: AppUi.textMuted.withValues(alpha: 0.7),
                 ),
+              ],
             ],
           ),
         ),

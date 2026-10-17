@@ -54,7 +54,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   List<dynamic> _reviews = [];
   bool _isLoadingPurified = true;
   Map<String, dynamic>? _selectedProduct;
-  final Map<String, int> _productQuantities = {};
 
   static const String _sampleStationImage =
       'https://images.unsplash.com/photo-1564419320461-6870880221ad?auto=format&fit=crop&w=1200&q=60';
@@ -859,6 +858,104 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     );
   }
 
+  Future<bool> _ensureCartForThisStation(CartProvider cart) async {
+    final targetStationId = _stationData['id']?.toString();
+    if (cart.items.isNotEmpty &&
+        cart.stationId != null &&
+        cart.stationId != targetStationId) {
+      final replace = await showDialog<bool>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          backgroundColor: AppUi.surfaceOf(dialogCtx),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'Start new order?',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            'Your cart already has items from ${cart.stationName ?? "another station"}. Adding from this station will replace them.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppUi.bluePrimary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Start New Order'),
+            ),
+          ],
+        ),
+      );
+      if (replace == true) {
+        cart.clearCart();
+        cart.setStation(
+          targetStationId,
+          _stationData['station_name']?.toString() ?? 'Water Station',
+        );
+        return true;
+      }
+      return false;
+    }
+
+    if (cart.stationId == null || cart.stationId != targetStationId) {
+      cart.setStation(
+        targetStationId,
+        _stationData['station_name']?.toString() ?? 'Water Station',
+      );
+    }
+    return true;
+  }
+
+  Future<void> _addItemToCart(Map<String, dynamic> product, {int qty = 1}) async {
+    final cart = context.read<CartProvider>();
+    final allowed = await _ensureCartForThisStation(cart);
+    if (!allowed) return;
+
+    final id = product['id']?.toString() ?? '';
+    final name = product['name']?.toString() ?? 'Water Product';
+    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
+
+    final currentQty = cart.items[id]?.quantity ?? 0;
+    if (currentQty == 0) {
+      cart.addItem(id, name, price);
+      if (qty > 1) {
+        cart.updateQuantity(id, qty);
+      }
+    } else {
+      cart.updateQuantity(id, currentQty + qty);
+    }
+    HapticFeedback.selectionClick();
+  }
+
+  void _removeItemFromCart(String productId) {
+    final cart = context.read<CartProvider>();
+    final currentQty = cart.items[productId]?.quantity ?? 0;
+    if (currentQty <= 1) {
+      cart.removeItem(productId);
+    } else {
+      cart.updateQuantity(productId, currentQty - 1);
+    }
+    HapticFeedback.selectionClick();
+  }
+
+  bool _isContainerOrAccessory(Map<String, dynamic> product) {
+    final cat = (product['category'] ?? '').toString().toLowerCase();
+    final name = (product['name'] ?? '').toString().toLowerCase();
+    return cat.contains('container') ||
+        cat.contains('accessory') ||
+        cat.contains('accessories') ||
+        name.contains('container') ||
+        name.contains('cap') ||
+        name.contains('bottle') ||
+        name.contains('dispenser');
+  }
+
   Future<void> _handleOrderNow({
     required bool canOrder,
     required String normalizedAvailability,
@@ -905,80 +1002,29 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
 
       final orderProduct = product!;
       final cart = context.read<CartProvider>();
-      final targetStationId = _stationData['id']?.toString();
-
-      if (cart.items.isNotEmpty &&
-          cart.stationId != null &&
-          cart.stationId != targetStationId) {
-        final replace = await showDialog<bool>(
-          context: context,
-          builder: (dialogCtx) => AlertDialog(
-            backgroundColor: AppUi.surfaceOf(dialogCtx),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text(
-              'Start new order?',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            content: Text(
-              'Your cart already has items from ${cart.stationName ?? "another station"}. Adding from this station will replace them.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppUi.bluePrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () => Navigator.pop(dialogCtx, true),
-                child: const Text('Start New Order'),
-              ),
-            ],
-          ),
-        );
-        if (!mounted || !context.mounted) return;
-        if (replace != true) {
-          setState(() => _isPlacingOrder = false);
-          return;
-        }
+      final allowed = await _ensureCartForThisStation(cart);
+      if (!allowed) {
+        setState(() => _isPlacingOrder = false);
+        return;
       }
 
       HapticFeedback.mediumImpact();
-      cart.clearCart();
-      cart.setStation(
-        targetStationId,
-        _stationData['station_name']?.toString() ?? 'Water Station',
-      );
+      final itemId = orderProduct['id'].toString();
+      final itemName = orderProduct['name']?.toString() ?? 'Water Refill';
+      final itemPrice = (orderProduct['price'] as num?)?.toDouble() ??
+          (_stationData['price_per_gallon'] as num?)?.toDouble() ??
+          25.0;
 
-      bool addedFromList = false;
-      for (final prod in _products) {
-        final pId = prod['id']?.toString() ?? '';
-        final pQty = _productQuantities[pId] ?? 0;
-        if (pQty > 0) {
-          final pName = prod['name']?.toString() ?? 'Water Refill';
-          final pPrice = (prod['price'] as num?)?.toDouble() ?? 25.0;
-          cart.addItem(pId, pName, pPrice);
-          cart.updateQuantity(pId, pQty);
-          addedFromList = true;
-        }
-      }
-
-      if (!addedFromList) {
-        final itemId = orderProduct['id'].toString();
-        final itemName = orderProduct['name']?.toString() ?? 'Water Refill';
-        final itemPrice = (orderProduct['price'] as num?)?.toDouble() ??
-            (_stationData['price_per_gallon'] as num?)?.toDouble() ??
-            25.0;
-
+      final existingQty = cart.items[itemId]?.quantity ?? 0;
+      if (existingQty == 0) {
         cart.addItem(itemId, itemName, itemPrice);
+        cart.updateQuantity(itemId, _quantity);
+      } else {
         cart.updateQuantity(itemId, _quantity);
       }
 
       if (!mounted || !context.mounted) return;
-      context.openCheckout(_stationData);
+      context.openCart(_stationData);
     } catch (e) {
       debugPrint('Order start error: $e');
       if (!mounted) return;
@@ -1499,6 +1545,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   }
 
   Widget _buildRefillProductsSection(BuildContext context) {
+    final refillProducts = _products
+        .where((p) => !_isContainerOrAccessory(Map<String, dynamic>.from(p)))
+        .toList();
+    final accessoryProducts = _products
+        .where((p) => _isContainerOrAccessory(Map<String, dynamic>.from(p)))
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1514,9 +1567,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 letterSpacing: -0.3,
               ),
             ),
-            if (_products.length > 1)
+            if (refillProducts.length > 1)
               Text(
-                '${_products.length} options',
+                '${refillProducts.length} options',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppUi.textSecondaryOf(context),
@@ -1537,8 +1590,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               ),
             ),
           )
-        else if (_products.isNotEmpty)
-          ..._products.map((p) {
+        else if (refillProducts.isNotEmpty)
+          ...refillProducts.map((p) {
             final pMap = OrderProductHelpers.withDisplayDefaults(
               Map<String, dynamic>.from(p),
             );
@@ -1559,6 +1612,57 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             isSelected: true,
             onTap: () {},
           ),
+
+        if (accessoryProducts.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Containers & Accessories',
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w900,
+                  color: AppUi.textPrimaryOf(context),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                '${accessoryProducts.length} items',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppUi.textSecondaryOf(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Containers, caps, and replacement accessories',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppUi.textSecondaryOf(context),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...accessoryProducts.map((p) {
+            final pMap = OrderProductHelpers.withDisplayDefaults(
+              Map<String, dynamic>.from(p),
+            );
+            final isSelected =
+                _selectedProduct?['id']?.toString() == pMap['id']?.toString();
+            return _buildProductCard(
+              pMap,
+              isSelected: isSelected,
+              isAccessory: true,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _selectedProduct = pMap);
+              },
+            );
+          }),
+        ],
       ],
     );
   }
@@ -1567,30 +1671,46 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     Map<String, dynamic> product, {
     required bool isSelected,
     required VoidCallback onTap,
+    bool isAccessory = false,
   }) {
     final category = product['category']?.toString() ?? product['name']?.toString() ?? '';
     final waterType = WaterTypes.byName(category);
     final price = (product['price'] as num?)?.toDouble();
-    final containerSize = product['container_size']?.toString() ?? '5-Gallon';
+    final containerSize = product['container_size']?.toString() ?? (isAccessory ? 'Piece' : '5-Gallon');
     final prepMinutes = (product['preparation_minutes'] as num?)?.toInt() ?? 15;
     final isAvailable = product['is_available'] != false;
     final customerPref = _getCustomerWaterPreference();
-    final isCustomerPreferred = customerPref != null &&
+    final isCustomerPreferred = !isAccessory &&
+        customerPref != null &&
         customerPref.trim().isNotEmpty &&
         WaterTypes.byName(customerPref).shortName.toLowerCase() ==
             waterType.shortName.toLowerCase();
 
+    final cart = context.watch<CartProvider>();
+    final targetStationId = _stationData['id']?.toString();
+    final pId = product['id']?.toString() ?? '';
+    final isThisStation = cart.stationId == targetStationId;
+    final inCartQty = isThisStation ? (cart.items[pId]?.quantity ?? 0) : 0;
+
     Color badgeBg;
     Color iconColor;
-    if (category.toLowerCase().contains('alkaline')) {
+    IconData cardIcon;
+    if (isAccessory) {
+      badgeBg = const Color(0xFFFFFBEB);
+      iconColor = const Color(0xFFD97706);
+      cardIcon = Icons.inventory_2_outlined;
+    } else if (category.toLowerCase().contains('alkaline')) {
       badgeBg = const Color(0xFFF3E8FF);
       iconColor = const Color(0xFF8B5CF6);
+      cardIcon = Icons.water_drop_rounded;
     } else if (category.toLowerCase().contains('mineral')) {
       badgeBg = const Color(0xFFE6FFFA);
       iconColor = const Color(0xFF0D9488);
+      cardIcon = Icons.water_drop_rounded;
     } else {
       badgeBg = AppUi.blueSoft;
       iconColor = AppUi.bluePrimary;
+      cardIcon = Icons.water_drop_rounded;
     }
 
     return Opacity(
@@ -1636,7 +1756,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     ),
                     alignment: Alignment.center,
                     child: Icon(
-                      Icons.water_drop_rounded,
+                      cardIcon,
                       color: iconColor,
                       size: 24,
                     ),
@@ -1740,12 +1860,20 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              '• ~$prepMinutes min prep',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppUi.textSecondaryOf(context),
+                            Expanded(
+                              child: Text(
+                                isAccessory
+                                    ? ((product['description']?.toString().isNotEmpty ?? false)
+                                        ? product['description'].toString()
+                                        : 'Standard item')
+                                    : '• ~$prepMinutes min prep',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppUi.textSecondaryOf(context),
+                                ),
                               ),
                             ),
                           ],
@@ -1754,33 +1882,111 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     ),
                   ),
 
-                  // Price display
-                  if (price != null) ...[
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                  const SizedBox(width: 10),
+
+                  // Price display & In-line Cart Controls
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (price != null) ...[
                         Text(
                           '₱${price.toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
-                            fontSize: 17,
+                            fontSize: 16,
                             color: AppUi.bluePrimary,
                             letterSpacing: -0.4,
                           ),
                         ),
                         Text(
-                          '/ refill',
+                          isAccessory ? '/ piece' : '/ refill',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: AppUi.textSecondaryOf(context),
                           ),
                         ),
+                        const SizedBox(height: 6),
                       ],
-                    ),
-                  ],
+                      if (inCartQty > 0)
+                        Container(
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: AppUi.blueSoft,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: AppUi.bluePrimary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () => _removeItemFromCart(pId),
+                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(15)),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                  child: Icon(Icons.remove_rounded, size: 14, color: AppUi.bluePrimary),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                child: Text(
+                                  '$inCartQty',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppUi.bluePrimary,
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => _addItemToCart(product, qty: 1),
+                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(15)),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                  child: Icon(Icons.add_rounded, size: 14, color: AppUi.bluePrimary),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        InkWell(
+                          onTap: isAvailable ? () => _addItemToCart(product, qty: 1) : null,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isAvailable
+                                  ? AppUi.bluePrimary.withValues(alpha: 0.1)
+                                  : AppUi.borderOf(context),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add_shopping_cart_rounded,
+                                  size: 13,
+                                  color: isAvailable ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Add',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: isAvailable ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -2263,6 +2469,65 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               ),
             ),
             actions: [
+              Consumer<CartProvider>(
+                builder: (context, cart, _) {
+                  final hasItems = cart.items.isNotEmpty;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.openCart(_stationData),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppUi.borderOf(context)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.shopping_cart_outlined,
+                              size: 19,
+                              color: hasItems ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
+                            ),
+                          ),
+                        ),
+                        if (hasItems)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFEF4444),
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${cart.totalItems}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: 12.0),
                 child: GestureDetector(
@@ -2411,138 +2676,232 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       ),
 
       // ── Sticky Bottom Action Bar ─────────────────────────────────────────
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-        decoration: BoxDecoration(
-          color: AppUi.surfaceOf(context),
-          border: Border(
-            top: BorderSide(
-              color: AppUi.dividerOf(context).withValues(alpha: 0.7),
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Row(
-            children: [
-              // Quantity Stepper Capsule
-              Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppUi.pageBgOf(context),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppUi.borderOf(context)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: _quantity > 1
-                          ? () {
-                              HapticFeedback.lightImpact();
-                              _setQuantity(_quantity - 1);
-                            }
-                          : null,
-                      icon: const Icon(Icons.remove_rounded, size: 18),
-                      color: AppUi.textPrimaryOf(context),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      constraints:
-                          const BoxConstraints(minWidth: 36, minHeight: 48),
-                    ),
-                    GestureDetector(
-                      onTap: _editQuantity,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          '$_quantity',
-                          style: TextStyle(
-                            color: AppUi.textPrimaryOf(context),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        _setQuantity(_quantity + 1);
-                      },
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      color: AppUi.textPrimaryOf(context),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      constraints:
-                          const BoxConstraints(minWidth: 36, minHeight: 48),
-                    ),
-                  ],
+      bottomNavigationBar: Consumer<CartProvider>(
+        builder: (context, cart, _) {
+          final isThisStation =
+              cart.stationId == _stationData['id']?.toString();
+          final hasItemsInCart = isThisStation && cart.totalItems > 0;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: AppUi.surfaceOf(context),
+              border: Border(
+                top: BorderSide(
+                  color: AppUi.dividerOf(context).withValues(alpha: 0.7),
                 ),
               ),
-              const SizedBox(width: 12),
-
-              // Order Action CTA Button
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: () => _handleOrderNow(
-                      canOrder: canOrder,
-                      normalizedAvailability: normalizedAvailability,
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor:
-                          canOrder ? AppUi.bluePrimary : AppUi.textMuted,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, -3),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasItemsInCart)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
                       ),
-                      elevation: 0,
-                    ),
-                    child: _isPlacingOrder
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.2,
+                      decoration: BoxDecoration(
+                        color: AppUi.bluePrimary,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppUi.bluePrimary.withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.shopping_bag_outlined,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${cart.totalItems} ${cart.totalItems == 1 ? "item" : "items"} in cart · ₱${cart.totalAmount.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
                             ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          ),
+                          InkWell(
+                            onTap: () => context.openCart(_stationData),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'View Cart',
+                                    style: TextStyle(
+                                      color: AppUi.bluePrimary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  SizedBox(width: 2),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 14,
+                                    color: AppUi.bluePrimary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    child: Row(
+                      children: [
+                        // Quantity Stepper Capsule
+                        Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppUi.pageBgOf(context),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: AppUi.borderOf(context)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                canOrder
-                                    ? 'Order ($_quantity) · ₱${subtotal.toStringAsFixed(0)}'
-                                    : (isOpen
-                                        ? 'Station Busy'
-                                        : 'Station Closed'),
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.2,
+                              IconButton(
+                                onPressed: _quantity > 1
+                                    ? () {
+                                        HapticFeedback.lightImpact();
+                                        _setQuantity(_quantity - 1);
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.remove_rounded, size: 18),
+                                color: AppUi.textPrimaryOf(context),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 48,
                                 ),
                               ),
-                              if (canOrder) ...[
-                                const SizedBox(width: 6),
-                                const Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 17,
+                              GestureDetector(
+                                onTap: _editQuantity,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text(
+                                    '$_quantity',
+                                    style: TextStyle(
+                                      color: AppUi.textPrimaryOf(context),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
                                 ),
-                              ],
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  HapticFeedback.lightImpact();
+                                  _setQuantity(_quantity + 1);
+                                },
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                color: AppUi.textPrimaryOf(context),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 48,
+                                ),
+                              ),
                             ],
                           ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // Order Action CTA Button
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: FilledButton(
+                              onPressed: () => _handleOrderNow(
+                                canOrder: canOrder,
+                                normalizedAvailability: normalizedAvailability,
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: canOrder
+                                    ? AppUi.bluePrimary
+                                    : AppUi.textMuted,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isPlacingOrder
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.2,
+                                      ),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          canOrder
+                                              ? (hasItemsInCart
+                                                  ? 'Add to Cart · ₱${subtotal.toStringAsFixed(0)}'
+                                                  : 'Order ($_quantity) · ₱${subtotal.toStringAsFixed(0)}')
+                                              : (isOpen
+                                                  ? 'Station Busy'
+                                                  : 'Station Closed'),
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: -0.2,
+                                          ),
+                                        ),
+                                        if (canOrder) ...[
+                                          const SizedBox(width: 6),
+                                          const Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 17,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

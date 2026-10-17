@@ -447,10 +447,6 @@ class _StationsScreenState extends State<StationsScreen> {
                   'Rate / Gal',
                   formatPeso(_selected!['price_per_gallon']),
                 ),
-                AdminDetailRow(
-                  'Service Radius',
-                  '${_selected!['service_radius_km'] ?? 5} km',
-                ),
                 AdminDetailRow('Riders', '${_selected!['rider_count'] ?? 0}'),
                 AdminDetailRow(
                   'Active Orders',
