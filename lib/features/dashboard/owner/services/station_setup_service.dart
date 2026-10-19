@@ -275,7 +275,7 @@ class StationSetupService {
 
       final isDeliveryComplete = sett == null || sett['delivery_ack'] != false;
 
-      final hasActiveProduct = (prods != null && prods.isNotEmpty) ||
+      final hasActiveProduct = prods.isNotEmpty ||
           ((sett?['price_per_gallon'] as num?)?.toDouble() ?? 0) > 0;
 
       final enabledMethods = sett?['enabled_payment_methods'];
