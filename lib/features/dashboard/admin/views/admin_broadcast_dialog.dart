@@ -191,7 +191,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                       ),
                       Text(
                         'Send real-time alerts to marketplace roles',
-                        style: TextStyle(fontSize: 12, color: AppUi.textMuted),
+                        style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
                       ),
                     ],
                   ),

@@ -244,7 +244,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: AppUi.textSecondary),
+            Icon(icon, size: 64, color: AppUi.textSecondaryOf(context)),
             AppUi.vGapLg,
             Text(
               title,

@@ -520,10 +520,10 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                   ),
                   Text(
                     'Order ID: #${(widget.orderId.length >= 8 ? widget.orderId.substring(0, 8) : widget.orderId).toUpperCase()}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppUi.textMuted,
+                      color: AppUi.textMutedOf(context),
                     ),
                   ),
                 ],
@@ -532,10 +532,10 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
             if (_riderLocation != null)
               Text(
                 _formatTime(_riderLocation!['timestamp']),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppUi.textSecondary,
+                  color: AppUi.textSecondaryOf(context),
                 ),
               ),
           ],
@@ -589,9 +589,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                           width: 52,
                           height: 52,
                           color: AppUi.chipBgOf(context),
-                          child: const Icon(
+                          child: Icon(
                             Icons.person_rounded,
-                            color: AppUi.textMuted,
+                            color: AppUi.textMutedOf(context),
                           ),
                         ),
                 ),

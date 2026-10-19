@@ -198,10 +198,10 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(
+            icon: Icon(
               Icons.more_vert_rounded,
               size: 20,
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
             ),
             tooltip: 'Rider Actions',
             shape: RoundedRectangleBorder(
@@ -327,8 +327,8 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     '@$username',
-                                    style: const TextStyle(
-                                      color: AppUi.textMuted,
+                                    style: TextStyle(
+                                      color: AppUi.textMutedOf(context),
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -418,10 +418,10 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                 letterSpacing: 0,
                               ),
                             ),
-                            const Text(
+                            Text(
                               ' / 5.0',
                               style: TextStyle(
-                                color: AppUi.textMuted,
+                                color: AppUi.textMutedOf(context),
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -683,9 +683,9 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AppUi.textMuted,
+            color: AppUi.textMutedOf(context),
             fontWeight: FontWeight.w700,
           ),
         ),

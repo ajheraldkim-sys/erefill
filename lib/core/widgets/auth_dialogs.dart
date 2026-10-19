@@ -18,17 +18,17 @@ class AuthDialogs {
             ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'You need an account to place orders, message stations, or save favorites. Join the eRefill community today!',
-          style: TextStyle(color: AppUi.textSecondary, height: 1.5),
+          style: TextStyle(color: AppUi.textSecondaryOf(context), height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Maybe Later',
               style: TextStyle(
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
                 fontWeight: FontWeight.w700,
               ),
             ),

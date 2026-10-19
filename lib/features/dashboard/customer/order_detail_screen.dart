@@ -2089,10 +2089,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                             ),
                                           );
                                         },
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.info_outline_rounded,
                                           size: 15,
-                                          color: AppUi.textMuted,
+                                          color: AppUi.textMutedOf(context),
                                         ),
                                       ),
                                     ],

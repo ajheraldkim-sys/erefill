@@ -253,7 +253,7 @@ class _AppFormFieldState extends State<AppFormField> {
       style: TextStyle(
         fontWeight: FontWeight.w700,
         fontSize: 15,
-        color: widget.enabled ? AppUi.textPrimaryOf(context) : AppUi.textMuted,
+        color: widget.enabled ? AppUi.textPrimaryOf(context) : AppUi.textMutedOf(context),
       ),
       decoration: AppFormDecoration.inputDecoration(
         context,

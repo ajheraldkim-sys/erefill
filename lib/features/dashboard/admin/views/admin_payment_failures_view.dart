@@ -175,7 +175,7 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
                           const SizedBox(height: 4),
                           Text(
                             'All payment gateway and COD transactions are reconciled.',
-                            style: TextStyle(color: AppUi.textMuted, fontSize: 12),
+                            style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 12),
                           ),
                         ],
                       ),
@@ -257,7 +257,7 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
                               const SizedBox(height: 2),
                               Text(
                                 'Method: ${f['payment_method'] ?? "Online"} • Placed on $date',
-                                style: TextStyle(fontSize: 11, color: AppUi.textMuted),
+                                style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
                               ),
                               const SizedBox(height: 12),
                               Row(

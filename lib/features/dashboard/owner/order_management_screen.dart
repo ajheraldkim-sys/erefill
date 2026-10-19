@@ -742,7 +742,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             size: 20,
                             color: isSelected
                                 ? AppUi.brandOf(context)
-                                : AppUi.textMuted,
+                                : AppUi.textMutedOf(context),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -754,8 +754,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                     ? FontWeight.w700
                                     : FontWeight.w500,
                                 color: isSelected
-                                    ? AppUi.textPrimary
-                                    : AppUi.textSecondary,
+                                    ? AppUi.textPrimaryOf(context)
+                                    : AppUi.textSecondaryOf(context),
                               ),
                             ),
                           ),
@@ -1110,17 +1110,17 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                       Expanded(
                                         child: Text(
                                           '$quantity× $name',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.w600,
-                                            color: Color(0xFF334155),
+                                            color: AppUi.textPrimaryOf(context),
                                           ),
                                         ),
                                       ),
                                       Text(
                                         _formatPeso(item['subtotal']),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w700,
-                                          color: AppUi.textPrimary,
+                                          color: AppUi.textPrimaryOf(context),
                                         ),
                                       ),
                                     ],
@@ -1141,10 +1141,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             children: [
                               Text(
                                 '${(order['empty_gallons_returned'] as num?)?.toInt() ?? 0} gallon(s) returned',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
-                                  color: AppUi.textPrimary,
+                                  color: AppUi.textPrimaryOf(context),
                                 ),
                               ),
                               if ((order['delivery_note']?.toString().trim() ??
@@ -1153,8 +1153,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 const SizedBox(height: 8),
                                 Text(
                                   order['delivery_note'].toString(),
-                                  style: const TextStyle(
-                                    color: AppUi.textSecondary,
+                                  style: TextStyle(
+                                    color: AppUi.textSecondaryOf(context),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -1171,26 +1171,26 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         decoration: BoxDecoration(
                           color: AppUi.pageBgOf(context),
                           borderRadius: AppUi.cardRadius,
-                          border: Border.all(color: AppUi.borderColor),
+                          border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Column(
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
+                                Text(
                                   'Total Amount',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
-                                    color: AppUi.textSecondary,
+                                    color: AppUi.textSecondaryOf(context),
                                   ),
                                 ),
                                 Text(
                                   total,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 20,
-                                    color: AppUi.textPrimary,
+                                    color: AppUi.textPrimaryOf(context),
                                   ),
                                 ),
                               ],
@@ -1199,13 +1199,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Align(
+                                Align(
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     'Payment Status',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      color: AppUi.textSecondary,
+                                      color: AppUi.textSecondaryOf(context),
                                     ),
                                   ),
                                 ),
@@ -1277,12 +1277,12 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                       if (rawStatus == 'ready_for_pickup' &&
                           assignedRiderId == null &&
                           _riders.isNotEmpty) ...[
-                        const Text(
+                        Text(
                           'Assign Rider',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
-                            color: AppUi.textPrimary,
+                            color: AppUi.textPrimaryOf(context),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -1629,14 +1629,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       children: [
         Row(
           children: [
-            Icon(icon, size: 14, color: AppUi.textMuted),
+            Icon(icon, size: 14, color: AppUi.textMutedOf(context)),
             const SizedBox(width: 6),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
                 letterSpacing: 0,
               ),
             ),
@@ -2553,7 +2553,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           : Icons.view_kanban_rounded,
                       color: Theme.of(context).brightness == Brightness.dark
                           ? Colors.white
-                          : AppUi.textPrimary,
+                          : AppUi.textPrimaryOf(context),
                       size: 22,
                     ),
                     tooltip: _isKanbanView
@@ -2566,7 +2566,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                       Icons.add_rounded,
                       color: Theme.of(context).brightness == Brightness.dark
                           ? Colors.white
-                          : AppUi.textPrimary,
+                          : AppUi.textPrimaryOf(context),
                       size: 24,
                     ),
                     tooltip: 'Add manual refill',
@@ -2579,14 +2579,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                     style: TextStyle(color: AppUi.textPrimaryOf(context)),
                     decoration: InputDecoration(
                       hintText: 'Search order, customer, or address',
-                      hintStyle: const TextStyle(
-                        color: AppUi.textMuted,
+                      hintStyle: TextStyle(
+                        color: AppUi.textMutedOf(context),
                         fontSize: 13,
                       ),
-                      prefixIcon: const Icon(
+                      prefixIcon: Icon(
                         Icons.search_rounded,
                         size: 20,
-                        color: AppUi.textSecondary,
+                        color: AppUi.textSecondaryOf(context),
                       ),
                       filled: true,
                       fillColor: Theme.of(context).brightness == Brightness.dark
@@ -2628,7 +2628,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     labelColor: AppUi.brandOf(context),
-                    unselectedLabelColor: AppUi.textMuted,
+                    unselectedLabelColor: AppUi.textMutedOf(context),
                     labelStyle: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -2888,7 +2888,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                       ? 'Drop here to move to $title'
                                       : 'No $title orders',
                                   style: TextStyle(
-                                    color: isHovered ? color : AppUi.textMuted,
+                                    color: isHovered ? color : AppUi.textMutedOf(context),
                                     fontWeight: isHovered
                                         ? FontWeight.w700
                                         : FontWeight.w500,
@@ -3004,7 +3004,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 isSelected ? FontWeight.w700 : FontWeight.w600,
                             color: isSelected
                                 ? Colors.white
-                                : AppUi.textSecondary,
+                                : AppUi.textSecondaryOf(context),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -3083,9 +3083,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             Text(
                               'Orders in the "${activeStage['title']}" pipeline stage will appear here.',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: AppUi.textMuted,
+                                color: AppUi.textMutedOf(context),
                               ),
                             ),
                           ],

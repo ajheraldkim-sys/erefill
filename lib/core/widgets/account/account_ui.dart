@@ -179,7 +179,7 @@ class AccountNavTile extends StatelessWidget {
                 Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
-                  color: AppUi.textMuted.withValues(alpha: 0.7),
+                  color: AppUi.textMutedOf(context).withValues(alpha: 0.7),
                 ),
               ],
             ],

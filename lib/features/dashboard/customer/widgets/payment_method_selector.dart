@@ -139,7 +139,7 @@ class PaymentMethodSelector extends StatelessWidget {
                     else if (isAvailable)
                       Icon(
                         Icons.radio_button_unchecked_rounded,
-                        color: AppUi.textMuted.withValues(alpha: 0.35),
+                        color: AppUi.textMutedOf(context).withValues(alpha: 0.35),
                         size: 18,
                       )
                     else
@@ -154,7 +154,7 @@ class PaymentMethodSelector extends StatelessWidget {
                   style: TextStyle(
                     color: isAvailable
                         ? AppUi.textPrimaryOf(context)
-                        : AppUi.textMuted,
+                        : AppUi.textMutedOf(context),
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -169,7 +169,7 @@ class PaymentMethodSelector extends StatelessWidget {
                   style: TextStyle(
                     color: isAvailable
                         ? AppUi.textSecondaryOf(context)
-                        : AppUi.textMuted,
+                        : AppUi.textMutedOf(context),
                     fontSize: 11,
                     height: 1.25,
                   ),

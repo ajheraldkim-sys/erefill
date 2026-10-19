@@ -1155,7 +1155,7 @@ class ActiveOrderCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isDone ? FontWeight.w700 : FontWeight.w500,
-            color: isDone ? AppUi.textPrimaryOf(context) : AppUi.textMuted,
+            color: isDone ? AppUi.textPrimaryOf(context) : AppUi.textMutedOf(context),
           ),
         ),
       ],

@@ -79,7 +79,7 @@ class AvailabilityPresentation {
       default:
         return const AvailabilityPresentation(
           label: 'Closed',
-          color: AppUi.textSecondary,
+          color: AppUi.textSecondary, // fixed-light: status tone, rendered on its own tint
         );
     }
   }
@@ -696,7 +696,7 @@ class _ProgressMilestone extends StatelessWidget {
           ),
           child: Icon(
             isComplete ? Icons.check_rounded : icon,
-            color: isReached ? Colors.white : AppUi.textMuted,
+            color: isReached ? Colors.white : AppUi.textMutedOf(context),
             size: 15,
           ),
         ),

@@ -12,13 +12,13 @@ class DmBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (points.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 180,
         child: Center(
           child: Text(
             'No data yet',
             style: TextStyle(
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -82,10 +82,10 @@ class DmBarChart extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       _shortLabel(points[idx].date),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                       ),
                     ),
                   );

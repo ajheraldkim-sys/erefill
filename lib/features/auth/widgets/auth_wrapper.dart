@@ -173,11 +173,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     'We could not connect to sync your profile. Please check your internet connection and tap Retry, or return to login.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: AppUi.textMuted,
+                      color: AppUi.textMutedOf(context),
                       fontSize: 13,
                       height: 1.45,
                     ),
@@ -327,7 +327,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             const SizedBox(height: 8),
             Text(
               'Role: ${user.role}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
             ),
             const SizedBox(height: 24),
             ElevatedButton(

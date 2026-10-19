@@ -155,7 +155,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.shield_outlined, size: 48, color: AppUi.textMuted),
+                                Icon(Icons.shield_outlined, size: 48, color: AppUi.textMutedOf(context)),
                                 const SizedBox(height: 12),
                                 Text(
                                   'No audit records found',
@@ -168,7 +168,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                                 const SizedBox(height: 4),
                                 Text(
                                   'All administrative actions are captured and logged here.',
-                                  style: TextStyle(color: AppUi.textMuted, fontSize: 12),
+                                  style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 12),
                                 ),
                               ],
                             ),
@@ -228,7 +228,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                                         const Spacer(),
                                         Text(
                                           '$date $time',
-                                          style: TextStyle(fontSize: 11, color: AppUi.textMuted),
+                                          style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
                                         ),
                                       ],
                                     ),
@@ -247,7 +247,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                                         'Payload: ${log['details'] ?? log['metadata']}',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: AppUi.textMuted,
+                                          color: AppUi.textMutedOf(context),
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,

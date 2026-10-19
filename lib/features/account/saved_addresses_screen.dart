@@ -982,7 +982,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                         Icon(
                           Icons.location_off_outlined,
                           size: 56,
-                          color: AppUi.textMuted,
+                          color: AppUi.textMutedOf(context),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -1099,7 +1099,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                               .radio_button_unchecked_rounded,
                                       color: isDefault
                                           ? AppUi.brandOf(context)
-                                          : AppUi.textMuted,
+                                          : AppUi.textMutedOf(context),
                                       size: 22,
                                     ),
                                     const SizedBox(width: 10),

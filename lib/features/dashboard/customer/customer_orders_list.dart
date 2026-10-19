@@ -646,7 +646,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                 label: const Text('Rate refill'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: AppUi.textPrimary,
+                  foregroundColor: AppUi.textPrimary, // fixed-light: on a fixed white button
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(

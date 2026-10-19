@@ -1749,10 +1749,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       _systemDeliveryRate == null
                           ? "Delivery fees are set by the eRefill admin and calculated automatically from each customer's distance."
                           : "Delivery rate: ${formatPeso(_systemDeliveryRate)}/km, set by the eRefill admin. Fees are calculated automatically from each customer's distance.",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
-                        color: AppUi.textSecondary,
+                        color: AppUi.textSecondaryOf(context),
                       ),
                     ),
                   ],
@@ -2869,11 +2869,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'This permanently removes your station profile, catalog, and operations data.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: AppUi.textSecondary,
+                        color: AppUi.textSecondaryOf(context),
                         fontWeight: FontWeight.w600,
                         height: 1.5,
                       ),

@@ -353,9 +353,9 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                         ],
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.gps_fixed_rounded,
-                      color: AppUi.textMuted,
+                      color: AppUi.textMutedOf(context),
                       size: 18,
                     ),
                   ],

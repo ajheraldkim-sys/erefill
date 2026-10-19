@@ -348,7 +348,7 @@ class _SetupStepRow extends StatelessWidget {
                     Text(
                       step.helper!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -567,7 +567,7 @@ class _ExperiencePainter extends CustomPainter {
   }) {
     final house = Paint()..color = color;
     final roof = Paint()
-      ..color = AppUi.textPrimary.withValues(alpha: 0.84);
+      ..color = AppUi.textPrimary.withValues(alpha: 0.84); // fixed-light: illustration art
     final x = compact ? size.width * 0.45 : size.width * 0.22;
     final y = compact ? size.height * 0.45 : size.height * 0.36;
     final width = compact ? size.width * 0.28 : size.width * 0.5;
@@ -615,7 +615,7 @@ class _ExperiencePainter extends CustomPainter {
   void _drawDelivery(Canvas canvas, Size size, Color color) {
     final truck = Paint()..color = color;
     final dark = Paint()
-      ..color = AppUi.textPrimary.withValues(alpha: 0.86);
+      ..color = AppUi.textPrimary.withValues(alpha: 0.86); // fixed-light: illustration art
     final x = size.width * 0.2;
     final y = size.height * 0.44;
     canvas.drawRRect(

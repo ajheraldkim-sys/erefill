@@ -168,7 +168,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                     height: 36,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isOpen ? AppUi.bluePrimary : AppUi.textMuted,
+                        color: isOpen ? AppUi.bluePrimary : AppUi.textMuted, // fixed-light: map marker on light map tiles
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: const [
@@ -227,7 +227,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                                   ? (activeCount > 0
                                       ? AppColors.statusOutForDelivery
                                       : AppColors.statusDelivered)
-                                  : AppUi.textMuted,
+                                  : AppUi.textMuted, // fixed-light: map marker on light map tiles
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 2),
                               boxShadow: const [
@@ -385,13 +385,13 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                           radius: 20,
                           backgroundColor: (_selectedRider!['is_online'] == true
                                   ? AppColors.statusDelivered
-                                  : AppUi.textMuted)
+                                  : AppUi.textMutedOf(context))
                               .withValues(alpha: 0.15),
                           child: Icon(
                             Icons.two_wheeler_rounded,
                             color: _selectedRider!['is_online'] == true
                                 ? AppColors.statusDelivered
-                                : AppUi.textMuted,
+                                : AppUi.textMutedOf(context),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -416,7 +416,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                                       shape: BoxShape.circle,
                                       color: _selectedRider!['is_online'] == true
                                           ? AppColors.statusDelivered
-                                          : AppUi.textMuted,
+                                          : AppUi.textMutedOf(context),
                                     ),
                                   ),
                                   const SizedBox(width: 6),
@@ -429,7 +429,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                                       fontWeight: FontWeight.w600,
                                       color: _selectedRider!['is_online'] == true
                                           ? AppColors.statusDelivered
-                                          : AppUi.textMuted,
+                                          : AppUi.textMutedOf(context),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -463,7 +463,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                                 'Active Deliveries',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: AppUi.textMuted,
+                                  color: AppUi.textMutedOf(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

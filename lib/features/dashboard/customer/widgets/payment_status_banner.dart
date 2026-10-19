@@ -96,8 +96,8 @@ class PaymentStatusBanner extends StatelessWidget {
                   message,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppUi.textSecondary,
+                  style: TextStyle(
+                    color: AppUi.textSecondaryOf(context),
                     fontWeight: FontWeight.w600,
                     fontSize: 11,
                   ),

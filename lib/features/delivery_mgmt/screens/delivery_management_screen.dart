@@ -928,11 +928,11 @@ class DmReportsAnalyticsTab extends StatelessWidget {
                                     color: AppUi.brandOf(context),
                                   ),
                                 ),
-                                const Text(
+                                Text(
                                   'Official sales, deliveries & tax statement',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: AppUi.textMuted,
+                                    color: AppUi.textMutedOf(context),
                                   ),
                                 ),
                               ],
@@ -966,11 +966,11 @@ class DmReportsAnalyticsTab extends StatelessWidget {
                               color: AppUi.brandOf(context),
                             ),
                           ),
-                          const Text(
+                          Text(
                             'Official sales, deliveries & tax statement',
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                             ),
                           ),
                         ],

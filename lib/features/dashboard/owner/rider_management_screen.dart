@@ -435,8 +435,8 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                           const SizedBox(height: 2),
                                           Text(
                                             "@${rider['username'] ?? 'username'}",
-                                            style: const TextStyle(
-                                              color: AppUi.textMuted,
+                                            style: TextStyle(
+                                              color: AppUi.textMutedOf(context),
                                               fontSize: 13,
                                               fontWeight: FontWeight.w600,
                                             ),
@@ -483,10 +483,10 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                         ),
                                         const SizedBox(width: 4),
                                         PopupMenuButton<String>(
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.more_vert_rounded,
                                             size: 20,
-                                            color: AppUi.textMuted,
+                                            color: AppUi.textMutedOf(context),
                                           ),
                                           tooltip: 'Rider Actions',
                                           shape: RoundedRectangleBorder(

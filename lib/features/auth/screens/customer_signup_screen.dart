@@ -632,7 +632,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                       icon: const Icon(Icons.my_location_rounded, size: 16),
                       label: const Text('Use My GPS Location'),
                       style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppUi.surfaceOf(context),
                         foregroundColor: AppUi.brandOf(context),
                         side: const BorderSide(color: AppUi.bluePrimary),
                         shape: RoundedRectangleBorder(
@@ -798,7 +798,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
             const SizedBox(height: 48),
             Row(
               children: [
-                const Expanded(child: Divider(color: AppUi.borderColor)),
+                Expanded(child: Divider(color: AppUi.borderOf(context))),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
@@ -811,7 +811,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                     ),
                   ),
                 ),
-                const Expanded(child: Divider(color: AppUi.borderColor)),
+                Expanded(child: Divider(color: AppUi.borderOf(context))),
               ],
             ),
             const SizedBox(height: 24),

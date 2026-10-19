@@ -2927,7 +2927,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               style: FilledButton.styleFrom(
                                 backgroundColor: canOrder
                                     ? AppUi.bluePrimary
-                                    : AppUi.textMuted,
+                                    : AppUi.textMutedOf(context),
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(

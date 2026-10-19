@@ -219,7 +219,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
                           'Loyalty Rewards',
                           style: TextStyle(
@@ -231,7 +231,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                           'Earn points on every refill & referral',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey,
+                            color: AppUi.textMutedOf(context),
                           ),
                         ),
                       ],
@@ -274,7 +274,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                           TabBar(
                             controller: _tabController,
                             labelColor: AppUi.brandOf(context),
-                            unselectedLabelColor: Colors.grey,
+                            unselectedLabelColor: AppUi.textMutedOf(context),
                             indicatorColor: AppUi.bluePrimary,
                             indicatorWeight: 3,
                             tabs: [
@@ -463,7 +463,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppUi.surfaceOf(context),
                     borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     border: Border.all(color: AppUi.successBorder),
                   ),
@@ -558,7 +558,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       ),
                       isDense: true,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: AppUi.surfaceOf(context),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         borderSide: const BorderSide(color: AppUi.successBorder),
@@ -645,7 +645,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   reward.isDeliveryDiscount
                       ? Icons.local_shipping_rounded
                       : Icons.local_offer_rounded,
-                  color: canAfford ? AppUi.brandOf(context) : Colors.grey,
+                  color: canAfford ? AppUi.brandOf(context) : AppUi.textMutedOf(context),
                   size: 24,
                 ),
               ),
@@ -666,7 +666,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       reward.description,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: AppUi.textMutedOf(context),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -698,7 +698,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   backgroundColor: AppUi.bluePrimary,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2),
-                  disabledForegroundColor: Colors.grey,
+                  disabledForegroundColor: AppUi.textMutedOf(context),
                   minimumSize: const Size(0, 36),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppUi.radiusControl),
@@ -737,9 +737,9 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Claim a voucher from the "Redeem Rewards" tab!',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+              style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 12),
             ),
           ],
         ),
@@ -795,7 +795,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
               const SizedBox(height: 4),
               Text(
                 v.description,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
               ),
               const Divider(height: 20),
               Row(
@@ -811,7 +811,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   ),
                   Text(
                     'Expires: ${v.expiresAt.month}/${v.expiresAt.day}/${v.expiresAt.year}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
                   ),
                 ],
               ),
@@ -824,10 +824,10 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
 
   Widget _buildHistoryTab() {
     if (_transactions.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No loyalty transactions recorded yet.',
-          style: TextStyle(color: Colors.grey),
+          style: TextStyle(color: AppUi.textMutedOf(context)),
         ),
       );
     }
@@ -858,7 +858,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           ),
           subtitle: Text(
             '${tx.createdAt.month}/${tx.createdAt.day}/${tx.createdAt.year} · ${tx.createdAt.hour}:${tx.createdAt.minute.toString().padLeft(2, '0')}',
-            style: const TextStyle(fontSize: 11, color: Colors.grey),
+            style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
           ),
           trailing: Text(
             '${isPositive ? '+' : ''}${tx.points} pts',

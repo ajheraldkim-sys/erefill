@@ -48,7 +48,7 @@ class _RidersScreenState extends State<RidersScreen>
                 borderSide: BorderSide(width: 3, color: AppUi.bluePrimary),
               ),
               labelColor: AppUi.brandOf(context),
-              unselectedLabelColor: AppUi.textMuted,
+              unselectedLabelColor: AppUi.textMutedOf(context),
               labelStyle: const TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,

@@ -209,12 +209,12 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Quick Walk-in / Order',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: AppUi.textPrimary,
+                        color: AppUi.textPrimaryOf(context),
                       ),
                     ),
                     IconButton(
@@ -577,7 +577,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppUi.textPrimary,
+                          color: AppUi.textPrimaryOf(context),
                         ),
                       ),
                       Text(

@@ -122,20 +122,20 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
               child: Center(
                 child: Column(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.account_balance_wallet_outlined,
                       size: 48,
-                      color: AppUi.textMuted,
+                      color: AppUi.textMutedOf(context),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       _filter == 'pending'
                           ? 'No pending withdrawal requests'
                           : 'No payout records found',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                       ),
                     ),
                   ],
@@ -211,9 +211,9 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                       ),
                       Text(
                         'Requested: ${_formatDate(req.createdAt)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppUi.textMuted,
+                          color: AppUi.textMutedOf(context),
                         ),
                       ),
                     ],
@@ -244,9 +244,9 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Amount to Pay',
-                    style: TextStyle(fontSize: 11, color: AppUi.textMuted),
+                    style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
                   ),
                   Text(
                     formatPeso(req.amount),
@@ -270,18 +270,18 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                   ),
                   Text(
                     req.accountNumber,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppUi.textMuted,
+                      color: AppUi.textMutedOf(context),
                     ),
                   ),
                   if (req.accountName.isNotEmpty)
                     Text(
                       req.accountName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                       ),
                     ),
                 ],

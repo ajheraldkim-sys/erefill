@@ -57,7 +57,7 @@ class CheckoutStepIndicator extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: isActive ? Colors.white : AppUi.textMuted,
+                          color: isActive ? Colors.white : AppUi.textMutedOf(context),
                         ),
                       ),
               ),
@@ -68,7 +68,7 @@ class CheckoutStepIndicator extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-                color: isActive ? AppUi.brandOf(context) : AppUi.textMuted,
+                color: isActive ? AppUi.brandOf(context) : AppUi.textMutedOf(context),
               ),
             ),
           ],

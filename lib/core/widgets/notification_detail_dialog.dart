@@ -35,27 +35,27 @@ Future<void> showNotificationDetailDialog(
       );
       return ScaleTransition(
         scale: Tween<double>(begin: 0.9, end: 1.0).animate(curvedAnimation),
-        child: FadeTransition(
-          opacity: animation,
-          child: child,
-        ),
+        child: FadeTransition(opacity: animation, child: child),
       );
     },
     pageBuilder: (dialogContext, animation, secondaryAnimation) {
       final type = notification.type;
       final typeColor = type.color;
-      final formattedDate =
-          DateFormat('MMM d, yyyy · h:mm a').format(notification.createdAt);
+      final formattedDate = DateFormat(
+        'MMM d, yyyy · h:mm a',
+      ).format(notification.createdAt);
       final timeAgo = notification.formattedTime;
 
       final metadata = notification.metadata;
-      final orderId = metadata['order_id']?.toString() ??
-          metadata['orderId']?.toString();
-      final roomId = metadata['room_id']?.toString() ??
+      final orderId =
+          metadata['order_id']?.toString() ?? metadata['orderId']?.toString();
+      final roomId =
+          metadata['room_id']?.toString() ??
           metadata['chat_room_id']?.toString();
       final status = metadata['status']?.toString();
       final amount = metadata['amount'] ?? metadata['total'];
-      final stationName = metadata['station_name']?.toString() ??
+      final stationName =
+          metadata['station_name']?.toString() ??
           metadata['stationName']?.toString();
 
       return Dialog(
@@ -100,7 +100,9 @@ Future<void> showNotificationDetailDialog(
                                 ),
                                 decoration: BoxDecoration(
                                   color: typeColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
+                                  borderRadius: BorderRadius.circular(
+                                    AppUi.radiusSm,
+                                  ),
                                 ),
                                 child: Text(
                                   type.displayName,
@@ -124,7 +126,9 @@ Future<void> showNotificationDetailDialog(
                                   decoration: BoxDecoration(
                                     color: notification.priority.color
                                         .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(AppUi.radiusSm),
+                                    borderRadius: BorderRadius.circular(
+                                      AppUi.radiusSm,
+                                    ),
                                   ),
                                   child: Text(
                                     notification.priority.value.toUpperCase(),
@@ -141,9 +145,9 @@ Future<void> showNotificationDetailDialog(
                           const SizedBox(height: 3),
                           Text(
                             '$formattedDate ($timeAgo)',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -201,29 +205,33 @@ Future<void> showNotificationDetailDialog(
                     decoration: BoxDecoration(
                       color: AppUi.pageBgOf(dialogContext),
                       borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                      border: Border.all(
-                        color: AppUi.borderOf(dialogContext),
-                      ),
+                      border: Border.all(color: AppUi.borderOf(dialogContext)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (orderId != null)
                           _buildDetailRow(
+                            context,
                             'Order ID',
                             '#${orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId}',
                           ),
                         if (stationName != null) ...[
                           const SizedBox(height: 6),
-                          _buildDetailRow('Station', stationName),
+                          _buildDetailRow(context, 'Station', stationName),
                         ],
                         if (status != null) ...[
                           const SizedBox(height: 6),
-                          _buildDetailRow('Status', status.toUpperCase()),
+                          _buildDetailRow(
+                            context,
+                            'Status',
+                            status.toUpperCase(),
+                          ),
                         ],
                         if (amount != null) ...[
                           const SizedBox(height: 6),
                           _buildDetailRow(
+                            context,
                             'Amount',
                             '₱${amount is num ? amount.toStringAsFixed(2) : amount}',
                           ),
@@ -244,7 +252,9 @@ Future<void> showNotificationDetailDialog(
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusCard,
+                            ),
                           ),
                         ),
                         child: const Text('Close'),
@@ -263,7 +273,9 @@ Future<void> showNotificationDetailDialog(
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                             ),
                           ),
                           child: const Text('View Order'),
@@ -286,7 +298,9 @@ Future<void> showNotificationDetailDialog(
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                             ),
                           ),
                           child: const Text('Open Chat'),
@@ -313,7 +327,9 @@ Future<void> showNotificationDetailDialogFromMap(
   final notification = SystemNotification(
     id: map['id']?.toString() ?? '',
     userId: map['user_id']?.toString() ?? '',
-    type: NotificationType.fromString(map['type']?.toString() ?? 'system_alert'),
+    type: NotificationType.fromString(
+      map['type']?.toString() ?? 'system_alert',
+    ),
     priority: NotificationPriority.fromString(
       map['priority']?.toString() ?? 'normal',
     ),
@@ -322,7 +338,8 @@ Future<void> showNotificationDetailDialogFromMap(
     metadata: (map['metadata'] as Map<String, dynamic>?) ?? {},
     isRead: map['is_read'] == true,
     actionUrl: map['action_url']?.toString(),
-    createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ??
+    createdAt:
+        DateTime.tryParse(map['created_at']?.toString() ?? '') ??
         DateTime.now(),
   );
 
@@ -333,24 +350,21 @@ Future<void> showNotificationDetailDialogFromMap(
   );
 }
 
-Widget _buildDetailRow(String label, String value) {
+Widget _buildDetailRow(BuildContext context, String label, String value) {
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
-          color: AppUi.textMuted,
+          color: AppUi.textMutedOf(context),
           fontWeight: FontWeight.w600,
         ),
       ),
       Text(
         value,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
     ],
   );

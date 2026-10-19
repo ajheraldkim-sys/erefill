@@ -38,7 +38,7 @@ class SettingsHubScreen extends StatelessWidget {
           Text(
             'These are the settings relevant to your role.',
             style: TextStyle(
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -116,14 +116,14 @@ class _SettingsTile extends StatelessWidget {
                         section.description,
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppUi.textMuted,
+                          color: AppUi.textMutedOf(context),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppUi.textMuted),
+                Icon(Icons.chevron_right_rounded, color: AppUi.textMutedOf(context)),
               ],
             ),
           ),

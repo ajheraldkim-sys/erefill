@@ -1,3 +1,4 @@
+// fixed-light-file: onboarding keeps its light look in both themes (see OnboardingPalette).
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_map/flutter_map.dart';

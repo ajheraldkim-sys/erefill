@@ -784,7 +784,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                     border: Border.all(
                       color: _homeBannerIndex == index
                           ? AppUi.bluePrimary
-                          : AppUi.textMuted.withValues(alpha: 0.25),
+                          : AppUi.textMutedOf(context).withValues(alpha: 0.25),
                     ),
                     borderRadius: BorderRadius.circular(AppUi.radiusFull),
                   ),
@@ -1304,8 +1304,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         if (isReorder && totalAmount != null) ...[
                           Text(
                             ' · ${formatPeso(totalAmount, whole: true)}',
-                            style: const TextStyle(
-                              color: AppUi.textSecondary,
+                            style: TextStyle(
+                              color: AppUi.textSecondaryOf(context),
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1924,7 +1924,7 @@ class _SheetHandle extends StatelessWidget {
       height: 4,
       margin: const EdgeInsets.only(top: 10, bottom: 8),
       decoration: BoxDecoration(
-        color: AppUi.textMuted.withValues(alpha: 0.35),
+        color: AppUi.textMutedOf(context).withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(AppUi.radiusFull),
       ),
     );
@@ -1945,13 +1945,13 @@ class _SheetEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 34, color: AppUi.textMuted),
+            Icon(icon, size: 34, color: AppUi.textMutedOf(context)),
             const SizedBox(height: 10),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppUi.textSecondary,
+              style: TextStyle(
+                color: AppUi.textSecondaryOf(context),
                 fontWeight: FontWeight.w600,
               ),
             ),

@@ -92,10 +92,10 @@ void main() async {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Check your connection and try again.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
+                    style: TextStyle(color: AppUi.textMuted), // fixed-light: default light MaterialApp
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(onPressed: main, child: const Text('Retry')),

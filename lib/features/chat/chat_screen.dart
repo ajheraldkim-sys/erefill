@@ -648,8 +648,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       decoration: InputDecoration(
                         hintText: 'Type a message...',
-                        hintStyle: const TextStyle(
-                          color: AppUi.textMuted,
+                        hintStyle: TextStyle(
+                          color: AppUi.textMutedOf(context),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -810,10 +810,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Secure Channel Active',
             style: TextStyle(
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
               fontWeight: FontWeight.w700,
               fontSize: 13,
               letterSpacing: 0.5,
@@ -1017,7 +1017,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       child: Center(
                                         child: Icon(
                                           Icons.broken_image_rounded,
-                                          color: isMine ? Colors.white70 : AppUi.textMuted,
+                                          color: isMine ? Colors.white70 : AppUi.textMutedOf(context),
                                         ),
                                       ),
                                     ),
@@ -1049,9 +1049,9 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Text(
                   _formatTime(msg.createdAt),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppUi.textMuted,
+                    color: AppUi.textMutedOf(context),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1060,7 +1060,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Icon(
                     msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
                     size: 12,
-                    color: msg.isRead ? AppUi.brandOf(context) : AppUi.textMuted,
+                    color: msg.isRead ? AppUi.brandOf(context) : AppUi.textMutedOf(context),
                   ),
                 ],
               ],
@@ -1335,10 +1335,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildLegacyMessages(String myId) {
-    return const Center(
+    return Center(
       child: Text(
         'Legacy messages are no longer supported. Please restart this conversation.',
-        style: TextStyle(color: AppUi.textMuted, fontSize: 13),
+        style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 13),
       ),
     );
   }

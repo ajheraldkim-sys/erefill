@@ -316,9 +316,9 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Your Delivery Rider',
-                          style: TextStyle(fontSize: 11, color: AppUi.textMuted, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context), fontWeight: FontWeight.w600),
                         ),
                         Text(
                           widget.riderName!,

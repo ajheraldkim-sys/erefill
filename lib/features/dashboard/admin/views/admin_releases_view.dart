@@ -234,7 +234,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: AppUi.textMuted)),
+        Text(label, style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context))),
         const SizedBox(height: 2),
         Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
       ],
@@ -337,7 +337,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
               Expanded(
                 child: Text(
                   downloadUrl,
-                  style: const TextStyle(fontSize: 11, color: AppUi.textMuted),
+                  style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -595,7 +595,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                         contentPadding: EdgeInsets.zero,
                         title: Text('$action by $email', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                         subtitle: Text(log['details']?.toString() ?? '', style: const TextStyle(fontSize: 11)),
-                        trailing: Text(time, style: const TextStyle(fontSize: 11, color: AppUi.textMuted)),
+                        trailing: Text(time, style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context))),
                       );
                     }),
                 ],

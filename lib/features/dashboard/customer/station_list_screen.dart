@@ -876,9 +876,9 @@ class _StationListScreenState extends State<StationListScreen> {
                 children: [
                   AvailabilityBadge(availability: isOpen ? 'open' : 'closed'),
                   const SizedBox(height: 8),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: AppUi.textMuted,
+                    color: AppUi.textMutedOf(context),
                     size: 20,
                   ),
                 ],
@@ -1082,7 +1082,7 @@ class _StationListScreenState extends State<StationListScreen> {
                               Text(
                                 'Swipe up for list',
                                 style: AppUi.captionText.copyWith(
-                                  color: AppUi.textMuted,
+                                  color: AppUi.textMutedOf(context),
                                 ),
                               ),
                             ],
@@ -1377,7 +1377,7 @@ class _StationListScreenState extends State<StationListScreen> {
                                           Text(
                                             ' · ',
                                             style: TextStyle(
-                                              color: AppUi.textMuted.withValues(
+                                              color: AppUi.textMutedOf(context).withValues(
                                                 alpha: 0.8,
                                               ),
                                             ),

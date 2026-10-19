@@ -290,7 +290,7 @@ class SignupRoleScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -409,7 +409,7 @@ class SignupRoleScreen extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -418,7 +418,7 @@ class SignupRoleScreen extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
                 size: 20,
               ),
             ],

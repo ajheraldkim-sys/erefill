@@ -279,7 +279,7 @@ class _InboxScreenState extends State<InboxScreen> {
                 Text(
                   'Sync disconnected. Tap to retry.',
                   style: TextStyle(
-                    color: Colors.grey[600],
+                    color: AppUi.textMutedOf(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -622,10 +622,10 @@ class _InboxScreenState extends State<InboxScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
+            child: Text(
               'Cancel',
               style: TextStyle(
-                color: AppUi.textSecondary,
+                color: AppUi.textSecondaryOf(context),
                 fontWeight: FontWeight.w700,
               ),
             ),

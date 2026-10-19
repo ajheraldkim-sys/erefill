@@ -1598,7 +1598,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
                 Text(
                   'Placed on $date • $stationName',
-                  style: TextStyle(fontSize: 12, color: AppUi.textMuted),
+                  style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
                 ),
                 const Divider(height: 24),
                 Text(
@@ -1653,7 +1653,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 if (items.isEmpty)
                   Text(
                     'No item details recorded',
-                    style: TextStyle(fontSize: 12, color: AppUi.textMuted),
+                    style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
                   )
                 else
                   ...items.map((it) {
@@ -1864,7 +1864,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppUi.textMuted.withValues(alpha: 0.3),
+                        color: AppUi.textMutedOf(context).withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -1945,7 +1945,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                   Icon(
                                     Icons.notifications_none_rounded,
                                     size: 48,
-                                    color: AppUi.textMuted.withValues(
+                                    color: AppUi.textMutedOf(context).withValues(
                                       alpha: 0.5,
                                     ),
                                   ),
@@ -1958,12 +1958,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  const Text(
+                                  Text(
                                     'New orders and station updates will stream here automatically.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: AppUi.textMuted,
+                                      color: AppUi.textMutedOf(context),
                                     ),
                                   ),
                                 ],
@@ -2015,9 +2015,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                       ),
                                       Text(
                                         timeStr,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
-                                          color: AppUi.textMuted,
+                                          color: AppUi.textMutedOf(context),
                                         ),
                                       ),
                                     ],
@@ -2057,7 +2057,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       configColor = AppUi.error;
     } else if (!_systemConfigLoaded) {
       configStatus = 'Checking configuration';
-      configColor = AppUi.textMuted;
+      configColor = AppUi.textMutedOf(context);
     } else if (_maintenanceMode) {
       configStatus = 'Maintenance Mode';
       configColor = AppUi.warningFg;
@@ -2160,7 +2160,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           isScrollable: true,
           labelPadding: const EdgeInsets.symmetric(horizontal: 12),
           labelColor: AppUi.brandOf(context),
-          unselectedLabelColor: AppUi.textMuted,
+          unselectedLabelColor: AppUi.textMutedOf(context),
           indicatorColor: AppUi.bluePrimary,
           indicatorWeight: 3,
           labelStyle: const TextStyle(
@@ -2488,9 +2488,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         _maintenanceMode
                             ? 'Active · Ordering is currently blocked'
                             : 'Normal · System active & orders flowing',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppUi.textSecondary,
+                          color: AppUi.textSecondaryOf(context),
                         ),
                       ),
                     ],
@@ -2582,7 +2582,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -2700,7 +2700,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               _buildOpAction(
                 icon: Icons.shield_rounded,
                 label: 'Audit Log',
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
                 onTap: () {
                   AppHaptics.light();
                   Navigator.push(
@@ -2912,7 +2912,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ? Center(
                   child: Text(
                     'No stations match the selected criteria.',
-                    style: TextStyle(color: AppUi.textMuted),
+                    style: TextStyle(color: AppUi.textMutedOf(context)),
                   ),
                 )
               : ListView.separated(
@@ -2978,7 +2978,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               Icon(
                                 Icons.location_on_outlined,
                                 size: 14,
-                                color: AppUi.textMuted,
+                                color: AppUi.textMutedOf(context),
                               ),
                               const SizedBox(width: 4),
                               Expanded(
@@ -3213,7 +3213,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ? Center(
                   child: Text(
                     'No orders match the selected filter.',
-                    style: TextStyle(color: AppUi.textMuted),
+                    style: TextStyle(color: AppUi.textMutedOf(context)),
                   ),
                 )
               : ListView.separated(
@@ -3277,7 +3277,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                         '• $date',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: AppUi.textMuted,
+                                          color: AppUi.textMutedOf(context),
                                         ),
                                         maxLines: 1,
                                       ),
@@ -3330,7 +3330,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                             Icon(
                               Icons.chevron_right_rounded,
                               size: 18,
-                              color: AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                             ),
                           ],
                         ),
@@ -3515,7 +3515,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ? Center(
                   child: Text(
                     'No users match the search filter.',
-                    style: TextStyle(color: AppUi.textMuted),
+                    style: TextStyle(color: AppUi.textMutedOf(context)),
                   ),
                 )
               : ListView.separated(
@@ -4139,7 +4139,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   child: Text(
                     'Last updated: ${_deliveryFeeUpdatedAt!.length >= 16 ? _deliveryFeeUpdatedAt!.substring(0, 16) : _deliveryFeeUpdatedAt!} ${_deliveryFeeUpdatedBy != null ? "by $_deliveryFeeUpdatedBy" : ""}',
                     style:
-                        const TextStyle(fontSize: 11, color: AppUi.textMuted),
+                        TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
                   ),
                 ),
               const SizedBox(height: 8),
@@ -4291,7 +4291,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         const SizedBox(height: 12),
         _buildOpToolTile(
           icon: Icons.shield_rounded,
-          iconColor: AppUi.textMuted,
+          iconColor: AppUi.textMutedOf(context),
           title: 'System Audit Trail',
           subtitle:
               'Immutable record of administrative actions, compliance updates, and security events.',
@@ -4422,7 +4422,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, color: AppUi.textMuted, size: 20),
+            Icon(Icons.chevron_right_rounded, color: AppUi.textMutedOf(context), size: 20),
           ],
         ),
       ),

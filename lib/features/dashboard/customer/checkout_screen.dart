@@ -491,12 +491,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const Divider(height: 12),
             if (_availableVouchers.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
                     'No active vouchers available to claim.',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: AppUi.textMutedOf(context)),
                   ),
                 ),
               )
@@ -539,9 +539,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                           subtitle: Text(
                             v.description,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey,
+                              color: AppUi.textMutedOf(context),
                             ),
                           ),
                           trailing: Text(
@@ -1909,7 +1909,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             vertical: 1.5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppUi.textPrimary,
+                            color: AppUi.textPrimary, // fixed-light: dark quantity pill with white text
                             borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             border: Border.all(color: Colors.white, width: 1.5),
                           ),
@@ -2061,7 +2061,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'The refilling station is closed right now. You can schedule this order for delivery when the station opens.',
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? Colors.grey[300] : AppUi.textSecondary,
+              color: isDark ? Colors.grey[300] : AppUi.textSecondaryOf(context),
             ),
           ),
           const SizedBox(height: 10),
@@ -2083,7 +2083,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : AppUi.textPrimary,
+                      color: isDark ? Colors.white : AppUi.textPrimaryOf(context),
                     ),
                   ),
                 ),
@@ -2136,7 +2136,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : AppUi.textPrimary,
+                        color: isDark ? Colors.white : AppUi.textPrimaryOf(context),
                       ),
                     ),
                     Text(
@@ -2145,7 +2145,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         fontSize: 11,
                         color: isDark
                             ? Colors.grey[400]
-                            : AppUi.textMuted,
+                            : AppUi.textMutedOf(context),
                       ),
                     ),
                   ],
@@ -2208,7 +2208,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ? AppUi.brandOf(context)
                                       : (isDark
                                             ? Colors.white
-                                            : AppUi.textPrimary),
+                                            : AppUi.textPrimaryOf(context)),
                                 ),
                               ),
                             ),
@@ -2221,7 +2221,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             fontSize: 11,
                             color: isDark
                                 ? Colors.grey[400]
-                                : AppUi.textMuted,
+                                : AppUi.textMutedOf(context),
                           ),
                         ),
                       ],
@@ -2282,7 +2282,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ? AppUi.brandOf(context)
                                       : (isDark
                                             ? Colors.white
-                                            : AppUi.textPrimary),
+                                            : AppUi.textPrimaryOf(context)),
                                 ),
                               ),
                             ),
@@ -2295,7 +2295,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             fontSize: 11,
                             color: isDark
                                 ? Colors.grey[400]
-                                : AppUi.textMuted,
+                                : AppUi.textMutedOf(context),
                           ),
                         ),
                       ],
@@ -2757,7 +2757,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           onPressed: onInfo,
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.info_outline_rounded, size: 18),
-          color: AppUi.textMuted,
+          color: AppUi.textMutedOf(context),
         ),
         const Spacer(),
         Text(

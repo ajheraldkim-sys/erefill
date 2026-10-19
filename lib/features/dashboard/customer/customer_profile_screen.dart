@@ -958,7 +958,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppUi.textMuted,
+                  color: AppUi.textMutedOf(context),
                 ),
               ),
             ),
@@ -1042,11 +1042,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'This permanently removes your profile, orders, and favorites.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: AppUi.textSecondary,
+                        color: AppUi.textSecondaryOf(context),
                         fontWeight: FontWeight.w600,
                         height: 1.5,
                       ),

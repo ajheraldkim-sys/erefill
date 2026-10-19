@@ -303,7 +303,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                     Icon(
                       Icons.event_repeat_rounded,
                       size: 48,
-                      color: AppUi.textMuted.withValues(alpha: 0.6),
+                      color: AppUi.textMutedOf(context).withValues(alpha: 0.6),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -398,10 +398,10 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
           const Divider(height: 18),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.repeat_rounded,
                 size: 16,
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
               ),
               const SizedBox(width: 6),
               Text(
@@ -412,18 +412,18 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                 ),
               ),
               const Spacer(),
-              const Icon(
+              Icon(
                 Icons.schedule_rounded,
                 size: 16,
-                color: AppUi.textMuted,
+                color: AppUi.textMutedOf(context),
               ),
               const SizedBox(width: 6),
               Text(
                 sub.preferredTimeSlot.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppUi.textMuted,
+                  color: AppUi.textMutedOf(context),
                 ),
               ),
             ],

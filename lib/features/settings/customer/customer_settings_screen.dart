@@ -355,7 +355,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: AppUi.textMuted),
+                  style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
                 ),
               ],
             ),

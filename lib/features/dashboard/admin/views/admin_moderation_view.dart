@@ -227,7 +227,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppUi.brandOf(context),
-          unselectedLabelColor: AppUi.textMuted,
+          unselectedLabelColor: AppUi.textMutedOf(context),
           indicatorColor: AppUi.bluePrimary,
           tabs: [
             Tab(
@@ -321,7 +321,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
                       const SizedBox(height: 4),
                       Text(
                         'Everything in the marketplace is running smoothly.',
-                        style: TextStyle(color: AppUi.textMuted, fontSize: 12),
+                        style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 12),
                       ),
                     ],
                   ),
@@ -460,7 +460,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
             const SizedBox(height: 4),
             Text(
               'Station ratings and customer satisfaction are high!',
-              style: TextStyle(color: AppUi.textMuted, fontSize: 12),
+              style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 12),
             ),
           ],
         ),
@@ -493,7 +493,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
                       (i) => Icon(
                         Icons.star_rounded,
                         size: 16,
-                        color: i < rating ? AppColors.uiWarning : AppUi.textMuted.withValues(alpha: 0.3),
+                        color: i < rating ? AppColors.uiWarning : AppUi.textMutedOf(context).withValues(alpha: 0.3),
                       ),
                     ),
                   ),
@@ -517,7 +517,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
               const SizedBox(height: 6),
               Text(
                 'Station ID: ${r['station_id'] ?? "Unknown"} • User: ${r['user_id'] ?? "Anonymous"}',
-                style: TextStyle(fontSize: 11, color: AppUi.textMuted),
+                style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
               ),
             ],
           ),

@@ -184,8 +184,8 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                           ),
                                           Text(
                                             'ORDER #$id',
-                                            style: const TextStyle(
-                                              color: AppUi.textMuted,
+                                            style: TextStyle(
+                                              color: AppUi.textMutedOf(context),
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 0.5,
@@ -211,10 +211,10 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            const Text(
+                                            Text(
                                               'Earnings',
                                               style: TextStyle(
-                                                color: AppUi.textMuted,
+                                                color: AppUi.textMutedOf(context),
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                                 letterSpacing: 0,
@@ -242,10 +242,10 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.end,
                                         children: [
-                                          const Text(
+                                          Text(
                                             'Total',
                                             style: TextStyle(
-                                              color: AppUi.textMuted,
+                                              color: AppUi.textMutedOf(context),
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 1,
@@ -595,7 +595,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: AppUi.textMuted,
+                                foregroundColor: AppUi.textMutedOf(context),
                                 side: const BorderSide(
                                   color: AppUi.borderStrongLight,
                                 ),
@@ -624,10 +624,10 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 11,
-            color: AppUi.textSecondary,
+            color: AppUi.textSecondaryOf(context),
             letterSpacing: 1.5,
           ),
         ),
@@ -645,7 +645,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 16, color: AppUi.textMuted),
+            child: Icon(icon, size: 16, color: AppUi.textMutedOf(context)),
           ),
           const SizedBox(width: 12),
           Expanded(

@@ -165,7 +165,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                       child: _buildMetricCard(
                         'Total Disbursed',
                         formatPeso(_totalDisbursed),
-                        AppUi.textMuted,
+                        AppUi.textMutedOf(context),
                         Icons.done_all_rounded,
                       ),
                     ),
@@ -224,13 +224,13 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                       borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       border: Border.all(color: AppUi.borderOf(context)),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Column(
                         children: [
                           Icon(
                             Icons.receipt_long_rounded,
                             size: 40,
-                            color: AppUi.textMuted,
+                            color: AppUi.textMutedOf(context),
                           ),
                           SizedBox(height: 8),
                           Text(
@@ -238,7 +238,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                             ),
                           ),
                         ],
@@ -277,10 +277,10 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppUi.textMuted,
+                  color: AppUi.textMutedOf(context),
                 ),
               ),
               Icon(icon, size: 16, color: color),
@@ -377,21 +377,21 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             children: [
               Text(
                 '${req.payoutMethod.toUpperCase()} · ${req.accountNumber}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppUi.textMuted,
+                  color: AppUi.textMutedOf(context),
                 ),
               ),
               if (req.accountName.isNotEmpty) ...[
-                const Text(' · ', style: TextStyle(color: AppUi.textMuted)),
+                Text(' · ', style: TextStyle(color: AppUi.textMutedOf(context))),
                 Expanded(
                   child: Text(
                     req.accountName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppUi.textMuted,
+                      color: AppUi.textMutedOf(context),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

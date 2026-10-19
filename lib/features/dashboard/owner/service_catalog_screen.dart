@@ -584,7 +584,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                                 fontWeight: FontWeight.w700,
                                 color: isActive
                                     ? AppUi.textPrimaryOf(context)
-                                    : AppUi.textMuted,
+                                    : AppUi.textMutedOf(context),
                               ),
                             ),
                           ),
@@ -661,7 +661,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
-                        color: isActive ? AppUi.brandOf(context) : AppUi.textMuted,
+                        color: isActive ? AppUi.brandOf(context) : AppUi.textMutedOf(context),
                       ),
                     ),
                     const SizedBox(height: 4),

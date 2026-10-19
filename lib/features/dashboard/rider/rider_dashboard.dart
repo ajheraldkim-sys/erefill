@@ -976,7 +976,7 @@ class _RiderDashboardState extends State<RiderDashboard>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final SignatureController controller = SignatureController(
       penStrokeWidth: 3,
-      penColor: isDark ? AppUi.darkTextPrimary : AppUi.textPrimary,
+      penColor: isDark ? AppUi.darkTextPrimary : AppUi.textPrimaryOf(context),
       exportBackgroundColor: AppUi.surfaceOf(context),
     );
 
@@ -1007,15 +1007,15 @@ class _RiderDashboardState extends State<RiderDashboard>
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Please have the customer sign below to confirm receipt.',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+              style: TextStyle(color: AppUi.textMutedOf(context), fontSize: 13),
             ),
             const SizedBox(height: 24),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppUi.borderColor),
+                  border: Border.all(color: AppUi.borderOf(context)),
                   borderRadius: AppUi.cardRadius,
                 ),
                 child: ClipRRect(
@@ -1603,10 +1603,10 @@ class _RiderDashboardState extends State<RiderDashboard>
                     padding: const EdgeInsets.only(left: 20),
                     child: Text(
                       'Landmark: ${order['customer_landmark']}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: AppUi.textMuted,
+                        color: AppUi.textMutedOf(context),
                       ),
                     ),
                   ),
@@ -1661,7 +1661,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                           fontWeight: FontWeight.w600,
                           color: isCod
                               ? AppUi.warningFg
-                              : AppUi.textMuted,
+                              : AppUi.textMutedOf(context),
                         ),
                       ),
                     ],
@@ -1874,7 +1874,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             height: 2,
                             color: i <= currentStep
                                 ? statusColor
-                                : AppUi.borderColor,
+                                : AppUi.borderOf(context),
                           ),
                         )
                       else
@@ -1888,7 +1888,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                           border: Border.all(
                             color: i <= currentStep
                                 ? statusColor
-                                : AppUi.borderColor,
+                                : AppUi.borderOf(context),
                             width: 2,
                           ),
                           boxShadow: i == currentStep
@@ -1906,7 +1906,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                           size: 12,
                           color: i <= currentStep
                               ? Colors.white
-                              : AppUi.textMuted,
+                              : AppUi.textMutedOf(context),
                         ),
                       ),
                       if (i < steps.length - 1)
@@ -1915,7 +1915,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             height: 2,
                             color: i < currentStep
                                 ? statusColor
-                                : AppUi.borderColor,
+                                : AppUi.borderOf(context),
                           ),
                         )
                       else
@@ -1931,7 +1931,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       fontWeight: i == currentStep
                           ? FontWeight.w700
                           : FontWeight.w600,
-                      color: i <= currentStep ? statusColor : AppUi.textMuted,
+                      color: i <= currentStep ? statusColor : AppUi.textMutedOf(context),
                     ),
                   ),
                 ],
@@ -2610,11 +2610,11 @@ class _RiderDashboardState extends State<RiderDashboard>
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'This permanently removes your account, delivery records, and profile.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: AppUi.textSecondary,
+                        color: AppUi.textSecondaryOf(context),
                         fontWeight: FontWeight.w600,
                         height: 1.5,
                       ),
@@ -2731,9 +2731,9 @@ class _RiderDashboardState extends State<RiderDashboard>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppUi.surfaceOf(context),
         borderRadius: AppUi.pillRadius,
-        border: Border.all(color: AppUi.bluePale),
+        border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2749,20 +2749,20 @@ class _RiderDashboardState extends State<RiderDashboard>
           const SizedBox(height: 12),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
               letterSpacing: 0,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppUi.textPrimary,
+              color: AppUi.textPrimaryOf(context),
             ),
           ),
         ],
@@ -2776,11 +2776,11 @@ class _RiderDashboardState extends State<RiderDashboard>
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
         title: const Text('Sign out?'),
-        content: const Text(
+        content: Text(
           'Are you sure you want to end your session? Your location tracking will stop.',
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: AppUi.textSecondary,
+            color: AppUi.textSecondaryOf(context),
           ),
         ),
         actions: [
@@ -2915,7 +2915,7 @@ class _RiderHomeOverview extends StatelessWidget {
             height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isOnline ? AppUi.accentGreen : AppUi.textMuted,
+              color: isOnline ? AppUi.accentGreen : AppUi.textMutedOf(context),
               boxShadow: isOnline
                   ? [
                       BoxShadow(
@@ -2937,7 +2937,7 @@ class _RiderHomeOverview extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: isOnline ? AppUi.accentGreen : AppUi.textSecondary,
+                    color: isOnline ? AppUi.accentGreen : AppUi.textSecondaryOf(context),
                     letterSpacing: 0.5,
                   ),
                 ),

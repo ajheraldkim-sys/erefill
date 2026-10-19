@@ -214,10 +214,10 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
                         title: 'Delivery preferences',
                         icon: Icons.delivery_dining_outlined,
                         children: [
-                          const Text(
+                          Text(
                             'Delivery assignment and navigation controls are managed from the active dispatch screen.',
                             style: TextStyle(
-                              color: AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                               fontSize: 12,
                             ),
                           ),
@@ -286,11 +286,11 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             'Preferred language for notifications & dispatch',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                             ),
                           ),
                           const SizedBox(height: 10),

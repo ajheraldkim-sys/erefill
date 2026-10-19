@@ -146,7 +146,7 @@ class _ReviewModalState extends State<ReviewModal> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppUi.dividerOf(context),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -161,7 +161,7 @@ class _ReviewModalState extends State<ReviewModal> {
           const SizedBox(height: 8),
           Text(
             'How was your delivery experience?',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 14, color: AppUi.textMutedOf(context)),
           ),
           const SizedBox(height: 24),
 

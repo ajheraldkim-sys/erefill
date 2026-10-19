@@ -123,7 +123,7 @@ class _NotificationSheetHandle extends StatelessWidget {
       height: 4,
       margin: const EdgeInsets.only(top: 10, bottom: 8),
       decoration: BoxDecoration(
-        color: AppUi.textMuted.withValues(alpha: 0.35),
+        color: AppUi.textMutedOf(context).withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(AppUi.radiusFull),
       ),
     );
@@ -144,14 +144,14 @@ class _NotificationSheetEmptyState extends StatelessWidget {
             Icon(
               Icons.notifications_none_rounded,
               size: 34,
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'You’re all caught up.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppUi.textSecondary,
+                color: AppUi.textSecondaryOf(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -230,16 +230,16 @@ class _NotificationPreviewTile extends StatelessWidget {
                       notification.content,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppUi.textSecondary,
+                      style: TextStyle(
+                        color: AppUi.textSecondaryOf(context),
                         fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 5),
                     Text(
                       notification.formattedTime,
-                      style: const TextStyle(
-                        color: AppUi.textMuted,
+                      style: TextStyle(
+                        color: AppUi.textMutedOf(context),
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
