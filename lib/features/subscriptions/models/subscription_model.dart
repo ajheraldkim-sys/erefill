@@ -4,10 +4,16 @@ class CustomerSubscription {
   final String stationId;
   final String stationName;
   final String? stationPhotoUrl;
+
+  /// Station product this routine refills. The server prices each generated
+  /// order from this product's current price, so [estimatedPrice] is only a
+  /// display estimate.
+  final String? productId;
   final int quantity;
   final String waterType;
   final double estimatedPrice;
-  final String frequency; // 'every_3_days', 'twice_weekly', 'weekly', 'bi_weekly', 'monthly'
+  final String
+  frequency; // 'every_3_days', 'twice_weekly', 'weekly', 'bi_weekly', 'monthly'
   final String preferredTimeSlot; // 'morning', 'afternoon', 'evening'
   final String deliveryAddress;
   final String paymentMethod;
@@ -22,6 +28,7 @@ class CustomerSubscription {
     required this.stationId,
     required this.stationName,
     this.stationPhotoUrl,
+    this.productId,
     required this.quantity,
     required this.waterType,
     required this.estimatedPrice,
@@ -89,6 +96,7 @@ class CustomerSubscription {
       stationId: json['station_id']?.toString() ?? '',
       stationName: json['station_name']?.toString() ?? 'Water Station',
       stationPhotoUrl: json['station_photo_url']?.toString(),
+      productId: json['product_id']?.toString(),
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       waterType: json['water_type']?.toString() ?? 'Purified',
       estimatedPrice: (json['estimated_price'] as num?)?.toDouble() ?? 30.0,
@@ -99,7 +107,7 @@ class CustomerSubscription {
       isActive: json['is_active'] == true || json['is_active'] == 1,
       nextDeliveryDate: json['next_delivery_date'] != null
           ? DateTime.tryParse(json['next_delivery_date'].toString()) ??
-              DateTime.now().add(const Duration(days: 7))
+                DateTime.now().add(const Duration(days: 7))
           : DateTime.now().add(const Duration(days: 7)),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
@@ -117,6 +125,7 @@ class CustomerSubscription {
       'station_id': stationId,
       'station_name': stationName,
       'station_photo_url': stationPhotoUrl,
+      'product_id': ?productId,
       'quantity': quantity,
       'water_type': waterType,
       'estimated_price': estimatedPrice,
@@ -145,6 +154,7 @@ class CustomerSubscription {
       stationId: stationId,
       stationName: stationName,
       stationPhotoUrl: stationPhotoUrl,
+      productId: productId,
       quantity: quantity ?? this.quantity,
       waterType: waterType,
       estimatedPrice: estimatedPrice,
@@ -159,4 +169,3 @@ class CustomerSubscription {
     );
   }
 }
-

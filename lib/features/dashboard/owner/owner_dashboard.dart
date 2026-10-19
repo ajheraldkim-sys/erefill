@@ -26,6 +26,7 @@ import 'services/station_setup_service.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/services/observability_service.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import '../../subscriptions/services/subscription_service.dart';
 import '../../payouts/widgets/owner_wallet_sheet.dart';
@@ -89,7 +90,11 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
     // Auto-process due recurring subscriptions for this station in background
     unawaited(
-      SubscriptionService().processDueSubscriptions(stationId: user.id),
+      SubscriptionService()
+          .processDueSubscriptions(stationId: user.id)
+          .then<void>((_) {})
+          .catchError((Object e) => ObservabilityService()
+              .logFailure('generate_due_subscription_orders', e)),
     );
     if (mounted) {
       context.read<CreditProvider>().initialize(user.id);

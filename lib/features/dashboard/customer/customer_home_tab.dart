@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
 import '../../../core/water_types.dart';
 import '../../../features/account/saved_addresses_screen.dart';
-import '../../../models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import '../../../core/utils/order_product_helpers.dart';
 import '../../../core/utils/station_query_helpers.dart';
 import '../../../core/providers/notification_provider.dart';

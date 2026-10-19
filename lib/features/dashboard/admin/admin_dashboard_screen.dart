@@ -633,7 +633,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           })
           .eq('id', userId);
 
-      // If user is a station owner, keep water_refill_stations synchronized
+      // If user is a station owner, keep water_refill_stations synchronized.
+      // The account change above already succeeded, so a failure here is
+      // reported as a warning instead of being hidden.
+      var stationSynced = true;
       if (role == 'owner') {
         try {
           await supabase
@@ -644,16 +647,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 'updated_at': nowIso,
               })
               .eq('owner_id', userId);
-        } catch (_) {}
+        } catch (e) {
+          stationSynced = false;
+          debugPrint('Station status sync failed for $userId: $e');
+        }
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Account for "$userName" ${!isSuspended ? "suspended" : "reactivated"}.',
+              stationSynced
+                  ? 'Account for "$userName" ${!isSuspended ? "suspended" : "reactivated"}.'
+                  : 'Account for "$userName" ${!isSuspended ? "suspended" : "reactivated"}, '
+                        'but the station listing could not be updated. Retry from the station view.',
             ),
-            backgroundColor: isSuspended ? AppUi.accentGreen : AppUi.error,
+            backgroundColor: !stationSynced
+                ? AppColors.uiWarning
+                : (isSuspended ? AppUi.accentGreen : AppUi.error),
           ),
         );
         _loadAllData();

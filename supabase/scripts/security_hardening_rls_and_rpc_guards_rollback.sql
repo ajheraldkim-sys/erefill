@@ -70,7 +70,7 @@ ALTER FUNCTION public.proc_log_dispute_event() SECURITY INVOKER;
 ALTER FUNCTION public.proc_log_dispute_event() RESET search_path;
 
 DROP POLICY IF EXISTS "Order parties can view order items" ON public.order_items;
-DROP POLICY IF EXISTS "Customers add items to own pending order" ON public.order_items;
+DROP POLICY IF EXISTS "Transitional: parties add items to new pending order" ON public.order_items;
 DROP POLICY IF EXISTS "Users log own domain events" ON public.domain_events;
 DROP POLICY IF EXISTS "Users read own domain events" ON public.domain_events;
 DROP POLICY IF EXISTS "Admins read ledger entries" ON public.ledger_entries;

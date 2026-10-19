@@ -4,7 +4,7 @@ import 'package:erefill/features/dashboard/customer/widgets/payment_status_banne
 import 'package:erefill/core/models/order_model.dart';
 import 'package:erefill/core/widgets/rider_active_delivery_card.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
-import 'package:erefill/models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import 'package:erefill/core/services/payment_launch_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

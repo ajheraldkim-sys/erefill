@@ -6,7 +6,7 @@ import '../../../core/routing/app_navigation.dart';
 import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 

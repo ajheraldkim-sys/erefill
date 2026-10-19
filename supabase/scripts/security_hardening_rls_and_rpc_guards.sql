@@ -38,10 +38,8 @@ ALTER TABLE public.remittances           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.suspicious_activities ENABLE ROW LEVEL SECURITY;
 
 -- order_items: visible to the parties of the parent order, mirroring the
--- existing policies on public.orders. Checkout and subscription orders are
--- written by create_order_atomic (definer); the only direct client insert is
--- the subscription fallback, limited here to the customer's own pending order.
--- No client UPDATE/DELETE policy: purchase prices are immutable from the app.
+-- existing policies on public.orders. No client UPDATE/DELETE policy:
+-- purchase prices are immutable from the app.
 DROP POLICY IF EXISTS "Order parties can view order items" ON public.order_items;
 CREATE POLICY "Order parties can view order items" ON public.order_items
   FOR SELECT TO authenticated
@@ -54,15 +52,21 @@ CREATE POLICY "Order parties can view order items" ON public.order_items
     )
   );
 
-DROP POLICY IF EXISTS "Customers add items to own pending order" ON public.order_items;
-CREATE POLICY "Customers add items to own pending order" ON public.order_items
+-- TRANSITIONAL: app versions released before generate_due_subscription_orders
+-- insert auto-refill orders and their items directly (as the customer or the
+-- station owner). Allow item inserts only onto a pending order the caller is
+-- a party to, created in the last 10 minutes. Removed by
+-- lock_direct_order_inserts.sql once the new app version is mandatory.
+DROP POLICY IF EXISTS "Transitional: parties add items to new pending order" ON public.order_items;
+CREATE POLICY "Transitional: parties add items to new pending order" ON public.order_items
   FOR INSERT TO authenticated
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.orders o
       WHERE o.id = order_items.order_id
-        AND o.customer_id = auth.uid()
+        AND auth.uid() IN (o.customer_id, o.owner_id)
         AND o.status = 'pending'
+        AND o.created_at > now() - interval '10 minutes'
     )
   );
 

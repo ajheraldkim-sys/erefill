@@ -10,6 +10,7 @@ import '../services/subscription_service.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 class CustomerSubscriptionsTab extends StatefulWidget {
   final VoidCallback? onBrowseStations;
   const CustomerSubscriptionsTab({super.key, this.onBrowseStations});
@@ -25,9 +26,13 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
   bool _isLoading = true;
   bool _isProcessingDue = false;
 
-  bool get _hasDueSubscriptions => _subscriptions.any((s) =>
-      s.isActive &&
-      s.nextDeliveryDate.isBefore(DateTime.now().add(const Duration(hours: 12))));
+  bool get _hasDueSubscriptions => _subscriptions.any(
+    (s) =>
+        s.isActive &&
+        s.nextDeliveryDate.isBefore(
+          DateTime.now().add(const Duration(hours: 12)),
+        ),
+  );
 
   @override
   void initState() {
@@ -57,25 +62,33 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
 
     setState(() => _isProcessingDue = true);
     try {
-      final generated =
-          await _service.processDueSubscriptions(customerId: customerId);
+      final result = await _service.processDueSubscriptions(
+        customerId: customerId,
+      );
       if (mounted) {
-        if (generated.isNotEmpty) {
+        if (result.skipped.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Created ${generated.length} auto-refill order(s) successfully!',
+                result.skipped.length == 1
+                    ? 'An auto-refill was not placed: ${result.skipped.single.message}. It will retry automatically.'
+                    : '${result.skipped.length} auto-refills were not placed because the station could not accept them. They will retry automatically.',
+              ),
+              backgroundColor: AppColors.uiWarning,
+            ),
+          );
+        } else if (result.created.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Created ${result.created.length} auto-refill order(s) successfully!',
               ),
               backgroundColor: AppColors.uiSuccess,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'All subscriptions are up to date.',
-              ),
-            ),
+            const SnackBar(content: Text('All subscriptions are up to date.')),
           );
         }
       }
@@ -83,12 +96,28 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to process subscriptions: ${FriendlyErrors.message(e)}')),
+          SnackBar(
+            content: Text(
+              'Failed to process subscriptions: ${FriendlyErrors.message(e)}',
+            ),
+          ),
         );
       }
     } finally {
       if (mounted) setState(() => _isProcessingDue = false);
     }
+  }
+
+  void _showActionError(String action, Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Could not $action this routine: ${FriendlyErrors.message(error)}',
+        ),
+        backgroundColor: AppColors.uiError,
+      ),
+    );
   }
 
   @override
@@ -229,7 +258,10 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.uiWarning,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -244,7 +276,10 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                           )
                         : const Text(
                             'Order Now',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                   ),
                 ],
@@ -346,11 +381,15 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                 value: sub.isActive,
                 activeThumbColor: AppUi.bluePrimary,
                 onChanged: (val) async {
-                  await _service.toggleSubscription(
-                    subscriptionId: sub.id,
-                    customerId: sub.customerId,
-                    isActive: val,
-                  );
+                  try {
+                    await _service.toggleSubscription(
+                      subscriptionId: sub.id,
+                      customerId: sub.customerId,
+                      isActive: val,
+                    );
+                  } catch (e) {
+                    _showActionError(val ? 'resume' : 'pause', e);
+                  }
                   _loadSubscriptions();
                 },
               ),
@@ -449,10 +488,14 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                     );
 
                     if (confirmed == true) {
-                      await _service.deleteSubscription(
-                        subscriptionId: sub.id,
-                        customerId: sub.customerId,
-                      );
+                      try {
+                        await _service.deleteSubscription(
+                          subscriptionId: sub.id,
+                          customerId: sub.customerId,
+                        );
+                      } catch (e) {
+                        _showActionError('cancel', e);
+                      }
                       _loadSubscriptions();
                     }
                   },
@@ -479,7 +522,8 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
   void _showAddSubscriptionDialog(BuildContext context) {
     final user = context.read<UserProvider>().user;
     final addressController = TextEditingController(
-      text: user?.completeAddress ??
+      text:
+          user?.completeAddress ??
           (user != null ? '${user.barangay ?? ''}, ${user.town ?? ''}' : ''),
     );
     int quantity = 2;
@@ -493,7 +537,9 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
       builder: (dlgCtx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           backgroundColor: AppUi.surfaceOf(context),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+          ),
           title: Row(
             children: [
               Icon(Icons.autorenew_rounded, color: AppUi.brandOf(context)),
@@ -526,7 +572,9 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                         onSelected: (_) => setDlgState(() => quantity = q),
                         selectedColor: AppUi.bluePrimary,
                         labelStyle: TextStyle(
-                          color: isSel ? Colors.white : AppUi.textSecondaryOf(context),
+                          color: isSel
+                              ? Colors.white
+                              : AppUi.textSecondaryOf(context),
                           fontWeight: FontWeight.w700,
                           fontSize: 11,
                         ),
@@ -754,7 +802,11 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                 } catch (e) {
                   if (mounted) {
                     messenger.showSnackBar(
-                      SnackBar(content: Text('Failed to schedule: ${FriendlyErrors.message(e)}')),
+                      SnackBar(
+                        content: Text(
+                          'Failed to schedule: ${FriendlyErrors.message(e)}',
+                        ),
+                      ),
                     );
                   }
                 }
@@ -769,10 +821,19 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
 
   String _formatDate(DateTime dt) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 }
-

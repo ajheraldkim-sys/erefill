@@ -13,7 +13,7 @@ import 'core/providers/user_provider.dart';
 import 'core/providers/notification_provider.dart';
 import 'core/routing/app_router.dart';
 import 'package:go_router/go_router.dart';
-import 'models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import 'core/services/observability_service.dart';
 import 'package:erefill/features/delivery_mgmt/services/local_db_service.dart';
 import 'package:erefill/features/delivery_mgmt/services/sync_service.dart';

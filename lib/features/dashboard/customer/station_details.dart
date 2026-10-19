@@ -20,7 +20,7 @@ import '../../../core/water_types.dart';
 import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/skeleton.dart';
-import '../../../models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import '../../chat/models/chat_room.dart';
 import '../../chat/services/chat_service.dart';
 import '../../subscriptions/models/subscription_model.dart';
@@ -767,6 +767,11 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             stationId: ownerId,
                             stationName: stationName,
                             stationPhotoUrl: _stationData['avatar_url']?.toString(),
+                            productId: OrderProductHelpers.isValidProductId(
+                              _selectedProduct?['id'],
+                            )
+                                ? _selectedProduct!['id'].toString()
+                                : null,
                             quantity: selectedQty,
                             waterType: selectedWaterType,
                             estimatedPrice: estimatedPrice,

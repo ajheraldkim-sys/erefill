@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/delivery_model.dart';
 import '../models/rider_model.dart';
@@ -16,6 +17,15 @@ class DeliveryService {
 
   DeliveryService({required this.local, required this.sync});
 
+  /// The immediate cloud push is an optimisation: the record is already saved
+  /// locally and SyncService.syncAll pushes it again, so a failure here is
+  /// logged rather than surfaced.
+  void _logDeferredPush(String kind, Object error) {
+    debugPrint(
+      '[DeliveryService] Immediate $kind push failed, will retry on next sync: $error',
+    );
+  }
+
   // ─── RIDERS ──────────────────────────────────────────────────────────────
 
   Future<List<DmRider>> getRiders(String ownerId) => local.getRiders(ownerId);
@@ -28,7 +38,9 @@ class DeliveryService {
         await _supabase
             .from('dm_riders')
             .upsert(saved.toCloudJson(), onConflict: 'id');
-      } catch (_) {}
+      } catch (e) {
+        _logDeferredPush('rider', e);
+      }
     }
     return saved;
   }
@@ -40,7 +52,9 @@ class DeliveryService {
         await _supabase
             .from('dm_riders')
             .upsert(rider.toCloudJson(), onConflict: 'id');
-      } catch (_) {}
+      } catch (e) {
+        _logDeferredPush('rider', e);
+      }
     }
   }
 
@@ -203,9 +217,11 @@ class DeliveryService {
       try {
         await _supabase
             .from('dm_credits')
-            .upsert(saved.toJson(), onConflict: 'id');
+            .upsert(saved.toCloudJson(), onConflict: 'id');
         await local.markCreditSynced(id);
-      } catch (_) {}
+      } catch (e) {
+        _logDeferredPush('credit', e);
+      }
     }
     return saved;
   }
@@ -216,9 +232,11 @@ class DeliveryService {
       try {
         await _supabase
             .from('dm_credits')
-            .upsert(credit.toJson(), onConflict: 'id');
+            .upsert(credit.toCloudJson(), onConflict: 'id');
         await local.markCreditSynced(credit.id);
-      } catch (_) {}
+      } catch (e) {
+        _logDeferredPush('credit', e);
+      }
     }
   }
 
@@ -253,8 +271,10 @@ class DeliveryService {
       try {
         await _supabase
             .from('dm_inventory')
-            .upsert(saved.toJson(), onConflict: 'id');
-      } catch (_) {}
+            .upsert(saved.toCloudJson(), onConflict: 'id');
+      } catch (e) {
+        _logDeferredPush('inventory', e);
+      }
     }
     return saved;
   }

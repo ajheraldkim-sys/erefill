@@ -2,7 +2,7 @@ import 'package:erefill/core/theme/app_theme.dart';
 import 'package:erefill/core/widgets/app_ui_kit.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/features/dashboard/customer/cart_screen.dart';
-import 'package:erefill/models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';

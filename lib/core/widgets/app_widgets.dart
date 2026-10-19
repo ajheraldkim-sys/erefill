@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/constants.dart';
-import '../core/widgets/skeleton.dart';
+import '../constants.dart';
+import 'skeleton.dart';
 
 /// Primary button. Material's built-in ink response provides clear, cheap tap
 /// feedback without rebuilding the button for every pointer event.

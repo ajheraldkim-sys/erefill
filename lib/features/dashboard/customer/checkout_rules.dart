@@ -1,4 +1,4 @@
-import '../../../models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 
 class CheckoutPaymentOption {
   final String type;

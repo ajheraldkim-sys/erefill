@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/app_header.dart';
-import 'package:erefill/widgets/app_widgets.dart';
+import 'package:erefill/core/widgets/app_widgets.dart';
 import 'rider_management_screen.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';

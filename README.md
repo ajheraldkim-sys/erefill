@@ -211,7 +211,18 @@ supabase/scripts/app_version_management_system.sql
 supabase/scripts/loyalty_and_referrals.sql
 supabase/scripts/auto_generate_subscription_orders.sql
 supabase/scripts/fix_customer_checkout_pricing.sql
+supabase/scripts/security_hardening_rls_and_rpc_guards.sql
+supabase/scripts/subscription_orders_server_pricing.sql
 ```
+
+After releasing the app version that calls `generate_due_subscription_orders`
+and making it the minimum required version, apply:
+
+```text
+supabase/scripts/lock_direct_order_inserts.sql
+```
+
+Each of the last three scripts has a matching `*_rollback.sql`.
 
 Important notes:
 - if app release tables are missing, run `app_version_management_system.sql`

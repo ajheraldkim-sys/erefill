@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:erefill/models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import '../../../core/routing/app_navigation.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 import 'package:erefill/core/theme/app_theme.dart';
-import 'package:erefill/models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import 'package:erefill/core/widgets/shadcn_widgets.dart';
 import 'package:erefill/features/dashboard/customer/cart_screen.dart';
 

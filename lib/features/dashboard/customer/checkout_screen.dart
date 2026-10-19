@@ -18,7 +18,7 @@ import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import 'widgets/payment_method_selector.dart';
 import 'widgets/payment_brand_mark.dart';
-import '../../../models/cart_model.dart';
+import 'package:erefill/core/models/cart_model.dart';
 import 'checkout_rules.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/routing/app_routes.dart';

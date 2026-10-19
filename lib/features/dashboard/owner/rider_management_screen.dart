@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
-import 'package:erefill/widgets/app_widgets.dart';
+import 'package:erefill/core/widgets/app_widgets.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';

@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/widgets/brand/axo_states.dart';
-import '../../../widgets/app_widgets.dart';
+import 'package:erefill/core/widgets/app_widgets.dart';
 import 'checkout_rules.dart';
 import '../../../core/routing/app_navigation.dart';
 

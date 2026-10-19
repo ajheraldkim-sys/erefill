@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Order data model with proper null safety
 class OrderModel {
   final String id;
@@ -43,22 +45,24 @@ class OrderModel {
       return OrderModel(id: '');
     }
 
-    // Safely parse items
-    List<OrderItem> parsedItems = [];
-    final itemsData = json['items'];
-    if (itemsData is List) {
-      parsedItems = itemsData
-          .map(
-            (item) =>
-                OrderItem.fromJson(item is Map<String, dynamic> ? item : {}),
-          )
-          .toList();
-    } else if (itemsData is String) {
-      // Handle JSON string case
+    // `items` is a jsonb array, but cached or legacy rows may hold it as a
+    // JSON-encoded string; malformed data yields no items rather than a crash.
+    Object? itemsData = json['items'];
+    if (itemsData is String) {
       try {
-        // Would need jsonDecode here if items are stored as strings
-      } catch (_) {}
+        itemsData = jsonDecode(itemsData);
+      } on FormatException {
+        itemsData = null;
+      }
     }
+    final parsedItems = itemsData is List
+        ? itemsData
+              .whereType<Map>()
+              .map(
+                (item) => OrderItem.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList()
+        : <OrderItem>[];
 
     return OrderModel(
       id: json['id']?.toString() ?? '',
