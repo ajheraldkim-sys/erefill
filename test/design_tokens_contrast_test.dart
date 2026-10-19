@@ -23,13 +23,20 @@ Iterable<File> _dartFiles(Directory directory) sync* {
 void main() {
   group('Design token contrast (WCAG 2.2 AA)', () {
     test('light text tokens read on every light surface', () {
-      for (final bg in [AppUi.surface, AppUi.pageBg, AppUi.lightSurfaceRaised]) {
+      for (final bg in [
+        AppUi.surface,
+        AppUi.pageBg,
+        AppUi.lightSurfaceRaised,
+      ]) {
         expect(contrast(AppUi.textPrimary, bg), greaterThanOrEqualTo(4.5));
         expect(contrast(AppUi.textSecondary, bg), greaterThanOrEqualTo(4.5));
         expect(contrast(AppUi.textMuted, bg), greaterThanOrEqualTo(4.5));
         expect(contrast(AppUi.bluePrimary, bg), greaterThanOrEqualTo(4.5));
       }
-      expect(contrast(AppUi.navUnselected, AppUi.surface), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(AppUi.navUnselected, AppUi.surface),
+        greaterThanOrEqualTo(4.5),
+      );
     });
 
     test('dark text tokens read on every dark surface', () {
@@ -39,17 +46,29 @@ void main() {
         AppUi.darkSurfaceRaised,
       ]) {
         expect(contrast(AppUi.darkTextPrimary, bg), greaterThanOrEqualTo(4.5));
-        expect(contrast(AppUi.darkTextSecondary, bg), greaterThanOrEqualTo(4.5));
+        expect(
+          contrast(AppUi.darkTextSecondary, bg),
+          greaterThanOrEqualTo(4.5),
+        );
         expect(contrast(AppUi.darkTextMuted, bg), greaterThanOrEqualTo(4.5));
         expect(contrast(AppUi.accentCyan, bg), greaterThanOrEqualTo(4.5));
       }
     });
 
     test('semantic feedback pairs are readable', () {
-      expect(contrast(AppUi.successFg, AppUi.successBg), greaterThanOrEqualTo(4.5));
-      expect(contrast(AppUi.warningFg, AppUi.warningBg), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(AppUi.successFg, AppUi.successBg),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(AppUi.warningFg, AppUi.warningBg),
+        greaterThanOrEqualTo(4.5),
+      );
       expect(contrast(AppUi.errorFg, AppUi.errorBg), greaterThanOrEqualTo(4.5));
-      expect(contrast(AppUi.bluePrimary, AppUi.blueSoft), greaterThanOrEqualTo(4.5));
+      expect(
+        contrast(AppUi.bluePrimary, AppUi.blueSoft),
+        greaterThanOrEqualTo(4.5),
+      );
       for (final c in [
         AppColors.uiSuccess,
         AppColors.uiWarning,
@@ -164,39 +183,44 @@ void main() {
       }
     });
 
-    test('app and admin source contain no gradients or glass effects', () {
-      final bannedPattern = RegExp(
-        r'\b(?:LinearGradient|RadialGradient|SweepGradient|BackdropFilter|AdminGlassCard|purple|indigo|violet|glassmorphism)\b|ImageFilter\.blur',
-        caseSensitive: false,
-      );
-      final colorLiteralPattern = RegExp(
-        r'Color\(\s*0xFF([0-9A-Fa-f]{6})\s*\)',
-      );
-      final offenders = <String>[];
+    test(
+      'app, admin, and download page contain no gradients or glass effects',
+      () {
+        final bannedPattern = RegExp(
+          r'\b(?:LinearGradient|RadialGradient|SweepGradient|BackdropFilter|AdminGlassCard|purple|indigo|violet|glassmorphism)\b|ImageFilter\.blur|(?:linear|radial|conic)-gradient|backdrop-filter\s*:|filter\s*:\s*blur|background\s*:\s*rgb\(',
+          caseSensitive: false,
+        );
+        final colorLiteralPattern = RegExp(
+          r'Color\(\s*0xFF([0-9A-Fa-f]{6})\s*\)',
+        );
+        final offenders = <String>[];
 
-      for (final directory in [Directory('lib'), Directory('admin/lib')]) {
-        for (final file in _dartFiles(directory)) {
+        final sourceFiles = [
+          ..._dartFiles(Directory('lib')),
+          ..._dartFiles(Directory('admin/lib')),
+          File('web/download.html'),
+        ];
+        for (final file in sourceFiles) {
           final source = file.readAsStringSync();
           final hasBannedEffect = bannedPattern.hasMatch(source);
-          final hasPurpleLiteral = colorLiteralPattern
-              .allMatches(source)
-              .any((match) {
-                final color = Color(
-                  0xFF000000 | int.parse(match.group(1)!, radix: 16),
-                );
-                final hsl = HSLColor.fromColor(color);
-                return hsl.saturation >= 0.2 &&
-                    hsl.hue >= 250 &&
-                    hsl.hue <= 300;
-              });
+          final colorPattern = file.path.endsWith('.html')
+              ? RegExp(r'#([0-9A-Fa-f]{6})\b')
+              : colorLiteralPattern;
+          final hasPurpleLiteral = colorPattern.allMatches(source).any((match) {
+            final color = Color(
+              0xFF000000 | int.parse(match.group(1)!, radix: 16),
+            );
+            final hsl = HSLColor.fromColor(color);
+            return hsl.saturation >= 0.2 && hsl.hue >= 250 && hsl.hue <= 300;
+          });
           if (hasBannedEffect || hasPurpleLiteral) {
             offenders.add(file.path);
           }
         }
-      }
 
-      expect(offenders, isEmpty, reason: offenders.join('\n'));
-    });
+        expect(offenders, isEmpty, reason: offenders.join('\n'));
+      },
+    );
 
     test('payment and account states map to consistent tones', () {
       expect(StatusToneStyle.paymentTone('paid'), StatusTone.success);
