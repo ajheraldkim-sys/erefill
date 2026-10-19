@@ -357,6 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: Colors.black45,
                     shape: const CircleBorder(),
                     child: IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -491,6 +492,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             TabScreenHeroHeader(
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () {
                   if (_selectedMessageIds.isNotEmpty) {
                     setState(() => _selectedMessageIds.clear());
@@ -511,6 +513,7 @@ class _ChatScreenState extends State<ChatScreen> {
               actions: _selectedMessageIds.isNotEmpty
                   ? [
                       IconButton(
+                        tooltip: 'Select all',
                         icon: Icon(
                           Icons.select_all_rounded,
                           color: AppUi.textPrimaryOf(context),
@@ -518,6 +521,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         onPressed: _selectAllMessages,
                       ),
                       IconButton(
+                        tooltip: 'Delete selected',
                         icon: const Icon(
                           Icons.delete_outline_rounded,
                           color: AppUi.error,
@@ -525,6 +529,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         onPressed: _deleteSelectedMessages,
                       ),
                       IconButton(
+                        tooltip: 'Cancel selection',
                         icon: Icon(
                           Icons.close_rounded,
                           color: AppUi.textPrimaryOf(context),
@@ -537,6 +542,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (_room?['room_type'] == 'order_delivery' &&
                           _assignedRiderId != null)
                         IconButton(
+                          tooltip: 'Open map',
                           icon: Icon(
                             Icons.location_on_rounded,
                             color: AppUi.brandOf(context),

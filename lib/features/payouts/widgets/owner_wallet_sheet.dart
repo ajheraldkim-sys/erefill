@@ -129,6 +129,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close_rounded),
                       onPressed: () => Navigator.of(context).pop(),
                     ),

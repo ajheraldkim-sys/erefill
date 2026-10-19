@@ -16,6 +16,7 @@ import '../../chat/services/chat_service.dart';
 import '../../chat/models/chat_room.dart';
 
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 class OrderTrackingMap extends StatefulWidget {
   final String orderId;
   final String? riderId;
@@ -185,10 +186,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
 
     // 2. Watch profile table (fallback)
     _profileSub = SafeSupabase.listen(
-      supabase
-          .from('profiles')
-          .stream(primaryKey: ['id'])
-          .eq('id', riderId),
+      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', riderId),
       (data) {
         if (data.isNotEmpty && mounted) {
           final lat = data.first['latitude'] as num?;
@@ -297,9 +295,11 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not start chat: ${FriendlyErrors.message(e)}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not start chat: ${FriendlyErrors.message(e)}'),
+          ),
+        );
       }
     }
   }
@@ -326,27 +326,35 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                   Positioned(
                     top: MediaQuery.of(context).padding.top + 10,
                     left: 20,
-                    child: GestureDetector(
-                      onTap: () => context.popRoute(),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppUi.surfaceOf(context),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha: Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.1,
+                    child: Semantics(
+                      button: true,
+                      label: 'Back',
+                      child: GestureDetector(
+                        onTap: () => context.popRoute(),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppUi.surfaceOf(context),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? 0.25
+                                      : 0.1,
+                                ),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 20,
-                          color: AppUi.textPrimaryOf(context),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 20,
+                            color: AppUi.textPrimaryOf(context),
+                          ),
                         ),
                       ),
                     ),
@@ -477,7 +485,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(
-                alpha: Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.08,
+                alpha: Theme.of(context).brightness == Brightness.dark
+                    ? 0.25
+                    : 0.08,
               ),
               blurRadius: 20,
               offset: const Offset(0, 5),
@@ -550,7 +560,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(
-                alpha: Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.1,
+                alpha: Theme.of(context).brightness == Brightness.dark
+                    ? 0.3
+                    : 0.1,
               ),
               blurRadius: 30,
               offset: const Offset(0, 10),

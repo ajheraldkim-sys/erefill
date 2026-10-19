@@ -26,6 +26,7 @@ import '../../../core/services/local_data_cache.dart';
 
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 class StationListScreen extends StatefulWidget {
   const StationListScreen({super.key, this.initialFilter});
 
@@ -64,7 +65,8 @@ class _StationListScreenState extends State<StationListScreen> {
   @override
   void initState() {
     super.initState();
-    _stationsController = StreamController<List<Map<String, dynamic>>>.broadcast();
+    _stationsController =
+        StreamController<List<Map<String, dynamic>>>.broadcast();
     _stationsStream = _stationsController.stream;
     if (widget.initialFilter != null && widget.initialFilter!.isNotEmpty) {
       _selectedFilter = widget.initialFilter!;
@@ -372,14 +374,20 @@ class _StationListScreenState extends State<StationListScreen> {
     try {
       final rows = await Future.wait<Map<String, dynamic>?>([
         supabase.from('profiles').select('town').eq('id', userId).maybeSingle(),
-        supabase.from('profiles').select('preferred_water_type').eq('id', userId).maybeSingle(),
+        supabase
+            .from('profiles')
+            .select('preferred_water_type')
+            .eq('id', userId)
+            .maybeSingle(),
       ]);
       final townRow = rows[0];
       final prefRow = rows[1];
       if (mounted) {
         setState(() {
           _userTown = townRow?['town'] as String? ?? _userTown;
-          _preferredWaterType = prefRow?['preferred_water_type']?.toString() ?? _preferredWaterType;
+          _preferredWaterType =
+              prefRow?['preferred_water_type']?.toString() ??
+              _preferredWaterType;
           _isLoading = false;
         });
       }
@@ -588,7 +596,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                 onTap: () => setBottomState(
                                   () => _filterMinRating = rating,
                                 ),
-                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusCard,
+                                ),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 10,
@@ -602,7 +612,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                           ? AppUi.bluePrimary
                                           : AppUi.borderOf(context),
                                     ),
-                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                    borderRadius: BorderRadius.circular(
+                                      AppUi.radiusCard,
+                                    ),
                                   ),
                                   alignment: Alignment.center,
                                   child: Text(
@@ -645,8 +657,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                              thumbColor:
-                                  WidgetStateProperty.resolveWith((states) {
+                              thumbColor: WidgetStateProperty.resolveWith((
+                                states,
+                              ) {
                                 if (states.contains(WidgetState.selected)) {
                                   return AppUi.bluePrimary;
                                 }
@@ -773,7 +786,9 @@ class _StationListScreenState extends State<StationListScreen> {
     final highlighted = _highlightedMapStationIndex == index;
 
     return Material(
-      color: highlighted ? AppUi.brandSoftOf(context) : AppUi.surfaceOf(context),
+      color: highlighted
+          ? AppUi.brandSoftOf(context)
+          : AppUi.surfaceOf(context),
       borderRadius: AppUi.cardRadius,
       child: InkWell(
         onTap: () => _openStationDetails(s),
@@ -916,7 +931,9 @@ class _StationListScreenState extends State<StationListScreen> {
         final mappableStations = _mappableFrom(stations);
 
         final town = _userTown?.trim();
-        final titleTown = town == null || town.isEmpty ||
+        final titleTown =
+            town == null ||
+                town.isEmpty ||
                 town.toLowerCase() == 'cantilan & madrid'
             ? 'your municipality'
             : town;
@@ -987,24 +1004,31 @@ class _StationListScreenState extends State<StationListScreen> {
                           (s['latitude'] as num).toDouble(),
                           (s['longitude'] as num).toDouble(),
                         ),
-                        child: GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _highlightedMapStationIndex = index);
-                          },
-                          child: Icon(
-                            Icons.location_on_rounded,
-                            color: selected
-                                ? AppUi.accentGreen
-                                : AppUi.brandOf(context),
-                            size: selected ? 48 : 44,
-                            shadows: const [
-                              Shadow(
-                                color: Colors.black54,
-                                blurRadius: 8,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
+                        child: Semantics(
+                          button: true,
+                          label:
+                              s['station_name']?.toString() ?? 'Water station',
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(
+                                () => _highlightedMapStationIndex = index,
+                              );
+                            },
+                            child: Icon(
+                              Icons.location_on_rounded,
+                              color: selected
+                                  ? AppUi.accentGreen
+                                  : AppUi.brandOf(context),
+                              size: selected ? 48 : 44,
+                              shadows: const [
+                                Shadow(
+                                  color: Colors.black54,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -1041,7 +1065,9 @@ class _StationListScreenState extends State<StationListScreen> {
                           height: 4,
                           decoration: BoxDecoration(
                             color: AppUi.borderOf(context),
-                            borderRadius: BorderRadius.circular(AppUi.radiusFull),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusFull,
+                            ),
                           ),
                         ),
                         Padding(
@@ -1109,15 +1135,15 @@ class _StationListScreenState extends State<StationListScreen> {
                       foregroundColor: WidgetStateProperty.resolveWith(
                         (states) => states.contains(WidgetState.selected)
                             ? (Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : AppUi.bluePrimary)
+                                  ? Colors.white
+                                  : AppUi.bluePrimary)
                             : AppUi.textSecondaryOf(context),
                       ),
                       backgroundColor: WidgetStateProperty.resolveWith(
                         (states) => states.contains(WidgetState.selected)
                             ? (Theme.of(context).brightness == Brightness.dark
-                                ? AppUi.bluePrimary
-                                : AppUi.surfaceOf(context))
+                                  ? AppUi.bluePrimary
+                                  : AppUi.surfaceOf(context))
                             : Colors.transparent,
                       ),
                       side: WidgetStatePropertyAll(
@@ -1182,7 +1208,9 @@ class _StationListScreenState extends State<StationListScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 9),
                             decoration: BoxDecoration(
                               color: AppUi.surfaceOf(context),
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                               border: Border.all(
                                 color: AppUi.borderOf(context),
                               ),
@@ -1200,7 +1228,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                     }.contains(_selectedFilter)
                                     ? _selectedFilter
                                     : 'All',
-                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusCard,
+                                ),
                                 icon: const Icon(
                                   Icons.expand_more_rounded,
                                   size: 18,
@@ -1270,15 +1300,21 @@ class _StationListScreenState extends State<StationListScreen> {
                           const SizedBox(width: 8),
                           Material(
                             color: AppUi.surfaceOf(context),
-                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusCard,
+                            ),
                             child: InkWell(
                               onTap: _showAdvancedFilters,
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                               child: Container(
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                  borderRadius: BorderRadius.circular(
+                                    AppUi.radiusCard,
+                                  ),
                                   border: Border.all(
                                     color: AppUi.borderOf(context),
                                   ),
@@ -1318,7 +1354,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                  borderRadius: BorderRadius.circular(
+                                    AppUi.radiusCard,
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1398,7 +1436,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                         const SizedBox(height: 10),
                                     itemBuilder: (context, index) =>
                                         RepaintBoundary(
-                                          child: _buildStationListTile(stations[index]),
+                                          child: _buildStationListTile(
+                                            stations[index],
+                                          ),
                                         ),
                                   ),
                                 ),

@@ -413,6 +413,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(ctx),
                   ),

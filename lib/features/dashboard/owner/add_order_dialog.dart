@@ -218,6 +218,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close_rounded),
                     ),

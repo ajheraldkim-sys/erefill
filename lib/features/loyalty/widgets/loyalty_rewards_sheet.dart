@@ -239,6 +239,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   ],
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(context),
                 ),

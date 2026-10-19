@@ -260,6 +260,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
               automaticallyImplyLeading: false,
               actions: [
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
                 ),

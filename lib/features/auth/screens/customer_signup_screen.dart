@@ -994,6 +994,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
         Widget? suffix;
         if (isPassword) {
           suffix = IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
             onPressed: onToggleObscure,
             icon: Icon(
               obscure

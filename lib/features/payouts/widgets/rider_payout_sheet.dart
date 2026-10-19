@@ -115,6 +115,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(context),
                 ),

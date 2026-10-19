@@ -134,10 +134,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 label: 'New Password',
                 prefixIcon: Icons.lock_outline_rounded,
                 suffixIcon: IconButton(
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
                   icon: Icon(
                     _obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     size: 20,
                   ),
                   onPressed: () =>
@@ -151,10 +152,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 label: 'Confirm New Password',
                 prefixIcon: Icons.lock_outline_rounded,
                 suffixIcon: IconButton(
+                  tooltip: _obscureConfirm ? 'Show password' : 'Hide password',
                   icon: Icon(
                     _obscureConfirm
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     size: 20,
                   ),
                   onPressed: () =>

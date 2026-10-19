@@ -704,6 +704,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
         Widget? suffix;
         if (isPassword) {
           suffix = IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
             onPressed: onToggleObscure,
             icon: Icon(
               obscure

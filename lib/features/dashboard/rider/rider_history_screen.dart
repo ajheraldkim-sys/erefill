@@ -701,6 +701,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(ctx),
                 ),

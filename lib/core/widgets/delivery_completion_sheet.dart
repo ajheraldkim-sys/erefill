@@ -181,6 +181,7 @@ class _DeliveryCompletionSheetState extends State<_DeliveryCompletionSheet> {
             Row(
               children: [
                 IconButton.filledTonal(
+                  tooltip: 'Remove one empty gallon',
                   onPressed: _emptyCount > 0
                       ? () => setState(() => _emptyCount--)
                       : null,
@@ -198,6 +199,7 @@ class _DeliveryCompletionSheetState extends State<_DeliveryCompletionSheet> {
                   ),
                 ),
                 IconButton.filledTonal(
+                  tooltip: 'Add one empty gallon',
                   onPressed: () => setState(() => _emptyCount++),
                   icon: const Icon(Icons.add_rounded),
                 ),

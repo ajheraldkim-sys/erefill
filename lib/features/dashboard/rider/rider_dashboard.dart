@@ -2083,6 +2083,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         onPressed: () {
                           if (!isSaving && sheetContext.mounted) {
                             final nav = Navigator.of(sheetContext);

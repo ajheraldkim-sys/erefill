@@ -465,7 +465,7 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                       color: isDark
                                           ? Colors.white

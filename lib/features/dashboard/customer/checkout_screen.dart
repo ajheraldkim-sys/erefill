@@ -483,6 +483,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ],
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(ctx),
                 ),
@@ -2893,6 +2894,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(ctx),
                 ),
@@ -2965,6 +2967,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.pop(ctx),
                   ),

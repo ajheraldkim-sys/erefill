@@ -615,6 +615,7 @@ class AuthTextField extends StatelessWidget {
         Widget? suffix;
         if (isPassword) {
           suffix = IconButton(
+            tooltip: obscure ? 'Show password' : 'Hide password',
             icon: Icon(
               obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
               color: AppUi.textSecondaryOf(context),

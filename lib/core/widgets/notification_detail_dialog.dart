@@ -151,6 +151,7 @@ Future<void> showNotificationDetailDialog(
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close_rounded, size: 20),
                       style: IconButton.styleFrom(
                         visualDensity: VisualDensity.compact,

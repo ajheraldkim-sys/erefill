@@ -647,6 +647,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           ),
                         ),
                         IconButton(
+                          tooltip: 'Close',
                           icon: const Icon(Icons.close_rounded, size: 20),
                           onPressed: () => Navigator.pop(sheetContext),
                         ),

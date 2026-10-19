@@ -643,6 +643,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                         appBar: AppBar(
                           title: const Text('Mandatory Update Preview'),
                           leading: IconButton(
+                            tooltip: 'Back',
                             icon: const Icon(Icons.arrow_back),
                             onPressed: () => Navigator.pop(context),
                           ),

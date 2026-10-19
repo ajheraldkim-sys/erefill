@@ -97,6 +97,7 @@ class ERefillHeader extends StatelessWidget implements PreferredSizeWidget {
 
     if (context.canPop() && automaticallyImplyLeading) {
       return IconButton(
+        tooltip: 'Back',
         icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
         onPressed: () => context.popRoute(),
       );
@@ -308,6 +309,7 @@ class ERefillHeader extends StatelessWidget implements PreferredSizeWidget {
           alignment: Alignment.center,
           children: [
             IconButton(
+              tooltip: 'Notifications',
               onPressed: onNotificationTap,
               icon: Icon(
                 Icons.notifications_none_rounded,

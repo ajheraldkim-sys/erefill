@@ -17,12 +17,13 @@ class AccountSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveAlignment = alignment ??
+    final effectiveAlignment =
+        alignment ??
         (textAlign == TextAlign.right
             ? Alignment.centerRight
             : textAlign == TextAlign.center
-                ? Alignment.center
-                : Alignment.centerLeft);
+            ? Alignment.center
+            : Alignment.centerLeft);
 
     return Container(
       width: double.infinity,
@@ -141,13 +142,21 @@ class AccountNavTile extends StatelessWidget {
               if (badgeText != null && badgeText!.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
-                    color: badgeBgColor ??
-                        (badgeColor ?? AppUi.bluePrimary).withValues(alpha: 0.12),
+                    color:
+                        badgeBgColor ??
+                        (badgeColor ?? AppUi.bluePrimary).withValues(
+                          alpha: 0.12,
+                        ),
                     borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     border: Border.all(
-                      color: (badgeColor ?? AppUi.bluePrimary).withValues(alpha: 0.3),
+                      color: (badgeColor ?? AppUi.bluePrimary).withValues(
+                        alpha: 0.3,
+                      ),
                       width: 1,
                     ),
                   ),
@@ -294,29 +303,33 @@ class AccountIdentityBlock extends StatelessWidget {
     );
 
     if (onAvatarTap != null) {
-      avatar = GestureDetector(
-        onTap: onAvatarTap,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            avatar,
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(
-                  color: AppUi.bluePrimary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Colors.white,
-                  size: 12,
+      avatar = Semantics(
+        button: true,
+        label: 'Change profile photo',
+        child: GestureDetector(
+          onTap: onAvatarTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              avatar,
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: const BoxDecoration(
+                    color: AppUi.bluePrimary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Colors.white,
+                    size: 12,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }

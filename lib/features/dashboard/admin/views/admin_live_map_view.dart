@@ -446,6 +446,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                           ),
                         ),
                         IconButton(
+                          tooltip: 'Close',
                           icon: const Icon(Icons.close_rounded, size: 20),
                           onPressed: () => setState(() => _selectedRider = null),
                         ),

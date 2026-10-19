@@ -818,6 +818,7 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -1071,6 +1072,7 @@ class _EditServiceDialogState extends State<EditServiceDialog> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -1267,6 +1269,7 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -1540,6 +1543,7 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
                   ),

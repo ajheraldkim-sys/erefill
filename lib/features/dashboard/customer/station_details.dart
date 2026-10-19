@@ -27,6 +27,7 @@ import '../../subscriptions/models/subscription_model.dart';
 import '../../subscriptions/services/subscription_service.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+
 class StationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> station;
   const StationDetailsScreen({super.key, required this.station});
@@ -82,7 +83,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       if (ownerId != null) _resolveSelectedProduct(ownerId);
     } else {
       // Seed immediately with initial station data so UI renders without delay
-      _pricePerGallon = (_stationData['price_per_gallon'] as num?)?.toDouble() ??
+      _pricePerGallon =
+          (_stationData['price_per_gallon'] as num?)?.toDouble() ??
           StationPriceHelpers.priceForStation(_stationData);
       _waterType = _stationData['primary_water_type']?.toString();
       if (ownerId != null) _resolveSelectedProduct(ownerId);
@@ -155,7 +157,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             StationDataCache.instance.applyRealtimeEvent(
               table: DbTables.waterOptions,
               ownerId: ownerId,
-              record: payload.newRecord.isNotEmpty ? payload.newRecord : payload.oldRecord,
+              record: payload.newRecord.isNotEmpty
+                  ? payload.newRecord
+                  : payload.oldRecord,
               eventType: payload.eventType.name.toUpperCase(),
             );
             _loadWaterOptions(forceRefresh: true);
@@ -174,7 +178,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             StationDataCache.instance.applyRealtimeEvent(
               table: 'owner_settings',
               ownerId: ownerId,
-              record: payload.newRecord.isNotEmpty ? payload.newRecord : payload.oldRecord,
+              record: payload.newRecord.isNotEmpty
+                  ? payload.newRecord
+                  : payload.oldRecord,
               eventType: payload.eventType.name.toUpperCase(),
             );
             _loadWaterOptions(forceRefresh: true);
@@ -193,7 +199,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             StationDataCache.instance.applyRealtimeEvent(
               table: 'profiles',
               ownerId: ownerId,
-              record: payload.newRecord.isNotEmpty ? payload.newRecord : payload.oldRecord,
+              record: payload.newRecord.isNotEmpty
+                  ? payload.newRecord
+                  : payload.oldRecord,
               eventType: payload.eventType.name.toUpperCase(),
             );
             _loadWaterOptions(forceRefresh: true);
@@ -273,10 +281,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     Map<String, dynamic>? previouslySelectedProduct;
     for (final product in _products) {
       if (product['id']?.toString() == previouslySelectedId) {
-        previouslySelectedProduct =
-            OrderProductHelpers.withDisplayDefaults(
-              Map<String, dynamic>.from(product),
-            );
+        previouslySelectedProduct = OrderProductHelpers.withDisplayDefaults(
+          Map<String, dynamic>.from(product),
+        );
         break;
       }
     }
@@ -360,9 +367,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     );
 
     if (!success && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Could not open maps application.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open maps application.')),
+      );
     }
   }
 
@@ -370,7 +377,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     final phone = _stationData['phone']?.toString().trim();
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Station phone number is not listed yet.')),
+        const SnackBar(
+          content: Text('Station phone number is not listed yet.'),
+        ),
       );
       return;
     }
@@ -395,7 +404,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     final ownerId = _stationData['id']?.toString();
     if (ownerId == null) return;
 
-    final stationName = _stationData['station_name']?.toString() ?? 'Water Station';
+    final stationName =
+        _stationData['station_name']?.toString() ?? 'Water Station';
 
     showDialog(
       context: context,
@@ -426,7 +436,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             content: Text(
               FriendlyErrors.message(
                 e,
-                fallback: 'Could not start chat with station. Please try again.',
+                fallback:
+                    'Could not start chat with station. Please try again.',
               ),
             ),
           ),
@@ -450,14 +461,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       return;
     }
 
-    final stationName = _stationData['station_name']?.toString() ??
+    final stationName =
+        _stationData['station_name']?.toString() ??
         _stationData['name']?.toString() ??
         'Water Station';
 
-    String selectedWaterType = _selectedProduct?['water_type']?.toString() ??
-        _waterType ??
-        'Purified';
-    double selectedPrice = (_selectedProduct?['price'] as num?)?.toDouble() ??
+    String selectedWaterType =
+        _selectedProduct?['water_type']?.toString() ?? _waterType ?? 'Purified';
+    double selectedPrice =
+        (_selectedProduct?['price'] as num?)?.toDouble() ??
         _pricePerGallon ??
         30.0;
     int selectedQty = _quantity > 0 ? _quantity : 1;
@@ -496,7 +508,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             ),
             decoration: BoxDecoration(
               color: isDark ? AppUi.darkSurfaceRaised : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppUi.radiusPill),
+              ),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -523,7 +537,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusControl,
+                              ),
                             ),
                             child: Icon(
                               Icons.autorenew_rounded,
@@ -555,6 +571,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                         ],
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         icon: const Icon(Icons.close_rounded),
                         onPressed: () => Navigator.pop(sheetCtx),
                       ),
@@ -573,17 +590,25 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: ['Purified', 'Alkaline', 'Mineral', 'Distilled'].map((type) {
-                      final isSel = selectedWaterType.toLowerCase() == type.toLowerCase();
-                      return ChoiceChip(
-                        label: Text(type),
-                        selected: isSel,
-                        selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
-                        onSelected: (val) {
-                          if (val) setSheetState(() => selectedWaterType = type);
-                        },
-                      );
-                    }).toList(),
+                    children: ['Purified', 'Alkaline', 'Mineral', 'Distilled']
+                        .map((type) {
+                          final isSel =
+                              selectedWaterType.toLowerCase() ==
+                              type.toLowerCase();
+                          return ChoiceChip(
+                            label: Text(type),
+                            selected: isSel,
+                            selectedColor: AppUi.bluePrimary.withValues(
+                              alpha: 0.15,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                setSheetState(() => selectedWaterType = type);
+                              }
+                            },
+                          );
+                        })
+                        .toList(),
                   ),
                   const SizedBox(height: 14),
 
@@ -603,17 +628,23 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           ),
                           Text(
                             '${formatPeso(selectedPrice, whole: true)} / bottle',
-                            style: TextStyle(fontSize: 11, color: AppUi.textSecondaryOf(ctx)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppUi.textSecondaryOf(ctx),
+                            ),
                           ),
                         ],
                       ),
                       Row(
                         children: [
                           IconButton(
+                            tooltip: 'Decrease quantity',
                             onPressed: selectedQty > 1
                                 ? () => setSheetState(() => selectedQty--)
                                 : null,
-                            icon: const Icon(Icons.remove_circle_outline_rounded),
+                            icon: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                            ),
                           ),
                           Text(
                             '$selectedQty',
@@ -624,6 +655,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             ),
                           ),
                           IconButton(
+                            tooltip: 'Increase quantity',
                             onPressed: () => setSheetState(() => selectedQty++),
                             icon: const Icon(Icons.add_circle_outline_rounded),
                           ),
@@ -645,15 +677,35 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: selectedFrequency,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'every_3_days', child: Text('Every 3 Days')),
-                      DropdownMenuItem(value: 'twice_weekly', child: Text('Twice a Week (Every 4 Days)')),
-                      DropdownMenuItem(value: 'weekly', child: Text('Weekly Refill (Every 7 Days)')),
-                      DropdownMenuItem(value: 'bi_weekly', child: Text('Every 2 Weeks (14 Days)')),
-                      DropdownMenuItem(value: 'monthly', child: Text('Monthly Refill')),
+                      DropdownMenuItem(
+                        value: 'every_3_days',
+                        child: Text('Every 3 Days'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'twice_weekly',
+                        child: Text('Twice a Week (Every 4 Days)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'weekly',
+                        child: Text('Weekly Refill (Every 7 Days)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'bi_weekly',
+                        child: Text('Every 2 Weeks (14 Days)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'monthly',
+                        child: Text('Monthly Refill'),
+                      ),
                     ],
                     onChanged: (v) {
                       if (v != null) setSheetState(() => selectedFrequency = v);
@@ -672,21 +724,31 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: [
-                      {'key': 'morning', 'label': 'Morning (8AM - 12PM)'},
-                      {'key': 'afternoon', 'label': 'Afternoon (1PM - 5PM)'},
-                      {'key': 'evening', 'label': 'Evening (5PM - 8PM)'},
-                    ].map((slot) {
-                      final isSel = selectedTimeSlot == slot['key'];
-                      return ChoiceChip(
-                        label: Text(slot['label']!),
-                        selected: isSel,
-                        selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
-                        onSelected: (val) {
-                          if (val) setSheetState(() => selectedTimeSlot = slot['key']!);
-                        },
-                      );
-                    }).toList(),
+                    children:
+                        [
+                          {'key': 'morning', 'label': 'Morning (8AM - 12PM)'},
+                          {
+                            'key': 'afternoon',
+                            'label': 'Afternoon (1PM - 5PM)',
+                          },
+                          {'key': 'evening', 'label': 'Evening (5PM - 8PM)'},
+                        ].map((slot) {
+                          final isSel = selectedTimeSlot == slot['key'];
+                          return ChoiceChip(
+                            label: Text(slot['label']!),
+                            selected: isSel,
+                            selectedColor: AppUi.bluePrimary.withValues(
+                              alpha: 0.15,
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                setSheetState(
+                                  () => selectedTimeSlot = slot['key']!,
+                                );
+                              }
+                            },
+                          );
+                        }).toList(),
                   ),
                   const SizedBox(height: 14),
 
@@ -703,8 +765,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     controller: addressController,
                     decoration: InputDecoration(
                       hintText: 'Enter street, purok, or landmark',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -754,7 +821,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                         final address = addressController.text.trim();
                         if (address.isEmpty) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('Please enter delivery address.')),
+                            const SnackBar(
+                              content: Text('Please enter delivery address.'),
+                            ),
                           );
                           return;
                         }
@@ -766,10 +835,12 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             customerId: user.id,
                             stationId: ownerId,
                             stationName: stationName,
-                            stationPhotoUrl: _stationData['avatar_url']?.toString(),
-                            productId: OrderProductHelpers.isValidProductId(
-                              _selectedProduct?['id'],
-                            )
+                            stationPhotoUrl: _stationData['avatar_url']
+                                ?.toString(),
+                            productId:
+                                OrderProductHelpers.isValidProductId(
+                                  _selectedProduct?['id'],
+                                )
                                 ? _selectedProduct!['id'].toString()
                                 : null,
                             quantity: selectedQty,
@@ -794,7 +865,11 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                         } catch (err) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to schedule routine: ${FriendlyErrors.message(err)}')),
+                              SnackBar(
+                                content: Text(
+                                  'Failed to schedule routine: ${FriendlyErrors.message(err)}',
+                                ),
+                              ),
                             );
                           }
                         }
@@ -819,8 +894,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     final ownerId = _stationData['id']?.toString();
     if (user == null || ownerId == null) return;
     try {
-      final subs =
-          await SubscriptionService().getCustomerSubscriptions(user.id);
+      final subs = await SubscriptionService().getCustomerSubscriptions(
+        user.id,
+      );
       final active = subs
           .where((s) => s.stationId == ownerId && s.isActive)
           .toList();
@@ -874,7 +950,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         context: context,
         builder: (dialogCtx) => AlertDialog(
           backgroundColor: AppUi.surfaceOf(dialogCtx),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+          ),
           title: const Text(
             'Start new order?',
             style: TextStyle(fontWeight: FontWeight.w700),
@@ -891,7 +969,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppUi.bluePrimary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                ),
               ),
               onPressed: () => Navigator.pop(dialogCtx, true),
               child: const Text('Start New Order'),
@@ -919,7 +999,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     return true;
   }
 
-  Future<void> _addItemToCart(Map<String, dynamic> product, {int qty = 1}) async {
+  Future<void> _addItemToCart(
+    Map<String, dynamic> product, {
+    int qty = 1,
+  }) async {
     final cart = context.read<CartProvider>();
     final allowed = await _ensureCartForThisStation(cart);
     if (!allowed) return;
@@ -976,8 +1059,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             normalizedAvailability == 'busy'
                 ? 'Station is busy and not accepting new orders.'
                 : normalizedAvailability == 'maintenance'
-                    ? 'Station is under maintenance right now.'
-                    : 'Station is currently closed.',
+                ? 'Station is under maintenance right now.'
+                : 'Station is currently closed.',
           ),
         ),
       );
@@ -1010,7 +1093,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       HapticFeedback.mediumImpact();
       final itemId = orderProduct['id'].toString();
       final itemName = orderProduct['name']?.toString() ?? 'Water Refill';
-      final itemPrice = (orderProduct['price'] as num?)?.toDouble() ??
+      final itemPrice =
+          (orderProduct['price'] as num?)?.toDouble() ??
           (_stationData['price_per_gallon'] as num?)?.toDouble() ??
           25.0;
 
@@ -1063,11 +1147,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         ),
         if (isVerified) ...[
           const SizedBox(width: 8),
-          Icon(
-            Icons.verified_rounded,
-            color: AppUi.brandOf(context),
-            size: 20,
-          ),
+          Icon(Icons.verified_rounded, color: AppUi.brandOf(context), size: 20),
         ],
       ],
     );
@@ -1101,9 +1181,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   width: 6,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: isOpen
-                        ? AppColors.uiSuccess
-                        : AppColors.uiError,
+                    color: isOpen ? AppColors.uiSuccess : AppColors.uiError,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1111,9 +1189,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 Text(
                   isOpen ? 'Open Now' : 'Closed',
                   style: TextStyle(
-                    color: isOpen
-                        ? AppColors.uiSuccess
-                        : AppUi.errorFg,
+                    color: isOpen ? AppColors.uiSuccess : AppUi.errorFg,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
@@ -1358,7 +1434,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               children: [
                 _buildBenefitRow(Icons.shield_outlined, 'UV Sterilized'),
                 const SizedBox(height: 8),
-                _buildBenefitRow(Icons.clean_hands_outlined, 'Free Sanitization'),
+                _buildBenefitRow(
+                  Icons.clean_hands_outlined,
+                  'Free Sanitization',
+                ),
               ],
             ),
           ),
@@ -1405,7 +1484,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
 
   Widget _buildAutoRefillCard(BuildContext context) {
     final hasActive = _activeSubscription != null;
-    final stationName = _stationData['station_name']?.toString() ?? 'this station';
+    final stationName =
+        _stationData['station_name']?.toString() ?? 'this station';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1734,11 +1814,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     );
     final waterType = WaterTypes.byName(category);
     final price = (product['price'] as num?)?.toDouble();
-    final containerSize = product['container_size']?.toString() ??
+    final containerSize =
+        product['container_size']?.toString() ??
         (isAccessory ? 'Piece' : '5-Gallon');
     final isAvailable = product['is_available'] != false;
     final customerPref = _getCustomerWaterPreference();
-    final isCustomerPreferred = !isAccessory &&
+    final isCustomerPreferred =
+        !isAccessory &&
         customerPref != null &&
         customerPref.trim().isNotEmpty &&
         WaterTypes.byName(customerPref).shortName.toLowerCase() ==
@@ -1786,15 +1868,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               color: isSelected
                   ? AppUi.bluePrimary.withValues(alpha: 0.05)
                   : (inCartQty > 0
-                      ? AppUi.brandSoftOf(context).withValues(alpha: 0.25)
-                      : AppUi.surfaceOf(context)),
+                        ? AppUi.brandSoftOf(context).withValues(alpha: 0.25)
+                        : AppUi.surfaceOf(context)),
               borderRadius: BorderRadius.circular(AppUi.radiusCard),
               border: Border.all(
                 color: isSelected
                     ? AppUi.bluePrimary
                     : (inCartQty > 0
-                        ? AppUi.bluePrimary.withValues(alpha: 0.4)
-                        : AppUi.borderOf(context)),
+                          ? AppUi.bluePrimary.withValues(alpha: 0.4)
+                          : AppUi.borderOf(context)),
                 width: isSelected ? 1.5 : 1.0,
               ),
             ),
@@ -1811,14 +1893,12 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       height: 36,
                       decoration: BoxDecoration(
                         color: badgeBg,
-                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                        borderRadius: BorderRadius.circular(
+                          AppUi.radiusControl,
+                        ),
                       ),
                       alignment: Alignment.center,
-                      child: Icon(
-                        cardIcon,
-                        color: iconColor,
-                        size: 20,
-                      ),
+                      child: Icon(cardIcon, color: iconColor, size: 20),
                     ),
                     if (isSelected)
                       Positioned(
@@ -1876,7 +1956,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
 
                 // Container Size badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: AppUi.surfaceRaisedOf(context),
                     borderRadius: BorderRadius.circular(AppUi.radiusXs),
@@ -2025,10 +2108,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
           ],
         ),
         const SizedBox(height: 10),
-        _buildRatingSummary(
-          rating: rating,
-          reviewCount: reviewCount,
-        ),
+        _buildRatingSummary(rating: rating, reviewCount: reviewCount),
         if (_reviews.isNotEmpty) ...[
           const SizedBox(height: 14),
           _buildCustomerReviewsList(context),
@@ -2054,7 +2134,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     final comment = rMap['comment']?.toString().trim();
     final createdAtRaw = rMap['created_at']?.toString();
     final profile = rMap['profiles'] is Map ? rMap['profiles'] as Map : null;
-    final customerName = profile?['full_name']?.toString().trim().isNotEmpty == true
+    final customerName =
+        profile?['full_name']?.toString().trim().isNotEmpty == true
         ? profile!['full_name'].toString().trim()
         : 'Verified Customer';
     final avatarUrl = profile?['avatar_url']?.toString();
@@ -2076,7 +2157,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       }
     }
 
-    final initial = customerName.isNotEmpty ? customerName[0].toUpperCase() : 'C';
+    final initial = customerName.isNotEmpty
+        ? customerName[0].toUpperCase()
+        : 'C';
 
     return Container(
       width: double.infinity,
@@ -2085,7 +2168,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
         borderRadius: BorderRadius.circular(AppUi.radiusCard),
-        border: Border.all(color: AppUi.borderOf(context).withValues(alpha: 0.8)),
+        border: Border.all(
+          color: AppUi.borderOf(context).withValues(alpha: 0.8),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2312,8 +2397,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   final icon = remaining >= 1
                       ? Icons.star_rounded
                       : remaining >= 0.25
-                          ? Icons.star_half_rounded
-                          : Icons.star_outline_rounded;
+                      ? Icons.star_half_rounded
+                      : Icons.star_outline_rounded;
                   return Icon(icon, color: AppColors.uiWarning, size: 16);
                 }),
               ),
@@ -2349,9 +2434,12 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(AppUi.radiusFull),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusFull,
+                              ),
                               child: LinearProgressIndicator(
-                                value: _ratingCounts[stars - 1] / maxRatingCount,
+                                value:
+                                    _ratingCounts[stars - 1] / maxRatingCount,
                                 minHeight: 5,
                                 backgroundColor: AppUi.borderOf(context),
                                 color: AppColors.uiWarning,
@@ -2389,8 +2477,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       }
     } else {
       final parts = [rawBarangay, rawTown].where((s) => s.isNotEmpty).toList();
-      completeAddress =
-          parts.isNotEmpty ? parts.join(', ') : 'Location not specified';
+      completeAddress = parts.isNotEmpty
+          ? parts.join(', ')
+          : 'Location not specified';
     }
 
     final reviewCount = _reviews.isNotEmpty
@@ -2403,13 +2492,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     acc +
                     ((r is Map ? r['rating'] : null) as num? ?? 0.0).toDouble(),
               ) /
-            _reviews.length)
+              _reviews.length)
         : ((station['average_rating'] as num?)?.toDouble() ?? 0.0);
     final isVerified =
         station['is_verified'] == true || station['verified'] == true;
     final photoUrl = station['station_photo_url'] as String?;
-    final photo =
-        (photoUrl == null || photoUrl.isEmpty) ? _sampleStationImage : photoUrl;
+    final photo = (photoUrl == null || photoUrl.isEmpty)
+        ? _sampleStationImage
+        : photoUrl;
 
     final isOpen = (station['is_open'] as bool?) ?? true;
     final availability =
@@ -2421,7 +2511,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         !{'busy', 'maintenance', 'closed'}.contains(normalizedAvailability);
 
     final selectedProduct = _selectedProduct ?? _displayProduct;
-    final unitPrice = (selectedProduct['price'] as num?)?.toDouble() ??
+    final unitPrice =
+        (selectedProduct['price'] as num?)?.toDouble() ??
         _pricePerGallon ??
         25.0;
     final subtotal = unitPrice * _quantity;
@@ -2440,20 +2531,24 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             elevation: 0,
             leading: Padding(
               padding: const EdgeInsets.all(8.0),
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).maybePop(),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppUi.borderOf(context)),
-                  ),
-                  child: Icon(
-                    Icons.arrow_back_rounded,
-                    size: 19,
-                    color: AppUi.textPrimaryOf(context),
+              child: Semantics(
+                button: true,
+                label: 'Back',
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).maybePop(),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppUi.borderOf(context)),
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_rounded,
+                      size: 19,
+                      color: AppUi.textPrimaryOf(context),
+                    ),
                   ),
                 ),
               ),
@@ -2473,14 +2568,20 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
+                              color: AppUi.surfaceOf(
+                                context,
+                              ).withValues(alpha: 0.9),
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppUi.borderOf(context)),
+                              border: Border.all(
+                                color: AppUi.borderOf(context),
+                              ),
                             ),
                             child: Icon(
                               Icons.shopping_cart_outlined,
                               size: 19,
-                              color: hasItems ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
+                              color: hasItems
+                                  ? AppUi.brandOf(context)
+                                  : AppUi.textPrimaryOf(context),
                             ),
                           ),
                         ),
@@ -2494,7 +2595,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                 color: AppColors.uiError,
                                 shape: BoxShape.circle,
                               ),
-                              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
                               alignment: Alignment.center,
                               child: Text(
                                 '${cart.totalItems}',
@@ -2513,24 +2617,28 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 12.0),
-                child: GestureDetector(
-                  onTap: _toggleFav,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppUi.borderOf(context)),
-                    ),
-                    child: Icon(
-                      _isFav
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      size: 19,
-                      color: _isFav
-                          ? AppColors.uiError
-                          : AppUi.textPrimaryOf(context),
+                child: Semantics(
+                  button: true,
+                  label: _isFav ? 'Remove from favorites' : 'Add to favorites',
+                  child: GestureDetector(
+                    onTap: _toggleFav,
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppUi.borderOf(context)),
+                      ),
+                      child: Icon(
+                        _isFav
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 19,
+                        color: _isFav
+                            ? AppColors.uiError
+                            : AppUi.textPrimaryOf(context),
+                      ),
                     ),
                   ),
                 ),
@@ -2539,43 +2647,43 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             flexibleSpace: FlexibleSpaceBar(
               centerTitle: true,
               background: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Container(color: Colors.white),
-                      Hero(
-                        tag: 'station_image_${station['id'] ?? stationName}',
-                        child: AppCachedImage(
-                          imageUrl: photo,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.contain,
-                          memCacheWidth: 800,
-                          memCacheHeight: 500,
-                          fallbackIcon: Icons.water_drop_rounded,
-                        ),
-                      ),
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: 70,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.12),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                fit: StackFit.expand,
+                children: [
+                  Container(color: Colors.white),
+                  Hero(
+                    tag: 'station_image_${station['id'] ?? stationName}',
+                    child: AppCachedImage(
+                      imageUrl: photo,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.contain,
+                      memCacheWidth: 800,
+                      memCacheHeight: 500,
+                      fallbackIcon: Icons.water_drop_rounded,
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 70,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.12),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
 
           // ── Main Content Body ────────────────────────────────────────────
           SliverToBoxAdapter(
@@ -2694,7 +2802,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           ),
                           InkWell(
                             onTap: () => context.openCart(_stationData),
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusControl,
+                            ),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -2702,7 +2812,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusControl,
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -2737,22 +2849,30 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           height: 48,
                           decoration: BoxDecoration(
                             color: AppUi.pageBgOf(context),
-                            borderRadius: BorderRadius.circular(AppUi.radiusPill),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusPill,
+                            ),
                             border: Border.all(color: AppUi.borderOf(context)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
+                                tooltip: 'Decrease quantity',
                                 onPressed: _quantity > 1
                                     ? () {
                                         HapticFeedback.lightImpact();
                                         _setQuantity(_quantity - 1);
                                       }
                                     : null,
-                                icon: const Icon(Icons.remove_rounded, size: 18),
+                                icon: const Icon(
+                                  Icons.remove_rounded,
+                                  size: 18,
+                                ),
                                 color: AppUi.textPrimaryOf(context),
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 constraints: const BoxConstraints(
                                   minWidth: 36,
                                   minHeight: 48,
@@ -2761,7 +2881,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               GestureDetector(
                                 onTap: _editQuantity,
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
                                   child: Text(
                                     '$_quantity',
                                     style: TextStyle(
@@ -2773,13 +2895,16 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Increase quantity',
                                 onPressed: () {
                                   HapticFeedback.lightImpact();
                                   _setQuantity(_quantity + 1);
                                 },
                                 icon: const Icon(Icons.add_rounded, size: 18),
                                 color: AppUi.textPrimaryOf(context),
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 constraints: const BoxConstraints(
                                   minWidth: 36,
                                   minHeight: 48,
@@ -2805,7 +2930,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                     : AppUi.textMuted,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppUi.radiusPill),
+                                  borderRadius: BorderRadius.circular(
+                                    AppUi.radiusPill,
+                                  ),
                                 ),
                                 elevation: 0,
                               ),
@@ -2819,16 +2946,17 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           canOrder
                                               ? (hasItemsInCart
-                                                  ? 'Add to Cart · ${formatPeso(subtotal, whole: true)}'
-                                                  : 'Order ($_quantity) · ${formatPeso(subtotal, whole: true)}')
+                                                    ? 'Add to Cart · ${formatPeso(subtotal, whole: true)}'
+                                                    : 'Order ($_quantity) · ${formatPeso(subtotal, whole: true)}')
                                               : (isOpen
-                                                  ? 'Station Busy'
-                                                  : 'Station Closed'),
+                                                    ? 'Station Busy'
+                                                    : 'Station Closed'),
                                           style: const TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w700,
@@ -2927,7 +3055,9 @@ class _QuantityInputDialogState extends State<_QuantityInputDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppUi.surfaceOf(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+      ),
       title: const Text(
         'Enter quantity',
         style: TextStyle(fontWeight: FontWeight.w700),
@@ -2955,7 +3085,9 @@ class _QuantityInputDialogState extends State<_QuantityInputDialog> {
           style: FilledButton.styleFrom(
             backgroundColor: AppUi.bluePrimary,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
+            ),
           ),
           child: const Text('Apply'),
         ),

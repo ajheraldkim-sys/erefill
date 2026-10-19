@@ -98,6 +98,7 @@ class _InboxScreenState extends State<InboxScreen> {
             actions: _selectedRoomIds.isNotEmpty
                 ? [
                     IconButton(
+                      tooltip: 'Select all',
                       icon: Icon(
                         Icons.select_all_rounded,
                         color: AppUi.textPrimaryOf(context),
@@ -115,6 +116,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       onPressed: _handleArchiveOrRestoreRooms,
                     ),
                     IconButton(
+                      tooltip: 'Cancel selection',
                       icon: Icon(
                         Icons.close_rounded,
                         color: AppUi.textPrimaryOf(context),
@@ -124,6 +126,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   ]
                 : [
                     IconButton(
+                      tooltip: 'Mark all as read',
                       icon: Icon(
                         Icons.done_all_rounded,
                         color: AppUi.brandOf(context),

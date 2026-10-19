@@ -1,3 +1,5 @@
+import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_theme.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/water_types.dart';
@@ -155,43 +157,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('DashboardStatCard handles flat trend and single-point list gracefully', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: Column(
-            children: [
-              DashboardStatCard(
-                label: 'Flat trend',
-                value: '10',
-                icon: Icons.show_chart,
-                trend: [0.0, 0.0, 0.0],
-              ),
-              DashboardStatCard(
-                label: 'Single point',
-                value: '5',
-                icon: Icons.show_chart,
-                trend: [1.0],
-              ),
-              DashboardStatCard(
-                label: 'Empty trend',
-                value: '0',
-                icon: Icons.show_chart,
-                trend: [],
-              ),
-            ],
+  testWidgets(
+    'DashboardStatCard handles flat trend and single-point list gracefully',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                DashboardStatCard(
+                  label: 'Flat trend',
+                  value: '10',
+                  icon: Icons.show_chart,
+                  trend: [0.0, 0.0, 0.0],
+                ),
+                DashboardStatCard(
+                  label: 'Single point',
+                  value: '5',
+                  icon: Icons.show_chart,
+                  trend: [1.0],
+                ),
+                DashboardStatCard(
+                  label: 'Empty trend',
+                  value: '0',
+                  icon: Icons.show_chart,
+                  trend: [],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('Flat trend'), findsOneWidget);
-    expect(find.text('Single point'), findsOneWidget);
-    expect(find.text('Empty trend'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('Flat trend'), findsOneWidget);
+      expect(find.text('Single point'), findsOneWidget);
+      expect(find.text('Empty trend'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   test('timeline maps every status synonym to a real stage', () {
     int idx(String s) => RefillOrderStatusTimeline.statusIndex(s);
@@ -209,7 +212,9 @@ void main() {
     expect(idx('rejected'), -1);
   });
 
-  testWidgets('rejected orders read as declined, not cancelled', (tester) async {
+  testWidgets('rejected orders read as declined, not cancelled', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(body: RefillOrderStatusTimeline(status: 'rejected')),
@@ -222,10 +227,64 @@ void main() {
   test('status synonyms share one canonical label', () {
     expect(OrderStatusColors.getLabel('confirmed'), 'Accepted');
     expect(OrderStatusColors.getLabel('completed'), 'Delivered');
-    expect(OrderStatusColors.getLabel('ready_for_delivery'), 'Ready for Pickup');
+    expect(
+      OrderStatusColors.getLabel('ready_for_delivery'),
+      'Ready for Pickup',
+    );
     expect(
       OrderStatusPresentation.fromStatus('completed').label,
       OrderStatusStyle.resolve('completed').label,
     );
   });
+
+  for (final waterType in WaterTypes.all) {
+    for (final brightness in Brightness.values) {
+      for (final compact in [false, true]) {
+        testWidgets(
+          'WaterTypeCard ${waterType.shortName} text is readable in ${brightness.name} mode (compact: $compact)',
+          (tester) async {
+            final isDark = brightness == Brightness.dark;
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: isDark ? AppTheme.darkTheme : AppTheme.lightTheme,
+                home: Scaffold(
+                  body: Center(
+                    child: WaterTypeCard(
+                      type: waterType,
+                      price: 45,
+                      containerSize: '5 gallon',
+                      preparationMinutes: 20,
+                      compact: compact,
+                    ),
+                  ),
+                ),
+              ),
+            );
+            _expectReadableOnSurface(
+              tester,
+              isDark ? AppUi.darkSurface : AppUi.surface,
+            );
+          },
+        );
+      }
+    }
+  }
+}
+
+double _contrast(Color a, Color b) {
+  final la = a.computeLuminance(), lb = b.computeLuminance();
+  final hi = la > lb ? la : lb, lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+void _expectReadableOnSurface(WidgetTester tester, Color surface) {
+  for (final text in tester.widgetList<Text>(find.byType(Text))) {
+    final color = text.style?.color;
+    if (color == null) continue;
+    expect(
+      _contrast(color, surface),
+      greaterThanOrEqualTo(4.5),
+      reason: '"${text.data}" is unreadable on its card',
+    );
+  }
 }

@@ -406,6 +406,39 @@ class AppUi {
     return isDark ? darkTextSecondary : textSecondary;
   }
 
+  /// [accent] adjusted for use as *text* on the current surface: same hue,
+  /// lightness shifted (darker in light mode, lighter in dark mode) until it
+  /// reaches WCAG AA 4.5:1. Brand accents such as `accentCyan` are tuned for
+  /// one mode only, so text must never use them raw. Icons and tints may.
+  static Color accentTextOf(
+    BuildContext context,
+    Color accent, {
+    Color? background,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = background ?? (isDark ? darkSurface : AppUi.surface);
+    final surfaceLum = surface.computeLuminance();
+    double ratio(Color c) {
+      final l = c.computeLuminance();
+      final hi = l > surfaceLum ? l : surfaceLum;
+      final lo = l > surfaceLum ? surfaceLum : l;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    var hsl = HSLColor.fromColor(accent);
+    for (var i = 0; i < 40 && ratio(hsl.toColor()) < 4.5; i++) {
+      hsl = hsl.withLightness(
+        (hsl.lightness + (isDark ? 0.02 : -0.02)).clamp(0.0, 1.0),
+      );
+    }
+    return hsl.toColor();
+  }
+
+  static Color textMutedOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+      ? darkTextMuted
+      : textMuted;
+
   static Color chipBgOf(BuildContext context) =>
       Theme.of(context).colorScheme.surfaceContainerHighest;
 

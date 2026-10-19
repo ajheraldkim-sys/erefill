@@ -233,7 +233,7 @@ class WaterTypeCard extends StatelessWidget {
           width: selected ? 2 : 1,
         ),
       ),
-      child: compact ? _compactContent() : _fullContent(),
+      child: compact ? _compactContent(context) : _fullContent(context),
     );
 
     if (onTap == null) {
@@ -247,7 +247,7 @@ class WaterTypeCard extends StatelessWidget {
     );
   }
 
-  Widget _compactContent() {
+  Widget _compactContent(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -265,10 +265,10 @@ class WaterTypeCard extends StatelessWidget {
             Expanded(
               child: Text(
                 type.shortName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
-                  color: AppUi.textPrimary,
+                  color: AppUi.textPrimaryOf(context),
                 ),
               ),
             ),
@@ -281,10 +281,10 @@ class WaterTypeCard extends StatelessWidget {
           type.tagline,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: AppUi.textPrimary,
+            color: AppUi.textPrimaryOf(context),
           ),
         ),
         const SizedBox(height: 4),
@@ -292,17 +292,17 @@ class WaterTypeCard extends StatelessWidget {
           description ?? type.description,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             height: 1.25,
-            color: AppUi.textSecondary,
+            color: AppUi.textSecondaryOf(context),
           ),
         ),
       ],
     );
   }
 
-  Widget _fullContent() {
+  Widget _fullContent(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -331,8 +331,8 @@ class WaterTypeCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                             color: selected
-                                ? AppUi.bluePrimary
-                                : AppUi.textPrimary,
+                                ? AppUi.brandOf(context)
+                                : AppUi.textPrimaryOf(context),
                           ),
                         ),
                       ),
@@ -345,7 +345,7 @@ class WaterTypeCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: type.color,
+                      color: AppUi.accentTextOf(context, type.color),
                     ),
                   ),
                 ],
@@ -358,7 +358,7 @@ class WaterTypeCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                 ),
               ),
             ],
@@ -367,9 +367,9 @@ class WaterTypeCard extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           description ?? type.description,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: AppUi.textSecondary,
+            color: AppUi.textSecondaryOf(context),
             fontWeight: FontWeight.w500,
             height: 1.35,
           ),
@@ -380,13 +380,24 @@ class WaterTypeCard extends StatelessWidget {
           runSpacing: 4,
           children: type.benefits
               .map(
-                (b) => Text(
-                  '✓ $b',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppUi.textSecondary,
-                  ),
+                (b) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_rounded,
+                      size: 12,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      b,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                  ],
                 ),
               )
               .toList(),
@@ -396,11 +407,12 @@ class WaterTypeCard extends StatelessWidget {
           Text(
             [
               ?containerSize,
-              if (preparationMinutes != null) 'Ready in ~$preparationMinutes min',
+              if (preparationMinutes != null)
+                'Ready in ~$preparationMinutes min',
             ].join(' · '),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              color: AppUi.textMuted,
+              color: AppUi.textMutedOf(context),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -429,7 +441,14 @@ class _TypeBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
-          color: color,
+          color: AppUi.accentTextOf(
+            context,
+            color,
+            background: Color.alphaBlend(
+              color.withValues(alpha: 0.12),
+              AppUi.surfaceOf(context),
+            ),
+          ),
         ),
       ),
     );
@@ -493,11 +512,12 @@ class RefillOrderStatusTimeline extends StatelessWidget {
     // dispatched, …) never fall through to "Cancelled".
     final normalized = switch (raw) {
       'assigned_to_rider' || 'rider_assigned' => 'assigned_to_rider',
-      _ => OrderStatusColors.normalize(raw) == 'pending_sync'
-          ? 'pending'
-          : (OrderStatusColors.normalize(raw) == 'ready'
-                ? 'ready_for_pickup'
-                : OrderStatusColors.normalize(raw)),
+      _ =>
+        OrderStatusColors.normalize(raw) == 'pending_sync'
+            ? 'pending'
+            : (OrderStatusColors.normalize(raw) == 'ready'
+                  ? 'ready_for_pickup'
+                  : OrderStatusColors.normalize(raw)),
     };
     return _stages.indexWhere((stage) => stage.status == normalized);
   }
@@ -618,7 +638,9 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                             color: i < progressIndex
                                 ? statusColor
                                 : AppUi.dividerOf(context),
-                            borderRadius: BorderRadius.circular(AppUi.radiusFull),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusFull,
+                            ),
                           ),
                         ),
                       ),

@@ -31,6 +31,7 @@ import 'services/station_setup_service.dart';
 import 'package:erefill/core/localization/app_strings.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
 
@@ -128,12 +129,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     super.initState();
     final user = supabase.auth.currentUser;
     if (user != null) {
-      final cachedSettings = LocalDataCache.instance.getMemory<Map<String, dynamic>>('owner_settings_${user.id}');
+      final cachedSettings = LocalDataCache.instance
+          .getMemory<Map<String, dynamic>>('owner_settings_${user.id}');
       if (cachedSettings != null) {
         _updateSettingsFromData(cachedSettings);
         _isLoading = false;
       }
-      final cachedProfile = LocalDataCache.instance.getMemory<Map<String, dynamic>>('user_profile_${user.id}');
+      final cachedProfile = LocalDataCache.instance
+          .getMemory<Map<String, dynamic>>('user_profile_${user.id}');
       if (cachedProfile != null) {
         _updateProfileFromData(cachedProfile);
         _isLoading = false;
@@ -198,17 +201,19 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     if (!mounted) return;
     setState(() {
       if (settings['price_per_gallon'] != null) {
-        _priceController.text =
-            (settings['price_per_gallon'] as num).toStringAsFixed(2);
+        _priceController.text = (settings['price_per_gallon'] as num)
+            .toStringAsFixed(2);
       }
       if (settings['base_delivery_fee'] != null) {
-        _deliveryFeeController.text =
-            (settings['base_delivery_fee'] as num).toStringAsFixed(2);
+        _deliveryFeeController.text = (settings['base_delivery_fee'] as num)
+            .toStringAsFixed(2);
       }
-      if (settings['opening_time'] != null && settings['opening_time'].toString().isNotEmpty) {
+      if (settings['opening_time'] != null &&
+          settings['opening_time'].toString().isNotEmpty) {
         _openingTime = settings['opening_time'].toString();
       }
-      if (settings['closing_time'] != null && settings['closing_time'].toString().isNotEmpty) {
+      if (settings['closing_time'] != null &&
+          settings['closing_time'].toString().isNotEmpty) {
         _closingTime = settings['closing_time'].toString();
       }
       if (settings['operating_days'] is List) {
@@ -272,12 +277,13 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       _barangayController.text = _selectedBarangay ?? '';
 
       if (profile['commission_rate'] != null) {
-        _commissionController.text =
-            (profile['commission_rate'] as num).toStringAsFixed(2);
+        _commissionController.text = (profile['commission_rate'] as num)
+            .toStringAsFixed(2);
       }
-      if (profile['price_per_gallon'] != null && _priceController.text.isEmpty) {
-        _priceController.text =
-            (profile['price_per_gallon'] as num).toStringAsFixed(2);
+      if (profile['price_per_gallon'] != null &&
+          _priceController.text.isEmpty) {
+        _priceController.text = (profile['price_per_gallon'] as num)
+            .toStringAsFixed(2);
       }
 
       final lat = (profile['latitude'] ?? profile['lat']) as num?;
@@ -392,8 +398,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           _barangayController.text = _selectedBarangay ?? '';
 
           if (profile['commission_rate'] != null) {
-            _commissionController.text =
-                (profile['commission_rate'] as num).toStringAsFixed(2);
+            _commissionController.text = (profile['commission_rate'] as num)
+                .toStringAsFixed(2);
           } else {
             _commissionController.text = '5.00';
           }
@@ -409,10 +415,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           _deliveryFeeController.text =
               (settings['base_delivery_fee'] as num?)?.toStringAsFixed(2) ??
               '25.00';
-          if (settings['opening_time'] != null && settings['opening_time'].toString().isNotEmpty) {
+          if (settings['opening_time'] != null &&
+              settings['opening_time'].toString().isNotEmpty) {
             _openingTime = settings['opening_time'].toString();
           }
-          if (settings['closing_time'] != null && settings['closing_time'].toString().isNotEmpty) {
+          if (settings['closing_time'] != null &&
+              settings['closing_time'].toString().isNotEmpty) {
             _closingTime = settings['closing_time'].toString();
           }
           if (settings['operating_days'] is List) {
@@ -470,12 +478,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     final daysStr = count == 7
         ? 'Daily'
         : count == 6 && !_operatingDays.contains('Sunday')
-            ? 'Mon - Sat'
-            : count == 5 &&
-                    !_operatingDays.contains('Saturday') &&
-                    !_operatingDays.contains('Sunday')
-                ? 'Mon - Fri'
-                : '$count days/wk';
+        ? 'Mon - Sat'
+        : count == 5 &&
+              !_operatingDays.contains('Saturday') &&
+              !_operatingDays.contains('Sunday')
+        ? 'Mon - Fri'
+        : '$count days/wk';
     return '$_openingTime - $_closingTime · $daysStr';
   }
 
@@ -490,7 +498,13 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   String get _paymentMethodsSummary {
     if (_enabledPaymentMethods.isEmpty) return 'None enabled';
     return _enabledPaymentMethods
-        .map((m) => m == 'cod' ? 'COD' : m == 'card' ? 'Card' : m.toUpperCase())
+        .map(
+          (m) => m == 'cod'
+              ? 'COD'
+              : m == 'card'
+              ? 'Card'
+              : m.toUpperCase(),
+        )
         .join(', ');
   }
 
@@ -513,7 +527,6 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       _selectedTown,
     ].where((part) => (part ?? '').trim().isNotEmpty).join(', ');
   }
-
 
   Future<bool> _saveStationDetails() async {
     if (!mounted) return false;
@@ -624,8 +637,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         onPressed: () {
-                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                          if (sheetContext.mounted &&
+                              Navigator.canPop(sheetContext)) {
                             Navigator.pop(sheetContext);
                           }
                         },
@@ -637,7 +652,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                 Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: _buildStationDetailsForm(sheetContext, setModalState),
+                    child: _buildStationDetailsForm(
+                      sheetContext,
+                      setModalState,
+                    ),
                   ),
                 ),
               ],
@@ -656,8 +674,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   ) {
     final barangayList =
         _selectedTown != null && _municipalityData.containsKey(_selectedTown)
-            ? _municipalityData[_selectedTown]!
-            : <String>[];
+        ? _municipalityData[_selectedTown]!
+        : <String>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -781,7 +799,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingStation,
           onPressed: () async {
             final saved = await _saveStationDetails();
-            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
+            if (saved &&
+                sheetContext.mounted &&
+                Navigator.canPop(sheetContext)) {
               Navigator.pop(sheetContext);
             }
           },
@@ -815,10 +835,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     if (!mounted) return false;
     setState(() => _isSavingOwner = true);
     try {
-      final fullName = "$fname $mi $lname $suffix".replaceAll(
-        RegExp(r'\s+'),
-        ' ',
-      ).trim();
+      final fullName = "$fname $mi $lname $suffix"
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
 
       await ProfileQueryHelpers.updateProfile(supabase, {
         'full_name': fullName,
@@ -901,8 +920,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         onPressed: () {
-                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                          if (sheetContext.mounted &&
+                              Navigator.canPop(sheetContext)) {
                             Navigator.pop(sheetContext);
                           }
                         },
@@ -1033,7 +1054,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingOwner,
           onPressed: () async {
             final saved = await _saveOwnerDetails();
-            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
+            if (saved &&
+                sheetContext.mounted &&
+                Navigator.canPop(sheetContext)) {
               Navigator.pop(sheetContext);
             }
           },
@@ -1104,7 +1127,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     }
   }
 
-  TimeOfDay _parseTimeOfDay(String timeStr, {int defaultHour = 8, int defaultMinute = 0}) {
+  TimeOfDay _parseTimeOfDay(
+    String timeStr, {
+    int defaultHour = 8,
+    int defaultMinute = 0,
+  }) {
     try {
       final parts = timeStr.split(':');
       if (parts.length >= 2) {
@@ -1126,7 +1153,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   String _formatTime12Hr(String timeStr) {
     final tod = _parseTimeOfDay(timeStr);
     final period = tod.hour >= 12 ? 'PM' : 'AM';
-    final hour12 = tod.hour == 0 ? 12 : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
+    final hour12 = tod.hour == 0
+        ? 12
+        : (tod.hour > 12 ? tod.hour - 12 : tod.hour);
     final min = tod.minute.toString().padLeft(2, '0');
     return '$hour12:$min $period';
   }
@@ -1166,7 +1195,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       debugPrint('Error saving operating schedule: $e');
       if (mounted) {
         final errStr = e.toString().toLowerCase();
-        if (errStr.contains('opening_time') || errStr.contains('schema cache') || errStr.contains('column')) {
+        if (errStr.contains('opening_time') ||
+            errStr.contains('schema cache') ||
+            errStr.contains('column')) {
           _showMessage(
             'Database update required: Run supabase/scripts/station_setup_and_product_management.sql in Supabase SQL Editor.',
             isError: true,
@@ -1244,6 +1275,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         onPressed: () {
                           if (sheetContext.mounted &&
                               Navigator.canPop(sheetContext)) {
@@ -1263,7 +1295,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       children: [
                         const AppFormSectionHeader(
                           title: 'BUSINESS HOURS',
-                          subtitle: 'Specify opening and closing hours for station operations',
+                          subtitle:
+                              'Specify opening and closing hours for station operations',
                         ),
                         AppUi.vGapMd,
                         Row(
@@ -1271,7 +1304,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             Expanded(
                               child: InkWell(
                                 onTap: () async {
-                                  final initial = _parseTimeOfDay(_openingTime, defaultHour: 8);
+                                  final initial = _parseTimeOfDay(
+                                    _openingTime,
+                                    defaultHour: 8,
+                                  );
                                   final picked = await showTimePicker(
                                     context: sheetContext,
                                     initialTime: initial,
@@ -1282,16 +1318,23 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                     setModalState(() {});
                                   }
                                 },
-                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusCard,
+                                ),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AppUi.chipBgOf(context),
-                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                                    border: Border.all(color: AppUi.borderOf(context)),
+                                    borderRadius: BorderRadius.circular(
+                                      AppUi.radiusCard,
+                                    ),
+                                    border: Border.all(
+                                      color: AppUi.borderOf(context),
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Opening Time',
@@ -1304,15 +1347,20 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                       const SizedBox(height: 6),
                                       Row(
                                         children: [
-                                          Icon(Icons.schedule_rounded,
-                                              size: 18, color: AppUi.brandOf(context)),
+                                          Icon(
+                                            Icons.schedule_rounded,
+                                            size: 18,
+                                            color: AppUi.brandOf(context),
+                                          ),
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatTime12Hr(_openingTime),
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w700,
-                                              color: AppUi.textPrimaryOf(context),
+                                              color: AppUi.textPrimaryOf(
+                                                context,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1326,7 +1374,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             Expanded(
                               child: InkWell(
                                 onTap: () async {
-                                  final initial = _parseTimeOfDay(_closingTime, defaultHour: 17);
+                                  final initial = _parseTimeOfDay(
+                                    _closingTime,
+                                    defaultHour: 17,
+                                  );
                                   final picked = await showTimePicker(
                                     context: sheetContext,
                                     initialTime: initial,
@@ -1337,16 +1388,23 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                     setModalState(() {});
                                   }
                                 },
-                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusCard,
+                                ),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AppUi.chipBgOf(context),
-                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                                    border: Border.all(color: AppUi.borderOf(context)),
+                                    borderRadius: BorderRadius.circular(
+                                      AppUi.radiusCard,
+                                    ),
+                                    border: Border.all(
+                                      color: AppUi.borderOf(context),
+                                    ),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Closing Time',
@@ -1359,15 +1417,20 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                       const SizedBox(height: 6),
                                       Row(
                                         children: [
-                                          Icon(Icons.schedule_rounded,
-                                              size: 18, color: AppUi.brandOf(context)),
+                                          Icon(
+                                            Icons.schedule_rounded,
+                                            size: 18,
+                                            color: AppUi.brandOf(context),
+                                          ),
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatTime12Hr(_closingTime),
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.w700,
-                                              color: AppUi.textPrimaryOf(context),
+                                              color: AppUi.textPrimaryOf(
+                                                context,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1382,7 +1445,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         AppUi.vGapLg,
                         const AppFormSectionHeader(
                           title: 'OPERATING DAYS',
-                          subtitle: 'Select days when the station accepts orders',
+                          subtitle:
+                              'Select days when the station accepts orders',
                         ),
                         AppUi.vGapSm,
                         Row(
@@ -1394,8 +1458,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 });
                                 setModalState(() {});
                               },
-                              icon: const Icon(Icons.done_all_rounded, size: 16),
-                              label: const Text('Daily (7 days)', style: TextStyle(fontSize: 12)),
+                              icon: const Icon(
+                                Icons.done_all_rounded,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Daily (7 days)',
+                                style: TextStyle(fontSize: 12),
+                              ),
                             ),
                             TextButton.icon(
                               onPressed: () {
@@ -1404,8 +1474,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 });
                                 setModalState(() {});
                               },
-                              icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                              label: const Text('Mon - Sat', style: TextStyle(fontSize: 12)),
+                              icon: const Icon(
+                                Icons.calendar_today_rounded,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Mon - Sat',
+                                style: TextStyle(fontSize: 12),
+                              ),
                             ),
                           ],
                         ),
@@ -1418,15 +1494,23 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                               label: Text(day),
                               selected: isSelected,
                               showCheckmark: true,
-                              selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
+                              selectedColor: AppUi.bluePrimary.withValues(
+                                alpha: 0.15,
+                              ),
                               checkmarkColor: AppUi.bluePrimary,
                               labelStyle: TextStyle(
                                 fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isSelected
+                                    ? AppUi.brandOf(context)
+                                    : AppUi.textPrimaryOf(context),
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusControl,
+                                ),
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppUi.bluePrimary
@@ -1443,7 +1527,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                     if (_operatingDays.length > 1) {
                                       _operatingDays.remove(day);
                                     } else {
-                                      _showMessage('You must keep at least 1 operating day.', isError: true);
+                                      _showMessage(
+                                        'You must keep at least 1 operating day.',
+                                        isError: true,
+                                      );
                                     }
                                   }
                                 });
@@ -1457,15 +1544,20 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: AppUi.brandSoftOf(context),
-                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusCard,
+                            ),
                             border: Border.all(
                               color: AppUi.bluePrimary.withValues(alpha: 0.25),
                             ),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.info_outline_rounded,
-                                  color: AppUi.brandOf(context), size: 20),
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: AppUi.brandOf(context),
+                                size: 20,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -1551,8 +1643,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         onPressed: () {
-                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                          if (sheetContext.mounted &&
+                              Navigator.canPop(sheetContext)) {
                             Navigator.pop(sheetContext);
                           }
                         },
@@ -1652,7 +1746,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _systemDeliveryRate == null ? "Delivery fees are set by the eRefill admin and calculated automatically from each customer's distance." : "Delivery rate: ${formatPeso(_systemDeliveryRate)}/km, set by the eRefill admin. Fees are calculated automatically from each customer's distance.",
+                      _systemDeliveryRate == null
+                          ? "Delivery fees are set by the eRefill admin and calculated automatically from each customer's distance."
+                          : "Delivery rate: ${formatPeso(_systemDeliveryRate)}/km, set by the eRefill admin. Fees are calculated automatically from each customer's distance.",
                       style: const TextStyle(
                         fontSize: 12,
                         height: 1.35,
@@ -1685,7 +1781,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingPricing,
           onPressed: () async {
             final saved = await _savePricingAndDelivery();
-            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
+            if (saved &&
+                sheetContext.mounted &&
+                Navigator.canPop(sheetContext)) {
               Navigator.pop(sheetContext);
             }
           },
@@ -1700,10 +1798,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     if (user == null) return false;
 
     if (_enabledPaymentMethods.isEmpty) {
-      _showMessage(
-        'Please enable at least one payment method.',
-        isError: true,
-      );
+      _showMessage('Please enable at least one payment method.', isError: true);
       return false;
     }
 
@@ -1785,8 +1880,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         onPressed: () {
-                          if (sheetContext.mounted && Navigator.canPop(sheetContext)) {
+                          if (sheetContext.mounted &&
+                              Navigator.canPop(sheetContext)) {
                             Navigator.pop(sheetContext);
                           }
                         },
@@ -1869,67 +1966,67 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                 ),
               ),
               child: SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  secondary: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isEnabled
-                          ? AppUi.bluePrimary.withValues(alpha: 0.15)
-                          : AppUi.borderOf(sheetContext).withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                    ),
-                    child: Icon(
-                      opt.$3,
-                      color: isEnabled
-                          ? AppUi.brandOf(context)
-                          : AppUi.textSecondaryOf(sheetContext),
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    opt.$2,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: AppUi.textPrimaryOf(sheetContext),
-                    ),
-                  ),
-                  subtitle: Text(
-                    opt.$4,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppUi.textSecondaryOf(sheetContext),
-                    ),
-                  ),
-                  value: isEnabled,
-                  activeThumbColor: AppUi.bluePrimary,
-                  onChanged: (val) {
-                    setModalState(() {
-                      setState(() {
-                        if (val) {
-                          if (!_enabledPaymentMethods.contains(opt.$1)) {
-                            _enabledPaymentMethods.add(opt.$1);
-                          }
-                        } else {
-                          if (_enabledPaymentMethods.length > 1) {
-                            _enabledPaymentMethods.remove(opt.$1);
-                          } else {
-                            _showMessage(
-                              'At least one payment method must remain enabled.',
-                              isError: true,
-                            );
-                          }
-                        }
-                      });
-                    });
-                  },
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
                 ),
+                secondary: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isEnabled
+                        ? AppUi.bluePrimary.withValues(alpha: 0.15)
+                        : AppUi.borderOf(sheetContext).withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                  ),
+                  child: Icon(
+                    opt.$3,
+                    color: isEnabled
+                        ? AppUi.brandOf(context)
+                        : AppUi.textSecondaryOf(sheetContext),
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  opt.$2,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppUi.textPrimaryOf(sheetContext),
+                  ),
+                ),
+                subtitle: Text(
+                  opt.$4,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppUi.textSecondaryOf(sheetContext),
+                  ),
+                ),
+                value: isEnabled,
+                activeThumbColor: AppUi.bluePrimary,
+                onChanged: (val) {
+                  setModalState(() {
+                    setState(() {
+                      if (val) {
+                        if (!_enabledPaymentMethods.contains(opt.$1)) {
+                          _enabledPaymentMethods.add(opt.$1);
+                        }
+                      } else {
+                        if (_enabledPaymentMethods.length > 1) {
+                          _enabledPaymentMethods.remove(opt.$1);
+                        } else {
+                          _showMessage(
+                            'At least one payment method must remain enabled.',
+                            isError: true,
+                          );
+                        }
+                      }
+                    });
+                  });
+                },
               ),
-            );
-          }),
+            ),
+          );
+        }),
         AppUi.vGapLg,
         AppFormSubmitButton(
           text: 'Save Payment Methods',
@@ -1937,7 +2034,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           isLoading: _isSavingPayments,
           onPressed: () async {
             final saved = await _savePaymentMethods();
-            if (saved && sheetContext.mounted && Navigator.canPop(sheetContext)) {
+            if (saved &&
+                sheetContext.mounted &&
+                Navigator.canPop(sheetContext)) {
               Navigator.pop(sheetContext);
             }
           },
@@ -2011,7 +2110,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusControl,
+                            ),
                           ),
                           child: Icon(
                             Icons.account_balance_wallet_rounded,
@@ -2123,7 +2224,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                         color: AppUi.bluePrimary.withValues(
                                           alpha: 0.12,
                                         ),
-                                        borderRadius: BorderRadius.circular(AppUi.radiusSm),
+                                        borderRadius: BorderRadius.circular(
+                                          AppUi.radiusSm,
+                                        ),
                                       ),
                                       child: Text(
                                         'PRIMARY',
@@ -2296,7 +2399,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                   _showMessage(
                     FriendlyErrors.message(
                       e,
-                      fallback: 'Could not save payout account. Please try again.',
+                      fallback:
+                          'Could not save payout account. Please try again.',
                     ),
                     isError: true,
                   );
@@ -2491,7 +2595,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             badgeColor: _setupStatus.scheduleSection.isComplete
                                 ? AppColors.uiSuccess
                                 : AppColors.uiError,
-                            badgeBgColor: _setupStatus.scheduleSection.isComplete
+                            badgeBgColor:
+                                _setupStatus.scheduleSection.isComplete
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openOperatingScheduleSheet,
@@ -2518,7 +2623,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             badgeColor: _setupStatus.deliverySection.isComplete
                                 ? AppColors.uiSuccess
                                 : AppColors.uiError,
-                            badgeBgColor: _setupStatus.deliverySection.isComplete
+                            badgeBgColor:
+                                _setupStatus.deliverySection.isComplete
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openPricingDeliverySheet,
@@ -2531,7 +2637,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             badgeColor: _setupStatus.paymentsSection.isComplete
                                 ? AppColors.uiSuccess
                                 : AppColors.uiError,
-                            badgeBgColor: _setupStatus.paymentsSection.isComplete
+                            badgeBgColor:
+                                _setupStatus.paymentsSection.isComplete
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openPaymentMethodsSheet,
@@ -2539,8 +2646,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           AccountNavTile(
                             icon: Icons.account_balance_wallet_outlined,
                             title: 'Payout destination',
-                            subtitle:
-                                'GCash & Maya destination for payments',
+                            subtitle: 'GCash & Maya destination for payments',
                             onTap: _showPayoutAccountSheet,
                           ),
                         ],
@@ -2552,175 +2658,167 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           AccountNavTile(
                             icon: Icons.water_drop_outlined,
                             title: 'Water products & catalog',
-                            subtitle:
-                                'Refill sizes, alkalines, and containers',
+                            subtitle: 'Refill sizes, alkalines, and containers',
                             badgeText: _setupStatus.productsSection.badgeText,
                             badgeColor: _setupStatus.productsSection.isComplete
                                 ? AppColors.uiSuccess
                                 : AppColors.uiWarning,
-                            badgeBgColor: _setupStatus.productsSection.isComplete
+                            badgeBgColor:
+                                _setupStatus.productsSection.isComplete
                                 ? AppUi.successBg
                                 : AppUi.warningBg,
                             onTap: _openWaterProductsCatalogPopup,
                           ),
-                              AccountNavTile(
-                                icon: Icons.inventory_2_outlined,
-                                title: 'Inventory stock',
-                                subtitle:
-                                    'Filled stock, empty gallons, and returns',
-                                onTap: () => context.openOwnerInventory(),
-                              ),
-                              AccountNavTile(
-                                icon: Icons.menu_book_outlined,
-                                title: 'Delivery & credit ledger',
-                                subtitle:
-                                    'Offline refills, customer credits, and sales analytics',
-                                onTap: () =>
-                                    context.push(AppRoutes.deliveryManagement),
-                              ),
-                            ],
+                          AccountNavTile(
+                            icon: Icons.inventory_2_outlined,
+                            title: 'Inventory stock',
+                            subtitle:
+                                'Filled stock, empty gallons, and returns',
+                            onTap: () => context.openOwnerInventory(),
                           ),
-
-                          const AccountSectionLabel('Preferences'),
-                          AccountGroup(
-                            children: [
-                              AccountToggleTile(
-                                icon: Icons.notifications_active_outlined,
-                                title: 'Order & dispatch alerts',
-                                value: _notificationsEnabled,
-                                onChanged: (v) =>
-                                    setState(() => _notificationsEnabled = v),
-                              ),
-                              AccountToggleTile(
-                                icon: Icons.dark_mode_outlined,
-                                title: 'Dark mode',
-                                value: context.select<ThemeProvider, bool>(
-                                  (t) => t.isDarkMode,
-                                ),
-                                onChanged: (v) => context
-                                    .read<ThemeProvider>()
-                                    .setDarkMode(v),
-                              ),
-                              AccountToggleTile(
-                                icon: Icons.wb_sunny_outlined,
-                                title: 'Outdoor high-contrast theme',
-                                value: context.select<ThemeProvider, bool>(
-                                  (t) => t.isOutdoorMode,
-                                ),
-                                onChanged: (v) => context
-                                    .read<ThemeProvider>()
-                                    .setOutdoorMode(v),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Language / Wika / Pinulongan',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Station & order management language',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppUi.textSecondaryOf(context),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Consumer<AppLanguageProvider>(
-                                      builder: (context, langProvider, _) {
-                                        return Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: AppLanguage.values.map((lang) {
-                                            final isSelected =
-                                                langProvider.language == lang;
-                                            return ChoiceChip(
-                                              label: Text(
-                                                '${lang.label} (${lang.subtitle})',
-                                              ),
-                                              selected: isSelected,
-                                              onSelected: (_) =>
-                                                  langProvider.setLanguage(lang),
-                                              selectedColor: AppUi.bluePrimary
-                                                  .withValues(alpha: 0.15),
-                                              labelStyle: TextStyle(
-                                                fontWeight: isSelected
-                                                    ? FontWeight.w700
-                                                    : FontWeight.w500,
-                                                color: isSelected
-                                                    ? AppUi.brandOf(context)
-                                                    : AppUi.textPrimaryOf(
-                                                        context,
-                                                      ),
-                                              ),
-                                            );
-                                          }).toList(),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          AccountNavTile(
+                            icon: Icons.menu_book_outlined,
+                            title: 'Delivery & credit ledger',
+                            subtitle:
+                                'Offline refills, customer credits, and sales analytics',
+                            onTap: () =>
+                                context.push(AppRoutes.deliveryManagement),
                           ),
-
-                          const AccountSectionLabel('Security & account'),
-                          AccountGroup(
-                            children: [
-                              AccountNavTile(
-                                icon: Icons.shield_outlined,
-                                title: 'Account security',
-                                subtitle:
-                                    'Password and account protection controls',
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const AccountSecurityScreen(
-                                          role: 'owner',
-                                        ),
-                                  ),
-                                ),
-                              ),
-                              AccountNavTile(
-                                icon: Icons.logout_rounded,
-                                iconColor: AppColors.uiError,
-                                title: 'Sign out',
-                                titleColor: AppColors.uiError,
-                                subtitle:
-                                    'Log out of your account on this device',
-                                onTap: _logout,
-                              ),
-                              AccountNavTile(
-                                icon: Icons.delete_outline_rounded,
-                                iconColor: AppColors.uiError,
-                                title: 'Delete account',
-                                titleColor: AppColors.uiError,
-                                subtitle:
-                                    'Permanently remove your account and data',
-                                onTap: () =>
-                                    _showDeleteAccountDialog(context),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
                         ],
                       ),
-                    ),
+
+                      const AccountSectionLabel('Preferences'),
+                      AccountGroup(
+                        children: [
+                          AccountToggleTile(
+                            icon: Icons.notifications_active_outlined,
+                            title: 'Order & dispatch alerts',
+                            value: _notificationsEnabled,
+                            onChanged: (v) =>
+                                setState(() => _notificationsEnabled = v),
+                          ),
+                          AccountToggleTile(
+                            icon: Icons.dark_mode_outlined,
+                            title: 'Dark mode',
+                            value: context.select<ThemeProvider, bool>(
+                              (t) => t.isDarkMode,
+                            ),
+                            onChanged: (v) =>
+                                context.read<ThemeProvider>().setDarkMode(v),
+                          ),
+                          AccountToggleTile(
+                            icon: Icons.wb_sunny_outlined,
+                            title: 'Outdoor high-contrast theme',
+                            value: context.select<ThemeProvider, bool>(
+                              (t) => t.isOutdoorMode,
+                            ),
+                            onChanged: (v) =>
+                                context.read<ThemeProvider>().setOutdoorMode(v),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Language / Wika / Pinulongan',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Station & order management language',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppUi.textSecondaryOf(context),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Consumer<AppLanguageProvider>(
+                                  builder: (context, langProvider, _) {
+                                    return Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: AppLanguage.values.map((lang) {
+                                        final isSelected =
+                                            langProvider.language == lang;
+                                        return ChoiceChip(
+                                          label: Text(
+                                            '${lang.label} (${lang.subtitle})',
+                                          ),
+                                          selected: isSelected,
+                                          onSelected: (_) =>
+                                              langProvider.setLanguage(lang),
+                                          selectedColor: AppUi.bluePrimary
+                                              .withValues(alpha: 0.15),
+                                          labelStyle: TextStyle(
+                                            fontWeight: isSelected
+                                                ? FontWeight.w700
+                                                : FontWeight.w500,
+                                            color: isSelected
+                                                ? AppUi.brandOf(context)
+                                                : AppUi.textPrimaryOf(context),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const AccountSectionLabel('Security & account'),
+                      AccountGroup(
+                        children: [
+                          AccountNavTile(
+                            icon: Icons.shield_outlined,
+                            title: 'Account security',
+                            subtitle:
+                                'Password and account protection controls',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const AccountSecurityScreen(role: 'owner'),
+                              ),
+                            ),
+                          ),
+                          AccountNavTile(
+                            icon: Icons.logout_rounded,
+                            iconColor: AppColors.uiError,
+                            title: 'Sign out',
+                            titleColor: AppColors.uiError,
+                            subtitle: 'Log out of your account on this device',
+                            onTap: _logout,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.delete_outline_rounded,
+                            iconColor: AppColors.uiError,
+                            title: 'Delete account',
+                            titleColor: AppColors.uiError,
+                            subtitle:
+                                'Permanently remove your account and data',
+                            onTap: () => _showDeleteAccountDialog(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        );
+        ],
+      ),
+    );
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
@@ -2814,7 +2912,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                   setSheetState(() => isDeleting = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deletion failed: ${FriendlyErrors.message(e)}'),
+                                      content: Text(
+                                        'Deletion failed: ${FriendlyErrors.message(e)}',
+                                      ),
                                       backgroundColor: AppColors.uiError,
                                     ),
                                   );
@@ -2919,7 +3019,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 tooltip: 'Change cover photo',
                                 onPressed: _pickAndUploadCoverPhoto,
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                constraints: const BoxConstraints(
+                                  minWidth: 40,
+                                  minHeight: 40,
+                                ),
                               ),
                       ),
                     ),
@@ -2930,66 +3033,70 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
               Positioned(
                 bottom: -28,
                 left: 20,
-                child: GestureDetector(
-                  onTap: _isUploadingImage ? null : _pickAndUploadImage,
-                  child: Stack(
-                    children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppUi.surfaceOf(context),
-                          border: Border.all(
-                            color: AppUi.surfaceOf(context),
-                            width: 3,
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(36),
-                          child: _avatarUrl.isNotEmpty
-                              ? Image.network(
-                                  _avatarUrl,
-                                  fit: BoxFit.cover,
-                                  cacheWidth: 200,
-                                  cacheHeight: 200,
-                                  filterQuality: FilterQuality.low,
-                                )
-                              : Container(
-                                  color: AppUi.bluePrimary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  child: Icon(
-                                    Icons.person,
-                                    color: AppUi.brandOf(context),
-                                    size: 32,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      if (_isUploadingImage)
-                        const Positioned.fill(
-                          child: Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                      Positioned(
-                        bottom: 2,
-                        right: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: AppUi.bluePrimary,
+                child: Semantics(
+                  button: true,
+                  label: 'Change station photo',
+                  child: GestureDetector(
+                    onTap: _isUploadingImage ? null : _pickAndUploadImage,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            color: AppUi.surfaceOf(context),
+                            border: Border.all(
+                              color: AppUi.surfaceOf(context),
+                              width: 3,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 11,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(36),
+                            child: _avatarUrl.isNotEmpty
+                                ? Image.network(
+                                    _avatarUrl,
+                                    fit: BoxFit.cover,
+                                    cacheWidth: 200,
+                                    cacheHeight: 200,
+                                    filterQuality: FilterQuality.low,
+                                  )
+                                : Container(
+                                    color: AppUi.bluePrimary.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    child: Icon(
+                                      Icons.person,
+                                      color: AppUi.brandOf(context),
+                                      size: 32,
+                                    ),
+                                  ),
                           ),
                         ),
-                      ),
-                    ],
+                        if (_isUploadingImage)
+                          const Positioned.fill(
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        Positioned(
+                          bottom: 2,
+                          right: 2,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: AppUi.bluePrimary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.white,
+                              size: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -3062,5 +3169,4 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       ),
     );
   }
-
 }
