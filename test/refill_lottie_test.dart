@@ -50,12 +50,12 @@ void main() {
       expect(find.byType(RefillLottie), findsOneWidget);
     });
 
-    testWidgets('RefillAnimation enum contains all registered asset paths', (tester) async {
+    testWidgets('RefillAnimation tracks removed motion assets as static placeholders', (tester) async {
       expect(RefillAnimation.values.length, 4);
-      expect(RefillAnimation.axoBob.assetPath, 'assets/animations/axo_bob.json');
-      expect(RefillAnimation.orderSuccess.assetPath, 'assets/animations/order_success.json');
-      expect(RefillAnimation.waterDrop.assetPath, 'assets/animations/water_drop.json');
-      expect(RefillAnimation.deliveryRider.assetPath, 'assets/animations/delivery_rider.json');
+      expect(RefillAnimation.axoBob.assetPath, isEmpty);
+      expect(RefillAnimation.orderSuccess.assetPath, isEmpty);
+      expect(RefillAnimation.waterDrop.assetPath, isEmpty);
+      expect(RefillAnimation.deliveryRider.assetPath, isEmpty);
     });
   });
 }

@@ -41,8 +41,6 @@ dependencies:
   fl_chart: ^0.70.2          # bar charts for reports
   connectivity_plus: ^6.1.1  # network state for sync trigger
 
-  lottie: ^3.3.1
-
   # --- UI / BRANDING ---
   cached_network_image: ^3.4.1
   google_fonts: ^6.2.1
@@ -86,7 +84,6 @@ flutter_native_splash:
 flutter:
   uses-material-design: true
   assets:
-    - assets/animations/
     - assets/icon/
     - assets/images/
     - assets/fonts/

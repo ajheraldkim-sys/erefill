@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import '../../constants.dart';
 
-/// Available pre-bundled Lottie animations in eRefill.
+/// Compatibility enum retained for safe static references.
 enum RefillAnimation {
-  axoBob('assets/animations/axo_bob.json'),
-  orderSuccess('assets/animations/order_success.json'),
-  waterDrop('assets/animations/water_drop.json'),
-  deliveryRider('assets/animations/delivery_rider.json');
+  axoBob(''),
+  orderSuccess(''),
+  waterDrop(''),
+  deliveryRider('');
 
   final String assetPath;
   const RefillAnimation(this.assetPath);
 }
 
-/// Centralized, high-performance Lottie animation widget for eRefill.
-///
-/// Features:
-/// - Fully offline-ready (uses bundled vector JSON assets in 0ms).
-/// - Fallback error handling so invalid frames never crash the screen.
-/// - Adaptive sizing and theme awareness.
+/// Static brand icon replacement used when motion-based Lottie assets are removed.
 class RefillLottie extends StatelessWidget {
   final RefillAnimation animation;
   final double? width;
@@ -28,7 +22,7 @@ class RefillLottie extends StatelessWidget {
   final BoxFit fit;
   final Alignment alignment;
   final AnimationController? controller;
-  final void Function(LottieComposition)? onLoaded;
+  final void Function(Object)? onLoaded;
   final Widget? fallback;
 
   const RefillLottie({
@@ -45,7 +39,6 @@ class RefillLottie extends StatelessWidget {
     this.fallback,
   });
 
-  /// Factory constructor for the bobbing Axo mascot.
   const RefillLottie.mascot({
     super.key,
     this.width = 110,
@@ -59,7 +52,6 @@ class RefillLottie extends StatelessWidget {
         controller = null,
         onLoaded = null;
 
-  /// Factory constructor for celebratory order success checkmark.
   const RefillLottie.success({
     super.key,
     this.width = 120,
@@ -73,7 +65,6 @@ class RefillLottie extends StatelessWidget {
         reverse = false,
         alignment = Alignment.center;
 
-  /// Factory constructor for water droplet & refill animations.
   const RefillLottie.waterDrop({
     super.key,
     this.width = 90,
@@ -87,7 +78,6 @@ class RefillLottie extends StatelessWidget {
         controller = null,
         onLoaded = null;
 
-  /// Factory constructor for out-for-delivery rider animation.
   const RefillLottie.rider({
     super.key,
     this.width = 130,
@@ -101,53 +91,38 @@ class RefillLottie extends StatelessWidget {
         controller = null,
         onLoaded = null;
 
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    if (reduceMotion) {
-      return fallback ??
-          SizedBox(
-            width: width ?? 48,
-            height: height ?? 48,
-            child: Center(
-              child: Icon(
-                Icons.water_drop_rounded,
-                color: AppUi.brandOf(context),
-                size: (width != null ? width! * 0.5 : 24),
-              ),
-            ),
-          );
+  IconData _iconForAnimation() {
+    switch (animation) {
+      case RefillAnimation.axoBob:
+        return Icons.water_drop_rounded;
+      case RefillAnimation.orderSuccess:
+        return Icons.check_circle_rounded;
+      case RefillAnimation.waterDrop:
+        return Icons.water_drop_rounded;
+      case RefillAnimation.deliveryRider:
+        return Icons.delivery_dining_rounded;
     }
-    return Lottie.asset(
-      animation.assetPath,
-      width: width,
-      height: height,
-      repeat: repeat,
-      reverse: reverse,
-      fit: fit,
-      alignment: alignment,
-      controller: controller,
-      onLoaded: onLoaded,
-      errorBuilder: (context, error, stackTrace) {
-        debugPrint('RefillLottie load error for ${animation.assetPath}: $error');
-        return fallback ??
-            SizedBox(
-              width: width ?? 48,
-              height: height ?? 48,
-              child: Center(
-                child: Icon(
-                  Icons.water_drop_rounded,
-                  color: AppUi.brandOf(context),
-                  size: (width != null ? width! * 0.5 : 24),
-                ),
-              ),
-            );
-      },
-    );
   }
 
-  /// Displays an attractive, celebratory order confirmation sheet with Lottie.
+  @override
+  Widget build(BuildContext context) {
+    final icon = _iconForAnimation();
+    final resolvedFallback = fallback ??
+        SizedBox(
+          width: width ?? 48,
+          height: height ?? 48,
+          child: Center(
+            child: Icon(
+              icon,
+              color: AppUi.brandOf(context),
+              size: (width != null ? width! * 0.5 : 24),
+            ),
+          ),
+        );
+
+    return resolvedFallback;
+  }
+
   static Future<void> showOrderSuccessDialog(
     BuildContext context, {
     required String orderNumber,
