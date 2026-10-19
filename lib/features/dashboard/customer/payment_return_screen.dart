@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/services/payment_checkout_service.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/widgets/brand/axo_states.dart';
@@ -53,20 +54,22 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
           .single();
 
       final status = (order['payment_status'] ?? '').toString().toLowerCase();
-      if (widget.isSuccess && status != 'success' && status != 'paid') {
+      if (widget.isSuccess && !PaymentCheckoutService.isPaidStatus(status)) {
         try {
-          final verifyRes = await _supabase.functions.invoke(
-            'create-payment-checkout',
-            body: {'action': 'verify', 'order_id': orderId},
-          );
-          if (verifyRes.data is Map && verifyRes.data['verified'] == true) {
+          final verification = await PaymentCheckoutService(
+            _supabase,
+          ).verify(orderId);
+          if (verification.isPaid) {
             order = await _supabase
                 .from('orders')
                 .select()
                 .eq('id', orderId)
                 .single();
           }
-        } catch (_) {}
+        } catch (e) {
+          // Best effort: the order row above is still shown.
+          debugPrint('Payment verify failed for $orderId: $e');
+        }
       }
 
       if (!mounted) return;

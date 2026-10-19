@@ -33,12 +33,10 @@ void main() {
       },
     );
 
-    test('admin includes platform configuration sections', () {
-      final sections = RoleSettingsCatalog.forRole('admin');
-
-      expect(sections.map((s) => s.key), contains('platform'));
-      expect(sections.map((s) => s.key), contains('user_management'));
-      expect(sections.map((s) => s.key), contains('commission_rules'));
+    test('administrative settings are desktop-only', () {
+      expect(RoleSettingsCatalog.forRole('admin'), isEmpty);
+      expect(RoleSettingsCatalog.forRole('super_admin'), isEmpty);
+      expect(RoleSettingsCatalog.forRole('administrator'), isEmpty);
     });
   });
 }

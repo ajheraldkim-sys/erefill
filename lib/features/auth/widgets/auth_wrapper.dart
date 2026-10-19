@@ -6,11 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/providers/user_provider.dart';
+import 'package:erefill/core/utils/app_roles.dart';
 import 'package:erefill/features/auth/screens/auth_entry_screen.dart';
 import 'package:erefill/features/dashboard/owner/owner_dashboard.dart';
 import 'package:erefill/features/dashboard/customer/customer_home.dart';
 import 'package:erefill/features/dashboard/rider/rider_dashboard.dart';
-import 'package:erefill/features/dashboard/admin/admin_dashboard_screen.dart';
+import 'package:erefill/features/auth/widgets/desktop_admin_only_screen.dart';
 import 'package:erefill/features/auth/screens/onboarding_screen.dart';
 import 'package:erefill/features/auth/widgets/location_permission_screen.dart';
 import 'package:erefill/features/onboarding/screens/welcome_onboarding_screen.dart';
@@ -20,6 +21,7 @@ import 'package:erefill/features/update/screens/mandatory_update_screen.dart';
 import 'package:erefill/features/update/widgets/optional_update_dialog.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -79,7 +81,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (updateSvc.isMandatoryUpdateRequired) {
       return const MandatoryUpdateScreen();
     }
-    if (updateSvc.status == AppVersionStatus.updateAvailable && updateSvc.policy != null) {
+    if (updateSvc.status == AppVersionStatus.updateAvailable &&
+        updateSvc.policy != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           OptionalUpdateDialog.maybeShow(context, updateSvc.policy!);
@@ -120,10 +123,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    // 4. Location Guard (Required for authenticated users accessing station/delivery features)
-    // Administrators do not require client GPS location tracking.
+    // 4. Desktop-only admin accounts must not enter customer, owner, or rider flows.
     final role = userProvider.user?.role;
-    if (role == 'admin' || role == 'super_admin' || role == 'administrator') {
+    if (AppRoles.isDesktopAdmin(role)) {
       return _buildAuthenticatedContent(context, userProvider);
     }
 
@@ -133,7 +135,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
     );
   }
 
-  Widget _buildAuthenticatedContent(BuildContext context, UserProvider userProvider) {
+  Widget _buildAuthenticatedContent(
+    BuildContext context,
+    UserProvider userProvider,
+  ) {
     final user = userProvider.user;
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -166,10 +171,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   const SizedBox(height: 20),
                   const Text(
                     'Unable to Load Profile',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 10),
@@ -198,7 +200,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
                             vertical: 12,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusControl,
+                            ),
                           ),
                         ),
                       ),
@@ -214,7 +218,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
                             vertical: 12,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusControl,
+                            ),
                           ),
                         ),
                       ),
@@ -226,6 +232,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
           ),
         ),
       );
+    }
+
+    if (AppRoles.isDesktopAdmin(user.role)) {
+      return const DesktopAdminOnlyScreen();
     }
 
     // --- ADMINISTRATIVE SUSPENSION GUARD ---
@@ -302,16 +312,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
 
     // --- SMART PROFILE ONBOARDING GUARD ---
-    // Riders and Admins bypass customer location onboarding.
-    final isAdmin = user.role == 'admin' || user.role == 'super_admin' || user.role == 'administrator';
-    if (user.role != 'rider' && !isAdmin && (user.town == null || user.town!.isEmpty)) {
+    // Riders bypass customer location onboarding.
+    if (user.role != 'rider' && (user.town == null || user.town!.isEmpty)) {
       return const OnboardingScreen();
     }
 
-    if (user.role == 'owner') return OwnerDashboard(key: ValueKey('owner_${user.id}'));
-    if (user.role == 'customer') return CustomerHome(key: ValueKey('customer_${user.id}'));
-    if (user.role == 'rider') return RiderDashboard(key: ValueKey('rider_${user.id}'));
-    if (isAdmin) return AdminDashboardScreen(key: ValueKey('admin_${user.id}'));
+    if (user.role == 'owner') {
+      return OwnerDashboard(key: ValueKey('owner_${user.id}'));
+    }
+    if (user.role == 'customer') {
+      return CustomerHome(key: ValueKey('customer_${user.id}'));
+    }
+    if (user.role == 'rider') {
+      return RiderDashboard(key: ValueKey('rider_${user.id}'));
+    }
 
     return Scaffold(
       body: Center(
@@ -365,9 +379,10 @@ class _SplashScreenState extends State<_SplashScreen>
     )..forward();
 
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _scale = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
   }
 
   @override

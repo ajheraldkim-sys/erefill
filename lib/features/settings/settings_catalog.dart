@@ -21,7 +21,6 @@ class RoleSettingsCatalog {
     'customer': 'Customer settings',
     'owner': 'Station owner settings',
     'rider': 'Rider settings',
-    'admin': 'Admin system settings',
   };
 
   static const List<SettingsSection> _customerSections = [
@@ -160,58 +159,6 @@ class RoleSettingsCatalog {
     ),
   ];
 
-  static const List<SettingsSection> _adminSections = [
-    SettingsSection(
-      key: 'platform',
-      title: 'Platform',
-      description:
-          'Application branding, support links, and maintenance settings.',
-      icon: Icons.dashboard_customize_outlined,
-    ),
-    SettingsSection(
-      key: 'user_management',
-      title: 'User management',
-      description: 'Customers, station owners, and riders across the platform.',
-      icon: Icons.manage_accounts_outlined,
-    ),
-    SettingsSection(
-      key: 'station_management',
-      title: 'Station management',
-      description: 'Review, approve, and monitor station activity.',
-      icon: Icons.store_mall_directory_outlined,
-    ),
-    SettingsSection(
-      key: 'orders',
-      title: 'Orders',
-      description: 'Search, filter, and review system-wide transactions.',
-      icon: Icons.receipt_long_outlined,
-    ),
-    SettingsSection(
-      key: 'payments',
-      title: 'Payments',
-      description: 'Enabled providers, cash availability, and monitoring.',
-      icon: Icons.payment_outlined,
-    ),
-    SettingsSection(
-      key: 'commission_rules',
-      title: 'Commission rules',
-      description: 'Rider commission and milestone policy configuration.',
-      icon: Icons.calculate_outlined,
-    ),
-    SettingsSection(
-      key: 'database_sync',
-      title: 'Database & sync',
-      description: 'Supabase, SQLite, and synchronization health checks.',
-      icon: Icons.sync_outlined,
-    ),
-    SettingsSection(
-      key: 'audit_logs',
-      title: 'Audit logs',
-      description: 'Configuration changes and ownership history.',
-      icon: Icons.history_edu_outlined,
-    ),
-  ];
-
   static String titleForRole(String? role) {
     final normalized = (role ?? 'customer').toLowerCase();
     return _roleTitles[normalized] ?? _roleTitles['customer']!;
@@ -224,7 +171,9 @@ class RoleSettingsCatalog {
       case 'rider':
         return _riderSections;
       case 'admin':
-        return _adminSections;
+      case 'super_admin':
+      case 'administrator':
+        return const [];
       case 'customer':
       default:
         return _customerSections;

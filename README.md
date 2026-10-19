@@ -52,6 +52,10 @@ Many water refilling stations still rely on fragmented communication methods, ma
 - submit proof of delivery and status updates
 - work with offline queue support during intermittent connectivity
 
+### Admin access
+- administrative tools are available only in the separate desktop app under `admin/`
+- the main eRefill mobile app supports customer, station owner, and rider accounts
+
 ### Operational features
 - real-time update channels through Supabase
 - local SQLite synchronization for delivery tasks
@@ -102,7 +106,7 @@ This keeps sensitive logic off the client and improves reliability in production
 ```text
 .
 ├── lib/                         # Flutter app source
-├── admin/                      # Admin-focused Flutter app workspace
+├── admin/                      # Separate desktop-only admin Flutter app
 ├── supabase/
 │   ├── functions/              # Edge Functions
 │   └── scripts/                # SQL schema and migration scripts
@@ -213,6 +217,7 @@ supabase/scripts/auto_generate_subscription_orders.sql
 supabase/scripts/fix_customer_checkout_pricing.sql
 supabase/scripts/security_hardening_rls_and_rpc_guards.sql
 supabase/scripts/subscription_orders_server_pricing.sql
+supabase/scripts/credit_returned_empties_on_delivery.sql
 ```
 
 After releasing the app version that calls `generate_due_subscription_orders`
@@ -222,7 +227,7 @@ and making it the minimum required version, apply:
 supabase/scripts/lock_direct_order_inserts.sql
 ```
 
-Each of the last three scripts has a matching `*_rollback.sql`.
+Each of the last four scripts has a matching `*_rollback.sql`.
 
 Important notes:
 - if app release tables are missing, run `app_version_management_system.sql`

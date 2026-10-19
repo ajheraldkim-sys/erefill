@@ -17,6 +17,7 @@ import 'checkout_rules.dart';
 import 'widgets/payment_status_banner.dart';
 import '../../../core/utils/friendly_errors.dart';
 import '../../../core/services/payment_launch_service.dart';
+import '../../../core/services/payment_checkout_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/services/offline_order_sync_service.dart';
 
@@ -558,33 +559,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         }
       }
 
-      // 3. If no existing URL or launch failed, create or refresh via edge function
-      final rawMethod =
-          (activeOrder['payment_method'] ?? order['payment_method'] ?? '')
-              .toString();
-      final normalizedMethod = rawMethod.trim().toLowerCase().replaceAll(
-        'paymaya',
-        'maya',
+      // 3. If no existing URL or launch failed, create a new checkout session.
+      // The previous checkout could not be reopened, so do not reuse its
+      // inaccessible URL when requesting another payment attempt.
+      final checkoutUrl = await PaymentCheckoutService().createCheckout(
+        orderId: orderId,
+        paymentMethod:
+            (activeOrder['payment_method'] ?? order['payment_method'] ?? '')
+                .toString(),
+        forceNewCheckout: true,
       );
-
-      final response = await supabase.functions.invoke(
-        'create-payment-checkout',
-        body: {
-          'order_id': orderId,
-          'payment_method': normalizedMethod,
-          // The previous checkout could not be reopened, so do not reuse its
-          // inaccessible URL when requesting another payment attempt.
-          'force_new_checkout': true,
-        },
-      );
-
-      final data = response.data;
-      final checkoutUrl = data is Map
-          ? data['checkout_url']?.toString().trim()
-          : null;
-      if (checkoutUrl == null || checkoutUrl.isEmpty) {
-        throw Exception('Payment checkout session could not be established.');
-      }
 
       if (mounted) {
         setState(() {
@@ -609,15 +593,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
       String errorMessage =
           'Could not reopen payment checkout. Please try again.';
-      if (e is FunctionException) {
-        final details = e.details;
-        if (details is Map && details['error'] != null) {
-          errorMessage = details['error'].toString();
-        } else if (details is String && details.isNotEmpty) {
-          errorMessage = details;
-        } else if (e.reasonPhrase != null && e.reasonPhrase!.isNotEmpty) {
-          errorMessage = e.reasonPhrase!;
-        }
+      if (e is PaymentCheckoutException) {
+        errorMessage = e.message;
       } else {
         errorMessage = FriendlyErrors.message(
           e,

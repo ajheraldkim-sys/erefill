@@ -21,7 +21,6 @@ import 'package:erefill/core/widgets/press_bounce.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
 import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import 'owner_order_queue.dart';
-import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'widgets/new_order_alert_sheet.dart';
 
 class OrderManagementScreen extends StatefulWidget {
@@ -568,26 +567,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               .eq('id', orderId);
         } catch (error) {
           debugPrint('Could not save order cancellation reason: $error');
-        }
-      }
-
-      if (newStatus == 'delivered' && originalOrder != null) {
-        final ownerId = originalOrder['owner_id']?.toString() ?? supabase.auth.currentUser?.id;
-        final qty = (originalOrder['quantity'] as num?)?.toInt() ?? 1;
-        final waterType = originalOrder['water_type']?.toString();
-        final productId = originalOrder['water_option_id']?.toString();
-        final emptyReturned = (originalOrder['empty_gallons_returned'] as num?)?.toInt() ?? 0;
-        if (ownerId != null) {
-          unawaited(
-            OwnerInventoryService().recordDeliveryCompletion(
-              ownerId: ownerId,
-              orderId: orderId,
-              gallons: qty,
-              waterType: waterType,
-              productId: productId,
-              emptyGallonsReturned: emptyReturned,
-            ),
-          );
         }
       }
 

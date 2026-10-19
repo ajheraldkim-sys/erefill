@@ -30,7 +30,6 @@ import '../../features/dashboard/owner/owner_menu_screen.dart';
 import '../../features/dashboard/owner/rider_performance_screen.dart';
 import '../../features/dashboard/owner/service_catalog_screen.dart';
 import '../../features/dashboard/rider/rider_dashboard.dart';
-import '../../features/dashboard/admin/admin_dashboard_screen.dart';
 import '../../features/delivery_mgmt/screens/delivery_management_screen.dart';
 
 import '../../features/settings/customer/customer_settings_screen.dart';
@@ -38,6 +37,7 @@ import '../../features/settings/payment_account_models.dart';
 import '../../features/settings/payment_accounts_screen.dart';
 import '../../features/settings/settings_hub_screen.dart';
 import '../providers/user_provider.dart';
+import '../utils/app_roles.dart';
 import '../services/app_update_service.dart';
 import '../../features/update/screens/mandatory_update_screen.dart';
 import '../widgets/brand/axo_states.dart';
@@ -72,6 +72,12 @@ class AppRouter {
           final session = Supabase.instance.client.auth.currentSession;
           final isAuth = session != null;
           final path = state.uri.path;
+          final profileRole = context.read<UserProvider>().user?.role;
+          final authRole = session?.user.userMetadata?['role']?.toString();
+          if (AppRoles.isDesktopAdmin(profileRole ?? authRole) &&
+              path != AppRoutes.home) {
+            return AppRoutes.home;
+          }
 
           final isAuthRoute =
               path == AppRoutes.login ||
@@ -95,7 +101,7 @@ class AppRouter {
             final role = session.user.userMetadata?['role']
                 ?.toString()
                 .toLowerCase();
-            if (role != null && role != 'owner' && role != 'admin') {
+            if (role != null && role != 'owner') {
               return AppRoutes.home;
             }
           }
@@ -153,10 +159,7 @@ class AppRouter {
           AppRoutes.forgotPassword,
           (_, _) => const ForgotPasswordScreen(),
         ),
-        _pushed(
-          AppRoutes.resetPassword,
-          (_, _) => const ResetPasswordScreen(),
-        ),
+        _pushed(AppRoutes.resetPassword, (_, _) => const ResetPasswordScreen()),
         _pushed(
           AppRoutes.paymentSuccess,
           (_, state) => PaymentReturnScreen(
@@ -302,10 +305,6 @@ class AppRouter {
           }
           return RiderHistoryScreen(riderId: riderId);
         }),
-        _pushed(
-          AppRoutes.adminDashboard,
-          (_, _) => const AdminDashboardScreen(),
-        ),
       ],
     );
   }

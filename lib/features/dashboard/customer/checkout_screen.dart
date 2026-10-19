@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,6 +7,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:erefill/core/services/payment_checkout_service.dart';
+import 'services/checkout_order_service.dart';
 
 import '../../../core/utils/profile_query_helpers.dart';
 import '../../../core/widgets/app_ui_kit.dart';
@@ -80,6 +81,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int _availabilityRequestId = 0;
 
   final LoyaltyService _loyaltyService = LoyaltyService();
+  final CheckoutOrderService _orderService = CheckoutOrderService();
+  final PaymentCheckoutService _paymentService = PaymentCheckoutService();
   List<LoyaltyRewardVoucher> _availableVouchers = [];
   LoyaltyRewardVoucher? _appliedVoucher;
 
@@ -735,57 +738,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return CheckoutRules.selectableMethods(_paymentMethods);
   }
 
-  String _friendlyCheckoutError(Object error) {
-    if (error is PostgrestException) {
-      final msg = error.message.trim();
-      if (msg.isNotEmpty) {
-        if (msg.contains('Only customer accounts can place orders')) {
-          return 'Only customer accounts can place orders.';
-        }
-        if (msg.contains('closed or unavailable')) {
-          return 'This water station is currently closed or unavailable.';
-        }
-        if (msg.contains('payment method is not available') ||
-            msg.contains('payment method')) {
-          return 'This payment method is not available for this station.';
-        }
-        if (msg.contains('unavailable at this station') ||
-            msg.contains('Product not found')) {
-          return 'One or more items in your cart are unavailable at this station.';
-        }
-        return msg;
-      }
-    }
-    final message = error.toString().replaceFirst('Exception: ', '');
-    if (message.contains('Not authorized')) {
-      return 'Please sign in again to place your order.';
-    }
-    if (message.contains('payment method')) {
-      return 'Cash on delivery is available for this station. Online payment is not set up yet.';
-    }
-    if (message.contains('Product not found') ||
-        message.contains('Product id is required')) {
-      return 'Ordering is unavailable for this station right now. Please choose another station.';
-    }
-    if (message.contains('Station is not available') ||
-        message.contains('not available')) {
-      return message;
-    }
-    if (message.contains('customer_latitude') ||
-        message.contains('customer_longitude')) {
-      return 'The checkout database schema is incomplete. Please sync the Supabase orders table with the latest delivery-location columns.';
-    }
-    if (message.contains('SocketException') ||
-        message.contains('Failed host lookup') ||
-        message.contains('NetworkImage') ||
-        message.contains('ClientException')) {
-      return 'Could not reach the server. Check your connection and try again.';
-    }
-    return message.isNotEmpty
-        ? message
-        : 'We could not place your order. Please try again.';
-  }
-
   Future<void> _confirmOrder(CartProvider cart) async {
     if (_isBootstrapping || _isSubmitting) return;
     if (_pricingSetupError != null ||
@@ -851,12 +803,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    final completeAddress = _customerProfile!['complete_address']
-        .toString()
-        .trim();
-    final customerLat = (_customerProfile!['latitude'] as num).toDouble();
-    final customerLng = (_customerProfile!['longitude'] as num).toDouble();
-
     final stationName =
         widget.station['station_name']?.toString() ??
         widget.station['name']?.toString() ??
@@ -875,42 +821,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       voucherDiscount: voucherDiscount,
     );
 
-    final paymentMethod =
-        CheckoutRules.isPaymentAvailable(_paymentMethod, _paymentMethods)
-        ? _paymentMethod
-        : null;
+    final paymentMethod = _paymentMethod;
+    final request = CheckoutOrderRequest(
+      customerId: customerId,
+      stationId: widget.station['id'],
+      stationName: stationName,
+      customerName: _resolveCustomerName(),
+      profile: _customerProfile!,
+      paymentMethod: paymentMethod,
+      items: [
+        for (final item in cart.items.values)
+          CheckoutLineItem(
+            productId: item.id,
+            name: item.name,
+            quantity: item.quantity,
+          ),
+      ],
+      subtotal: cart.totalAmount,
+      deliveryFee: _deliveryFee,
+      deliveryDistanceKm: _deliveryDistanceKm,
+      deliveryRatePerKm: _deliveryRatePerKm,
+      totalAmount: totalAmount,
+      voucherId: _appliedVoucher?.id,
+      containerOption: _containerOption,
+      scheduleForNextOpen: _isOutsideHours && _scheduleForNextOpen,
+      stationOpeningTime: _stationOpeningTime,
+      userNotes: _notesController.text,
+    );
+    final itemsData = request.itemsData;
+    final completeAddress = request.address;
 
-    final itemsData = cart.items.values
-        .map(
-          (item) => {
-            'product_id': item.id,
-            'product_name': item.name,
-            'quantity': item.quantity,
-          },
-        )
-        .toList();
-
-    final sortedItems = [...itemsData]
-      ..sort(
-        (a, b) =>
-            a['product_id']!.toString().compareTo(b['product_id']!.toString()),
-      );
-    final requestFingerprint = jsonEncode({
-      'customer_id': customerId,
-      'station_id': widget.station['id'],
-      'payment_method': paymentMethod,
-      'address': completeAddress,
-      'barangay': _customerProfile?['barangay'],
-      'town': _customerProfile?['town'],
-      'landmark': _customerProfile?['landmark'],
-      'latitude': customerLat,
-      'longitude': customerLng,
-      'notes': _notesController.text.trim(),
-      'voucher_id': _appliedVoucher?.id,
-      'items': sortedItems,
-    });
-    if (_orderAttemptFingerprint != requestFingerprint) {
-      _orderAttemptFingerprint = requestFingerprint;
+    // Same order as the last attempt -> same idempotency key, so a retry
+    // after a lost response cannot create a duplicate order.
+    if (_orderAttemptFingerprint != request.fingerprint) {
+      _orderAttemptFingerprint = request.fingerprint;
       _orderAttemptKey = const Uuid().v4();
     }
 
@@ -919,73 +863,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _checkoutHint = null;
     });
     try {
-      if (paymentMethod == null) {
-        throw StateError('Selected payment method is not available.');
-      }
-
-      final containerNotice = _containerOption == 'swap'
-          ? '[Container: 1-to-1 Bottle Swap]'
-          : '[Container: No Empty Bottle (Deposit / New Container Needed)]';
-
-      final scheduleNotice = _isOutsideHours && _scheduleForNextOpen
-          ? '[Scheduled for next station opening (${_stationOpeningTime ?? '8:00 AM'})]'
-          : null;
-
-      final userNotes = _notesController.text.trim();
-      final combinedNotes = [
-        containerNotice,
-        ?scheduleNotice,
-        if (userNotes.isNotEmpty) userNotes,
-      ].join(' · ');
-
-      final orderData = {
-        'customer_id': customerId,
-        'owner_id': widget.station['id'],
-        'station_name': stationName,
-        'customer_name': _resolveCustomerName(),
-        'customer_phone': _customerProfile?['phone'],
-        'customer_address': completeAddress,
-        'customer_barangay': _customerProfile?['barangay'],
-        'customer_municipality': _customerProfile?['town'],
-        'customer_landmark': _customerProfile?['landmark'],
-        'idempotency_key': _orderAttemptKey,
-        'voucher_id': _appliedVoucher?.id,
-        'subtotal': cart.totalAmount,
-        'delivery_fee': _deliveryFee,
-        'delivery_distance_km': _deliveryDistanceKm,
-        'delivery_rate_per_km': _deliveryRatePerKm,
-        'total_amount': totalAmount,
-        'payment_method': paymentMethod,
-        'payment_proof_url': null,
-        'notes': combinedNotes,
-        'region_id': _customerProfile?['region_id'],
-        'customer_latitude': customerLat,
-        'customer_longitude': customerLng,
-        'container_exchange_type': _containerOption,
-        if (_isOutsideHours && _scheduleForNextOpen)
-          'scheduled_for_next_open': true,
-      };
-
-      final response = await supabase.rpc(
-        'create_order_atomic',
-        params: {'p_order_data': orderData, 'p_items_data': itemsData},
+      final placed = await _orderService.placeOrder(
+        request,
+        idempotencyKey: _orderAttemptKey!,
       );
-      if (response == null || response is! Map) {
-        throw StateError('Order creation failed: invalid server response.');
-      }
-      final orderMap = Map<String, dynamic>.from(response);
-      final orderId = orderMap['id']?.toString();
-      if (orderId == null || orderId.isEmpty) {
-        throw StateError('Order creation failed: missing order ID.');
-      }
-      final serverTotal = orderMap['total_amount'];
-      if (serverTotal is num) {
-        totalAmount = serverTotal.toDouble();
-      }
+      final orderId = placed.id;
+      totalAmount = placed.totalAmount;
 
       if (CheckoutRules.isOnlinePayment(paymentMethod)) {
         try {
-          final checkoutUrl = await _createOnlinePaymentCheckout(
+          final checkoutUrl = await _paymentService.createCheckout(
             orderId: orderId,
             paymentMethod: paymentMethod,
           );
@@ -1037,11 +924,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       }
 
-      final orderRecord = await supabase
-          .from('orders')
-          .select()
-          .eq('id', orderId)
-          .single();
+      final orderRecord = await _orderService.fetchOrder(orderId);
 
       if (!mounted) return;
       final shortId = orderId.length >= 8
@@ -1066,7 +949,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           errStr.contains('failed host lookup') ||
           errStr.contains('clientexception');
 
-      final selectedPayment = paymentMethod ?? 'cod';
+      final selectedPayment = paymentMethod;
       if (CheckoutRules.isOnlinePayment(selectedPayment) && isOfflineLikely) {
         if (mounted) {
           _setCheckoutHint(
@@ -1140,58 +1023,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       if (mounted) {
-        _setCheckoutHint(_friendlyCheckoutError(e));
+        _setCheckoutHint(CheckoutOrderService.friendlyError(e));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<String> _createOnlinePaymentCheckout({
-    required String orderId,
-    required String paymentMethod,
-    bool forceNewCheckout = false,
-  }) async {
-    final normalizedMethod = paymentMethod.trim().toLowerCase().replaceAll(
-      'paymaya',
-      'maya',
-    );
-    try {
-      final response = await supabase.functions.invoke(
-        'create-payment-checkout',
-        body: {
-          'order_id': orderId,
-          'payment_method': normalizedMethod,
-          if (forceNewCheckout) 'force_new_checkout': true,
-        },
-      );
-
-      final data = response.data;
-      if (data is Map) {
-        final checkoutUrl = data['checkout_url']?.toString().trim();
-        if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
-          return checkoutUrl;
-        }
-        if (data['error'] != null) {
-          throw Exception(data['error'].toString());
-        }
-      }
-      if (response.status != 200) {
-        throw Exception(
-          'Payment gateway server returned status ${response.status}.',
-        );
-      }
-      throw Exception('Payment checkout session was not created.');
-    } on FunctionException catch (fe) {
-      final details = fe.details;
-      if (details is Map && details['error'] != null) {
-        throw Exception(details['error'].toString());
-      } else if (details is String && details.isNotEmpty) {
-        throw Exception(details);
-      } else if (fe.reasonPhrase != null && fe.reasonPhrase!.isNotEmpty) {
-        throw Exception(fe.reasonPhrase!);
-      }
-      rethrow;
     }
   }
 
@@ -1318,7 +1153,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required CartProvider cart,
   }) async {
     try {
-      final checkoutUrl = await _createOnlinePaymentCheckout(
+      final checkoutUrl = await _paymentService.createCheckout(
         orderId: orderId,
         paymentMethod: paymentMethod,
       );
@@ -3338,6 +3173,18 @@ class _PaymentVerificationModal extends StatefulWidget {
 
 class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
   final _supabase = Supabase.instance.client;
+  final _paymentService = PaymentCheckoutService();
+
+  /// Realtime updates and the manual check can both report success (the
+  /// webhook and the verify call each write payment_status). Navigating twice
+  /// would pop the route underneath the sheet, so only the first one counts.
+  bool _successHandled = false;
+
+  void _handlePaymentSuccess(Map<String, dynamic> orderRecord) {
+    if (_successHandled) return;
+    _successHandled = true;
+    widget.onPaymentSuccess(orderRecord);
+  }
   bool _isCheckingStatus = false;
   String _paymentStatus = 'processing';
   String? _checkoutUrl;
@@ -3375,7 +3222,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
             if (status == 'success' ||
                 status == 'paid' ||
                 status == 'succeeded') {
-              widget.onPaymentSuccess(newRecord);
+              _handlePaymentSuccess(newRecord);
             }
           },
         )
@@ -3404,27 +3251,21 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
       var status = (record['payment_status'] ?? '').toString().toLowerCase();
 
       // If still awaiting confirmation, verify directly against PayMongo via Edge Function
-      if (status != 'success' && status != 'paid' && status != 'succeeded') {
+      if (!PaymentCheckoutService.isPaidStatus(status)) {
         try {
-          final verifyRes = await _supabase.functions.invoke(
-            'create-payment-checkout',
-            body: {'action': 'verify', 'order_id': widget.orderId},
-          );
-          final vData = verifyRes.data;
-          if (vData is Map && vData['payment_status'] != null) {
-            final verifiedStatus = vData['payment_status']
-                .toString()
-                .toLowerCase();
-            if (verifiedStatus == 'success' || verifiedStatus == 'paid') {
-              record = await _supabase
-                  .from('orders')
-                  .select()
-                  .eq('id', widget.orderId)
-                  .single();
-              status = 'success';
-            }
+          final verification = await _paymentService.verify(widget.orderId);
+          if (verification.isPaid) {
+            record = await _supabase
+                .from('orders')
+                .select()
+                .eq('id', widget.orderId)
+                .single();
+            status = 'success';
           }
-        } catch (_) {}
+        } catch (e) {
+          // Best effort: the order row above is still shown.
+          debugPrint('Payment verify failed for ${widget.orderId}: $e');
+        }
       }
 
       if (mounted) {
@@ -3438,7 +3279,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
       }
 
       if (status == 'success' || status == 'paid' || status == 'succeeded') {
-        widget.onPaymentSuccess(record);
+        _handlePaymentSuccess(record);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -3480,42 +3321,22 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
     }
 
     try {
-      final normalizedMethod = widget.paymentMethod
-          .trim()
-          .toLowerCase()
-          .replaceAll('paymaya', 'maya');
-      final response = await _supabase.functions.invoke(
-        'create-payment-checkout',
-        body: {
-          'order_id': widget.orderId,
-          'payment_method': normalizedMethod,
-          'force_new_checkout': true,
-        },
+      final newUrl = await _paymentService.createCheckout(
+        orderId: widget.orderId,
+        paymentMethod: widget.paymentMethod,
+        forceNewCheckout: true,
       );
-      final data = response.data;
-      if (data is Map && data['checkout_url'] is String) {
-        final newUrl = data['checkout_url'] as String;
-        if (mounted) {
-          setState(() => _checkoutUrl = newUrl);
-        }
-        final launched = await PaymentLaunchService.launchCheckoutUrl(newUrl);
-        if (!launched) {
-          throw Exception('Unable to open the renewed payment checkout page.');
-        }
-        return;
+      if (mounted) {
+        setState(() => _checkoutUrl = newUrl);
       }
-      final err = data is Map ? data['error'] : null;
-      throw Exception(err?.toString() ?? 'Could not reopen payment checkout.');
-    } on FunctionException catch (fe) {
-      final details = fe.details;
-      final msg = details is Map && details['error'] != null
-          ? details['error'].toString()
-          : details is String && details.isNotEmpty
-          ? details
-          : fe.reasonPhrase ?? 'Could not reopen payment checkout.';
+      final launched = await PaymentLaunchService.launchCheckoutUrl(newUrl);
+      if (!launched) {
+        throw Exception('Unable to open the renewed payment checkout page.');
+      }
+    } on PaymentCheckoutException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: AppColors.uiError),
+          SnackBar(content: Text(e.message), backgroundColor: AppColors.uiError),
         );
       }
     } catch (e) {

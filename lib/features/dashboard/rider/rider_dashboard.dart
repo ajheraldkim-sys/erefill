@@ -19,12 +19,9 @@ import 'package:erefill/core/providers/theme_provider.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
-import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
-import 'package:erefill/core/widgets/notification_preview_sheet.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/profile_query_helpers.dart';
-import 'package:erefill/core/widgets/rider_active_delivery_card.dart';
 import 'package:erefill/core/widgets/role_bottom_nav_bar.dart';
 import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
@@ -39,7 +36,6 @@ import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 import 'services/location_service.dart';
-import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'services/order_cache_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
 import 'services/offline_delivery_queue_service.dart';
@@ -49,6 +45,8 @@ import '../../payouts/widgets/rider_payout_sheet.dart';
 import 'rider_history_screen.dart';
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'widgets/rider_home_overview.dart';
+import 'widgets/rider_swipe_to_accept_slider.dart';
 export 'rider_history_screen.dart';
 
 double _safeDouble(dynamic value, {double fallback = 0}) {
@@ -879,28 +877,9 @@ class _RiderDashboardState extends State<RiderDashboard>
 
       // Update UI after delivery confirms
       if (mounted) {
-        final currentOrder = _myActiveOrders.firstWhere(
-          (o) => o['id']?.toString() == orderId,
-          orElse: () => <String, dynamic>{},
-        );
-        final ownerId = currentOrder['owner_id']?.toString();
-        final qty = _safeInt(currentOrder['quantity'], fallback: 1);
-        final waterType = currentOrder['water_type']?.toString();
-        final productId = currentOrder['water_option_id']?.toString();
-
-        if (ownerId != null && ownerId.isNotEmpty) {
-          unawaited(
-            OwnerInventoryService().recordDeliveryCompletion(
-              ownerId: ownerId,
-              orderId: orderId,
-              gallons: qty,
-              waterType: waterType,
-              productId: productId,
-              emptyGallonsReturned: completion.emptyGallonsReturned,
-            ),
-          );
-        }
-
+        // Returned empties are credited to the station by the database when
+        // the order becomes delivered (trg_credit_returned_empties); filled
+        // stock was already reserved when the order was placed.
         setState(() {
           _myActiveOrders.removeWhere((o) => o['id'] == orderId);
         });
@@ -1226,7 +1205,7 @@ class _RiderDashboardState extends State<RiderDashboard>
     final myId = supabase.auth.currentUser?.id;
 
     final pages = [
-      _RiderHomeOverview(
+      RiderHomeOverview(
         profile: _profile,
         completedCount: _completedDeliveries,
         totalEarnings: _totalEarnings,
@@ -1783,7 +1762,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                 const SizedBox(width: 8),
                 Expanded(
                   child: status == 'assigned_to_rider'
-                      ? _RiderSwipeToAcceptSlider(
+                      ? RiderSwipeToAcceptSlider(
                           label: 'Slide to Accept Order',
                           onAccepted: () =>
                               _updateOrderStatus(orderId, 'out_for_delivery'),
@@ -2857,386 +2836,3 @@ class _RiderDashboardState extends State<RiderDashboard>
 }
 
 // RiderHistoryScreen extracted to rider_history_screen.dart
-
-// ── Rider Home Overview Tab ───────────────────────────────────────────────────
-
-class _RiderHomeOverview extends StatelessWidget {
-  final Map<String, dynamic>? profile;
-  final int completedCount;
-  final double totalEarnings;
-  final List<Map<String, dynamic>> activeOrders;
-  final ValueChanged<int> onNavigate;
-  final Future<void> Function()? onRefresh;
-  final Future<void> Function(bool)? onToggleOnline;
-
-  const _RiderHomeOverview({
-    required this.profile,
-    required this.completedCount,
-    required this.totalEarnings,
-    required this.activeOrders,
-    required this.onNavigate,
-    this.onRefresh,
-    this.onToggleOnline,
-  });
-
-  String get _greeting {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
-  Widget _buildOnlineStatusCard(BuildContext context, bool isOnline) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-        border: Border.all(
-          color: isOnline
-              ? AppUi.accentGreen.withValues(alpha: 0.3)
-              : AppUi.borderOf(context),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (isOnline ? AppUi.accentGreen : Colors.black).withValues(
-              alpha: 0.04,
-            ),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isOnline ? AppUi.accentGreen : AppUi.textMutedOf(context),
-              boxShadow: isOnline
-                  ? [
-                      BoxShadow(
-                        color: AppUi.accentGreen.withValues(alpha: 0.4),
-                        blurRadius: 6,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isOnline ? "YOU'RE ONLINE" : "YOU'RE OFFLINE",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: isOnline ? AppUi.accentGreen : AppUi.textSecondaryOf(context),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isOnline
-                      ? 'Ready to receive station deliveries'
-                      : 'Switch online to accept dispatches',
-                  style: AppUi.captionText,
-                ),
-              ],
-            ),
-          ),
-          Switch.adaptive(
-            value: isOnline,
-            activeTrackColor: AppUi.accentGreen,
-            onChanged: onToggleOnline != null
-                ? (v) => onToggleOnline!(v)
-                : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fullName = profile?['full_name'] ?? 'Rider';
-    final firstName = fullName.split(' ').first;
-    final isOnline = profile?['is_online'] == true;
-    final active = activeOrders.isNotEmpty ? activeOrders.first : null;
-
-    return Scaffold(
-      backgroundColor: AppUi.pageBgOf(context),
-      body: Column(
-        children: [
-          RiderHeroHeader(
-            greeting: '$_greeting, $firstName',
-            subtitle:
-                '$completedCount completed · ${formatPeso(totalEarnings, whole: true)} earned',
-            onNotificationTap: () => showNotificationPreviewSheet(
-              context,
-              onViewAll: () => context.openInbox(),
-            ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: onRefresh ?? () async {},
-              color: AppUi.bluePrimary,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverPadding(
-                    padding: AppUi.pagePaddingLoose.copyWith(
-                      top: AppUi.spacingMd,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        const OfflineSyncStatusPill(),
-                        _buildOnlineStatusCard(context, isOnline),
-                        AppUi.vGapMd,
-                        if (active != null) ...[
-                          RiderActiveDeliveryCard(
-                            order: active,
-                            onTap: () => onNavigate(1),
-                          ),
-                          AppUi.vGapLg,
-                        ] else ...[
-                          FriendlyHeroCard(
-                            role: ExperienceRole.rider,
-                            scene: ExperienceScene.delivery,
-                            eyebrow: 'Ready mode',
-                            title: 'Dispatches will land here',
-                            message:
-                                'When your station assigns a refill, you will see pickup, customer, and route details immediately.',
-                            actionLabel: 'Open dispatch',
-                            actionIcon: Icons.delivery_dining_rounded,
-                            onAction: () => onNavigate(1),
-                          ),
-                          AppUi.vGapLg,
-                        ],
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: 'Total earnings',
-                                    value:
-                                        formatPeso(totalEarnings, whole: true),
-                                    icon: Icons.payments_rounded,
-                                    color: AppUi.accentGreen,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: 'Completed',
-                                    value: '$completedCount',
-                                    icon: Icons.check_circle_rounded,
-                                    color: OrderStatusColors.getColor(
-                                      'completed',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: 'Active jobs',
-                                    value: '${activeOrders.length}',
-                                    icon: Icons.local_shipping_rounded,
-                                    color: OrderStatusColors.getColor(
-                                      'out_for_delivery',
-                                    ),
-                                    onTap: () => onNavigate(1),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: 'Pending pickup',
-                                    value:
-                                        '${activeOrders.where((o) => o['status'] == 'assigned_to_rider').length}',
-                                    icon: Icons.inventory_2_outlined,
-                                    color: OrderStatusColors.getColor(
-                                      'ready_for_pickup',
-                                    ),
-                                    onTap: () => onNavigate(1),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        AppUi.vGapLg,
-                        AxoTipCard(
-                          title: 'Deliver fast, earn more',
-                          message:
-                              'Quick deliveries and proof-of-delivery photos help you get priority jobs from your station.',
-                          trailingIcon: Icons.bolt_rounded,
-                        ),
-                      ]),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Interactive swipe-to-accept slider for riders with haptic feedback
-class _RiderSwipeToAcceptSlider extends StatefulWidget {
-  final VoidCallback onAccepted;
-  final String label;
-
-  const _RiderSwipeToAcceptSlider({
-    required this.onAccepted,
-    this.label = 'Slide to Accept Order',
-  });
-
-  @override
-  State<_RiderSwipeToAcceptSlider> createState() =>
-      _RiderSwipeToAcceptSliderState();
-}
-
-class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
-  double _position = 0.0;
-  bool _accepted = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (_accepted) {
-      return Container(
-        height: AppUi.kRiderTouchTarget,
-        decoration: BoxDecoration(
-          color: AppUi.accentGreen,
-          borderRadius: AppUi.controlRadius,
-        ),
-        alignment: Alignment.center,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Accepted & Starting!',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxSlide =
-            (constraints.maxWidth - AppUi.kRiderTouchTarget).clamp(0.0, 500.0);
-
-        return Container(
-          height: AppUi.kRiderTouchTarget,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppUi.bluePrimary,
-                AppUi.bluePrimary.withValues(alpha: 0.85),
-              ],
-            ),
-            borderRadius: AppUi.controlRadius,
-          ),
-          child: Stack(
-            children: [
-              Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      widget.label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                left: _position,
-                top: 2,
-                bottom: 2,
-                child: GestureDetector(
-                  onHorizontalDragUpdate: (details) {
-                    setState(() {
-                      _position = (_position + details.delta.dx).clamp(
-                        0.0,
-                        maxSlide,
-                      );
-                    });
-                  },
-                  onHorizontalDragEnd: (details) {
-                    if (_position >= maxSlide * 0.72) {
-                      setState(() {
-                        _position = maxSlide;
-                        _accepted = true;
-                      });
-                      HapticFeedback.heavyImpact();
-                      widget.onAccepted();
-                    } else {
-                      setState(() {
-                        _position = 0.0;
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: AppUi.kRiderTouchTarget - 4,
-                    height: AppUi.kRiderTouchTarget - 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x33000000),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.double_arrow_rounded,
-                      color: AppUi.brandOf(context),
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-}

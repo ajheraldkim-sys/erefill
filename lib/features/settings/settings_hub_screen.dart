@@ -3,12 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/providers/user_provider.dart';
+import 'package:erefill/core/utils/app_roles.dart';
 import 'package:erefill/features/settings/rider/rider_settings_screen.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
 import 'package:erefill/features/account/saved_addresses_screen.dart';
 import 'package:erefill/features/settings/settings_catalog.dart';
 import 'package:erefill/features/settings/payment_account_models.dart';
-import 'package:erefill/features/dashboard/admin/admin_dashboard_screen.dart';
+import 'package:erefill/features/auth/widgets/desktop_admin_only_screen.dart';
 
 class SettingsHubScreen extends StatelessWidget {
   const SettingsHubScreen({super.key, this.role = 'customer'});
@@ -17,9 +18,12 @@ class SettingsHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authenticatedRole = _normalizeRole(
-      context.watch<UserProvider>().user?.role,
-    );
+    final profileRole = context.watch<UserProvider>().user?.role;
+    if (AppRoles.isDesktopAdmin(profileRole) || AppRoles.isDesktopAdmin(role)) {
+      return const DesktopAdminOnlyScreen();
+    }
+
+    final authenticatedRole = _normalizeRole(profileRole);
     final effectiveRole = authenticatedRole ?? 'customer';
     final sections = RoleSettingsCatalog.forRole(effectiveRole);
 
@@ -61,9 +65,6 @@ class SettingsHubScreen extends StatelessWidget {
         return 'owner';
       case 'rider':
         return 'rider';
-      case 'admin':
-      case 'administrator':
-        return 'admin';
       default:
         return null;
     }
@@ -97,7 +98,11 @@ class _SettingsTile extends StatelessWidget {
                     color: AppUi.brandSoftOf(context),
                     borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   ),
-                  child: Icon(section.icon, color: AppUi.brandOf(context), size: 20),
+                  child: Icon(
+                    section.icon,
+                    color: AppUi.brandOf(context),
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -123,7 +128,10 @@ class _SettingsTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppUi.textMutedOf(context)),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppUi.textMutedOf(context),
+                ),
               ],
             ),
           ),
@@ -142,9 +150,6 @@ class _SettingsTile extends StatelessWidget {
         return;
       case 'rider':
         _handleRiderTap(context);
-        return;
-      case 'admin':
-        _handleAdminTap(context);
         return;
       default:
         _handleCustomerTap(context);
@@ -214,7 +219,6 @@ class _SettingsTile extends StatelessWidget {
         context.openPaymentAccounts(PaymentAccountScope.ownerPayoutAccounts);
         return;
       case 'riders':
-        
         return;
       case 'notifications':
         context.openOwnerMenu();
@@ -248,10 +252,8 @@ class _SettingsTile extends StatelessWidget {
         ).push(MaterialPageRoute(builder: (_) => const RiderSettingsScreen()));
         return;
       case 'availability':
-        
         return;
       case 'commission_earnings':
-        
         return;
       case 'security':
         Navigator.of(context).push(
@@ -270,11 +272,5 @@ class _SettingsTile extends StatelessWidget {
           ),
         );
     }
-  }
-
-  void _handleAdminTap(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-    );
   }
 }
