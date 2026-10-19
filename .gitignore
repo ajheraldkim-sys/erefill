@@ -38,6 +38,7 @@ migrate_working_dir/
 /android/build/
 /admin/build/
 /coverage/
+/.worktrees/
 
 # Symbolication related
 app.*.symbols
