@@ -435,7 +435,7 @@ class _StationsScreenState extends State<StationsScreen> {
           ],
         ),
       ),
-      toolbar: AdminGlassCard(
+      toolbar: AdminCard(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -699,7 +699,7 @@ class _StationsScreenState extends State<StationsScreen> {
 
               return SizedBox(
                 width: cardWidth,
-                child: AdminGlassCard(
+                child: AdminCard(
                   padding: const EdgeInsets.all(18),
                   accent: isSelected ? AppUi.bluePrimary : null,
                   onTap: () => setState(() => _selected = s),
@@ -1112,7 +1112,7 @@ class _StationsScreenState extends State<StationsScreen> {
         .where((s) => s['latitude'] != null && s['longitude'] != null)
         .toList();
 
-    return AdminGlassCard(
+    return AdminCard(
       expand: true,
       padding: EdgeInsets.zero,
       child: Column(

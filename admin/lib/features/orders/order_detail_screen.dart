@@ -297,7 +297,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _infoCard(String title, List<Widget> rows) {
-    return AdminGlassCard(
+    return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -356,7 +356,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ? itemsRaw.map((i) => Map<String, dynamic>.from(i as Map)).toList()
         : <Map<String, dynamic>>[];
 
-    return AdminGlassCard(
+    return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

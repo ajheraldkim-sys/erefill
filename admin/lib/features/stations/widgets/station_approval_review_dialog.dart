@@ -348,7 +348,7 @@ class _StationApprovalReviewDialogState
           const SizedBox(height: 12),
 
           // Station Location & Coordinates
-          AdminGlassCard(
+          AdminCard(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,7 +402,7 @@ class _StationApprovalReviewDialogState
     required List<String> details,
     required IconData icon,
   }) {
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

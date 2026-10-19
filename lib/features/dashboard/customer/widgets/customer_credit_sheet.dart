@@ -228,24 +228,12 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _totalDebt > 0
-                      ? [
-                          AppColors.uiError.withValues(alpha: 0.1),
-                          const Color(0xFFF97316).withValues(alpha: 0.08),
-                        ]
-                      : [
-                          AppColors.uiSuccess.withValues(alpha: 0.1),
-                          AppColors.uiSuccess.withValues(alpha: 0.05),
-                        ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: _totalDebt > 0 ? AppUi.errorBg : AppUi.successBg,
                 borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                 border: Border.all(
                   color: _totalDebt > 0
-                      ? AppColors.uiError.withValues(alpha: 0.3)
-                      : AppColors.uiSuccess.withValues(alpha: 0.3),
+                      ? AppUi.errorBorder
+                      : AppUi.successBorder,
                 ),
               ),
               child: Row(
@@ -455,4 +443,3 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
     );
   }
 }
-

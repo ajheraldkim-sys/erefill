@@ -2667,17 +2667,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     left: 0,
                     right: 0,
                     height: 70,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.12),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
+                    child: const ColoredBox(
+                      color: Color(0x1F000000),
                     ),
                   ),
                 ],

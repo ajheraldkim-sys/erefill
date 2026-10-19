@@ -12,15 +12,16 @@
 
 ## Direction
 
-**Minimal, operational, water-calm.** Neutral slate surfaces, one brand blue
-accent, borders instead of shadows, and color reserved for meaning (status).
+**Minimal, operational, water-calm.** Neutral slate surfaces, a muted brand
+blue accent, borders instead of shadows, and color reserved for meaning
+(status).
 Generated with the UI UX Pro Max skill
 (`search.py "water delivery ordering SaaS …" --design-system`), then adapted:
 
 | Skill recommendation | Decision | Why |
 |---|---|---|
 | Style "Vibrant & Block-based" | **Rejected** → Minimalism / Swiss + Flat | The brief asks for minimal and operational; the skill's own style search ranks Minimalism & Swiss (WCAG AAA) for SaaS dashboards. |
-| Primary cyan `#0891B2` | **Kept existing brand blue `#0F71C3`** | Same water hue family, already in launcher icon and splash, 5.0:1 on white. Cyan `#42C2C8` stays as the dark-mode primary. |
+| Primary cyan `#0891B2` | **Kept eRefill's muted water blue `#426779`** | Preserves the brand hue family with lower saturation and 6.1:1 contrast on white. Muted cyan `#65A8AB` stays as the dark-mode primary. |
 | CTA green `#22C55E` | **Rejected** | 2.3:1 on white; a second accent competes with status green. Primary actions use brand blue. |
 | Inter | **Kept Plus Jakarta Sans** | Same "clean, functional" role; already bundled; switching changes text metrics on 200+ screens. |
 | Data-dense dashboard for admin | **Adopted** for admin tables and owner queues | Space-efficient, WCAG AA. |
@@ -32,8 +33,8 @@ Generated with the UI UX Pro Max skill
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `bluePrimary` / `accentCyan` | `#0F71C3` | `#42C2C8` | Primary actions, active nav, links, focus |
-| `blueSoft` | `#EEF6FD` | cyan 16 % | Selected chips, nav indicator, info tint |
+| `bluePrimary` / `accentCyan` | `#426779` | `#65A8AB` | Primary actions, active nav, links, focus |
+| `blueSoft` | `#E8EFF4` | cyan 16 % | Selected chips, nav indicator, info tint |
 | `pageBg` / `darkPageBg` | `#F8FAFC` | `#0B1220` | Scaffold |
 | `surface` / `darkSurface` | `#FFFFFF` | `#111A2B` | Cards, sheets, dialogs, inputs |
 | `lightSurfaceRaised` / `darkSurfaceRaised` | `#F1F5F9` | `#1A2538` | Wells, disabled fills, table headers |
@@ -45,8 +46,9 @@ Generated with the UI UX Pro Max skill
 
 In widgets, prefer the theme-aware helpers `AppUi.brandOf(context)` (brand
 text/icons), `AppUi.brandSoftOf(context)` (tinted tiles, tonal buttons) and
-`AppUi.onBrandSoftOf(context)` (content on that tint). The raw light values
-(`bluePrimary` 3.5:1, `blueSoft` glare) are wrong on dark surfaces.
+`AppUi.onBrandSoftOf(context)` (content on that tint). The light-mode
+`bluePrimary` and `blueSoft` values should not be used directly on dark
+surfaces.
 
 All text tokens are ≥ 4.5:1 on every surface of their mode — enforced by
 `test/design_tokens_contrast_test.dart`.
@@ -55,9 +57,9 @@ All text tokens are ≥ 4.5:1 on every surface of their mode — enforced by
 
 | Role | Solid (text/icon on white) | Tint bg | Text on tint |
 |---|---|---|---|
-| Success | `AppColors.uiSuccess #15803D` | `AppUi.successBg #DCFCE7` | `AppUi.successFg #166534` |
-| Warning | `AppColors.uiWarning #B45309` | `AppUi.warningBg #FEF3C7` | `AppUi.warningFg #92400E` |
-| Error | `AppUi.error #DC2626` | `AppUi.errorBg #FEE2E2` | `AppUi.errorFg #B91C1C` |
+| Success | `AppColors.uiSuccess #3F684B` | `AppUi.successBg #E6EEE8` | `AppUi.successFg #3F684B` |
+| Warning | `AppColors.uiWarning #755B34` | `AppUi.warningBg #F2ECE2` | `AppUi.warningFg #755B34` |
+| Error | `AppUi.error #914646` | `AppUi.errorBg #F1E7E7` | `AppUi.errorFg #7C4141` |
 | Info | `AppUi.info` (brand) | `AppUi.infoBg` | `bluePrimary` |
 
 Tint borders: `successBorder`, `warningBorder`, `errorBorder`. Readable
@@ -72,14 +74,14 @@ untouched.
 
 | Canonical status | Accepted aliases | Color | Label |
 |---|---|---|---|
-| `pending` | `pending_sync` (offline) | Amber `#B45309` | Pending / Queued Offline |
-| `accepted` | `confirmed` | Blue `#2563EB` | Accepted |
-| `preparing` | `in_prep` | Violet `#7C3AED` | Preparing |
-| `ready_for_pickup` | `ready`, `ready_for_delivery` | Teal `#0F766E` | Ready for Pickup |
-| `out_for_delivery` | `assigned_to_rider`, `rider_assigned`, `delivering`, `dispatched` | Indigo `#4338CA` | Out for Delivery / Assigned to Rider |
-| `delivered` | `completed` | Green `#16803D` | Delivered |
-| `cancelled` | `canceled` | Red `#DC2626` | Cancelled |
-| `rejected` | — | Crimson `#991B1B` | Rejected |
+| `pending` | `pending_sync` (offline) | Muted amber `#925B28` | Pending / Queued Offline |
+| `accepted` | `confirmed` | Muted blue `#426F95` | Accepted |
+| `preparing` | `in_prep` | Slate `#626C74` | Preparing |
+| `ready_for_pickup` | `ready`, `ready_for_delivery` | Muted teal `#3F736D` | Ready for Pickup |
+| `out_for_delivery` | `assigned_to_rider`, `rider_assigned`, `delivering`, `dispatched` | Muted blue-teal `#4B738A` | Out for Delivery / Assigned to Rider |
+| `delivered` | `completed` | Muted green `#4F775C` | Delivered |
+| `cancelled` | `canceled` | Muted red `#914646` | Cancelled |
+| `rejected` | — | Muted crimson `#80434A` | Rejected |
 | anything else | — | Slate `#64748B` | Processing |
 
 ### Other statuses — `StatusTone`
@@ -127,7 +129,9 @@ status pills, avatars).
 
 Borders separate; shadows are for overlays only.
 Cards: `elevation 0` + 1 px `borderLight`. Floating overlays: `AppUi.shadowMd`.
-No gradients on functional surfaces.
+Use solid fills throughout the system: no gradients, purple/indigo accents,
+backdrop blur, or translucent glass-style cards. Keep status colors muted,
+distinct, and contrast-safe.
 
 ## Controls
 

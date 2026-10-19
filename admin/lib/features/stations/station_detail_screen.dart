@@ -345,7 +345,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 840;
 
-              final stationInfoCard = AdminGlassCard(
+              final stationInfoCard = AdminCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -451,7 +451,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
               final rightColumn = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  AdminGlassCard(
+                  AdminCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -500,7 +500,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                     ),
                   ),
                   AppUi.vGapMd,
-                  AdminGlassCard(
+                  AdminCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -566,7 +566,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AdminGlassCard(
+          AdminCard(
             padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -673,7 +673,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
             ),
           ),
           AppUi.vGapLg,
-          AdminGlassCard(
+          AdminCard(
             padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -757,7 +757,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AdminGlassCard(
+          AdminCard(
             padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -857,7 +857,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
             ),
           ),
           AppUi.vGapLg,
-          AdminGlassCard(
+          AdminCard(
             padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

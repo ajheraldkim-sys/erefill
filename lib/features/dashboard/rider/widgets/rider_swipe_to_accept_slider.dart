@@ -59,12 +59,7 @@ class _RiderSwipeToAcceptSliderState extends State<RiderSwipeToAcceptSlider> {
         return Container(
           height: AppUi.kRiderTouchTarget,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppUi.bluePrimary,
-                AppUi.bluePrimary.withValues(alpha: 0.85),
-              ],
-            ),
+            color: AppUi.bluePrimary,
             borderRadius: AppUi.controlRadius,
           ),
           child: Stack(

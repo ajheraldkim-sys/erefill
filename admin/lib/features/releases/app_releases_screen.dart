@@ -221,7 +221,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
           const SizedBox(height: 28),
 
           // Search and Filters Card
-          AdminGlassCard(
+          AdminCard(
             padding: const EdgeInsets.all(16),
             child: Wrap(
               spacing: 16,
@@ -340,7 +340,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               ),
             )
           else if (_error != null)
-            AdminGlassCard(
+            AdminCard(
               accent: AppUi.error,
               child: Column(
                 children: [
@@ -363,7 +363,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
               ),
             )
           else if (_filteredReleases.isEmpty)
-            AdminGlassCard(
+            AdminCard(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   vertical: 48,
@@ -439,7 +439,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
     final isMandatory = updateType == 'mandatory';
     final isPublished = status == 'published';
 
-    return AdminGlassCard(
+    return AdminCard(
       accent: isActive
           ? AppColors.uiSuccess
           : (isMandatory ? AppColors.uiError : null),
@@ -483,7 +483,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                         _buildBadge(platform, Colors.blueGrey),
                         _buildBadge(
                           channel.replaceAll('_', ' '),
-                          Colors.indigo,
+                          AppUi.bluePrimary,
                         ),
                         if (isActive)
                           _buildBadge(

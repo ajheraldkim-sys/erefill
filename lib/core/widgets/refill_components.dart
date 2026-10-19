@@ -779,9 +779,7 @@ class DashboardStatCard extends StatelessWidget {
               Container(
                 height: 3,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accent, accent.withValues(alpha: 0.35)],
-                  ),
+                  color: accent,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AppUi.radiusCard),
                   ),
@@ -913,14 +911,7 @@ class _SparklineChart extends StatelessWidget {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              gradient: LinearGradient(
-                colors: [
-                  color.withValues(alpha: 0.22),
-                  color.withValues(alpha: 0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+              color: color.withValues(alpha: 0.12),
             ),
           ),
         ],

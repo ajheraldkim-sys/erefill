@@ -53,13 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Expanded(
             flex: 5,
             child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppUi.deepBlue, AppUi.bluePrimary, AppUi.accentCyan],
-                ),
-              ),
+              color: AppUi.deepBlue,
               child: SafeArea(
                 child: Padding(
                   padding: AppUi.pagePaddingLoose,

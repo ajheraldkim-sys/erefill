@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:erefill/core/constants.dart';
+
 class WelcomeOnboardingScreen extends StatelessWidget {
   final VoidCallback onFinish;
   const WelcomeOnboardingScreen({super.key, required this.onFinish});
@@ -29,24 +30,13 @@ class WelcomeOnboardingScreen extends StatelessWidget {
               fit: BoxFit.cover,
               alignment: Alignment.center,
             ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF0A0F1A).withValues(alpha: 0.6),
-                    Colors.transparent,
-                    Colors.transparent,
-                    const Color(0xFF0A0F1A).withValues(alpha: 0.8),
-                  ],
-                  stops: const [0.0, 0.2, 0.7, 1.0],
-                ),
-              ),
-            ),
+            const ColoredBox(color: Color(0x990A0F1A)),
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 16.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -126,7 +116,9 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
           child: Stack(
             children: [
               AnimatedContainer(
-                duration: _isDragging ? Duration.zero : const Duration(milliseconds: 300),
+                duration: _isDragging
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
                 width: _dragPosition + thumbSize,
                 height: thumbSize,
                 decoration: BoxDecoration(
@@ -150,7 +142,9 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
                 ),
               ),
               AnimatedPositioned(
-                duration: _isDragging ? Duration.zero : const Duration(milliseconds: 300),
+                duration: _isDragging
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
                 left: _dragPosition,
                 top: 0,
@@ -176,7 +170,10 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
                         _dragPosition = maxDrag;
                         _isSwiped = true;
                       });
-                      Future.delayed(const Duration(milliseconds: 400), widget.onSwipe);
+                      Future.delayed(
+                        const Duration(milliseconds: 400),
+                        widget.onSwipe,
+                      );
                     } else {
                       setState(() {
                         _dragPosition = 0.0;

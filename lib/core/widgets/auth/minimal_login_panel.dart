@@ -122,24 +122,6 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
             fit: StackFit.expand,
             children: [
               Positioned.fill(child: ColoredBox(color: backgroundColor)),
-              Positioned(
-                top: -100,
-                left: -50,
-                child: Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        accentColor.withValues(alpha: isDark ? 0.12 : 0.08),
-                        accentColor.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
               SafeArea(
                 child: Form(
                   key: _formKey,

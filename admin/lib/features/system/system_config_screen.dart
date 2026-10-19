@@ -153,7 +153,7 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
     final enabled = _asBool(value);
     final critical = key == 'maintenance_mode';
 
-    return AdminGlassCard(
+    return AdminCard(
       accent: critical ? AppUi.warningFg : AppUi.bluePrimary,
       padding: EdgeInsets.zero,
       child: SwitchListTile(
@@ -170,7 +170,7 @@ class _SystemConfigScreenState extends State<SystemConfigScreen> {
     final value = row['value'];
     final description = row['description']?.toString() ?? '';
 
-    return AdminGlassCard(
+    return AdminCard(
       padding: AppUi.cardPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

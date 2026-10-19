@@ -30,7 +30,7 @@ class AdminTimeline extends StatelessWidget {
           _ => adminMutedTextColor(context),
         };
 
-        return AdminGlassCard(
+        return AdminCard(
           padding: const EdgeInsets.all(14),
           accent: color,
           child: Row(

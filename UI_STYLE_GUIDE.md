@@ -18,6 +18,9 @@ This page is the "how do I use it in code" companion.
 4. **Money = `formatPeso(amount)`** — always `₱1,234.50`.
 5. **Show only real data.** No placeholder ETAs, ratings, or fees. If the
    backend hasn't answered, say so ("Calculated at checkout").
+6. **Keep surfaces flat and colors restrained.** No gradients, purple/indigo
+   accents, backdrop blur, or glass-style cards. Use solid, opaque surfaces and
+   shared muted color tokens.
 
 ## Tokens at a glance
 

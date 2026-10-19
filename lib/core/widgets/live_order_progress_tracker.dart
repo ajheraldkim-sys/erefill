@@ -203,9 +203,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                       height: 4,
                       width: (constraints.maxWidth - 40) * (activeIndex / (_steps.length - 1)),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.brandPrimary, AppColors.statusReady],
-                        ),
+                        color: AppColors.brandPrimary,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -373,4 +371,3 @@ class _StepDef {
   final IconData icon;
   const _StepDef({required this.title, required this.icon});
 }
-

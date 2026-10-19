@@ -76,8 +76,8 @@ Color adminStatusColor(BuildContext context, String status) {
 
 /// Advanced desktop & tablet layout primitives for eRefill Admin console.
 
-class AdminGlassCard extends StatelessWidget {
-  const AdminGlassCard({
+class AdminCard extends StatelessWidget {
+  const AdminCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
@@ -116,18 +116,8 @@ class AdminGlassCard extends StatelessWidget {
       );
     }
 
-    return Container(
+    return SizedBox(
       width: expand ? double.infinity : null,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 18,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Material(
         color: AppUi.surfaceOf(context),
         clipBehavior: Clip.antiAlias,
@@ -215,7 +205,7 @@ class AdminKpiTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdminGlassCard(
+    return AdminCard(
       padding: EdgeInsets.all(compact ? 16 : 20),
       child: Row(
         children: [
@@ -478,7 +468,7 @@ class AdminToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -539,7 +529,7 @@ class AdminDataPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdminGlassCard(
+    return AdminCard(
       expand: true,
       padding: EdgeInsets.zero,
       child: Column(
@@ -591,7 +581,7 @@ class AdminDetailPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AdminGlassCard(
+    return AdminCard(
       expand: true,
       padding: EdgeInsets.zero,
       child: Column(
@@ -925,7 +915,7 @@ class AdminErrorState extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
-        child: AdminGlassCard(
+        child: AdminCard(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -983,7 +973,7 @@ class AdminMetricStrip extends StatelessWidget {
       runSpacing: 12,
       children: items
           .map(
-            (item) => AdminGlassCard(
+            (item) => AdminCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1792,4 +1782,3 @@ class AdminActivateButton extends StatelessWidget {
     );
   }
 }
-

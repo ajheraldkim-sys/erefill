@@ -286,7 +286,7 @@ class _UsersScreenState extends State<UsersScreen> {
           onSelectionChanged: (s) => setState(() => _viewMode = s.first),
         ),
       ),
-      toolbar: AdminGlassCard(
+      toolbar: AdminCard(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -570,7 +570,7 @@ class _UsersScreenState extends State<UsersScreen> {
 
                   return SizedBox(
                     width: cardWidth,
-                    child: AdminGlassCard(
+                    child: AdminCard(
                       padding: const EdgeInsets.all(18),
                       accent: isSelected ? AppUi.bluePrimary : null,
                       onTap: () => setState(() => _selected = u),

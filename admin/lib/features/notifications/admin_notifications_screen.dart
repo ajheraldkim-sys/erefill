@@ -124,7 +124,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
           ),
           if (_admins.isNotEmpty) ...[
             AppUi.vGapLg,
-            AdminGlassCard(
+            AdminCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -177,7 +177,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
   }
 
   Widget _composeCard() {
-    return AdminGlassCard(
+    return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -244,7 +244,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
   }
 
   Widget _broadcastCard() {
-    return AdminGlassCard(
+    return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

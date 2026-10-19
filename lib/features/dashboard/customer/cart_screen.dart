@@ -396,7 +396,7 @@ class _CartLineItem extends StatelessWidget {
         name.contains('accessory');
     final accent = isAccessory
         ? (AppUi.isDark(context)
-              ? const Color(0xFFC4B5FD)
+              ? AppUi.accentCyan
               : AppColors.statusPreparing)
         : AppUi.brandOf(context);
 

@@ -377,7 +377,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── Card 1: Plain-English Explanation ──
-          AdminGlassCard(
+          AdminCard(
             accent: AppUi.bluePrimary,
             padding: const EdgeInsets.all(20),
             child: Row(
@@ -428,7 +428,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
             builder: (context, c) {
               final wide = c.maxWidth >= 900;
 
-              final feeConfigCard = AdminGlassCard(
+              final feeConfigCard = AdminCard(
                 padding: const EdgeInsets.all(22),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -622,7 +622,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                 ),
               );
 
-              final maintenanceCard = AdminGlassCard(
+              final maintenanceCard = AdminCard(
                 accent: _maintenanceMode ? AppUi.warningFg : null,
                 padding: const EdgeInsets.all(22),
                 child: Column(
@@ -754,7 +754,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
   Widget _buildDeliveryFeeCard(BuildContext context) {
     final sampleDistances = [1.0, 2.0, 3.5, 5.0, 10.0];
 
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.all(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

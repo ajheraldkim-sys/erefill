@@ -31,15 +31,16 @@ void main() {
   });
 
   group('WCAG AA Contrast & Colorblind Accessibility Tests', () {
-    test('OrderStatusStyle pending badges use dark readable foreground on tinted background', () {
+    test('OrderStatusStyle pending badges use muted solid status colors', () {
       final lightStyle = OrderStatusStyle.resolve('pending', isDark: false);
-      // Background is tinted amber-100, text is dark amber-800
-      expect(lightStyle.badgeBackground, equals(const Color(0xFFFEF3C7)));
-      expect(lightStyle.badgeForeground, equals(const Color(0xFF92400E)));
+      // Muted amber tokens keep the badge readable in both themes.
+      expect(lightStyle.badgeBackground, equals(AppUi.warningBg));
+      expect(lightStyle.badgeForeground, equals(AppUi.warningFg));
 
       final darkStyle = OrderStatusStyle.resolve('pending', isDark: true);
-      expect(darkStyle.badgeBackground, equals(const Color(0xFF451A03).withValues(alpha: 0.70)));
-      expect(darkStyle.badgeForeground, equals(const Color(0xFFFCD34D)));
+      expect(darkStyle.badgeBackground, equals(const Color(0xFF3D3323)));
+      expect(darkStyle.badgeForeground, equals(AppUi.warningFgDark));
+      expect(darkStyle.badgeBackground.a, 1.0);
     });
 
     testWidgets('AvailabilityBadge pairs color with status icon for colorblind accessibility',

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -410,99 +409,54 @@ class _SplashScreenState extends State<_SplashScreen>
               errorBuilder: (context, error, stackTrace) =>
                   const SizedBox.shrink(),
             ),
-            // Gradient overlay — darker than onboarding for a more dramatic splash
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF0A0F1A).withValues(alpha: 0.75),
-                    const Color(0xFF0A0F1A).withValues(alpha: 0.55),
-                    const Color(0xFF0A0F1A).withValues(alpha: 0.85),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-            // Centered branding with Glassmorphism
+            const ColoredBox(color: Color(0xCC0A0F1A)),
             Center(
               child: FadeTransition(
                 opacity: _fade,
                 child: ScaleTransition(
                   scale: _scale,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppUi.radiusPill),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 32,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.16),
-                              const Color(0xFF0A0F1A).withValues(alpha: 0.55),
-                            ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 32,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppUi.darkSurface,
+                      borderRadius: BorderRadius.circular(AppUi.radiusPill),
+                      border: Border.all(color: AppUi.borderDark),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'eRefill',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -1.5,
                           ),
-                          borderRadius: BorderRadius.circular(AppUi.radiusPill),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.22),
-                            width: 1.5,
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Smart Water Delivery',
+                          style: TextStyle(
+                            color: AppUi.borderStrongLight,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppUi.infoFgDark.withValues(alpha: 0.12),
-                              blurRadius: 32,
-                              spreadRadius: 2,
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              blurRadius: 24,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Wordmark
-                            const Text(
-                              'eRefill',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 42,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Smart Water Delivery',
-                              style: TextStyle(
-                                color: AppUi.borderStrongLight,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            // Loading indicator
-                            const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: AppUi.infoFgDark,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 28),
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: AppUi.infoFgDark,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),

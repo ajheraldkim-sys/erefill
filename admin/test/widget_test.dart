@@ -177,7 +177,7 @@ void main() {
                 children: [
                   Flexible(
                     fit: wide ? FlexFit.tight : FlexFit.loose,
-                    child: const AdminGlassCard(
+                    child: const AdminCard(
                       child: SizedBox(
                         height: 120,
                         child: Text('Primary panel'),
@@ -187,7 +187,7 @@ void main() {
                   SizedBox(width: wide ? 16 : 0, height: wide ? 0 : 16),
                   Flexible(
                     fit: wide ? FlexFit.tight : FlexFit.loose,
-                    child: const AdminGlassCard(
+                    child: const AdminCard(
                       child: SizedBox(
                         height: 120,
                         child: Text('Secondary panel'),

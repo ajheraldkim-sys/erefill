@@ -242,7 +242,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // ── Pending Approvals Banner ──
           if (_pendingStations.isNotEmpty) ...[
-            AdminGlassCard(
+            AdminCard(
               accent: Theme.of(context).brightness == Brightness.dark
                   ? AppUi.warningFgDark
                   : AppColors.uiWarning,
@@ -414,7 +414,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           AppUi.vGapLg,
 
           // ── Quick Actions Row ──
-          AdminGlassCard(
+          AdminCard(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -472,7 +472,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           LayoutBuilder(
             builder: (context, c) {
               final wide = c.maxWidth > 920;
-              final recentOrdersCard = AdminGlassCard(
+              final recentOrdersCard = AdminCard(
                 padding: EdgeInsets.zero,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -580,7 +580,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               );
 
-              final systemOverviewCard = AdminGlassCard(
+              final systemOverviewCard = AdminCard(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

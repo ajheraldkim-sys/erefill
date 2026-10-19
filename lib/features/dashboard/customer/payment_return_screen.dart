@@ -119,12 +119,7 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
                       height: 118,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            AppUi.bluePrimary.withValues(alpha: 0.9),
-                            AppUi.bluePrimary.withValues(alpha: 0.65),
-                          ],
-                        ),
+                        color: AppUi.bluePrimary,
                       ),
                       child: Icon(
                         widget.isSuccess && !hasLoadError

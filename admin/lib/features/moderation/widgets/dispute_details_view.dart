@@ -174,7 +174,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // 1. Complaint Description Card
-                  AdminGlassCard(
+                  AdminCard(
                     padding: const EdgeInsets.all(14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +240,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
   }
 
   Widget _buildTimelineSection(BuildContext context, Map<String, dynamic> order) {
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,7 +347,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
     final hasPhoto = podPhoto != null && podPhoto.toString().isNotEmpty;
     final hasSignature = signatureUrl != null && signatureUrl.toString().isNotEmpty;
 
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,7 +473,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
       },
     ];
 
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,7 +546,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
     final ref = order['payment_reference'] ?? order['id']?.toString().substring(0, 8) ?? '—';
     final pStatus = order['payment_status']?.toString() ?? 'Pending Settlement';
 
-    return AdminGlassCard(
+    return AdminCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -138,7 +138,7 @@ class _RidersMapScreenState extends State<RidersMapScreen> {
         children: [
           Expanded(
             flex: 2,
-            child: AdminGlassCard(
+            child: AdminCard(
               expand: true,
               padding: EdgeInsets.zero,
               child: mapStations.isEmpty
