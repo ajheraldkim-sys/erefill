@@ -33,6 +33,17 @@ void main() {
       },
     );
 
+    test('account section replaces security across all account roles', () {
+      for (final role in ['customer', 'owner', 'rider']) {
+        final sections = RoleSettingsCatalog.forRole(role);
+        final account = sections.firstWhere((item) => item.key == 'account');
+
+        expect(account.title, 'Account');
+        expect(account.description, 'Email, username, and password settings.');
+        expect(sections.map((item) => item.key), isNot(contains('security')));
+      }
+    });
+
     test('administrative settings are desktop-only', () {
       expect(RoleSettingsCatalog.forRole('admin'), isEmpty);
       expect(RoleSettingsCatalog.forRole('super_admin'), isEmpty);

@@ -620,14 +620,14 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
             context,
             order: newestPending,
             onAccept: (orderId) async {
-              await SafeSupabase.transitionOrderStatus(
+              await SafeSupabase.requireOrderTransition(
                 orderId: orderId,
                 newStatus: 'accepted',
               );
               _refreshOrdersSnapshot();
             },
             onDecline: (orderId) async {
-              await SafeSupabase.transitionOrderStatus(
+              await SafeSupabase.requireOrderTransition(
                 orderId: orderId,
                 newStatus: 'cancelled',
               );

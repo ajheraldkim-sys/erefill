@@ -154,51 +154,29 @@ class SafeSupabase {
     }
   }
 
-  /// Safely transitions an order status using the RPC if available,
-  /// falling back to a direct database update if the RPC is not installed.
+  /// Changes an order's status through `transition_order_status_safely`,
+  /// which enforces the allowed transitions per role and notifies the
+  /// customer.
+  ///
+  /// There is deliberately no direct-update fallback: a transition the server
+  /// rejects (it raises, e.g. "Invalid station order status transition") must
+  /// stay rejected. Errors propagate; a `success: false` reply is returned.
   static Future<Map<String, dynamic>> transitionOrderStatus({
     required String orderId,
     required String newStatus,
-    String? reason,
+    SupabaseClient? client,
   }) async {
-    Map<String, dynamic>? result;
-    try {
-      final response = await _client.rpc(
-        'transition_order_status_safely',
-        params: {'p_order_id': orderId, 'p_new_status': newStatus},
-      );
-      if (response is Map) {
-        final map = Map<String, dynamic>.from(response);
-        if (map['success'] == true) {
-          result = map;
-        }
-      }
-    } catch (e) {
-      debugPrint('transition_order_status_safely RPC fallback triggered: $e');
-    }
-
-    if (result == null) {
-      // Direct database update fallback
-      try {
-        final updateData = <String, dynamic>{
-          'status': newStatus,
-          'updated_at': DateTime.now().toIso8601String(),
-        };
-        if (reason != null && reason.isNotEmpty) {
-          updateData['notes'] = 'Declined: $reason';
-        }
-        if (newStatus == 'delivered') {
-          final nowIso = DateTime.now().toIso8601String();
-          updateData['delivered_at'] = nowIso;
-          updateData['actual_completion_at'] = nowIso;
-        }
-        await _client.from('orders').update(updateData).eq('id', orderId);
-        result = {'success': true, 'fallback': true};
-      } catch (fallbackError) {
-        debugPrint('Direct order status update failed: $fallbackError');
-        rethrow;
-      }
-    }
+    final db = client ?? _client;
+    final response = await db.rpc(
+      'transition_order_status_safely',
+      params: {'p_order_id': orderId, 'p_new_status': newStatus},
+    );
+    final result = response is Map
+        ? Map<String, dynamic>.from(response)
+        : <String, dynamic>{
+            'success': false,
+            'message': 'Unexpected response from the order status service.',
+          };
 
     // Invalidate cached order overviews and lists across all roles
     unawaited(LocalDataCache.instance.invalidatePattern('owner_overview_'));
@@ -210,71 +188,90 @@ class SafeSupabase {
     return result;
   }
 
-  /// Safely unlinks a rider from the station using RPC or direct fallback
-  static Future<Map<String, dynamic>> unlinkRider({
-    required String riderId,
+  /// Completes a station pickup through its audited server-side workflow.
+  static Future<Map<String, dynamic>> completePickupOrder({
+    required String orderId,
+    SupabaseClient? client,
   }) async {
-    try {
-      final response = await _client.rpc(
-        'owner_unlink_rider',
-        params: {'p_rider_id': riderId},
-      );
-      if (response is Map) {
-        final map = Map<String, dynamic>.from(response);
-        if (map['success'] == true) return map;
-      }
-    } catch (e) {
-      debugPrint('owner_unlink_rider RPC fallback triggered: $e');
-    }
+    final result = await _requireSuccess(
+      (client ?? _client).rpc(
+        'complete_pickup_order_safely',
+        params: {'p_order_id': orderId},
+      ),
+      'Pickup order could not be completed.',
+    );
+    unawaited(LocalDataCache.instance.invalidatePattern('owner_overview_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('owner_orders_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('customer_home_'));
+    unawaited(LocalDataCache.instance.invalidatePattern('customer_orders_'));
+    return result;
+  }
 
-    try {
-      await _client.from('profiles').update({
-        'owner_id': null,
-        'station_id': null,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', riderId);
-      return {'success': true, 'fallback': true};
-    } catch (fallbackError) {
-      debugPrint('Direct rider unlink failed: $fallbackError');
-      rethrow;
+  /// Like [transitionOrderStatus] but throws when the server refuses, for
+  /// callers that only need to know whether the change happened.
+  static Future<void> requireOrderTransition({
+    required String orderId,
+    required String newStatus,
+    SupabaseClient? client,
+  }) async {
+    final result = await transitionOrderStatus(
+      orderId: orderId,
+      newStatus: newStatus,
+      client: client,
+    );
+    if (result['success'] != true) {
+      throw StateError(
+        result['message']?.toString() ?? 'Order status update was rejected.',
+      );
     }
   }
 
-  /// Safely suspends or activates a rider using RPC or direct fallback
+  /// Detaches a rider from the caller's station via `owner_unlink_rider`,
+  /// which checks the rider belongs to the caller. Throws unless the server
+  /// confirms (a direct profiles update cannot work: RLS only allows editing
+  /// your own profile, so it would silently change nothing).
+  static Future<Map<String, dynamic>> unlinkRider({
+    required String riderId,
+    SupabaseClient? client,
+  }) => _requireSuccess(
+    (client ?? _client).rpc(
+      'owner_unlink_rider',
+      params: {'p_rider_id': riderId},
+    ),
+    'Rider could not be unlinked.',
+  );
+
+  /// Suspends or reactivates a rider via `owner_set_rider_status`. Throws
+  /// unless the server confirms; see [unlinkRider].
   static Future<Map<String, dynamic>> setRiderStatus({
     required String riderId,
     required bool isSuspended,
     String? reason,
-  }) async {
-    try {
-      final response = await _client.rpc(
-        'owner_set_rider_status',
-        params: {
-          'p_rider_id': riderId,
-          'p_is_suspended': isSuspended,
-          'p_reason': reason,
-        },
-      );
-      if (response is Map) {
-        final map = Map<String, dynamic>.from(response);
-        if (map['success'] == true) return map;
-      }
-    } catch (e) {
-      debugPrint('owner_set_rider_status RPC fallback triggered: $e');
-    }
+    SupabaseClient? client,
+  }) => _requireSuccess(
+    (client ?? _client).rpc(
+      'owner_set_rider_status',
+      params: {
+        'p_rider_id': riderId,
+        'p_is_suspended': isSuspended,
+        'p_reason': reason,
+      },
+    ),
+    'Rider status could not be changed.',
+  );
 
-    try {
-      await _client.from('profiles').update({
-        'is_suspended': isSuspended,
-        'suspended_at': isSuspended ? DateTime.now().toIso8601String() : null,
-        'suspended_reason': isSuspended ? (reason ?? 'Suspended by station owner') : null,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', riderId);
-      return {'success': true, 'fallback': true};
-    } catch (fallbackError) {
-      debugPrint('Direct rider status update failed: $fallbackError');
-      rethrow;
+  static Future<Map<String, dynamic>> _requireSuccess(
+    Future<dynamic> call,
+    String fallbackMessage,
+  ) async {
+    final response = await call;
+    final result = response is Map
+        ? Map<String, dynamic>.from(response)
+        : const <String, dynamic>{};
+    if (result['success'] != true) {
+      throw StateError(result['message']?.toString() ?? fallbackMessage);
     }
+    return result;
   }
 
   /// Safe stream with error handling
@@ -317,7 +314,9 @@ class SafeSupabase {
     }
     _lastStreamErrorMsg = msg;
     _lastStreamErrorLog = now;
-    debugPrint('SafeSupabase realtime stream error: $error (resilient fallback active)');
+    debugPrint(
+      'SafeSupabase realtime stream error: $error (resilient fallback active)',
+    );
   }
 
   static StreamSubscription<List<Map<String, dynamic>>> listen(

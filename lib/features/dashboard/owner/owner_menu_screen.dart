@@ -1,4 +1,4 @@
-import 'package:erefill/core/utils/money.dart';
+﻿import 'package:erefill/core/utils/money.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -2569,7 +2569,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           },
                         ),
                       ],
-                      const AccountSectionLabel('Station identity'),
+                      const AccountSectionLabel('Station profile'),
                       AccountGroup(
                         children: [
                           AccountNavTile(
@@ -2775,21 +2775,43 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         ],
                       ),
 
-                      const AccountSectionLabel('Security & account'),
+                      const AccountSectionLabel('Account'),
                       AccountGroup(
                         children: [
                           AccountNavTile(
-                            icon: Icons.shield_outlined,
-                            title: 'Account security',
+                            icon: Icons.mark_email_unread_outlined,
+                            title: 'Email',
                             subtitle:
-                                'Password and account protection controls',
+                                'Manage your email address and verification',
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    const AccountSecurityScreen(role: 'owner'),
+                                builder: (_) => const AccountSecurityScreen(
+                                  role: 'owner',
+                                  section: AccountSecuritySection.email,
                               ),
                             ),
                           ),
+                          ),
+                          AccountNavTile(
+                            icon: Icons.lock_reset_rounded,
+                            title: 'Change password',
+                            subtitle: 'Update your sign-in password',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AccountSecurityScreen(
+                                  role: 'owner',
+                                  section:
+                                      AccountSecuritySection.changePassword,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const AccountSectionLabel('Account access'),
+                      AccountGroup(
+                        children: [
                           AccountNavTile(
                             icon: Icons.logout_rounded,
                             iconColor: AppColors.uiError,

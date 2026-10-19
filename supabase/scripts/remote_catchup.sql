@@ -1,6 +1,8 @@
--- Run this in Supabase Dashboard → SQL Editor when `supabase db push` fails
+-- Run this in Supabase Dashboard â†’ SQL Editor when `supabase db push` fails
 -- due to migration history conflicts (duplicate version keys like 20260318).
 -- Safe to re-run: every change uses IF NOT EXISTS.
+-- After this script, apply automated_proof_of_delivery.sql, then
+-- harden_order_status_transitions.sql to install the current lifecycle RPCs.
 
 BEGIN;
 
@@ -81,7 +83,7 @@ USING (auth.uid() = owner_id);
 
 ALTER TABLE public.owner_inventory_ledger REPLICA IDENTITY FULL;
 
--- Inventory RPC (copy from 20260601 migration — idempotent replace)
+-- Inventory RPC (copy from 20260601 migration â€” idempotent replace)
 CREATE OR REPLACE FUNCTION public.log_owner_inventory_tx(
     p_tx_type text,
     p_gallons integer,
@@ -220,7 +222,7 @@ FOR ALL TO authenticated
 USING (customer_id = auth.uid())
 WITH CHECK (customer_id = auth.uid());
 
--- Payment methods RPC (20260527) — per-station methods, enabled by default
+-- Payment methods RPC (20260527) â€” per-station methods, enabled by default
 ALTER TABLE public.owner_settings
   ADD COLUMN IF NOT EXISTS enabled_payment_methods text[] NOT NULL
   DEFAULT ARRAY['cod', 'gcash', 'maya', 'card']::text[];
@@ -772,7 +774,7 @@ DO $$ DECLARE v_owner_id uuid; BEGIN
   END LOOP;
 END; $$;
 
--- ── Performance Optimization: High-traffic composite indexes ──
+-- â”€â”€ Performance Optimization: High-traffic composite indexes â”€â”€
 CREATE INDEX IF NOT EXISTS idx_orders_owner_status_created 
   ON public.orders (owner_id, status, created_at DESC);
 
@@ -782,7 +784,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_rider_status_created
 CREATE INDEX IF NOT EXISTS idx_messages_room_created 
   ON public.messages (room_id, created_at ASC);
 
--- ── Security Guard: Prevent unauthorized role escalation & suspension modification ──
+-- â”€â”€ Security Guard: Prevent unauthorized role escalation & suspension modification â”€â”€
 DROP POLICY IF EXISTS "profiles_users_update_own" ON public.profiles;
 CREATE POLICY "profiles_users_update_own"
   ON public.profiles
@@ -818,7 +820,7 @@ CREATE TRIGGER trg_guard_profile_role_changes
 BEFORE UPDATE ON public.profiles
 FOR EACH ROW EXECUTE FUNCTION public.guard_profile_role_changes();
 
--- ── Security Guard: Prevent regular authenticated users from forging system messages ──
+-- â”€â”€ Security Guard: Prevent regular authenticated users from forging system messages â”€â”€
 CREATE OR REPLACE FUNCTION public.guard_system_message_spoofing()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -842,7 +844,7 @@ CREATE TRIGGER trg_guard_system_message_spoofing
 BEFORE INSERT ON public.messages
 FOR EACH ROW EXECUTE FUNCTION public.guard_system_message_spoofing();
 
--- ── Chat Message Notification Trigger ──
+-- â”€â”€ Chat Message Notification Trigger â”€â”€
 -- Automatically notifies all other chat room participants via system_notifications table
 CREATE OR REPLACE FUNCTION public.notify_chat_message()
 RETURNS trigger
@@ -875,7 +877,7 @@ BEGIN
 
   -- Preview content based on type
   IF NEW.message_type = 'image' THEN
-    v_body := '📷 Photo message';
+    v_body := 'ðŸ“· Photo message';
   ELSIF NEW.message_type = 'quick_reply' THEN
     v_body := coalesce(NEW.content, 'Quick response');
   ELSE
@@ -922,7 +924,7 @@ AFTER INSERT ON public.messages
 FOR EACH ROW
 EXECUTE FUNCTION public.notify_chat_message();
 
--- ── Order Creation: Atomic order insertion with server-verified line item pricing ──
+-- â”€â”€ Order Creation: Atomic order insertion with server-verified line item pricing â”€â”€
 CREATE OR REPLACE FUNCTION public.create_order_atomic(
   p_order_data jsonb,
   p_items_data jsonb
@@ -1105,129 +1107,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_order_atomic(jsonb, jsonb) TO authenticated;
 REVOKE ALL ON FUNCTION public.create_order_atomic(jsonb, jsonb) FROM PUBLIC, anon;
 
--- Transition order status safely and notify customer/owner
-CREATE OR REPLACE FUNCTION public.transition_order_status_safely(
-  p_order_id uuid,
-  p_new_status text
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_order public.orders%ROWTYPE;
-  v_role text;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Authentication required.';
-  END IF;
+-- Order lifecycle RPCs are managed by harden_order_status_transitions.sql.
 
-  SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Order not found');
-  END IF;
-
-  SELECT role INTO v_role FROM public.profiles WHERE id = auth.uid();
-
-  IF v_role = 'owner' AND auth.uid() = v_order.owner_id THEN
-    IF NOT (
-      (v_order.status = 'pending' AND p_new_status IN ('accepted', 'cancelled'))
-      OR (v_order.status = 'accepted' AND p_new_status IN ('preparing', 'cancelled'))
-      OR (v_order.status = 'preparing' AND p_new_status IN ('ready_for_pickup', 'cancelled'))
-    ) THEN
-      RAISE EXCEPTION 'Invalid station order status transition.';
-    END IF;
-  ELSIF v_role = 'rider'
-      AND auth.uid() = v_order.assigned_rider_id
-      AND v_order.status = 'assigned_to_rider'
-      AND p_new_status = 'out_for_delivery' THEN
-    NULL;
-  ELSIF v_role = 'customer'
-      AND auth.uid() = v_order.customer_id
-      AND v_order.status = 'pending'
-      AND p_new_status = 'cancelled' THEN
-    NULL;
-  ELSE
-    RAISE EXCEPTION 'You are not authorized to make this order status change.';
-  END IF;
-
-  UPDATE public.orders
-  SET
-    status = p_new_status::public.order_status,
-    updated_at = now()
-  WHERE id = p_order_id;
-
-  -- Lifecycle status notifications for customer
-  IF p_new_status = 'accepted' THEN
-    INSERT INTO public.system_notifications (
-      user_id, type, priority, title, content, metadata
-    ) VALUES (
-      v_order.customer_id, 'system_alert', 'high', 'Order Accepted',
-      'The water station accepted your refill order and is preparing to refill.',
-      jsonb_build_object('order_id', p_order_id, 'status', 'accepted')
-    );
-  ELSIF p_new_status = 'preparing' THEN
-    INSERT INTO public.system_notifications (
-      user_id, type, priority, title, content, metadata
-    ) VALUES (
-      v_order.customer_id, 'system_alert', 'normal', 'Refill in Preparation',
-      'Your water containers are now being refilled and inspected.',
-      jsonb_build_object('order_id', p_order_id, 'status', 'preparing')
-    );
-  ELSIF p_new_status = 'ready_for_pickup' THEN
-    INSERT INTO public.system_notifications (
-      user_id, type, priority, title, content, metadata
-    ) VALUES (
-      v_order.customer_id, 'system_alert', 'normal', 'Refill Ready for Dispatch',
-      'Your containers are refilled and ready for rider pickup.',
-      jsonb_build_object('order_id', p_order_id, 'status', 'ready_for_pickup')
-    );
-  ELSIF p_new_status = 'out_for_delivery' THEN
-    INSERT INTO public.system_notifications (
-      user_id, type, priority, title, content, metadata
-    ) VALUES (
-      v_order.customer_id, 'system_alert', 'high', 'Out for Delivery',
-      'Your rider picked up your refill and is heading to your address.',
-      jsonb_build_object('order_id', p_order_id, 'status', 'out_for_delivery')
-    );
-  ELSIF p_new_status = 'delivered' THEN
-    INSERT INTO public.system_notifications (
-      user_id, type, priority, title, content, metadata
-    ) VALUES (
-      v_order.customer_id, 'system_alert', 'high', 'Refill Delivered',
-      'Your water refill delivery has been completed. Thank you!',
-      jsonb_build_object('order_id', p_order_id, 'status', 'delivered')
-    );
-  ELSIF p_new_status = 'cancelled' THEN
-    IF auth.uid() = v_order.owner_id THEN
-      INSERT INTO public.system_notifications (
-        user_id, type, priority, title, content, metadata
-      ) VALUES (
-        v_order.customer_id, 'order_cancelled', 'urgent', 'Order Cancelled',
-        'Your refill order #' || upper(substr(p_order_id::text, 1, 8)) || ' was cancelled by the station.',
-        jsonb_build_object('order_id', p_order_id, 'status', 'cancelled')
-      );
-    ELSE
-      INSERT INTO public.system_notifications (
-        user_id, type, priority, title, content, metadata
-      ) VALUES (
-        v_order.owner_id, 'order_cancelled', 'high', 'Order Cancelled by Customer',
-        coalesce(v_order.customer_name, 'Customer') || ' cancelled refill order #' || upper(substr(p_order_id::text, 1, 8)) || '.',
-        jsonb_build_object('order_id', p_order_id, 'status', 'cancelled')
-      );
-    END IF;
-  END IF;
-
-  RETURN jsonb_build_object('success', true, 'message', 'Order status updated successfully');
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.transition_order_status_safely(uuid, text) TO authenticated;
-REVOKE ALL ON FUNCTION public.transition_order_status_safely(uuid, text) FROM PUBLIC, anon;
-
--- Safely assigns rider to refill order and notifies both rider and customer
 CREATE OR REPLACE FUNCTION public.assign_rider_safely(
   p_order_id uuid,
   p_rider_id uuid
@@ -1326,89 +1207,6 @@ GRANT EXECUTE ON FUNCTION public.assign_rider_safely(uuid, uuid) TO authenticate
 REVOKE ALL ON FUNCTION public.assign_rider_safely(uuid, uuid) FROM PUBLIC, anon;
 
 -- Safely confirms delivery with proof metadata, empty gallon return tracking, and COD payment resolution
-CREATE OR REPLACE FUNCTION public.confirm_delivery_safely(
-  p_order_id uuid,
-  p_lat double precision DEFAULT NULL,
-  p_lng double precision DEFAULT NULL,
-  p_photo_url text DEFAULT NULL,
-  p_signature_url text DEFAULT NULL,
-  p_delivery_note text DEFAULT NULL,
-  p_empty_gallons_returned integer DEFAULT 0
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_order public.orders%ROWTYPE;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Authentication required.';
-  END IF;
-
-  SELECT * INTO v_order FROM public.orders WHERE id = p_order_id FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Order not found');
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role = 'rider'
-  ) OR auth.uid() <> v_order.assigned_rider_id THEN
-    RAISE EXCEPTION 'Only the assigned rider can confirm this delivery.';
-  END IF;
-
-  IF v_order.status = 'delivered' THEN
-    RETURN jsonb_build_object('success', true, 'message', 'Order is already delivered');
-  END IF;
-
-  IF v_order.status <> 'out_for_delivery' THEN
-    RAISE EXCEPTION 'Only an order out for delivery can be completed.';
-  END IF;
-
-  UPDATE public.orders
-  SET
-    status = 'delivered',
-    delivered_at = coalesce(delivered_at, now()),
-    proof_of_delivery_url = coalesce(p_photo_url, proof_of_delivery_url),
-    delivery_signature_url = coalesce(p_signature_url, delivery_signature_url),
-    delivery_note = coalesce(p_delivery_note, delivery_note),
-    empty_gallons_returned = coalesce(p_empty_gallons_returned, empty_gallons_returned, 0),
-    delivery_lat = coalesce(p_lat, delivery_lat),
-    delivery_lng = coalesce(p_lng, delivery_lng),
-    payment_status = CASE
-      WHEN lower(coalesce(payment_method, 'cod')) IN ('cod', 'cash') THEN 'success'
-      ELSE payment_status
-    END,
-    updated_at = now()
-  WHERE id = p_order_id;
-
-  -- Notify Customer
-  INSERT INTO public.system_notifications (
-    user_id, type, priority, title, content, metadata
-  ) VALUES (
-    v_order.customer_id, 'system_alert', 'high', 'Refill Delivered',
-    'Your water refill delivery has been completed. Thank you!',
-    jsonb_build_object('order_id', p_order_id, 'status', 'delivered')
-  );
-
-  -- Notify Owner
-  INSERT INTO public.system_notifications (
-    user_id, type, priority, title, content, metadata
-  ) VALUES (
-    v_order.owner_id, 'system_alert', 'high', 'Delivery Completed',
-    'Order #' || upper(substr(p_order_id::text, 1, 8)) || ' was successfully delivered to ' || coalesce(v_order.customer_name, 'customer') || '.',
-    jsonb_build_object('order_id', p_order_id, 'status', 'delivered')
-  );
-
-  RETURN jsonb_build_object('success', true, 'message', 'Delivery confirmed successfully');
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.confirm_delivery_safely(uuid, double precision, double precision, text, text, text, integer) TO authenticated;
-REVOKE ALL ON FUNCTION public.confirm_delivery_safely(uuid, double precision, double precision, text, text, text, integer) FROM PUBLIC, anon;
 
 -- Create rider_payout_requests table
 CREATE TABLE IF NOT EXISTS public.rider_payout_requests (
@@ -1506,11 +1304,11 @@ END $$;
 
 COMMIT;
 
--- ── Admin role and RPCs ──
+-- â”€â”€ Admin role and RPCs â”€â”€
 -- Deploy administrator RPC migrations using Supabase CLI or Dashboard SQL editor.
 -- Keep administrative accounts managed via secure environment variables or auth vault.
 
--- ── Fix Review Stats Trigger & Sync Profile Rating/Counts ──
+-- â”€â”€ Fix Review Stats Trigger & Sync Profile Rating/Counts â”€â”€
 CREATE OR REPLACE FUNCTION public.update_station_stats()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -1590,5 +1388,4 @@ ALTER TABLE IF EXISTS public.dm_deliveries
 
 ALTER TABLE IF EXISTS public.dm_credits
   ADD COLUMN IF NOT EXISTS rider_name text;
-
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
@@ -186,12 +186,8 @@ class _SettingsTile extends StatelessWidget {
       case 'app_preferences':
         context.openCustomerSettings();
         return;
-      case 'security':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AccountSecurityScreen(role: 'customer'),
-          ),
-        );
+      case 'account':
+        _openAccountSettings(context);
         return;
       default:
         Navigator.of(context).pop();
@@ -223,12 +219,8 @@ class _SettingsTile extends StatelessWidget {
       case 'notifications':
         context.openOwnerMenu();
         return;
-      case 'security':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AccountSecurityScreen(role: 'owner'),
-          ),
-        );
+      case 'account':
+        _openAccountSettings(context);
         return;
       default:
         Navigator.of(context).pop();
@@ -255,12 +247,8 @@ class _SettingsTile extends StatelessWidget {
         return;
       case 'commission_earnings':
         return;
-      case 'security':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AccountSecurityScreen(role: 'rider'),
-          ),
-        );
+      case 'account':
+        _openAccountSettings(context);
         return;
       default:
         Navigator.of(context).pop();
@@ -272,5 +260,74 @@ class _SettingsTile extends StatelessWidget {
           ),
         );
     }
+  }
+
+  void _openAccountSettings(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppUi.surfaceOf(context),
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.mark_email_unread_outlined),
+              title: const Text('Email'),
+              onTap: () => _openAccountSection(
+                context,
+                sheetContext,
+                AccountSecuritySection.email,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline_rounded),
+              title: const Text('Username'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                switch (role.toLowerCase()) {
+                  case 'customer':
+                    context.openCustomerSettings();
+                    return;
+                  case 'owner':
+                    context.openOwnerMenu();
+                    return;
+                  case 'rider':
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const RiderSettingsScreen(),
+                      ),
+                    );
+                    return;
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_reset_rounded),
+              title: const Text('Change password'),
+              onTap: () => _openAccountSection(
+                context,
+                sheetContext,
+                AccountSecuritySection.changePassword,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openAccountSection(
+    BuildContext context,
+    BuildContext sheetContext,
+    AccountSecuritySection section,
+  ) {
+    Navigator.of(sheetContext).pop();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AccountSecurityScreen(role: role, section: section),
+      ),
+    );
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,12 +18,12 @@ import '../../../core/widgets/app_form_fields.dart';
 import '../../loyalty/widgets/loyalty_rewards_sheet.dart';
 import '../../account/saved_addresses_screen.dart';
 import '../../../core/services/local_data_cache.dart';
-import '../../auth/widgets/gmail_binding_card.dart';
 import '../../settings/account_security_screen.dart';
 import 'widgets/customer_credit_sheet.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
 
@@ -158,7 +158,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    final hasExistingData = _firstNameController.text.isNotEmpty || _phoneController.text.isNotEmpty;
+    final hasExistingData =
+        _firstNameController.text.isNotEmpty ||
+        _phoneController.text.isNotEmpty;
     setState(() {
       _loadError = null;
       if (!hasExistingData) {
@@ -405,7 +407,6 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       if (mounted) setState(() => _isEditingProfile = false);
     });
   }
-
 
   Future<void> _openSavedAddresses() async {
     final user = context.read<UserProvider>().user;
@@ -677,7 +678,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: AppUi.cardRadius,
                     side: BorderSide(
-                      color: isSelected ? AppUi.bluePrimary : AppUi.borderOf(ctx),
+                      color: isSelected
+                          ? AppUi.bluePrimary
+                          : AppUi.borderOf(ctx),
                       width: isSelected ? 1.5 : 1,
                     ),
                   ),
@@ -1085,7 +1088,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                   setSheetState(() => isDeleting = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deletion failed: ${FriendlyErrors.message(e)}'),
+                                      content: Text(
+                                        'Deletion failed: ${FriendlyErrors.message(e)}',
+                                      ),
                                       backgroundColor: AppColors.uiError,
                                     ),
                                   );
@@ -1144,8 +1149,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         SliverPadding(
-                          padding:
-                              AppUi.pagePadding.copyWith(top: 12, bottom: 96),
+                          padding: AppUi.pagePadding.copyWith(
+                            top: 12,
+                            bottom: 96,
+                          ),
                           sliver: SliverList(
                       delegate: SliverChildListDelegate([
                         AccountIdentityBlock(
@@ -1156,8 +1163,12 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                           AccountCompletenessHint(
                             message: _profileCompletionMessage,
                             onTap:
-                                (_firstNameController.text.trim().isEmpty ||
-                                    _lastNameController.text.trim().isEmpty ||
+                                      (_firstNameController.text
+                                              .trim()
+                                              .isEmpty ||
+                                          _lastNameController.text
+                                              .trim()
+                                              .isEmpty ||
                                     _phoneController.text.trim().isEmpty)
                                 ? _openEditProfileSheet
                                 : _openSavedAddresses,
@@ -1168,7 +1179,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             AccountNavTile(
                               icon: Icons.person_outline_rounded,
                               title: 'Personal information',
-                              subtitle: _phoneController.text.trim().isEmpty
+                                    subtitle:
+                                        _phoneController.text.trim().isEmpty
                                   ? 'Name, phone number, and username'
                                   : 'Phone: ${_phoneController.text.trim()} · Tap to edit',
                               onTap: _openEditProfileSheet,
@@ -1217,7 +1229,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                 CustomerCreditSheet.show(
                                   context,
                                   customerName: _composedFullName,
-                                  customerId: supabase.auth.currentUser?.id,
+                                        customerId:
+                                            supabase.auth.currentUser?.id,
                                 );
                               },
                             ),
@@ -1238,8 +1251,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               icon: Icons.notifications_active_outlined,
                               title: 'Order notifications',
                               value: _notificationsEnabled,
-                              onChanged: (v) =>
-                                  setState(() => _notificationsEnabled = v),
+                                    onChanged: (v) => setState(
+                                      () => _notificationsEnabled = v,
+                                    ),
                             ),
                             AccountToggleTile(
                               icon: Icons.dark_mode_outlined,
@@ -1247,8 +1261,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               value: context.select<ThemeProvider, bool>(
                                 (t) => t.isDarkMode,
                               ),
-                              onChanged: (v) =>
-                                  context.read<ThemeProvider>().setDarkMode(v),
+                                    onChanged: (v) => context
+                                        .read<ThemeProvider>()
+                                        .setDarkMode(v),
                             ),
                           ],
                         ),
@@ -1263,76 +1278,47 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             ),
                           ],
                         ),
-                        const AccountSectionLabel('Security & Verification'),
+                              const AccountSectionLabel('Account'),
                         AccountGroup(
                           children: [
                             AccountNavTile(
                               icon: Icons.mark_email_unread_rounded,
-                              title: 'Email & account security',
-                              subtitle: 'Manage email verification and password security',
-                              onTap: () {
-                                showModalBottomSheet<void>(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (ctx) => Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                                    ),
-                                    child: SingleChildScrollView(
-                                      child: Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: AppUi.pageBgOf(ctx),
-                                          borderRadius: const BorderRadius.vertical(
-                                            top: Radius.circular(AppUi.radiusPill),
-                                          ),
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Center(
-                                              child: Container(
-                                                width: 40,
-                                                height: 4,
-                                                margin: const EdgeInsets.only(bottom: 16),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey.withValues(alpha: 0.4),
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                            ),
-                                            GmailBindingCard(
-                                              onVerified: () {
-                                                if (ctx.mounted) Navigator.pop(ctx);
-                                                _loadProfileData();
-                                              },
-                                            ),
-                                            const SizedBox(height: 24),
-                                          ],
-                                        ),
+                                    title: 'Email',
+                                    subtitle:
+                                        'Manage your email address and verification',
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const AccountSecurityScreen(
+                                              role: 'customer',
+                                              section:
+                                                  AccountSecuritySection.email,
                                       ),
                                     ),
                                   ),
-                                );
-                              },
                             ),
                             AccountNavTile(
                               icon: Icons.lock_reset_rounded,
-                              title: 'Password & Security',
-                              subtitle: 'Change password or manage credentials',
+                                    title: 'Change password',
+                                    subtitle: 'Update your sign-in password',
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const AccountSecurityScreen(role: 'customer'),
+                                          builder: (_) =>
+                                              const AccountSecurityScreen(
+                                                role: 'customer',
+                                                section: AccountSecuritySection
+                                                    .changePassword,
+                                              ),
                                   ),
                                 );
                               },
                             ),
                           ],
                         ),
-                        const AccountSectionLabel('Account'),
+                              const AccountSectionLabel('Account access'),
                         AccountGroup(
                           children: [
                             AccountNavTile(
@@ -1342,7 +1328,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               titleColor: AppColors.uiError,
                               subtitle:
                                   'Log out of your account on this device',
-                              onTap: () => _showLogoutConfirmation(context),
+                                    onTap: () =>
+                                        _showLogoutConfirmation(context),
                             ),
                             AccountNavTile(
                               icon: Icons.delete_outline_rounded,
@@ -1351,7 +1338,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               titleColor: AppColors.uiError,
                               subtitle:
                                   'Permanently remove your account and data',
-                              onTap: () => _showDeleteAccountDialog(context),
+                                    onTap: () =>
+                                        _showDeleteAccountDialog(context),
                             ),
                           ],
                         ),

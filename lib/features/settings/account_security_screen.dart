@@ -8,12 +8,21 @@ import '../../core/constants.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/widgets/app_form_fields.dart';
 import '../../core/services/external_notification_service.dart';
+import '../auth/widgets/gmail_binding_card.dart';
 
 import 'package:erefill/core/utils/friendly_errors.dart';
+
+enum AccountSecuritySection { email, changePassword }
+
 class AccountSecurityScreen extends StatefulWidget {
-  const AccountSecurityScreen({super.key, required this.role});
+  const AccountSecurityScreen({
+    super.key,
+    required this.role,
+    this.section,
+  });
 
   final String role;
+  final AccountSecuritySection? section;
 
   @override
   State<AccountSecurityScreen> createState() => _AccountSecurityScreenState();
@@ -414,10 +423,18 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        '${widget.role[0].toUpperCase()}${widget.role.substring(1)} Security';
+    final title = switch (widget.section) {
+      AccountSecuritySection.email => 'Email',
+      AccountSecuritySection.changePassword => 'Change password',
+      null => '${widget.role[0].toUpperCase()}${widget.role.substring(1)} Security',
+    };
     final user = _currentUser;
     final email = user?.email ?? 'No email associated';
+    final showEmail =
+        widget.section == null || widget.section == AccountSecuritySection.email;
+    final showPassword =
+        widget.section == null ||
+        widget.section == AccountSecuritySection.changePassword;
 
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
@@ -434,8 +451,9 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── A. EMAIL SECURITY ──────────────────────────────────────────
-              Container(
+                if (showEmail) ...[
+                // ── A. EMAIL SECURITY ──────────────────────────────────────────
+                Container(
                 width: double.infinity,
                 padding: AppUi.cardPadding,
                 decoration: AppUi.cardDecorationOf(context),
@@ -578,7 +596,11 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              const GmailBindingCard(),
+              const SizedBox(height: 20),
+              ],
 
+              if (showPassword) ...[
               // ── B. UPDATE PASSWORD ─────────────────────────────────────────
               Form(
                 key: _formKey,
@@ -693,7 +715,9 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              ],
 
+              if (widget.section == null) ...[
               // ── C. DANGER ZONE (DELETE ACCOUNT) ───────────────────────────
               Container(
                 width: double.infinity,
@@ -791,6 +815,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+              ],
             ],
           ),
         ),

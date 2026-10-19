@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -299,7 +299,9 @@ class _RiderDashboardState extends State<RiderDashboard>
     } catch (e) {
       debugPrint('Sync offline error: $e');
       if (mounted) {
-        _showError('Sync failed. Your saved delivery updates are still on this device.');
+        _showError(
+          'Sync failed. Your saved delivery updates are still on this device.',
+        );
       }
     } finally {
       if (mounted) setState(() => _isSyncingOffline = false);
@@ -837,15 +839,22 @@ class _RiderDashboardState extends State<RiderDashboard>
       final contentType = photoExtension == 'png' ? 'image/png' : 'image/jpeg';
       photoPath = '$orderId/proof_$timestamp.$photoExtension';
       signaturePath = '$orderId/signature_$timestamp.png';
-      await supabase.storage.from('delivery_proofs').upload(
+      await supabase.storage
+          .from('delivery_proofs')
+          .upload(
         photoPath,
         localPhoto,
         fileOptions: FileOptions(contentType: contentType, upsert: true),
       );
-      await supabase.storage.from('delivery_proofs').upload(
+      await supabase.storage
+          .from('delivery_proofs')
+          .upload(
         signaturePath,
         localSignature,
-        fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
+            fileOptions: const FileOptions(
+              contentType: 'image/png',
+              upsert: true,
+            ),
       );
 
       // 7. Completion must be confirmed by the proof-aware server RPC.
@@ -964,7 +973,9 @@ class _RiderDashboardState extends State<RiderDashboard>
       isScrollControlled: true,
       backgroundColor: AppUi.surfaceOf(context),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppUi.radiusSheet),
+        ),
       ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
@@ -1028,7 +1039,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                       if (controller.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('The recipient signature is required.'),
+                            content: Text(
+                              'The recipient signature is required.',
+                            ),
                           ),
                         );
                         return;
@@ -1064,7 +1077,9 @@ class _RiderDashboardState extends State<RiderDashboard>
         content: Text(msg),
         backgroundColor: AppColors.uiSuccess,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
+        ),
       ),
     );
   }
@@ -1075,7 +1090,9 @@ class _RiderDashboardState extends State<RiderDashboard>
         content: Text(msg),
         backgroundColor: AppColors.uiError,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
+        ),
       ),
     );
   }
@@ -1599,14 +1616,10 @@ class _RiderDashboardState extends State<RiderDashboard>
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             margin: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: isCod
-                  ? AppUi.warningBg
-                  : AppUi.surfaceRaisedOf(context),
+              color: isCod ? AppUi.warningBg : AppUi.surfaceRaisedOf(context),
               borderRadius: AppUi.cardRadius,
               border: Border.all(
-                color: isCod
-                    ? AppColors.uiWarning
-                    : AppUi.borderOf(context),
+                color: isCod ? AppColors.uiWarning : AppUi.borderOf(context),
                 width: isCod ? 1.5 : 1,
               ),
             ),
@@ -1654,9 +1667,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 20,
-                        color: isCod
-                            ? AppUi.warningFg
-                            : AppUi.brandOf(context),
+                        color: isCod ? AppUi.warningFg : AppUi.brandOf(context),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1709,7 +1720,10 @@ class _RiderDashboardState extends State<RiderDashboard>
                   tooltip: 'Navigate',
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppUi.brandOf(context),
-                    side: BorderSide(color: AppUi.borderOf(context), width: 1.5),
+                    side: BorderSide(
+                      color: AppUi.borderOf(context),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.controlRadius,
                     ),
@@ -1726,7 +1740,10 @@ class _RiderDashboardState extends State<RiderDashboard>
                   tooltip: 'Chat',
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppUi.textSecondaryOf(context),
-                    side: BorderSide(color: AppUi.borderOf(context), width: 1.5),
+                    side: BorderSide(
+                      color: AppUi.borderOf(context),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.controlRadius,
                     ),
@@ -1809,7 +1826,6 @@ class _RiderDashboardState extends State<RiderDashboard>
               ],
             ),
           ),
-
         ],
       ),
     );
@@ -1910,7 +1926,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                       fontWeight: i == currentStep
                           ? FontWeight.w700
                           : FontWeight.w600,
-                      color: i <= currentStep ? statusColor : AppUi.textMutedOf(context),
+                      color: i <= currentStep
+                          ? statusColor
+                          : AppUi.textMutedOf(context),
                     ),
                   ),
                 ],
@@ -1969,9 +1987,13 @@ class _RiderDashboardState extends State<RiderDashboard>
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error updating profile: ${FriendlyErrors.message(e)}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error updating profile: ${FriendlyErrors.message(e)}',
+            ),
+          ),
+        );
       }
       return false;
     }
@@ -2496,19 +2518,39 @@ class _RiderDashboardState extends State<RiderDashboard>
                         AccountGroup(
                           children: [
                             AccountNavTile(
-                              icon: Icons.shield_outlined,
-                              title: 'Account security',
+                              icon: Icons.mark_email_unread_outlined,
+                              title: 'Email',
                               subtitle:
-                                  'Password and Gmail binding controls',
+                                  'Manage your email address and verification',
                               onTap: () => Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      const AccountSecurityScreen(
+                                  builder: (_) => const AccountSecurityScreen(
                                         role: 'rider',
+                                    section: AccountSecuritySection.email,
                                       ),
                                 ),
                               ),
                             ),
+                            AccountNavTile(
+                              icon: Icons.lock_reset_rounded,
+                              title: 'Change password',
+                              subtitle: 'Update your sign-in password',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const AccountSecurityScreen(
+                                    role: 'rider',
+                                    section:
+                                        AccountSecuritySection.changePassword,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const AccountSectionLabel('Account access'),
+                        AccountGroup(
+                          children: [
                             AccountNavTile(
                               icon: Icons.logout_rounded,
                               iconColor: AppColors.uiError,
@@ -2633,7 +2675,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   setSheetState(() => isDeleting = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deletion failed: ${FriendlyErrors.message(e)}'),
+                                      content: Text(
+                                        'Deletion failed: ${FriendlyErrors.message(e)}',
+                                      ),
                                       backgroundColor: AppColors.uiError,
                                     ),
                                   );

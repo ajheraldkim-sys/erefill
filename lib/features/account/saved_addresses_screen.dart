@@ -16,6 +16,27 @@ import '../../core/widgets/app_form_fields.dart';
 import '../../core/utils/profile_query_helpers.dart';
 
 import 'package:erefill/core/utils/friendly_errors.dart';
+
+bool savedAddressNeedsPinConfirmation(Map<String, dynamic> address) {
+  final town = address['town']?.toString();
+  final pinTown = address['map_pin_town']?.toString();
+  final latitude = (address['latitude'] as num?)?.toDouble() ?? 0;
+  final longitude = (address['longitude'] as num?)?.toDouble() ?? 0;
+  final hasValidCoordinates =
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180 &&
+      (latitude != 0 || longitude != 0);
+
+  return !hasValidCoordinates ||
+      town == null ||
+      town.trim().isEmpty ||
+      pinTown == null ||
+      pinTown.trim().isEmpty ||
+      pinTown != town;
+}
+
 /// Launch context for saved-addresses route (`extra` map).
 class SavedAddressLaunchContext {
   final String address;
@@ -248,25 +269,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     );
     if (target.isEmpty) return;
 
-    final town = target['town']?.toString();
-    final pinTown = target['map_pin_town']?.toString();
-    final lat = (target['latitude'] as num?)?.toDouble() ?? 0.0;
-    final lng = (target['longitude'] as num?)?.toDouble() ?? 0.0;
-    final hasValidCoords = (lat != 0 || lng != 0) &&
-        lat >= -90 &&
-        lat <= 90 &&
-        lng >= -180 &&
-        lng <= 180;
-
-    // Only force map confirmation if coordinates are completely missing/zero,
-    // or if pinTown is explicitly non-null and differs from the address municipality.
-    final hasPinMismatch = pinTown != null &&
-        pinTown.isNotEmpty &&
-        town != null &&
-        town.isNotEmpty &&
-        pinTown != town;
-
-    if (!hasValidCoords || hasPinMismatch) {
+    if (savedAddressNeedsPinConfirmation(target)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -454,9 +457,12 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     bool isDefault = initial?['is_default'] == true || _addresses.isEmpty;
     bool isSaving = false;
     bool isLocating = false;
-    final pinTown = initial?['map_pin_town']?.toString();
-    bool requiresPinConfirmation = !hasInitialPin ||
-        (pinTown != null && pinTown.isNotEmpty && pinTown != selectedTown);
+    bool requiresPinConfirmation = savedAddressNeedsPinConfirmation({
+      'latitude': initLat,
+      'longitude': initLng,
+      'town': selectedTown,
+      'map_pin_town': initial?['map_pin_town'],
+    });
 
     await showModalBottomSheet<void>(
       context: context,

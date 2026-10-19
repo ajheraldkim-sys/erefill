@@ -102,26 +102,49 @@ class OfflineQueueService {
           if (assigned != true) {
             throw StateError('Rider assignment was rejected by the server.');
           }
-        } else if (action.actionType == 'UPDATE_ORDER_STATUS') {
+        } else if (action.actionType == 'UPDATE_ORDER_STATUS' ||
+            action.actionType == 'COMPLETE_PICKUP_ORDER') {
           final orderId = action.payload['order_id']?.toString();
           final newStatus = action.payload['new_status']?.toString();
           final reason = action.payload['reason']?.toString();
-          if (orderId != null && newStatus != null) {
+          if (orderId == null || orderId.isEmpty) {
+            throw StateError('Queued status action has no order ID.');
+          }
+          if (action.actionType == 'COMPLETE_PICKUP_ORDER' ||
+              newStatus == 'delivered') {
+            await SafeSupabase.completePickupOrder(
+              orderId: orderId,
+              client: client,
+            );
+          } else if (newStatus != null) {
             final res = await SafeSupabase.transitionOrderStatus(
               orderId: orderId,
               newStatus: newStatus,
-              reason: reason,
+              client: client,
             );
             if (res['success'] != true) {
               throw StateError(
                 res['message']?.toString() ?? 'Status update rejected',
               );
             }
+          } else {
+            throw StateError('Queued status action has no target status.');
+          }
+          // Same as the online decline path: keep the owner's reason.
+          if (reason != null && reason.isNotEmpty) {
+            await client
+                .from('orders')
+                .update({'notes': 'Declined: $reason'})
+                .eq('id', orderId);
           }
         }
-      } catch (e) {
-        debugPrint('OfflineQueueService: Failed to process ${action.id}: $e');
-        remaining.add(action);
+      } catch (error) {
+        debugPrint('OfflineQueueService: Failed to process ${action.id}: $error');
+        final isRejected =
+            error is StateError ||
+            (error is PostgrestException &&
+                const {'P0001', '42501', '23514'}.contains(error.code));
+        if (!isRejected) remaining.add(action);
       }
     }
 

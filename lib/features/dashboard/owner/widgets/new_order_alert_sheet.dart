@@ -138,8 +138,16 @@ class _NewOrderAlertSheetState extends State<NewOrderAlertSheet>
       setState(() => _isProcessing = true);
       try {
         await widget.onDecline!(orderId);
-      } finally {
         if (mounted) Navigator.of(context).maybePop();
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to decline order: ${FriendlyErrors.message(e)}'),
+            ),
+          );
+        }
       }
     } else {
       Navigator.of(context).maybePop();

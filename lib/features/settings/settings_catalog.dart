@@ -61,10 +61,10 @@ class RoleSettingsCatalog {
       icon: Icons.tune_rounded,
     ),
     SettingsSection(
-      key: 'security',
-      title: 'Security',
-      description: 'Password, login, and account protection settings.',
-      icon: Icons.security_outlined,
+      key: 'account',
+      title: 'Account',
+      description: 'Email, username, and password settings.',
+      icon: Icons.manage_accounts_outlined,
     ),
   ];
 
@@ -113,10 +113,10 @@ class RoleSettingsCatalog {
       icon: Icons.notifications_active_outlined,
     ),
     SettingsSection(
-      key: 'security',
-      title: 'Security',
-      description: 'Station business access and account protection controls.',
-      icon: Icons.shield_outlined,
+      key: 'account',
+      title: 'Account',
+      description: 'Email, username, and password settings.',
+      icon: Icons.manage_accounts_outlined,
     ),
   ];
 
@@ -152,10 +152,10 @@ class RoleSettingsCatalog {
       icon: Icons.notifications_outlined,
     ),
     SettingsSection(
-      key: 'security',
-      title: 'Security',
-      description: 'Password and access controls for your rider account.',
-      icon: Icons.security_outlined,
+      key: 'account',
+      title: 'Account',
+      description: 'Email, username, and password settings.',
+      icon: Icons.manage_accounts_outlined,
     ),
   ];
 

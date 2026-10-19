@@ -4,6 +4,30 @@ import 'package:erefill/features/account/saved_addresses_screen.dart';
 
 void main() {
   group('Saved Addresses & Checkout Delivery Rules Tests', () {
+    test('legacy saved address without map municipality needs confirmation', () {
+      expect(
+        savedAddressNeedsPinConfirmation({
+          'town': 'Cantilan',
+          'map_pin_town': null,
+          'latitude': 9.3517,
+          'longitude': 125.9784,
+        }),
+        isTrue,
+      );
+    });
+
+    test('saved address with matching confirmed map pin needs no confirmation', () {
+      expect(
+        savedAddressNeedsPinConfirmation({
+          'town': 'Madrid',
+          'map_pin_town': 'Madrid',
+          'latitude': 9.2745,
+          'longitude': 125.9643,
+        }),
+        isFalse,
+      );
+    });
+
     test('legacy address with null map_pin_town and valid coordinates is allowed', () {
       final profile = {
         'complete_address': 'Purok 3, Consuelo',
