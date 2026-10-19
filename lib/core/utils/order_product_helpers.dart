@@ -87,7 +87,9 @@ abstract final class OrderProductHelpers {
     return pool.first;
   }
 
-  /// Applies UI defaults for optional refill metadata columns.
+  /// Fills optional refill metadata when a query didn't select it. The values
+  /// mirror the `water_options` column defaults (`'5 gallon'`, `15`), so the
+  /// UI never shows anything the database wouldn't.
   static Map<String, dynamic> withDisplayDefaults(
     Map<String, dynamic> product,
   ) {
@@ -97,6 +99,37 @@ abstract final class OrderProductHelpers {
       'preparation_minutes':
           (product['preparation_minutes'] as num?)?.toInt() ?? 15,
     };
+  }
+
+  /// Single source of truth for classifying physical goods vs water refills.
+  static bool isContainerOrAccessory(Map<String, dynamic>? product) {
+    if (product == null) return false;
+    final cat = (product['category'] ?? '').toString().toLowerCase();
+    final name = (product['name'] ?? '').toString().toLowerCase();
+    return cat == 'containers' ||
+        cat == 'accessories' ||
+        cat == 'products' ||
+        cat.contains('container') ||
+        cat.contains('accessory') ||
+        name.contains('container') ||
+        name.contains('cap') ||
+        name.contains('bottle') ||
+        name.contains('dispenser') ||
+        name.contains('pump') ||
+        name.contains('jug');
+  }
+
+  /// Returns user-friendly category display label.
+  static String formatCategory(String? category, {String? name}) {
+    final raw = (category ?? '').trim();
+    if (raw.toLowerCase() == 'products' || raw.toLowerCase() == 'accessories') {
+      final n = (name ?? '').toLowerCase();
+      if (n.contains('container') || n.contains('bottle') || n.contains('jug')) {
+        return 'Containers';
+      }
+      return 'Accessories';
+    }
+    return raw.isNotEmpty ? raw : 'Accessories';
   }
 
   /// Ensures a single orderable product exists for the owner using station pricing settings.

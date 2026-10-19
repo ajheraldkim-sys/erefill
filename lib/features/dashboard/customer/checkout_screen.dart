@@ -10,7 +10,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/utils/profile_query_helpers.dart';
+import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/constants.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/map_tiles.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
@@ -26,6 +28,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/services/offline_order_sync_service.dart';
 import '../../../core/services/payment_launch_service.dart';
+import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/friendly_errors.dart';
 import '../../loyalty/models/loyalty_model.dart';
 import '../../loyalty/services/loyalty_service.dart';
@@ -80,12 +83,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<LoyaltyRewardVoucher> _availableVouchers = [];
   LoyaltyRewardVoucher? _appliedVoucher;
 
+  String _containerOption = 'swap';
+  bool _isFeeBreakdownExpanded = false;
+  String? _stationOpeningTime;
+  String? _stationClosingTime;
+  List<String> _stationOperatingDays = [];
+  bool _isOutsideHours = false;
+  bool _scheduleForNextOpen = false;
+
   @override
   void initState() {
     super.initState();
-    _stationLat = (widget.station['latitude'] as num?)?.toDouble() ??
+    _stationLat =
+        (widget.station['latitude'] as num?)?.toDouble() ??
         (widget.station['lat'] as num?)?.toDouble();
-    _stationLng = (widget.station['longitude'] as num?)?.toDouble() ??
+    _stationLng =
+        (widget.station['longitude'] as num?)?.toDouble() ??
         (widget.station['lng'] as num?)?.toDouble();
     _setupConfigRealtimeChannel();
     _loadInitialData();
@@ -158,12 +171,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           .where((option) => option.available)
           .toList();
 
+      final user = supabase.auth.currentUser;
+      String? lastUsedMethod;
+      if (user != null) {
+        lastUsedMethod =
+            LocalDataCache.instance.getMemory<String>(
+              'last_used_payment_method_${user.id}',
+            ) ??
+            await LocalDataCache.instance.get<String>(
+              'last_used_payment_method_${user.id}',
+            );
+      }
+
       if (!mounted) return;
       setState(() {
         _paymentMethods = options;
         _paymentMethodsLoaded = true;
         _paymentMethodsError = null;
-        if (!CheckoutRules.isPaymentAvailable(_paymentMethod, options)) {
+        if (lastUsedMethod != null &&
+            CheckoutRules.isPaymentAvailable(lastUsedMethod, options)) {
+          _paymentMethod = lastUsedMethod;
+        } else if (!CheckoutRules.isPaymentAvailable(_paymentMethod, options)) {
           _paymentMethod = availableOptions.isEmpty
               ? ''
               : availableOptions.first.type;
@@ -215,12 +243,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _deliveryMinFee =
               (_deliveryFeeConfig?['minimum_fee'] as num?)?.toDouble() ?? 20.0;
           _deliveryMinDistance =
-              (_deliveryFeeConfig?['min_billable_distance_km'] as num?)?.toDouble() ?? 1.0;
+              (_deliveryFeeConfig?['min_billable_distance_km'] as num?)
+                  ?.toDouble() ??
+              1.0;
           _deliveryRoundingRule =
               (_deliveryFeeConfig?['rounding_rule'] ?? 'exact').toString();
           _stationSettingsLoaded = true;
         });
         _recalculateDeliveryFee();
+
+        try {
+          final sett = await supabase
+              .from('owner_settings')
+              .select('opening_time, closing_time, operating_days')
+              .eq('owner_id', ownerId)
+              .maybeSingle();
+          if (sett != null && mounted) {
+            _stationOpeningTime = sett['opening_time']?.toString();
+            _stationClosingTime = sett['closing_time']?.toString();
+            if (sett['operating_days'] is List) {
+              _stationOperatingDays = List<String>.from(sett['operating_days']);
+            }
+            _evaluateOperatingHours();
+          }
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('Error loading delivery fee settings: $e');
@@ -234,13 +280,59 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  void _evaluateOperatingHours() {
+    if (_stationOpeningTime == null || _stationClosingTime == null) {
+      if (mounted) setState(() => _isOutsideHours = false);
+      return;
+    }
+    final now = DateTime.now();
+    bool outside = false;
+
+    if (_stationOperatingDays.isNotEmpty) {
+      const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      final currentDay = days[now.weekday - 1];
+      if (!_stationOperatingDays.any(
+        (d) => d.toLowerCase().startsWith(currentDay),
+      )) {
+        outside = true;
+      }
+    }
+
+    if (!outside) {
+      try {
+        final openParts = _stationOpeningTime!.split(':');
+        final closeParts = _stationClosingTime!.split(':');
+        final openMin =
+            int.parse(openParts[0].trim()) * 60 +
+            int.parse(openParts[1].trim());
+        final closeMin =
+            int.parse(closeParts[0].trim()) * 60 +
+            int.parse(closeParts[1].trim());
+        final nowMin = now.hour * 60 + now.minute;
+
+        if (nowMin < openMin || nowMin > closeMin) {
+          outside = true;
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _isOutsideHours = outside;
+        if (outside) _scheduleForNextOpen = true;
+      });
+    }
+  }
+
   void _recalculateDeliveryFee() {
     final customerLat = (_customerProfile?['latitude'] as num?)?.toDouble();
     final customerLng = (_customerProfile?['longitude'] as num?)?.toDouble();
-    final stationLat = _stationLat ??
+    final stationLat =
+        _stationLat ??
         (widget.station['latitude'] as num?)?.toDouble() ??
         (widget.station['lat'] as num?)?.toDouble();
-    final stationLng = _stationLng ??
+    final stationLng =
+        _stationLng ??
         (widget.station['longitude'] as num?)?.toDouble() ??
         (widget.station['lng'] as num?)?.toDouble();
 
@@ -362,7 +454,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (ctx) => Container(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -374,10 +466,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  children: const [
+                  children: [
                     Icon(
                       Icons.local_offer_rounded,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                       size: 20,
                     ),
                     SizedBox(width: 8),
@@ -385,7 +477,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       'Select Reward Voucher',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -420,11 +512,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         border: Border.all(
                           color: Colors.grey.withValues(alpha: 0.2),
                         ),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       ),
                       child: Material(
                         color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         clipBehavior: Clip.antiAlias,
                         child: ListTile(
                           leading: CircleAvatar(
@@ -433,7 +525,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ).withValues(alpha: 0.1),
                             child: const Icon(
                               Icons.check_rounded,
-                              color: Color(0xFF10B981),
+                              color: AppColors.uiSuccess,
                               size: 18,
                             ),
                           ),
@@ -454,10 +546,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           trailing: Text(
                             v.isDeliveryDiscount
                                 ? 'Free Delivery'
-                                : '-\u20B1${v.discountAmount.toStringAsFixed(0)}',
+                                : '-${formatPeso(v.discountAmount, whole: true)}',
                             style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.uiSuccess,
                             ),
                           ),
                           onTap: () {
@@ -830,10 +922,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw StateError('Selected payment method is not available.');
       }
 
-      final notesText = _appliedVoucher != null
-          ? '${_notesController.text.trim()} [Voucher: ${_appliedVoucher!.code} -₱${voucherDiscount.toStringAsFixed(2)}]'
-                .trim()
-          : _notesController.text.trim();
+      final containerNotice = _containerOption == 'swap'
+          ? '[Container: 1-to-1 Bottle Swap]'
+          : '[Container: No Empty Bottle (Deposit / New Container Needed)]';
+
+      final scheduleNotice = _isOutsideHours && _scheduleForNextOpen
+          ? '[Scheduled for next station opening (${_stationOpeningTime ?? '8:00 AM'})]'
+          : null;
+
+      final userNotes = _notesController.text.trim();
+      final combinedNotes = [
+        containerNotice,
+        ?scheduleNotice,
+        if (userNotes.isNotEmpty) userNotes,
+      ].join(' · ');
 
       final orderData = {
         'customer_id': customerId,
@@ -854,10 +956,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'total_amount': totalAmount,
         'payment_method': paymentMethod,
         'payment_proof_url': null,
-        'notes': notesText,
+        'notes': combinedNotes,
         'region_id': _customerProfile?['region_id'],
         'customer_latitude': customerLat,
         'customer_longitude': customerLng,
+        'container_exchange_type': _containerOption,
+        if (_isOutsideHours && _scheduleForNextOpen)
+          'scheduled_for_next_open': true,
       };
 
       final response = await supabase.rpc(
@@ -1159,10 +1264,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
         title: Row(
           children: const [
-            Icon(Icons.error_outline, color: Colors.redAccent),
+            Icon(Icons.error_outline, color: AppColors.uiError),
             SizedBox(width: 8),
             Text(
               'Payment Notice',
@@ -1184,7 +1289,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               backgroundColor: AppUi.bluePrimary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
             ),
             onPressed: () async {
@@ -1248,7 +1353,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               fallback: 'Could not reopen payment checkout. Please try again.',
             ),
           ),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: AppColors.uiError,
         ),
       );
     }
@@ -1301,9 +1406,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     color: AppUi.blueSoft,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.shopping_cart_outlined,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                     size: 38,
                   ),
                 ),
@@ -1311,7 +1416,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Text(
                   'Your cart is empty',
                   style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -1336,7 +1441,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       vertical: 12,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     ),
                   ),
                 ),
@@ -1384,8 +1489,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   _buildDeliveryAddressCard(context, profileReady),
                   const SizedBox(height: 12),
 
+                  if (_isOutsideHours) ...[
+                    _buildStationScheduleNotice(context),
+                    const SizedBox(height: 12),
+                  ],
+
                   // ── 2. STATION & REFILL ITEMS CARD ───────────────
                   _buildStationAndItemsCard(context, stationName, cart),
+                  const SizedBox(height: 12),
+
+                  // ── CONTAINER EXCHANGE OPTION ────────────────────
+                  _buildContainerExchangeCard(context, cart),
                   const SizedBox(height: 12),
 
                   // ── 3. VOUCHER / PROMOTION CARD ──────────────────
@@ -1430,7 +1544,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ── CUSTOM TOP NAVIGATION ──────────────────────────────────────────────────
 
   PreferredSize _buildCustomHeader(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return PreferredSize(
       preferredSize: const Size.fromHeight(56),
       child: SafeArea(
@@ -1440,46 +1553,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(
-                onTap: () => Navigator.of(context).maybePop(),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppUi.surfaceOf(context),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppUi.borderOf(context),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDark ? 0.2 : 0.04,
-                        ),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.arrow_back_rounded,
-                    size: 20,
-                    color: AppUi.textPrimaryOf(context),
-                  ),
+              IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).maybePop(),
+                style: IconButton.styleFrom(
+                  side: BorderSide(color: AppUi.borderOf(context)),
+                  shape: const CircleBorder(),
+                ),
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  size: 20,
+                  color: AppUi.textPrimaryOf(context),
                 ),
               ),
               Text(
-                'Confirm Refill',
+                'Checkout',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
-              const SizedBox(width: 40),
+              const SizedBox(width: 48),
             ],
           ),
         ),
@@ -1498,15 +1594,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       key: _deliverySectionKey,
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(color: AppUi.borderOf(context), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -1550,7 +1639,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             padding: const EdgeInsets.all(4),
                             child: const Icon(
                               Icons.location_on_rounded,
-                              color: Color(0xFFEF4444),
+                              color: AppColors.uiError,
                               size: 24,
                             ),
                           ),
@@ -1565,7 +1654,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Container(
               height: 80,
               width: double.infinity,
-              color: AppUi.blueSoft.withValues(alpha: 0.6),
+              color: AppUi.brandSoftOf(context).withValues(alpha: 0.6),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1575,12 +1664,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     size: 22,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Set delivery pin on map',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                     ),
                   ),
                 ],
@@ -1593,9 +1682,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Deliver to \u00B7 ~20-30 min',
+                  'Deliver to',
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: AppUi.textSecondaryOf(context),
                   ),
@@ -1608,7 +1697,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         _deliveryDestinationLabel(),
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: -0.2,
                           color: AppUi.textPrimaryOf(context),
                         ),
@@ -1618,7 +1707,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     InkWell(
                       onTap: _openAddressSetup,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 4,
@@ -1630,16 +1719,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             Text(
                               'Change',
                               style: TextStyle(
-                                fontSize: 13.5,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF2E7D32),
+                                color: AppColors.uiSuccess,
                               ),
                             ),
                             SizedBox(width: 2),
                             Icon(
                               Icons.chevron_right_rounded,
                               size: 18,
-                              color: Color(0xFF2E7D32),
+                              color: AppColors.uiSuccess,
                             ),
                           ],
                         ),
@@ -1674,7 +1763,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           padding: const EdgeInsets.only(right: 8),
                           child: InkWell(
                             onTap: () => _selectSavedAddress(addr),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -1684,7 +1773,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 color: isSelected
                                     ? AppUi.bluePrimary.withValues(alpha: 0.12)
                                     : AppUi.pageBgOf(context),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                                 border: Border.all(
                                   color: isSelected
                                       ? AppUi.bluePrimary
@@ -1695,12 +1784,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               child: Text(
                                 addr['label']?.toString() ?? 'Address',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12,
                                   fontWeight: isSelected
                                       ? FontWeight.w700
                                       : FontWeight.w500,
                                   color: isSelected
-                                      ? AppUi.bluePrimary
+                                      ? AppUi.brandOf(context)
                                       : AppUi.textSecondaryOf(context),
                                 ),
                               ),
@@ -1729,15 +1818,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(color: AppUi.borderOf(context), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1750,12 +1832,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppUi.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.water_drop_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 16,
                 ),
               ),
@@ -1764,8 +1846,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: Text(
                   stationName,
                   style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                   maxLines: 1,
@@ -1790,30 +1872,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: AppUi.blueSoft.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppUi.brandSoftOf(context).withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         ),
                         alignment: Alignment.center,
                         child:
                             item.imageUrl != null && item.imageUrl!.isNotEmpty
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 child: CachedNetworkImage(
                                   imageUrl: item.imageUrl!,
                                   width: 52,
                                   height: 52,
                                   fit: BoxFit.cover,
                                   errorWidget: (context, url, error) =>
-                                      const Icon(
+                                      Icon(
                                         Icons.water_drop_outlined,
-                                        color: AppUi.bluePrimary,
+                                        color: AppUi.brandOf(context),
                                         size: 26,
                                       ),
                                 ),
                               )
-                            : const Icon(
+                            : Icon(
                                 Icons.water_drop_rounded,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                                 size: 26,
                               ),
                       ),
@@ -1826,16 +1908,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             vertical: 1.5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
-                            borderRadius: BorderRadius.circular(8),
+                            color: AppUi.textPrimary,
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             border: Border.all(color: Colors.white, width: 1.5),
                           ),
                           child: Text(
                             '${item.quantity}x',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1850,7 +1932,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           item.name,
                           style: TextStyle(
-                            fontSize: 14.5,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
@@ -1870,9 +1952,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    '\u20B1${(item.price * item.quantity).toStringAsFixed(2)}',
+                    formatPeso((item.price * item.quantity)),
                     style: TextStyle(
-                      fontSize: 14.5,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
@@ -1891,7 +1973,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // Delivery notes / special instructions row
           InkWell(
             onTap: () => _showNotesDialog(context),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppUi.radiusControl),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -1908,7 +1990,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ? 'Add delivery notes / gate instructions...'
                           : 'Note: ${_notesController.text.trim()}',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13,
                         fontStyle: _notesController.text.trim().isEmpty
                             ? FontStyle.italic
                             : FontStyle.normal,
@@ -1925,11 +2007,302 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ? Icons.add_rounded
                         : Icons.edit_outlined,
                     size: 16,
-                    color: const Color(0xFF2E7D32),
+                    color: AppColors.uiSuccess,
                   ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStationScheduleNotice(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final openTime = _stationOpeningTime ?? '8:00 AM';
+    final closeTime = _stationClosingTime ?? '5:00 PM';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.uiWarning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+        border: Border.all(
+          color: AppColors.uiWarning.withValues(alpha: 0.3),
+        ),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.schedule_rounded,
+                color: AppColors.uiWarning,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Station Closed (Operating Hours: $openTime - $closeTime)',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.uiWarning,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The refilling station is closed right now. You can schedule this order for delivery when the station opens.',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey[300] : AppUi.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: () =>
+                setState(() => _scheduleForNextOpen = !_scheduleForNextOpen),
+            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _scheduleForNextOpen,
+                  activeColor: AppColors.uiWarning,
+                  onChanged: (v) =>
+                      setState(() => _scheduleForNextOpen = v ?? false),
+                ),
+                Expanded(
+                  child: Text(
+                    'Schedule for next opening ($openTime delivery queue)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppUi.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContainerExchangeCard(BuildContext context, CartProvider cart) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF161F30) : Colors.white;
+    final borderColor = isDark
+        ? const Color(0xFF1E2D4A)
+        : AppUi.borderLight;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                ),
+                child: Icon(
+                  Icons.swap_horizontal_circle_outlined,
+                  size: 20,
+                  color: AppUi.brandOf(context),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Container Exchange Option',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : AppUi.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Do you have empty bottles to swap?',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? Colors.grey[400]
+                            : AppUi.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _containerOption = 'swap'),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    constraints: const BoxConstraints(
+                      minHeight: AppUi.kMinTouchTarget,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _containerOption == 'swap'
+                          ? AppColors.brandPrimary.withValues(alpha: 0.1)
+                          : (isDark
+                                ? AppUi.darkSurfaceRaised
+                                : AppUi.pageBg),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      border: Border.all(
+                        color: _containerOption == 'swap'
+                            ? AppColors.brandPrimary
+                            : borderColor,
+                        width: _containerOption == 'swap' ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _containerOption == 'swap'
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.radio_button_off_rounded,
+                              size: 16,
+                              color: _containerOption == 'swap'
+                                  ? AppUi.brandOf(context)
+                                  : Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                '1-to-1 Swap',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _containerOption == 'swap'
+                                      ? AppUi.brandOf(context)
+                                      : (isDark
+                                            ? Colors.white
+                                            : AppUi.textPrimary),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Hand over your empty gallon, no deposit',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? Colors.grey[400]
+                                : AppUi.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _containerOption = 'deposit'),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    constraints: const BoxConstraints(
+                      minHeight: AppUi.kMinTouchTarget,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _containerOption == 'deposit'
+                          ? AppColors.brandPrimary.withValues(alpha: 0.1)
+                          : (isDark
+                                ? AppUi.darkSurfaceRaised
+                                : AppUi.pageBg),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      border: Border.all(
+                        color: _containerOption == 'deposit'
+                            ? AppColors.brandPrimary
+                            : borderColor,
+                        width: _containerOption == 'deposit' ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _containerOption == 'deposit'
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.radio_button_off_rounded,
+                              size: 16,
+                              color: _containerOption == 'deposit'
+                                  ? AppUi.brandOf(context)
+                                  : Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'New / Deposit',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _containerOption == 'deposit'
+                                      ? AppUi.brandOf(context)
+                                      : (isDark
+                                            ? Colors.white
+                                            : AppUi.textPrimary),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Buy or deposit new container',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? Colors.grey[400]
+                                : AppUi.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1945,14 +2318,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: _showSelectVoucherSheet,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         child: Container(
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             border: Border.all(
               color: _appliedVoucher != null
-                  ? const Color(0xFF10B981)
+                  ? AppColors.uiSuccess
                   : AppUi.borderOf(context),
               width: 1,
             ),
@@ -1988,7 +2361,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         child: const Icon(
                           Icons.confirmation_number_outlined,
-                          color: Color(0xFF2E7D32),
+                          color: AppColors.uiSuccess,
                           size: 16,
                         ),
                       ),
@@ -1996,9 +2369,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const Text(
                         'Voucher',
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF2E7D32),
+                          color: AppColors.uiSuccess,
                         ),
                       ),
                     ],
@@ -2022,9 +2395,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               : 'Select a voucher',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: _appliedVoucher != null
-                                ? const Color(0xFF16A34A)
+                                ? AppColors.uiSuccess
                                 : AppUi.textPrimaryOf(context),
                           ),
                           maxLines: 1,
@@ -2035,7 +2408,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           _appliedVoucher != null
                               ? (_appliedVoucher!.isDeliveryDiscount
                                     ? 'Free delivery discount applied'
-                                    : '-\u20B1${voucherDiscount.toStringAsFixed(0)} discount applied')
+                                    : '-${formatPeso(voucherDiscount, whole: true)} discount applied')
                               : (_availableVouchers.isEmpty
                                     ? 'No vouchers available for this order'
                                     : '${_availableVouchers.length} available for this order'),
@@ -2073,7 +2446,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.redAccent,
+                                color: AppColors.uiError,
                               ),
                             ),
                           )
@@ -2084,13 +2457,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF2E5E3B),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                             ),
                             child: const Text(
                               'Select',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 12.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -2112,19 +2485,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: _showPaymentSelectorSheet,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         child: Container(
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             border: Border.all(color: AppUi.borderOf(context), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -2133,7 +2499,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Text(
                 'Payment method',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppUi.textSecondaryOf(context),
                 ),
@@ -2150,8 +2516,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           CheckoutRules.paymentLabel(_paymentMethod),
                           style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -2172,16 +2538,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       Text(
                         'Change',
                         style: TextStyle(
-                          fontSize: 13.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF2E7D32),
+                          color: AppColors.uiSuccess,
                         ),
                       ),
                       SizedBox(width: 2),
                       Icon(
                         Icons.chevron_right_rounded,
                         size: 18,
-                        color: Color(0xFF2E7D32),
+                        color: AppColors.uiSuccess,
                       ),
                     ],
                   ),
@@ -2195,24 +2561,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: AppUi.blueSoft.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppUi.brandSoftOf(context).withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.lock_outline_rounded,
                         size: 14,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Secure checkout powered by PayMongo Philippines',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       ),
@@ -2236,175 +2602,128 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     double voucherDiscount,
     double totalWithDelivery,
   ) {
-    final isFreeDelivery =
-        _deliveryFee == 0 ||
-        (_appliedVoucher != null && _appliedVoucher!.isDeliveryDiscount);
+    // "Free" only when no fee is charged. A delivery voucher is shown as its
+    // own deduction so the lines always add up to the total.
+    final isFreeDelivery = _deliveryFee == 0;
+    final hasVoucher = _appliedVoucher != null && voucherDiscount > 0;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppUi.borderOf(context), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _summaryRow(
             context,
-            'Subtotal',
-            '\u20B1${cart.totalAmount.toStringAsFixed(2)}',
+            'Subtotal (${cart.totalItems} item${cart.totalItems == 1 ? '' : 's'})',
+            formatPeso(cart.totalAmount),
           ),
-          const SizedBox(height: 10),
-          _summaryRow(
+          const SizedBox(height: AppUi.spacingSm),
+          _feeRow(
             context,
-            'Delivery distance',
-            '${_deliveryDistanceKm.toStringAsFixed(1)} km',
+            label: 'Delivery fee',
+            infoTooltip: 'How the delivery fee is calculated',
+            onInfo: () => _showDeliveryFeeInfoDialog(context),
+            value: isFreeDelivery ? 'Free' : formatPeso(_deliveryFee),
+            valueColor: isFreeDelivery ? AppColors.uiSuccess : null,
           ),
-          const SizedBox(height: 10),
-          _summaryRow(
-            context,
-            'Delivery rate',
-            '\u20B1${_deliveryRatePerKm.toStringAsFixed(2)}/km',
+          TextButton.icon(
+            onPressed: () => setState(
+              () => _isFeeBreakdownExpanded = !_isFeeBreakdownExpanded,
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+              minimumSize: const Size(0, 36),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            icon: Icon(
+              _isFeeBreakdownExpanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              size: 18,
+            ),
+            label: Text(
+              _isFeeBreakdownExpanded
+                  ? 'Hide fee calculation'
+                  : 'Show fee calculation',
+            ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+          if (_isFeeBreakdownExpanded) ...[
+            Container(
+              padding: const EdgeInsets.all(AppUi.spacingMd),
+              decoration: BoxDecoration(
+                color: AppUi.surfaceRaisedOf(context),
+                borderRadius: AppUi.controlRadius,
+              ),
+              child: Column(
                 children: [
-                  Text(
-                    'Delivery fee',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: AppUi.textSecondaryOf(context),
-                      fontWeight: FontWeight.w500,
-                    ),
+                  _summaryRow(
+                    context,
+                    'Distance from station',
+                    '${_deliveryDistanceKm.toStringAsFixed(1)} km',
                   ),
-                  const SizedBox(width: 5),
-                  GestureDetector(
-                    onTap: () => _showDeliveryFeeInfoDialog(context),
-                    child: const Icon(
-                      Icons.info_outline_rounded,
-                      size: 14,
-                      color: AppUi.textMuted,
-                    ),
+                  const SizedBox(height: 6),
+                  _summaryRow(
+                    context,
+                    'Rate',
+                    '${formatPeso(_deliveryRatePerKm)}/km',
+                  ),
+                  const SizedBox(height: 6),
+                  _summaryRow(
+                    context,
+                    'Minimum fee',
+                    formatPeso(_deliveryMinFee),
                   ),
                 ],
               ),
-              isFreeDelivery
-                  ? const Text(
-                      'Free',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF2E7D32),
-                      ),
-                    )
-                  : Text(
-                      '\u20B1${_deliveryFee.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppUi.textPrimaryOf(context),
-                      ),
-                    ),
-            ],
-          ),
+            ),
+            const SizedBox(height: AppUi.spacingSm),
+          ],
           if (platformFee > 0) ...[
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Service fee',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        color: AppUi.textSecondaryOf(context),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    GestureDetector(
-                      onTap: () => _showServiceFeeInfoDialog(context),
-                      child: const Icon(
-                        Icons.info_outline_rounded,
-                        size: 14,
-                        color: AppUi.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '\u20B1${platformFee.toStringAsFixed(2)}',
+            const SizedBox(height: AppUi.spacingXs),
+            _feeRow(
+              context,
+              label: 'Service fee',
+              infoTooltip: 'What the service fee covers',
+              onInfo: () => _showServiceFeeInfoDialog(context),
+              value: formatPeso(platformFee),
+            ),
+          ],
+          if (hasVoucher) ...[
+            const SizedBox(height: AppUi.spacingSm),
+            _summaryRow(
+              context,
+              _appliedVoucher!.isDeliveryDiscount
+                  ? 'Delivery voucher'
+                  : 'Voucher discount',
+              '−${formatPeso(voucherDiscount)}',
+              valueColor: AppColors.uiSuccess,
+            ),
+          ],
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppUi.spacingMd),
+            child: Divider(height: 1),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Total',
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                 ),
-              ],
-            ),
-          ],
-          if (_appliedVoucher != null && voucherDiscount > 0) ...[
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Voucher discount',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: Color(0xFF2E7D32),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  '-\u20B1${voucherDiscount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Divider(
-              height: 1,
-              color: AppUi.dividerOf(context).withValues(alpha: 0.6),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppUi.textPrimaryOf(context),
-                ),
               ),
               Text(
-                '\u20B1${totalWithDelivery.toStringAsFixed(2)}',
+                formatPeso(totalWithDelivery),
                 style: TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -2414,24 +2733,71 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _summaryRow(BuildContext context, String label, String value) {
+  Widget _feeRow(
+    BuildContext context, {
+    required String label,
+    required String infoTooltip,
+    required VoidCallback onInfo,
+    required String value,
+    Color? valueColor,
+  }) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: 13.5,
+            fontSize: 14,
             color: AppUi.textSecondaryOf(context),
             fontWeight: FontWeight.w500,
           ),
         ),
+        IconButton(
+          tooltip: infoTooltip,
+          onPressed: onInfo,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.info_outline_rounded, size: 18),
+          color: AppUi.textMuted,
+        ),
+        const Spacer(),
         Text(
           value,
           style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: AppUi.textPrimaryOf(context),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? AppUi.textPrimaryOf(context),
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _summaryRow(
+    BuildContext context,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppUi.textSecondaryOf(context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppUi.spacingMd),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? AppUi.textPrimaryOf(context),
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ],
@@ -2492,7 +2858,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       builder: (ctx) => Container(
         decoration: BoxDecoration(
           color: AppUi.surfaceOf(context),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
         ),
         padding: EdgeInsets.fromLTRB(
           20,
@@ -2522,7 +2888,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   'Select Payment Method',
                   style: TextStyle(
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                 ),
@@ -2538,6 +2904,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               methods: _selectablePaymentMethods,
               onSelected: (method) {
                 setState(() => _paymentMethod = method);
+                final user = supabase.auth.currentUser;
+                if (user != null) {
+                  LocalDataCache.instance.set(
+                    'last_used_payment_method_${user.id}',
+                    method,
+                  );
+                }
                 Navigator.pop(ctx);
               },
             ),
@@ -2557,7 +2930,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Container(
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
           ),
           padding: EdgeInsets.fromLTRB(
             20,
@@ -2587,7 +2960,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     'Special Instructions',
                     style: TextStyle(
                       fontSize: 17,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
@@ -2619,7 +2992,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     backgroundColor: AppUi.bluePrimary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     ),
                   ),
                   child: const Text(
@@ -2644,11 +3017,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(
               Icons.local_shipping_outlined,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               size: 20,
             ),
             SizedBox(width: 8),
@@ -2667,47 +3040,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppUi.blueSoft,
-                borderRadius: BorderRadius.circular(10),
+                color: AppUi.brandSoftOf(context),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '• Route Distance: ${dist.toStringAsFixed(2)} km',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
-                    '• Centralized Rate: ₱${rate.toStringAsFixed(2)} / km',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    '• Centralized Rate: ${formatPeso(rate)} / km',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   if (minFee > 0)
                     Text(
-                      '• Minimum Delivery Fee: ₱${minFee.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      '• Minimum Delivery Fee: ${formatPeso(minFee)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   if (rounding == 'ceil')
                     const Text(
                       '• Rounding Rule: Round up to next whole km',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     )
                   else if (rounding == 'round')
                     const Text(
                       '• Rounding Rule: Round to nearest whole km',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     )
                   else
                     const Text(
                       '• Calculation: Exact proportional distance',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   const Divider(height: 16),
                   Text(
-                    'Final Delivery Fee: ₱${_deliveryFee.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
+                    'Final Delivery Fee: ${formatPeso(_deliveryFee)}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
                     ),
                   ),
                 ],
@@ -2729,11 +3120,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(
               Icons.info_outline_rounded,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               size: 20,
             ),
             SizedBox(width: 8),
@@ -2760,7 +3151,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppUi.warningBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.warningFg.withValues(alpha: 0.25)),
       ),
       child: Row(
@@ -2863,17 +3254,17 @@ class _CheckoutBottomBar extends StatelessWidget {
                   Text(
                     'Total',
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 13,
                       color: AppUi.textSecondaryOf(context),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '\u20B1${total.toStringAsFixed(2)}',
+                    formatPeso(total),
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -0.5,
                       color: AppUi.textPrimaryOf(context),
                     ),
@@ -2887,16 +3278,8 @@ class _CheckoutBottomBar extends StatelessWidget {
               child: FilledButton(
                 onPressed: canSubmit ? onConfirm : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF88BA3A),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(
-                    0xFF88BA3A,
-                  ).withValues(alpha: 0.35),
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(26),
-                  ),
-                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  minimumSize: const Size(0, 52),
                 ),
                 child: isSubmitting
                     ? const SizedBox(
@@ -2910,10 +3293,10 @@ class _CheckoutBottomBar extends StatelessWidget {
                         ),
                       )
                     : const Text(
-                        'Confirm Refill',
+                        'Checkout',
                         style: TextStyle(
                           fontSize: 15.5,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: -0.2,
                         ),
                       ),
@@ -3077,7 +3460,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                 fallback: 'Could not check payment status.',
               ),
             ),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -3129,7 +3512,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
           : fe.reasonPhrase ?? 'Could not reopen payment checkout.';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(msg), backgroundColor: AppColors.uiError),
         );
       }
     } catch (e) {
@@ -3142,7 +3525,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                 fallback: 'Could not reopen payment checkout.',
               ),
             ),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -3158,7 +3541,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
     return Container(
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
@@ -3183,8 +3566,8 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
               height: 4,
               decoration: BoxDecoration(
                 color: isDark
-                    ? const Color(0xFF334155)
-                    : const Color(0xFFCBD5E1),
+                    ? AppUi.borderDark
+                    : AppUi.borderStrongLight,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -3196,12 +3579,12 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppUi.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.account_balance_wallet_outlined,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 24,
                 ),
               ),
@@ -3213,13 +3596,13 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                     Text(
                       'Complete $methodName Payment',
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '₱${widget.totalAmount.toStringAsFixed(2)} • ${widget.stationName}',
+                      '${formatPeso(widget.totalAmount)} • ${widget.stationName}',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppUi.textSecondaryOf(context),
@@ -3235,8 +3618,8 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
+              color: isDark ? AppUi.textPrimary : AppUi.pageBg,
+              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
               border: Border.all(color: AppUi.borderOf(context)),
             ),
             child: Column(
@@ -3247,14 +3630,14 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                     if (_paymentStatus == 'failed') ...[
                       const Icon(
                         Icons.cancel,
-                        color: Colors.redAccent,
+                        color: AppColors.uiError,
                         size: 24,
                       ),
                       const SizedBox(width: 8),
                       const Text(
                         'Payment Unsuccessful',
                         style: TextStyle(
-                          color: Colors.redAccent,
+                          color: AppColors.uiError,
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                         ),
@@ -3289,7 +3672,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
                       : 'Please authorize the payment in your $methodName wallet or browser. Once completed, your order will update automatically.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13,
                     color: AppUi.textSecondaryOf(context),
                     height: 1.4,
                   ),
@@ -3307,7 +3690,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
               ),
               elevation: 0,
             ),
@@ -3328,7 +3711,7 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
               side: BorderSide(color: AppUi.borderOf(context)),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
               ),
             ),
           ),

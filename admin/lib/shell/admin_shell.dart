@@ -70,10 +70,17 @@ class _AdminShellState extends State<AdminShell> {
           schema: 'public',
           table: 'orders',
           callback: (payload) {
-            final id = payload.newRecord['id']?.toString() ?? '';
+            final rec = payload.newRecord.isNotEmpty
+                ? payload.newRecord
+                : payload.oldRecord;
+            final id = rec['id']?.toString() ?? '';
             final shortId = id.length >= 8 ? id.substring(0, 8) : id;
-            final status = payload.newRecord['status']?.toString() ?? 'updated';
-            _onLiveEvent('Order Update', 'Order #$shortId status changed to $status');
+            if (payload.eventType == PostgresChangeEvent.delete) {
+              _onLiveEvent('Order Removed', 'Order #$shortId was removed');
+            } else {
+              final status = rec['status']?.toString() ?? 'updated';
+              _onLiveEvent('Order Update', 'Order #$shortId status changed to $status');
+            }
           },
         )
         ..onPostgresChanges(
@@ -81,8 +88,15 @@ class _AdminShellState extends State<AdminShell> {
           schema: 'public',
           table: 'water_refill_stations',
           callback: (payload) {
-            final name = payload.newRecord['name']?.toString() ?? 'Station';
-            _onLiveEvent('Station Event', 'Station "$name" updated in system');
+            final rec = payload.newRecord.isNotEmpty
+                ? payload.newRecord
+                : payload.oldRecord;
+            final name = rec['name']?.toString() ?? 'Station';
+            if (payload.eventType == PostgresChangeEvent.delete) {
+              _onLiveEvent('Station Removed', 'Station "$name" was removed');
+            } else {
+              _onLiveEvent('Station Event', 'Station "$name" updated in system');
+            }
           },
         )
         ..onPostgresChanges(
@@ -242,41 +256,57 @@ class _AdminSidebar extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onSignOut;
 
-  static const _items = [
-    _NavItem(
-      AdminSection.dashboard,
-      LucideIcons.layoutDashboard,
-      'Dashboard',
+  /// Grouped by job-to-be-done so the console scans like a SaaS sidebar.
+  static const _groups = <(String, List<_NavItem>)>[
+    (
+      'Overview',
+      [
+        _NavItem(
+          AdminSection.dashboard,
+          LucideIcons.layoutDashboard,
+          'Dashboard',
+        ),
+      ],
     ),
-    _NavItem(
-      AdminSection.stations,
-      LucideIcons.store,
-      'Water Stations',
+    (
+      'Operations',
+      [
+        _NavItem(
+          AdminSection.orders,
+          LucideIcons.shoppingBag,
+          'Refill Orders',
+        ),
+        _NavItem(
+          AdminSection.stations,
+          LucideIcons.store,
+          'Water Stations',
+        ),
+        _NavItem(
+          AdminSection.users,
+          LucideIcons.users,
+          'Users & Accounts',
+        ),
+      ],
     ),
-    _NavItem(
-      AdminSection.users,
-      LucideIcons.users,
-      'Users & Accounts',
-    ),
-    _NavItem(
-      AdminSection.releases,
-      LucideIcons.packageCheck,
-      'App Releases',
-    ),
-    _NavItem(
-      AdminSection.orders,
-      LucideIcons.shoppingBag,
-      'Refill Orders',
-    ),
-    _NavItem(
-      AdminSection.notifications,
-      LucideIcons.bell,
-      'Notifications',
-    ),
-    _NavItem(
-      AdminSection.settings,
-      LucideIcons.settings,
-      'System Settings',
+    (
+      'Platform',
+      [
+        _NavItem(
+          AdminSection.notifications,
+          LucideIcons.bell,
+          'Notifications',
+        ),
+        _NavItem(
+          AdminSection.releases,
+          LucideIcons.packageCheck,
+          'App Releases',
+        ),
+        _NavItem(
+          AdminSection.settings,
+          LucideIcons.settings,
+          'System Settings',
+        ),
+      ],
     ),
   ];
 
@@ -367,8 +397,33 @@ class _AdminSidebar extends StatelessWidget {
                       vertical: 6,
                     ),
                     children: [
-                      for (final item in _items)
-                        _navTile(context, item, compactLayout),
+                      for (final (index, group) in _groups.indexed) ...[
+                        if (compactLayout && index > 0)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider(height: 1),
+                          )
+                        else if (!compactLayout)
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              14,
+                              index == 0 ? 4 : 16,
+                              14,
+                              6,
+                            ),
+                            child: Text(
+                              group.$1.toUpperCase(),
+                              style: TextStyle(
+                                color: AppUi.textSecondaryOf(context),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ),
+                        for (final item in group.$2)
+                          _navTile(context, item, compactLayout),
+                      ],
                     ],
                   ),
                 ),
@@ -397,7 +452,7 @@ class _AdminSidebar extends StatelessWidget {
                         )
                       : InkWell(
                           onTap: onSignOut,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           child: const Padding(
                             padding: EdgeInsets.symmetric(
                               horizontal: 14,
@@ -412,11 +467,11 @@ class _AdminSidebar extends StatelessWidget {
                                 ),
                                 SizedBox(width: 12),
                                 Text(
-                                  'Sign Out',
+                                  'Sign out',
                                   style: TextStyle(
                                     color: AppUi.error,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 13.5,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ],
@@ -437,20 +492,25 @@ class _AdminSidebar extends StatelessWidget {
     final active = selected == item.section;
     final isNotifications = item.section == AdminSection.notifications;
     final showBadge = isNotifications && unreadNotifications > 0;
+    final isDark = AppUi.isDark(context);
+    final activeFg = isDark ? AppUi.accentCyan : AppUi.bluePrimaryDark;
+    final activeBg = isDark
+        ? AppUi.accentCyan.withValues(alpha: 0.16)
+        : AppUi.blueSoft;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
-        color: active ? AppUi.bluePrimary : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        color: active ? activeBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppUi.radiusControl),
         child: InkWell(
           onTap: () => onSelect(item.section),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusControl),
           hoverColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: compactLayout ? 0 : 14,
-              vertical: 11,
+              vertical: 10,
             ),
             child: compactLayout
                 ? Center(
@@ -463,7 +523,7 @@ class _AdminSidebar extends StatelessWidget {
                             item.icon,
                             size: 20,
                             color: active
-                                ? Colors.white
+                                ? activeFg
                                 : AppUi.textSecondaryOf(context),
                           ),
                           if (showBadge)
@@ -489,7 +549,7 @@ class _AdminSidebar extends StatelessWidget {
                         item.icon,
                         size: 18,
                         color: active
-                            ? Colors.white
+                            ? activeFg
                             : AppUi.textSecondaryOf(context),
                       ),
                       const SizedBox(width: 12),
@@ -498,11 +558,11 @@ class _AdminSidebar extends StatelessWidget {
                           item.label,
                           style: TextStyle(
                             color: active
-                                ? Colors.white
+                                ? activeFg
                                 : AppUi.textPrimaryOf(context),
                             fontWeight:
-                                active ? FontWeight.w700 : FontWeight.w600,
-                            fontSize: 13.5,
+                                active ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 14,
                           ),
                         ),
                       ),
@@ -513,17 +573,17 @@ class _AdminSidebar extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: active ? Colors.white : AppUi.error,
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppUi.error,
+                            borderRadius: AppUi.fullRadius,
                           ),
                           child: Text(
                             unreadNotifications > 99
                                 ? '99+'
                                 : '$unreadNotifications',
                             style: TextStyle(
-                              color: active ? AppUi.bluePrimary : Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -629,7 +689,7 @@ class _AdminTopBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
                 color: AppUi.accentGreen.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                 border: Border.all(
                   color: AppUi.accentGreen.withValues(alpha: 0.4),
                 ),
@@ -668,7 +728,7 @@ class _AdminTopBar extends StatelessWidget {
               isLabelVisible: unreadNotifications > 0,
               label: Text(
                 unreadNotifications > 99 ? '99+' : '$unreadNotifications',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
               child: const Icon(LucideIcons.bell, size: 19),
             ),
@@ -685,7 +745,7 @@ class _AdminTopBar extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(AppUi.radiusFull),
               border: Border.all(color: AppUi.borderOf(context)),
             ),
             child: Row(
@@ -704,7 +764,7 @@ class _AdminTopBar extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
                         color: AppUi.textPrimaryOf(context),
                       ),

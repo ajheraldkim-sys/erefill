@@ -82,9 +82,9 @@ class _SettingsTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
           onTap: () => _handleTap(context),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -94,10 +94,10 @@ class _SettingsTile extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: AppUi.blueSoft,
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppUi.brandSoftOf(context),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   ),
-                  child: Icon(section.icon, color: AppUi.bluePrimary, size: 20),
+                  child: Icon(section.icon, color: AppUi.brandOf(context), size: 20),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -108,7 +108,7 @@ class _SettingsTile extends StatelessWidget {
                         section.title,
                         style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 4),

@@ -1,10 +1,14 @@
+import 'dart:typed_data';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/services/receipt_service.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class DeliveryReceiptMessage extends StatefulWidget {
   const DeliveryReceiptMessage({super.key, required this.snapshot});
 
@@ -23,19 +27,8 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
     _evidence = _loadEvidence();
   }
 
-  Future<_ReceiptEvidence> _loadEvidence() async {
-    final storage = Supabase.instance.client.storage.from('delivery_proofs');
-    final photoPath = widget.snapshot['photo_path']?.toString();
-    final signaturePath = widget.snapshot['signature_path']?.toString();
-    if (photoPath == null || signaturePath == null) {
-      throw StateError('Receipt evidence references are missing.');
-    }
-    final urls = await Future.wait([
-      storage.createSignedUrl(photoPath, 600),
-      storage.createSignedUrl(signaturePath, 600),
-    ]);
-    return _ReceiptEvidence(photoUrl: urls[0], signatureUrl: urls[1]);
-  }
+  Future<_ReceiptEvidence> _loadEvidence() =>
+      _resolveReceiptEvidence(widget.snapshot);
 
   void _retry() => setState(() => _evidence = _loadEvidence());
 
@@ -66,7 +59,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             children: [
               const Icon(
                 Icons.verified_rounded,
-                color: Color(0xFF16A34A),
+                color: AppColors.uiSuccess,
                 size: 22,
               ),
               const SizedBox(width: 8),
@@ -76,7 +69,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
                   style: TextStyle(
                     color: AppUi.textPrimaryOf(context),
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -103,14 +96,14 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             style: TextStyle(
               color: AppUi.textPrimaryOf(context),
               fontSize: 16,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
           Text(
             'Payment: $paymentStatus  |  Paid: $paid  |  Outstanding: $outstanding',
             style: TextStyle(
               color: paymentVerified
-                  ? const Color(0xFF15803D)
+                  ? AppColors.uiSuccess
                   : AppUi.textSecondaryOf(context),
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -190,6 +183,37 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
     required String label,
     required String url,
   }) {
+    if (url.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: AppUi.textSecondaryOf(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Container(
+            height: 76,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppUi.surfaceRaisedOf(context),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              label.contains('Signature')
+                  ? Icons.draw_outlined
+                  : Icons.image_not_supported_outlined,
+              color: AppUi.textSecondaryOf(context),
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -205,7 +229,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
         GestureDetector(
           onTap: () => _showImage(context, url, label),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppUi.radiusControl),
             child: Image.network(
               url,
               height: 76,
@@ -272,19 +296,8 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
     _evidence = _loadEvidence();
   }
 
-  Future<_ReceiptEvidence> _loadEvidence() async {
-    final storage = Supabase.instance.client.storage.from('delivery_proofs');
-    final photoPath = widget.snapshot['photo_path']?.toString();
-    final signaturePath = widget.snapshot['signature_path']?.toString();
-    if (photoPath == null || signaturePath == null) {
-      throw StateError('Receipt evidence references are missing.');
-    }
-    final urls = await Future.wait([
-      storage.createSignedUrl(photoPath, 600),
-      storage.createSignedUrl(signaturePath, 600),
-    ]);
-    return _ReceiptEvidence(photoUrl: urls[0], signatureUrl: urls[1]);
-  }
+  Future<_ReceiptEvidence> _loadEvidence() =>
+      _resolveReceiptEvidence(widget.snapshot);
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +319,7 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
                 children: [
                   const Text(
                     'Erefill - Delivery Receipt',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
                   Text('Receipt ${snapshot['receipt_number'] ?? ''}'),
@@ -349,7 +362,7 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
                 children: [
                   const Text(
                     'Delivered items',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
                   for (final item in items)
@@ -426,11 +439,47 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
     setState(() => _isPrinting = true);
     try {
       final storage = Supabase.instance.client.storage.from('delivery_proofs');
-      final photo = await storage.download(widget.snapshot['photo_path']);
-      final signature = await storage.download(
-        widget.snapshot['signature_path'],
-      );
       final snapshot = widget.snapshot;
+      final rawPhoto =
+          snapshot['photo_path']?.toString() ??
+          snapshot['photo_url']?.toString() ??
+          snapshot['delivery_photo_url']?.toString();
+      final rawSignature =
+          snapshot['signature_path']?.toString() ??
+          snapshot['signature_url']?.toString();
+
+      final evidence = await _evidence;
+
+      Future<Uint8List?> fetchEvidenceBytes(
+        String? raw,
+        String resolvedUrl,
+      ) async {
+        if (raw != null &&
+            raw.trim().isNotEmpty &&
+            !raw.trim().startsWith('http')) {
+          try {
+            final bytes = await storage.download(raw.trim());
+            if (bytes.isNotEmpty) return bytes;
+          } catch (_) {}
+        }
+        final urlToFetch = resolvedUrl.isNotEmpty
+            ? resolvedUrl
+            : ((raw != null && raw.trim().startsWith('http')) ? raw.trim() : '');
+        if (urlToFetch.isNotEmpty) {
+          try {
+            final res = await http.get(Uri.parse(urlToFetch));
+            if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+              return res.bodyBytes;
+            }
+          } catch (_) {}
+        }
+        return null;
+      }
+
+      final photo = await fetchEvidenceBytes(rawPhoto, evidence.photoUrl);
+      final signature =
+          await fetchEvidenceBytes(rawSignature, evidence.signatureUrl);
+
       final orderId = snapshot['order_id']?.toString() ?? '';
       final order = <String, dynamic>{
         ...snapshot,
@@ -453,7 +502,7 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not prepare receipt PDF: $error')),
+          SnackBar(content: Text('Could not prepare receipt PDF: ${FriendlyErrors.message(error)}')),
         );
       }
     } finally {
@@ -462,6 +511,20 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
   }
 
   Widget _evidenceCard(BuildContext context, String title, String url) {
+    if (url.isEmpty) {
+      return Card(
+        child: ListTile(
+          leading: Icon(
+            title.contains('Signature')
+                ? Icons.draw_outlined
+                : Icons.image_not_supported_outlined,
+            color: AppUi.textSecondaryOf(context),
+          ),
+          title: Text(title),
+          subtitle: const Text('No digital evidence recorded for this order.'),
+        ),
+      );
+    }
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,6 +544,12 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
               width: double.infinity,
               height: title == 'Delivery photo' ? 240 : 160,
               fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Container(
+                height: 120,
+                color: AppUi.surfaceRaisedOf(context),
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_outlined),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -515,6 +584,54 @@ class _DeliveryReceiptScreenState extends State<DeliveryReceiptScreen> {
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
   }
+}
+
+Future<_ReceiptEvidence> _resolveReceiptEvidence(
+  Map<String, dynamic> snapshot,
+) async {
+  final storage = Supabase.instance.client.storage.from('delivery_proofs');
+  final rawPhoto =
+      snapshot['photo_path']?.toString() ??
+      snapshot['photo_url']?.toString() ??
+      snapshot['delivery_photo_url']?.toString();
+  final rawSignature =
+      snapshot['signature_path']?.toString() ??
+      snapshot['signature_url']?.toString();
+
+  String photoUrl = '';
+  String signatureUrl = '';
+
+  if (rawPhoto != null && rawPhoto.trim().isNotEmpty) {
+    final trimmed = rawPhoto.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      photoUrl = trimmed;
+    } else {
+      try {
+        photoUrl = await storage.createSignedUrl(trimmed, 3600);
+      } catch (_) {
+        try {
+          photoUrl = storage.getPublicUrl(trimmed);
+        } catch (_) {}
+      }
+    }
+  }
+
+  if (rawSignature != null && rawSignature.trim().isNotEmpty) {
+    final trimmed = rawSignature.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      signatureUrl = trimmed;
+    } else {
+      try {
+        signatureUrl = await storage.createSignedUrl(trimmed, 3600);
+      } catch (_) {
+        try {
+          signatureUrl = storage.getPublicUrl(trimmed);
+        } catch (_) {}
+      }
+    }
+  }
+
+  return _ReceiptEvidence(photoUrl: photoUrl, signatureUrl: signatureUrl);
 }
 
 class _ReceiptEvidence {

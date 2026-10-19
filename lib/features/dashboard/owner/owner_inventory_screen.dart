@@ -8,8 +8,16 @@ import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/water_types.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class OwnerInventoryScreen extends StatefulWidget {
-  const OwnerInventoryScreen({super.key});
+  final bool embedded;
+  final VoidCallback? onSwitchToCredits;
+
+  const OwnerInventoryScreen({
+    super.key,
+    this.embedded = false,
+    this.onSwitchToCredits,
+  });
 
   @override
   State<OwnerInventoryScreen> createState() => _OwnerInventoryScreenState();
@@ -87,7 +95,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
       isScrollControlled: true,
       backgroundColor: AppUi.surfaceOf(context),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (context) => Padding(
         padding: EdgeInsets.fromLTRB(
@@ -105,7 +113,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                 title,
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -151,10 +159,10 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                     label: Text('+$batch'),
                     labelStyle: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
                     ),
-                    backgroundColor: AppUi.blueSoft,
+                    backgroundColor: AppUi.brandSoftOf(context),
                     side: BorderSide.none,
                     onPressed: () {
                       HapticFeedback.lightImpact();
@@ -213,7 +221,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
+        backgroundColor: isError ? AppColors.uiError : null,
       ),
     );
   }
@@ -221,6 +229,84 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final ownerId = _supabase.auth.currentUser?.id;
+
+    final body = RefreshIndicator(
+      onRefresh: _load,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: ClampingScrollPhysics(),
+        ),
+        slivers: [
+          if (_isLoading)
+            const SliverFillRemaining(child: SkeletonList(itemCount: 4))
+          else if (_error != null)
+            SliverFillRemaining(
+              child: AxoEmptyState(
+                pose: AxoPose.thinking,
+                title: 'Could not load inventory',
+                message: _error!,
+                actionLabel: 'Retry',
+                onAction: _load,
+                compact: true,
+              ),
+            )
+          else ...[
+            SliverPadding(
+              padding: AppUi.pagePaddingLoose.copyWith(top: 0),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildStockCards(_snapshot!),
+                  const SizedBox(height: 16),
+                  _buildActions(_snapshot!),
+                  if (_snapshot!.products.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Text('Product stock', style: AppUi.sectionTitle),
+                    const SizedBox(height: 10),
+                    ..._snapshot!.products.map(_buildProductRow),
+                  ],
+                  const SizedBox(height: 24),
+                  Text('Recent activity', style: AppUi.sectionTitle),
+                  const SizedBox(height: 10),
+                ]),
+              ),
+            ),
+            if (ownerId != null && _ledgerStream != null)
+              SliverPadding(
+                padding: AppUi.pagePaddingLoose.copyWith(top: 0),
+                sliver: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _ledgerStream,
+                  builder: (context, snapshot) {
+                    final rows = snapshot.data ?? [];
+                    if (rows.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: AxoEmptyState(
+                          pose: AxoPose.empty,
+                          title: 'No inventory activity yet',
+                          message:
+                              'Loads, adjustments, and empty returns will appear here.',
+                          compact: true,
+                        ),
+                      );
+                    }
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) =>
+                            _LedgerTile(row: rows[index]),
+                        childCount: rows.length.clamp(0, 20),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ],
+      ),
+    );
+
+    if (widget.embedded) {
+      return body;
+    }
 
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
@@ -230,81 +316,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
             title: 'Inventory',
             subtitle: 'Filled stock, empty containers, and returns',
           ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _load,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
-                ),
-                slivers: [
-                  if (_isLoading)
-                    const SliverFillRemaining(child: SkeletonList(itemCount: 4))
-                  else if (_error != null)
-                    SliverFillRemaining(
-                      child: AxoEmptyState(
-                        pose: AxoPose.thinking,
-                        title: 'Could not load inventory',
-                        message: _error!,
-                        actionLabel: 'Retry',
-                        onAction: _load,
-                        compact: true,
-                      ),
-                    )
-                  else ...[
-                    SliverPadding(
-                      padding: AppUi.pagePaddingLoose.copyWith(top: 0),
-                      sliver: SliverList(
-                        delegate: SliverChildListDelegate([
-                          _buildStockCards(_snapshot!),
-                          const SizedBox(height: 16),
-                          _buildActions(_snapshot!),
-                          if (_snapshot!.products.isNotEmpty) ...[
-                            const SizedBox(height: 20),
-                            Text('Product stock', style: AppUi.sectionTitle),
-                            const SizedBox(height: 10),
-                            ..._snapshot!.products.map(_buildProductRow),
-                          ],
-                          const SizedBox(height: 24),
-                          Text('Recent activity', style: AppUi.sectionTitle),
-                          const SizedBox(height: 10),
-                        ]),
-                      ),
-                    ),
-                    if (ownerId != null && _ledgerStream != null)
-                      SliverPadding(
-                        padding: AppUi.pagePaddingLoose.copyWith(top: 0),
-                        sliver: StreamBuilder<List<Map<String, dynamic>>>(
-                          stream: _ledgerStream,
-                          builder: (context, snapshot) {
-                            final rows = snapshot.data ?? [];
-                            if (rows.isEmpty) {
-                              return SliverToBoxAdapter(
-                                child: AxoEmptyState(
-                                  pose: AxoPose.empty,
-                                  title: 'No inventory activity yet',
-                                  message:
-                                      'Loads, adjustments, and empty returns will appear here.',
-                                  compact: true,
-                                ),
-                              );
-                            }
-                            return SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) =>
-                                    _LedgerTile(row: rows[index]),
-                                childCount: rows.length.clamp(0, 20),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                  ],
-                ],
-              ),
-            ),
-          ),
+          Expanded(child: body),
         ],
       ),
     );
@@ -328,7 +340,7 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
             label: 'Empty containers',
             value: '${snapshot.emptyGallons}',
             icon: Icons.inventory_2_outlined,
-            color: const Color(0xFF0F766E),
+            color: AppColors.statusReady,
           ),
         ),
       ],
@@ -337,47 +349,100 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
 
   Widget _buildActions(OwnerInventorySnapshot snapshot) {
     final hasProducts = snapshot.products.isNotEmpty;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
       children: [
-        _ActionChip(
-          label: 'Load filled',
-          onTap: hasProducts
-              ? () => _showTxSheet(
-                  title: 'Load filled gallons',
-                  txType: 'load_filled',
-                  needsProduct: true,
-                )
-              : null,
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.water_drop_rounded, size: 16),
+                label: const Text('Load Filled'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppUi.brandOf(context),
+                  side: const BorderSide(color: AppUi.bluePrimary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                onPressed: hasProducts
+                    ? () => _showTxSheet(
+                        title: 'Load filled gallons',
+                        txType: 'load_filled',
+                        needsProduct: true,
+                      )
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Load Empty'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.statusReady,
+                  side: const BorderSide(color: AppColors.statusReady),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                onPressed: () => _showTxSheet(
+                  title: 'Load empty containers',
+                  txType: 'load_empty',
+                  needsProduct: false,
+                ),
+              ),
+            ),
+          ],
         ),
-        _ActionChip(
-          label: 'Adjust filled',
-          onTap: hasProducts
-              ? () => _showTxSheet(
-                  title: 'Adjust filled stock',
-                  txType: 'adjust_filled',
-                  needsProduct: true,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Adjust Filled'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppUi.textSecondaryOf(context),
+                  side: BorderSide(color: AppUi.borderOf(context)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onPressed: hasProducts
+                    ? () => _showTxSheet(
+                        title: 'Adjust filled stock',
+                        txType: 'adjust_filled',
+                        needsProduct: true,
+                        allowNegative: true,
+                      )
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Adjust Empty'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppUi.textSecondaryOf(context),
+                  side: BorderSide(color: AppUi.borderOf(context)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onPressed: () => _showTxSheet(
+                  title: 'Adjust empty stock',
+                  txType: 'adjust_empty',
+                  needsProduct: false,
                   allowNegative: true,
-                )
-              : null,
-        ),
-        _ActionChip(
-          label: 'Load empty',
-          onTap: () => _showTxSheet(
-            title: 'Load empty containers',
-            txType: 'load_empty',
-            needsProduct: false,
-          ),
-        ),
-        _ActionChip(
-          label: 'Adjust empty',
-          onTap: () => _showTxSheet(
-            title: 'Adjust empty stock',
-            txType: 'adjust_empty',
-            needsProduct: false,
-            allowNegative: true,
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -408,9 +473,9 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
           Text(
             '$stock gal',
             style: TextStyle(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: stock <= threshold
-                  ? Colors.orange.shade800
+                  ? AppColors.uiWarning
                   : AppUi.textPrimaryOf(context),
             ),
           ),
@@ -451,7 +516,7 @@ class _StockCard extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 28,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppUi.textPrimaryOf(context),
             ),
           ),
@@ -460,7 +525,7 @@ class _StockCard extends StatelessWidget {
             Text(
               warning!,
               style: TextStyle(
-                color: Colors.orange.shade800,
+                color: AppColors.uiWarning,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
@@ -469,18 +534,6 @@ class _StockCard extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _ActionChip extends StatelessWidget {
-  const _ActionChip({required this.label, this.onTap});
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(label: Text(label), onPressed: onTap);
   }
 }
 
@@ -505,7 +558,7 @@ class _LedgerTile extends StatelessWidget {
         children: [
           Icon(
             isReturn ? Icons.recycling_rounded : Icons.swap_vert_rounded,
-            color: isReturn ? const Color(0xFF0F766E) : AppUi.bluePrimary,
+            color: isReturn ? AppColors.statusReady : AppUi.brandOf(context),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -515,7 +568,7 @@ class _LedgerTile extends StatelessWidget {
                 Text(
                   OwnerInventoryService.labelForTxType(txType),
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                 ),
@@ -529,10 +582,10 @@ class _LedgerTile extends StatelessWidget {
           Text(
             '${gallons >= 0 ? '+' : ''}$gallons',
             style: TextStyle(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: gallons >= 0
-                  ? const Color(0xFF0F766E)
-                  : Colors.orange.shade800,
+                  ? AppColors.statusReady
+                  : AppColors.uiWarning,
             ),
           ),
         ],

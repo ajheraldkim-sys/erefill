@@ -7,6 +7,8 @@ import '../../../core/theme/app_colors.dart';
 import '../models/payout_model.dart';
 import '../services/payout_service.dart';
 
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class RiderPayoutSheet extends StatefulWidget {
   final double totalEarnings;
   final int completedDeliveries;
@@ -110,7 +112,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
               children: [
                 const Text(
                   'Earnings & Payouts',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -130,7 +132,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     Expanded(
                       child: _buildMetricCard(
                         'Available Balance',
-                        '₱${_availableBalance.toStringAsFixed(2)}',
+                        formatPeso(_availableBalance),
                         AppUi.bluePrimary,
                         Icons.account_balance_wallet_rounded,
                       ),
@@ -139,8 +141,8 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     Expanded(
                       child: _buildMetricCard(
                         'Total Earned',
-                        '₱${widget.totalEarnings.toStringAsFixed(2)}',
-                        const Color(0xFF10B981),
+                        formatPeso(widget.totalEarnings),
+                        AppColors.uiSuccess,
                         Icons.trending_up_rounded,
                       ),
                     ),
@@ -152,8 +154,8 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     Expanded(
                       child: _buildMetricCard(
                         'Pending Payout',
-                        '₱${_totalPending.toStringAsFixed(2)}',
-                        const Color(0xFFF59E0B),
+                        formatPeso(_totalPending),
+                        AppColors.uiWarning,
                         Icons.pending_actions_rounded,
                       ),
                     ),
@@ -161,8 +163,8 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     Expanded(
                       child: _buildMetricCard(
                         'Total Disbursed',
-                        '₱${_totalDisbursed.toStringAsFixed(2)}',
-                        const Color(0xFF64748B),
+                        formatPeso(_totalDisbursed),
+                        AppUi.textMuted,
                         Icons.done_all_rounded,
                       ),
                     ),
@@ -189,7 +191,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       ),
                       textStyle: const TextStyle(
                         fontSize: 14,
@@ -203,7 +205,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                 // Payout Requests History
                 const Text(
                   'Withdrawal History',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
                 if (_isLoading)
@@ -218,7 +220,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: AppUi.surfaceOf(context),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       border: Border.all(color: AppUi.borderOf(context)),
                     ),
                     child: const Center(
@@ -263,7 +265,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Column(
@@ -288,7 +290,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             value,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
@@ -329,7 +331,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Column(
@@ -339,17 +341,17 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '₱${req.amount.toStringAsFixed(2)}',
+                formatPeso(req.amount),
                 style: const TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -359,8 +361,8 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     Text(
                       statusLabel,
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: statusColor,
                       ),
                     ),
@@ -401,7 +403,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             const SizedBox(height: 4),
             Text(
               'Ref #: ${req.referenceNumber}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF10B981)),
+              style: const TextStyle(fontSize: 11, color: AppColors.uiSuccess),
             ),
           ],
           if (req.rejectionReason != null &&
@@ -409,7 +411,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             const SizedBox(height: 4),
             Text(
               'Reason: ${req.rejectionReason}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFFEF4444)),
+              style: const TextStyle(fontSize: 11, color: AppColors.uiError),
             ),
           ],
         ],
@@ -433,14 +435,14 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
       builder: (dlgCtx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           backgroundColor: AppUi.surfaceOf(context),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
+          title: Row(
             children: [
-              Icon(Icons.payments_rounded, color: AppUi.bluePrimary),
+              Icon(Icons.payments_rounded, color: AppUi.brandOf(context)),
               SizedBox(width: 8),
               Text(
                 'Request Withdrawal',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
               ),
             ],
           ),
@@ -452,11 +454,11 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Available Balance: ₱${_availableBalance.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    'Available Balance: ${formatPeso(_availableBalance)}',
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -474,7 +476,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                       labelText: 'Withdrawal Amount (₱)',
                       hintText: 'e.g. 500',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                       prefixText: '₱ ',
                     ),
@@ -526,7 +528,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     initialValue: selectedMethod,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -560,7 +562,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                           : 'Account / Mobile Number',
                       hintText: '09xxxxxxxxx',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     validator: (val) => val == null || val.trim().isEmpty
@@ -576,7 +578,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                       labelText: 'Account / Recipient Name',
                       hintText: 'Full Name',
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     validator: (val) => val == null || val.trim().isEmpty
@@ -597,7 +599,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                 backgroundColor: AppUi.bluePrimary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
               ),
               onPressed: () async {
@@ -633,14 +635,14 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                         content: Text(
                           'Withdrawal request submitted successfully! Station owner will process your payout.',
                         ),
-                        backgroundColor: Color(0xFF10B981),
+                        backgroundColor: AppColors.uiSuccess,
                       ),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     messenger.showSnackBar(
-                      SnackBar(content: Text('Submission error: $e')),
+                      SnackBar(content: Text('Submission error: ${FriendlyErrors.message(e)}')),
                     );
                   }
                 }

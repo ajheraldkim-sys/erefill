@@ -27,7 +27,7 @@ class AdminStationMap extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selectedMarkerColor = Theme.of(context).colorScheme.primary;
     final availableMarkerColor = isDark
-        ? const Color(0xFF56D6A6)
+        ? AppUi.successFgDark
         : AppUi.accentGreen;
     final markers = <Marker>[];
     for (final s in stations) {
@@ -96,7 +96,7 @@ class AdminStationMap extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                   boxShadow: const [
                     BoxShadow(
@@ -223,7 +223,7 @@ class AdminSingleStationMap extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                   border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                   boxShadow: const [
                     BoxShadow(

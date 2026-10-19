@@ -11,7 +11,7 @@ class AdminTheme {
     final dark = brightness == Brightness.dark;
     final surface = dark ? AppUi.darkSurface : AppUi.surface;
     final border = dark ? AppUi.borderDark : AppUi.borderLight;
-    final text = dark ? const Color(0xFFE8F0F2) : AppUi.textPrimary;
+    final text = dark ? AppUi.darkTextPrimary : AppUi.textPrimary;
     final mutedSurface = dark ? AppUi.darkSurfaceRaised : AppUi.blueSoft;
     final primary = dark ? AppUi.accentCyan : AppUi.bluePrimary;
     final onPrimary = dark ? AppUi.darkPageBg : Colors.white;
@@ -141,7 +141,7 @@ class AdminTheme {
         ),
       ),
       listTileTheme: ListTileThemeData(
-        iconColor: dark ? const Color(0xFFB8C9CE) : AppUi.textSecondary,
+        iconColor: dark ? AppUi.darkTextSecondary : AppUi.textSecondary,
         textColor: text,
         selectedColor: primary,
         selectedTileColor: primary.withValues(alpha: dark ? 0.12 : 0.08),
@@ -205,7 +205,7 @@ class AdminTheme {
       tabBarTheme: base.tabBarTheme.copyWith(
         labelColor: primary,
         unselectedLabelColor: dark
-            ? const Color(0xFFA0B2B7)
+            ? AppUi.darkTextSecondary
             : AppUi.textSecondary,
         indicatorColor: primary,
       ),

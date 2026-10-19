@@ -8,13 +8,13 @@ class AuthDialogs {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: AppUi.dialogRadius),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.lock_person_rounded, color: AppUi.bluePrimary),
+            Icon(Icons.lock_person_rounded, color: AppUi.brandOf(context)),
             SizedBox(width: 12),
             Text(
               'Sign In Required',
-              style: TextStyle(fontWeight: FontWeight.w900),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -42,13 +42,13 @@ class AuthDialogs {
               backgroundColor: AppUi.bluePrimary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
               ),
               elevation: 0,
             ),
             child: const Text(
               'Sign In / Sign Up',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ],

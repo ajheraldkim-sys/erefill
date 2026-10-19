@@ -184,7 +184,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: compact ? 26 : 32,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               color: titleColor,
                               letterSpacing: -1.0,
                               height: 1.1,
@@ -214,7 +214,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                 color: isDark
                                     ? const Color(0xFF3A1B1E)
                                     : const Color(0xFFFCEBED),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 border: Border.all(
                                   color: AppUi.error.withValues(alpha: 0.35),
                                 ),
@@ -241,7 +241,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                   InkWell(
                                     onTap: () =>
                                         setState(() => _errorMessage = null),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                     child: const Padding(
                                       padding: EdgeInsets.all(4.0),
                                       child: Icon(
@@ -352,7 +352,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                       : const Text(
                                           'Sign in',
                                           style: TextStyle(
-                                            fontWeight: FontWeight.w800,
+                                            fontWeight: FontWeight.w700,
                                             fontSize: 18,
                                           ),
                                         ),
@@ -454,7 +454,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                 child: const Text(
                                   'Sign Up',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 15,
                                   ),
                                 ),
@@ -518,7 +518,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                 Navigator.pop(context);
                               }
                             },
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(AppUi.radiusPill),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -528,7 +528,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                 color: isDark
                                     ? Colors.white.withValues(alpha: 0.08)
                                     : Colors.black.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(AppUi.radiusPill),
                                 border: Border.all(
                                   color: AppUi.dividerOf(context),
                                 ),

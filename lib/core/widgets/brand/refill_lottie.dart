@@ -103,6 +103,22 @@ class RefillLottie extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      return fallback ??
+          SizedBox(
+            width: width ?? 48,
+            height: height ?? 48,
+            child: Center(
+              child: Icon(
+                Icons.water_drop_rounded,
+                color: AppUi.brandOf(context),
+                size: (width != null ? width! * 0.5 : 24),
+              ),
+            ),
+          );
+    }
     return Lottie.asset(
       animation.assetPath,
       width: width,
@@ -122,7 +138,7 @@ class RefillLottie extends StatelessWidget {
               child: Center(
                 child: Icon(
                   Icons.water_drop_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: (width != null ? width! * 0.5 : 24),
                 ),
               ),
@@ -149,15 +165,8 @@ class RefillLottie extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
         decoration: BoxDecoration(
           color: isDark ? AppUi.surfaceRaisedOf(context) : AppUi.surfaceOf(context),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppUi.radiusPill),
           border: Border.all(color: AppUi.borderOf(context)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -168,7 +177,7 @@ class RefillLottie extends StatelessWidget {
               'Order Placed!',
               style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),
@@ -177,7 +186,7 @@ class RefillLottie extends StatelessWidget {
               'Your refill order #$orderNumber has been sent to $stationName.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 14,
                 color: AppUi.textSecondaryOf(context),
                 height: 1.35,
               ),
@@ -194,7 +203,7 @@ class RefillLottie extends StatelessWidget {
                   backgroundColor: AppUi.bluePrimary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   ),
                 ),
                 child: const Text(

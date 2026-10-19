@@ -5,6 +5,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 class AdminPaymentFailuresView extends StatefulWidget {
   const AdminPaymentFailuresView({super.key});
 
@@ -61,8 +62,14 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Reconcile Payment?'),
-        content: Text(
-          'Mark payment for Order #${order['id'].toString().substring(0, 8)} as PAID? Use this if customer provided manual proof of payment.',
+        content: Builder(
+          builder: (context) {
+            final id = order['id']?.toString() ?? '';
+            final shortId = id.length >= 8 ? id.substring(0, 8) : id;
+            return Text(
+              'Mark payment for Order #$shortId as PAID? Use this if customer provided manual proof of payment.',
+            );
+          },
         ),
         actions: [
           TextButton(
@@ -101,7 +108,7 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -117,7 +124,7 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
           'Payment Failures & Discrepancies',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(context),
           ),
         ),
@@ -160,7 +167,7 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
                           Text(
                             'Zero payment failures',
                             style: TextStyle(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               fontSize: 16,
                               color: AppUi.textPrimaryOf(context),
                             ),
@@ -201,31 +208,37 @@ class _AdminPaymentFailuresViewState extends State<AdminPaymentFailuresView> {
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: AppUi.error.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(AppUi.radiusSm),
                                     ),
                                     child: const Text(
                                       'PAYMENT FAILED',
                                       style: TextStyle(
                                         color: AppUi.error,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    'Order #${f['id'].toString().substring(0, 8)}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13,
-                                      color: AppUi.textPrimaryOf(context),
-                                    ),
+                                  Builder(
+                                    builder: (context) {
+                                      final id = f['id']?.toString() ?? '';
+                                      final shortId = id.length >= 8 ? id.substring(0, 8) : id;
+                                      return Text(
+                                        'Order #$shortId',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: AppUi.textPrimaryOf(context),
+                                        ),
+                                      );
+                                    },
                                   ),
                                   const Spacer(),
                                   Text(
                                     currencyFormat.format(amt),
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 14,
                                       color: AppUi.textPrimaryOf(context),
                                     ),

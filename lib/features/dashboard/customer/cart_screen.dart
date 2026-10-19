@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
+import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/hero_header.dart';
 import '../../../models/cart_model.dart';
+
+import 'package:erefill/core/theme/app_colors.dart';
 
 class CartScreen extends StatefulWidget {
   final Map<String, dynamic>? station;
@@ -18,10 +20,20 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final _supabase = Supabase.instance.client;
+  SupabaseClient? get _supabase {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Map<String, dynamic>? _resolvedStation;
-  double _ratePerKm = 10.0;
-  double _minDeliveryFee = 20.0;
+
+  // Null until the platform config loads, so the cart never shows an
+  // invented fee. Checkout computes the exact distance-based fee.
+  double? _ratePerKm;
+  double? _minDeliveryFee;
   bool _deliveryFeeEnabled = true;
 
   @override
@@ -33,13 +45,17 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _loadDeliveryConfig() async {
+    final client = _supabase;
+    if (client == null) return;
     try {
-      final res = await _supabase.rpc('get_delivery_fee_config');
+      final res = await client.rpc('get_delivery_fee_config');
       if (res is Map && mounted) {
+        // Same keys checkout reads from get_delivery_fee_config
+        // (`minimum_fee`, `enabled`), so cart and checkout always agree.
         setState(() {
-          _ratePerKm = (res['rate_per_km'] as num?)?.toDouble() ?? _ratePerKm;
-          _minDeliveryFee = (res['min_delivery_fee'] as num?)?.toDouble() ?? _minDeliveryFee;
-          _deliveryFeeEnabled = res['is_enabled'] != false;
+          _ratePerKm = (res['rate_per_km'] as num?)?.toDouble();
+          _minDeliveryFee = (res['minimum_fee'] as num?)?.toDouble();
+          _deliveryFeeEnabled = res['enabled'] != false;
         });
       }
     } catch (_) {}
@@ -51,8 +67,11 @@ class _CartScreenState extends State<CartScreen> {
     final sId = cart.stationId;
     if (sId == null || sId.isEmpty) return;
 
+    final client = _supabase;
+    if (client == null) return;
+
     try {
-      final res = await _supabase
+      final res = await client
           .from('profiles')
           .select(
             'id, station_name, complete_address, town, barangay, latitude, longitude, lat, lng, price_per_gallon, primary_water_type, is_open, station_availability',
@@ -83,37 +102,43 @@ class _CartScreenState extends State<CartScreen> {
     context.openCheckout(stationData);
   }
 
-  void _confirmClearCart() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppUi.surfaceOf(ctx),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Clear Cart?',
-          style: TextStyle(fontWeight: FontWeight.w800),
+  Future<void> _confirmClearCart() async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Clear cart?',
+      message: 'All items from this station will be removed.',
+      confirmLabel: 'Clear cart',
+      destructive: true,
+    );
+    if (confirmed && mounted) {
+      context.read<CartProvider>().clearCart();
+    }
+  }
+
+  void _removeWithUndo(CartProvider cart, CartItem item) {
+    cart.removeItem(item.id);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${item.name} removed'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            cart.addItem(item.id, item.name, item.price, imageUrl: item.imageUrl);
+            if (item.quantity > 1) {
+              cart.updateQuantity(item.id, item.quantity);
+            }
+          },
         ),
-        content: const Text('Are you sure you want to remove all items from your cart?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<CartProvider>().clearCart();
-            },
-            child: const Text('Clear Cart'),
-          ),
-        ],
       ),
     );
+  }
+
+  /// Lowest delivery fee the customer could pay, or null when unknown.
+  double? get _deliveryFeeFloor {
+    if (!_deliveryFeeEnabled) return 0;
+    return _minDeliveryFee;
   }
 
   @override
@@ -127,17 +152,18 @@ class _CartScreenState extends State<CartScreen> {
       body: Column(
         children: [
           TabScreenHeroHeader(
-            title: 'Shopping Cart',
+            title: 'Cart',
             subtitle: cart.stationName ?? 'Your selected items',
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded),
+              tooltip: 'Back',
               onPressed: () => Navigator.of(context).maybePop(),
             ),
             actions: [
               if (hasItems)
                 IconButton(
                   icon: const Icon(Icons.delete_sweep_outlined),
-                  tooltip: 'Clear Cart',
+                  tooltip: 'Clear cart',
                   onPressed: _confirmClearCart,
                 ),
             ],
@@ -148,8 +174,9 @@ class _CartScreenState extends State<CartScreen> {
                     child: AxoEmptyState(
                       pose: AxoPose.empty,
                       title: 'Your cart is empty',
-                      message: 'Browse water refilling stations to add fresh water, containers, or accessories.',
-                      actionLabel: 'Browse Stations',
+                      message:
+                          'Browse water refilling stations to add fresh water, containers, or accessories.',
+                      actionLabel: 'Browse stations',
                       onAction: () {
                         if (Navigator.of(context).canPop()) {
                           Navigator.of(context).pop();
@@ -159,70 +186,55 @@ class _CartScreenState extends State<CartScreen> {
                       },
                     ),
                   )
-                : ListView(
-                    padding: AppUi.pagePadding.copyWith(top: 14, bottom: 24),
-                    children: [
-                      // Station Header Banner
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppUi.blueSoft,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: AppUi.bluePrimary.withValues(alpha: 0.2),
-                          ),
+                : ResponsiveCenter(
+                    maxWidth: AppBreakpoints.formMaxWidth,
+                    child: ListView(
+                      padding: AppUi.pagePadding.copyWith(top: AppUi.spacingMd),
+                      children: [
+                        _StationStrip(
+                          name: cart.stationName ?? 'Water Station',
+                          itemCount: cart.totalItems,
                         ),
-                        child: Row(
+                        const SizedBox(height: AppUi.spacingLg),
+                        Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppUi.bluePrimary,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.storefront_rounded,
-                                color: Colors.white,
-                                size: 18,
+                            Expanded(
+                              child: Text(
+                                'Items',
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    cart.stationName ?? 'Water Station',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                      color: AppUi.textPrimaryOf(context),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Single-station order · ${cart.totalItems} item${cart.totalItems > 1 ? "s" : ""}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppUi.textSecondaryOf(context),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            TextButton.icon(
+                              onPressed: () {
+                                if (Navigator.of(context).canPop()) {
+                                  Navigator.of(context).pop();
+                                } else {
+                                  context.openStationList();
+                                }
+                              },
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add more'),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Cart Items List
-                      ...itemsList.map((item) => _buildCartItemCard(context, cart, item)),
-
-                      const SizedBox(height: 16),
-
-                      // Order Summary Breakdown
-                      _buildSummaryCard(context, cart),
-                    ],
+                        const SizedBox(height: AppUi.spacingXs),
+                        ...itemsList.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppUi.spacingSm,
+                            ),
+                            child: _CartLineItem(
+                              item: item,
+                              onQuantityChanged: (q) =>
+                                  cart.updateQuantity(item.id, q),
+                              onRemove: () => _removeWithUndo(cart, item),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppUi.spacingLg),
+                        AppCard(child: _buildSummary(cart)),
+                      ],
+                    ),
                   ),
           ),
           if (hasItems) _buildBottomBar(context, cart),
@@ -231,46 +243,181 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildCartItemCard(BuildContext context, CartProvider cart, CartItem item) {
-    final lineTotal = item.price * item.quantity;
-    final isContainerOrCap = item.name.toLowerCase().contains('container') ||
-        item.name.toLowerCase().contains('cap') ||
-        item.name.toLowerCase().contains('accessory');
+  Widget _buildSummary(CartProvider cart) {
+    final floor = _deliveryFeeFloor;
+    final String? deliveryNote;
+    if (!_deliveryFeeEnabled) {
+      deliveryNote = null;
+    } else if (_ratePerKm != null) {
+      deliveryNote =
+          '${formatPeso(_ratePerKm)}/km from the station · exact fee set at checkout';
+    } else {
+      deliveryNote = 'Based on distance to your delivery address';
+    }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+    return PriceBreakdown(
+      title: 'Order summary',
+      lines: [
+        PriceLine(
+          label:
+              'Subtotal (${cart.totalItems} item${cart.totalItems == 1 ? '' : 's'})',
+          amount: cart.totalAmount,
+        ),
+        PriceLine(
+          label: _deliveryFeeEnabled ? 'Delivery fee' : 'Delivery',
+          amount: _deliveryFeeEnabled ? null : 0,
+          placeholder: floor != null && floor > 0
+              ? 'from ${formatPeso(floor)}'
+              : 'At checkout',
+          note: deliveryNote,
+        ),
+      ],
+      totalLabel: 'Estimated total',
+      total: cart.totalAmount + (floor ?? 0),
+    );
+  }
+
+  Widget _buildBottomBar(BuildContext context, CartProvider cart) {
+    final estimate = cart.totalAmount + (_deliveryFeeFloor ?? 0);
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppUi.borderOf(context)),
+        border: Border(top: BorderSide(color: AppUi.borderOf(context))),
       ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Estimated total',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      formatPeso(estimate),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.textPrimaryOf(context),
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppUi.spacingMd),
+              FilledButton.icon(
+                onPressed: _proceedToCheckout,
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: const Text('Checkout'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationStrip extends StatelessWidget {
+  final String name;
+  final int itemCount;
+
+  const _StationStrip({required this.name, required this.itemCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Item Icon
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppUi.brandSoftOf(context),
+              borderRadius: AppUi.controlRadius,
+            ),
+            child: Icon(
+              Icons.storefront_rounded,
+              color: AppUi.onBrandSoftOf(context),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: AppUi.spacingMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$itemCount item${itemCount == 1 ? '' : 's'} · one station per order',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartLineItem extends StatelessWidget {
+  final CartItem item;
+  final ValueChanged<int> onQuantityChanged;
+  final VoidCallback onRemove;
+
+  const _CartLineItem({
+    required this.item,
+    required this.onQuantityChanged,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = item.name.toLowerCase();
+    final isAccessory = name.contains('container') ||
+        name.contains('cap') ||
+        name.contains('accessory');
+    final accent = isAccessory
+        ? (AppUi.isDark(context)
+              ? const Color(0xFFC4B5FD)
+              : AppColors.statusPreparing)
+        : AppUi.brandOf(context);
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppUi.spacingMd),
+      child: Row(
+        children: [
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: isContainerOrCap
-                  ? const Color(0xFFF3E8FF)
-                  : AppUi.bluePrimary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: accent.withValues(alpha: AppUi.isDark(context) ? 0.16 : 0.1),
+              borderRadius: AppUi.controlRadius,
             ),
             child: Icon(
-              isContainerOrCap
-                  ? Icons.inventory_2_outlined
-                  : Icons.water_drop_rounded,
-              color: isContainerOrCap
-                  ? const Color(0xFF8B5CF6)
-                  : AppUi.bluePrimary,
+              isAccessory ? Icons.inventory_2_outlined : Icons.water_drop_rounded,
+              color: accent,
               size: 22,
             ),
           ),
-          const SizedBox(width: 12),
-
-          // Name & Unit Price
+          const SizedBox(width: AppUi.spacingMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,264 +426,32 @@ class _CartScreenState extends State<CartScreen> {
                   item.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                    color: AppUi.textPrimaryOf(context),
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  '₱${item.price.toStringAsFixed(2)} each',
+                  '${formatPeso(item.price)} each',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppUi.spacingXs),
+                Text(
+                  formatPeso(item.price * item.quantity),
                   style: TextStyle(
-                    fontSize: 12,
-                    color: AppUi.textSecondaryOf(context),
-                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppUi.textPrimaryOf(context),
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
             ),
           ),
-
-          // Stepper & Remove Action
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Quantity Stepper
-              Container(
-                decoration: BoxDecoration(
-                  color: AppUi.surfaceRaisedOf(context),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppUi.borderOf(context)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove, size: 16),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        cart.updateQuantity(item.id, item.quantity - 1);
-                      },
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
-                        '${item.quantity}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: AppUi.textPrimaryOf(context),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add, size: 16),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        cart.updateQuantity(item.id, item.quantity + 1);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Line total
-              SizedBox(
-                width: 65,
-                child: Text(
-                  '₱${lineTotal.toStringAsFixed(0)}',
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                    color: AppUi.bluePrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard(BuildContext context, CartProvider cart) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppUi.borderOf(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Order Breakdown',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-              color: AppUi.textPrimaryOf(context),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _summaryRow(
-            'Items Subtotal (${cart.totalItems} items)',
-            '₱${cart.totalAmount.toStringAsFixed(2)}',
-            context,
-          ),
-          const SizedBox(height: 8),
-          _summaryRow(
-            'Centralized Delivery Fee',
-            _deliveryFeeEnabled
-                ? '₱${_minDeliveryFee.toStringAsFixed(2)} min (₱${_ratePerKm.toStringAsFixed(0)}/km)'
-                : 'Free',
-            context,
-            isDelivery: true,
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total Estimated',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                  color: AppUi.textPrimaryOf(context),
-                ),
-              ),
-              Text(
-                '₱${(cart.totalAmount + (_deliveryFeeEnabled ? _minDeliveryFee : 0)).toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                  color: AppUi.bluePrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Exact distance and final fee verified at checkout based on your delivery address.',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppUi.textSecondaryOf(context),
-              height: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value, BuildContext context, {bool isDelivery = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppUi.textSecondaryOf(context),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isDelivery ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomBar(BuildContext context, CartProvider cart) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 14,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
-      ),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Continue Shopping Button
-          Expanded(
-            flex: 2,
-            child: OutlinedButton(
-              onPressed: () {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
-                } else {
-                  context.openStationList();
-                }
-              },
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                side: BorderSide(color: AppUi.borderOf(context)),
-              ),
-              child: const Text(
-                'Add More',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Proceed to Checkout Button
-          Expanded(
-            flex: 3,
-            child: FilledButton(
-              onPressed: _proceedToCheckout,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppUi.bluePrimary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Checkout',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
-              ),
-            ),
+          const SizedBox(width: AppUi.spacingSm),
+          QuantitySelector(
+            value: item.quantity,
+            itemLabel: item.name,
+            onChanged: onQuantityChanged,
+            onRemove: onRemove,
           ),
         ],
       ),

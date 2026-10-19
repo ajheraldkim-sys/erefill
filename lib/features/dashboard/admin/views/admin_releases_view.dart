@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class AdminReleasesView extends StatefulWidget {
   const AdminReleasesView({super.key});
 
@@ -66,7 +68,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       appBar: AppBar(
         title: const Text(
           'App Releases & Versions',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
         ),
         actions: [
           IconButton(
@@ -94,7 +96,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
         onPressed: _openCreateReleaseDialog,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppUi.bluePrimary))
+          ? Center(child: CircularProgressIndicator(color: AppUi.brandOf(context)))
           : _error != null
               ? Center(
                   child: Padding(
@@ -130,7 +132,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                             'All Releases (${_releases.length})',
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: AppUi.textPrimaryOf(context),
                             ),
                           ),
@@ -167,7 +169,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(
           color: isMandatory ? AppUi.error.withValues(alpha: 0.4) : AppUi.accentGreen.withValues(alpha: 0.4),
           width: 1.5,
@@ -182,7 +184,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: (isMandatory ? AppUi.error : AppUi.accentGreen).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
                 child: Icon(
                   isMandatory ? Icons.shield_rounded : Icons.check_circle_rounded,
@@ -197,7 +199,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                   children: [
                     const Text(
                       'Active Production Policy',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                     ),
                     Text(
                       isMandatory
@@ -234,7 +236,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       children: [
         Text(label, style: const TextStyle(fontSize: 11, color: AppUi.textMuted)),
         const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
       ],
     );
   }
@@ -257,7 +259,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(
           color: isActive ? AppUi.accentGreen.withValues(alpha: 0.5) : AppUi.borderOf(context),
         ),
@@ -270,7 +272,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
               Expanded(
                 child: Text(
                   'v$version (Build $build)',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
               if (isActive)
@@ -278,26 +280,26 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppUi.accentGreen.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(AppUi.radiusSm),
                   ),
                   child: const Text(
                     'ACTIVE',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppUi.accentGreen),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppUi.accentGreen),
                   ),
                 )
               else
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: (isPublished ? AppUi.bluePrimary : Colors.amber).withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(6),
+                    color: (isPublished ? AppUi.bluePrimary : AppColors.uiWarning).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(AppUi.radiusSm),
                   ),
                   child: Text(
                     status.toUpperCase(),
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: isPublished ? AppUi.bluePrimary : Colors.amber.shade800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isPublished ? AppUi.brandOf(context) : AppColors.uiWarning,
                     ),
                   ),
                 ),
@@ -306,13 +308,13 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: (isMandatory ? AppUi.error : Colors.teal).withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
                 ),
                 child: Text(
                   isMandatory ? 'MANDATORY' : 'OPTIONAL',
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: isMandatory ? AppUi.error : Colors.teal,
                   ),
                 ),
@@ -376,7 +378,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
           children: [
             Icon(
               isMandatory ? Icons.warning_rounded : Icons.send_rounded,
-              color: isMandatory ? AppUi.error : AppUi.bluePrimary,
+              color: isMandatory ? AppUi.error : AppUi.brandOf(context),
             ),
             const SizedBox(width: 10),
             const Text('Publish Release'),
@@ -412,7 +414,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Publish error: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Publish error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       }
     }
@@ -533,7 +535,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create draft: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Failed to create draft: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       }
     }
@@ -544,7 +546,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: AppUi.surfaceOf(context),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet))),
       builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,
@@ -575,7 +577,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Release Audit Trail', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const Text('Release Audit Trail', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 16),
                   if (snapshot.connectionState == ConnectionState.waiting)
                     const Center(child: CircularProgressIndicator())
@@ -621,14 +623,14 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppUi.surfaceOf(context),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet))),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Preview Update UI', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              const Text('Preview Update UI', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
               const SizedBox(height: 16),
               ListTile(
                 leading: const Icon(Icons.shield_rounded, color: AppUi.error),
@@ -652,7 +654,7 @@ class _AdminReleasesViewState extends State<AdminReleasesView> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.info_rounded, color: AppUi.bluePrimary),
+                leading: Icon(Icons.info_rounded, color: AppUi.brandOf(context)),
                 title: const Text('Preview Optional Update Dialog'),
                 onTap: () {
                   Navigator.pop(ctx);

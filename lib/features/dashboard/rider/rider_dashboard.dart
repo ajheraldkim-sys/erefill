@@ -39,6 +39,7 @@ import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 import 'services/location_service.dart';
+import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'services/order_cache_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
 import 'services/offline_delivery_queue_service.dart';
@@ -46,6 +47,8 @@ import 'services/queued_delivery_rules.dart';
 import '../../payouts/widgets/rider_payout_sheet.dart';
 
 import 'rider_history_screen.dart';
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 export 'rider_history_screen.dart';
 
 double _safeDouble(dynamic value, {double fallback = 0}) {
@@ -93,9 +96,7 @@ class _RiderDashboardState extends State<RiderDashboard>
   final supabase = Supabase.instance.client;
   final _locationService = LocationService();
   final _orderCache = OrderCacheService();
-  int _pendingOfflineCount = 0;
   bool _isSyncingOffline = false;
-  String? _offlineSyncError;
   RealtimeChannel? _ordersChannel;
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
   Timer? _riderPollingTimer;
@@ -278,22 +279,9 @@ class _RiderDashboardState extends State<RiderDashboard>
 
   Future<void> _checkOfflineQueue() async {
     try {
-      final pending = await OfflineDeliveryQueueService()
-          .getPendingDeliveries();
-      if (mounted) {
-        setState(() {
-          _pendingOfflineCount = pending.length;
-          if (pending.isEmpty) _offlineSyncError = null;
-        });
-      }
+      await OfflineDeliveryQueueService().getPendingDeliveries();
     } catch (error) {
       debugPrint('Could not inspect queued deliveries: $error');
-      if (mounted) {
-        setState(
-          () => _offlineSyncError =
-              'Saved delivery updates could not be checked on this device.',
-        );
-      }
     }
   }
 
@@ -304,13 +292,6 @@ class _RiderDashboardState extends State<RiderDashboard>
       final synced = await OfflineDeliveryQueueService()
           .syncPendingDeliveries();
       await _checkOfflineQueue();
-      if (mounted) {
-        setState(() {
-          _offlineSyncError = _pendingOfflineCount > 0
-              ? '$_pendingOfflineCount delivery update${_pendingOfflineCount == 1 ? '' : 's'} still need attention.'
-              : null;
-        });
-      }
       if (synced > 0) {
         await _loadRiderData();
         if (mounted) {
@@ -320,10 +301,7 @@ class _RiderDashboardState extends State<RiderDashboard>
     } catch (e) {
       debugPrint('Sync offline error: $e');
       if (mounted) {
-        setState(
-          () => _offlineSyncError =
-              'Sync failed. Your saved delivery updates are still on this device.',
-        );
+        _showError('Sync failed. Your saved delivery updates are still on this device.');
       }
     } finally {
       if (mounted) setState(() => _isSyncingOffline = false);
@@ -432,12 +410,8 @@ class _RiderDashboardState extends State<RiderDashboard>
             return {...order, 'status': queued.status};
           })
           .toList();
-      _pendingOfflineCount = queuedUpdates.length;
-      if (queuedUpdates.isEmpty) _offlineSyncError = null;
     } catch (error) {
       debugPrint('Could not reconcile queued rider updates: $error');
-      _offlineSyncError =
-          'Saved delivery updates could not be checked on this device.';
     }
 
     if (!mounted) return;
@@ -579,12 +553,12 @@ class _RiderDashboardState extends State<RiderDashboard>
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                color: AppColors.uiSuccess.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.rocket_launch_rounded,
-                color: Color(0xFF10B981),
+                color: AppColors.uiSuccess,
                 size: 40,
               ),
             ),
@@ -593,7 +567,7 @@ class _RiderDashboardState extends State<RiderDashboard>
               'New Assignment Ready!',
               style: TextStyle(
                 fontSize: 24,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),
@@ -626,7 +600,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                 ),
                 child: const Text(
                   'View Task Now',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
               ),
             ),
@@ -905,6 +879,28 @@ class _RiderDashboardState extends State<RiderDashboard>
 
       // Update UI after delivery confirms
       if (mounted) {
+        final currentOrder = _myActiveOrders.firstWhere(
+          (o) => o['id']?.toString() == orderId,
+          orElse: () => <String, dynamic>{},
+        );
+        final ownerId = currentOrder['owner_id']?.toString();
+        final qty = _safeInt(currentOrder['quantity'], fallback: 1);
+        final waterType = currentOrder['water_type']?.toString();
+        final productId = currentOrder['water_option_id']?.toString();
+
+        if (ownerId != null && ownerId.isNotEmpty) {
+          unawaited(
+            OwnerInventoryService().recordDeliveryCompletion(
+              ownerId: ownerId,
+              orderId: orderId,
+              gallons: qty,
+              waterType: waterType,
+              productId: productId,
+              emptyGallonsReturned: completion.emptyGallonsReturned,
+            ),
+          );
+        }
+
         setState(() {
           _myActiveOrders.removeWhere((o) => o['id'] == orderId);
         });
@@ -980,7 +976,7 @@ class _RiderDashboardState extends State<RiderDashboard>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final SignatureController controller = SignatureController(
       penStrokeWidth: 3,
-      penColor: isDark ? const Color(0xFFE8F0F2) : AppUi.textPrimary,
+      penColor: isDark ? AppUi.darkTextPrimary : AppUi.textPrimary,
       exportBackgroundColor: AppUi.surfaceOf(context),
     );
 
@@ -989,7 +985,7 @@ class _RiderDashboardState extends State<RiderDashboard>
       isScrollControlled: true,
       backgroundColor: AppUi.surfaceOf(context),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
@@ -1087,9 +1083,9 @@ class _RiderDashboardState extends State<RiderDashboard>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: const Color(0xFF10B981),
+        backgroundColor: AppColors.uiSuccess,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
       ),
     );
   }
@@ -1098,9 +1094,9 @@ class _RiderDashboardState extends State<RiderDashboard>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColors.uiError,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
       ),
     );
   }
@@ -1142,8 +1138,8 @@ class _RiderDashboardState extends State<RiderDashboard>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Chat error: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Chat error: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -1373,69 +1369,18 @@ class _RiderDashboardState extends State<RiderDashboard>
                               Expanded(
                                 child: _buildSmallStatTile(
                                   'Earnings',
-                                  '₱${_totalEarnings.toStringAsFixed(0)}',
+                                  formatPeso(_totalEarnings, whole: true),
                                   Icons.payments_rounded,
-                                  const Color(0xFF10B981),
+                                  AppColors.uiSuccess,
                                 ),
                               ),
                             ],
                           ),
-                          if (_pendingOfflineCount > 0 ||
-                              _offlineSyncError != null) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.withValues(alpha: 0.15),
-                                borderRadius: AppUi.cardRadius,
-                                border: Border.all(
-                                  color: Colors.amber.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.cloud_off_rounded,
-                                    color: Colors.amber,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _offlineSyncError ??
-                                         '$_pendingOfflineCount ${_pendingOfflineCount == 1 ? "delivery update" : "delivery updates"} waiting to sync. Offline completions are not confirmed until sync succeeds.',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: _isSyncingOffline
-                                        ? null
-                                        : _syncOfflineQueue,
-                                    child: _isSyncingOffline
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Text(
-                                            'Sync Now',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                          const SizedBox(height: 8),
+                          OfflineSyncStatusPill(
+                            showAlways: true,
+                            onSyncTap: _syncOfflineQueue,
+                          ),
                         ],
                       ),
                     ),
@@ -1570,7 +1515,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       Text(
                         'Order #${orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase()}',
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           fontSize: 13,
                           color: AppUi.textPrimaryOf(context),
                         ),
@@ -1582,8 +1527,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'CASH ON DELIVERY'
                             : 'AWAITING PAYMENT (${paymentLabel.toUpperCase()})',
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                           color: isPaid
                               ? AppColors.uiSuccess
                               : isCod
@@ -1622,7 +1567,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                     Text(
                       customerName,
                       style: TextStyle(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 16,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -1633,9 +1578,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.location_on_rounded,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                       size: 14,
                     ),
                     const SizedBox(width: 6),
@@ -1670,55 +1615,101 @@ class _RiderDashboardState extends State<RiderDashboard>
             ),
           ),
 
-          // 3. Refill details & amount
+          // 3. Refill details & COD cash clarity
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             margin: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: AppUi.surfaceRaisedOf(context),
+              color: isCod
+                  ? AppUi.warningBg
+                  : AppUi.surfaceRaisedOf(context),
               borderRadius: AppUi.cardRadius,
+              border: Border.all(
+                color: isCod
+                    ? AppColors.uiWarning
+                    : AppUi.borderOf(context),
+                width: isCod ? 1.5 : 1,
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    itemsString,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: AppUi.textPrimaryOf(context),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        itemsString,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: isCod
+                              ? const Color(0xFF78350F)
+                              : AppUi.textPrimaryOf(context),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isCod
+                            ? 'Exact amount to collect:'
+                            : isPaid
+                            ? 'Online payment confirmed'
+                            : 'Check payment status',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isCod
+                              ? AppUi.warningFg
+                              : AppUi.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '₱${total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        color: AppUi.bluePrimary,
+                      formatPeso(total),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        color: isCod
+                            ? AppUi.warningFg
+                            : AppUi.brandOf(context),
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      isPaid
-                          ? 'PAID (Do not collect)'
-                          : isCod
-                          ? 'COLLECT CASH'
-                          : 'VERIFY PAYMENT',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
                         color: isPaid
-                            ? AppColors.uiSuccess
+                            ? AppUi.successBg
                             : isCod
-                            ? AppColors.uiWarning
-                            : AppColors.uiError,
-                        letterSpacing: 0.2,
+                            ? AppUi.warningBorder
+                            : AppUi.errorBg,
+                        borderRadius: BorderRadius.circular(AppUi.radiusSm),
+                      ),
+                      child: Text(
+                        isPaid
+                            ? 'PAID ONLINE (DO NOT COLLECT)'
+                            : isCod
+                            ? 'COLLECT CASH'
+                            : 'VERIFY PAYMENT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isPaid
+                              ? AppUi.successFg
+                              : isCod
+                              ? const Color(0xFF78350F)
+                              : AppUi.errorFg,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
                   ],
@@ -1726,53 +1717,66 @@ class _RiderDashboardState extends State<RiderDashboard>
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // 4. Actions
+          // 4. Large 56dp Touch Target Actions for One-Hand / Motorbike Operation
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Row(
               children: [
                 IconButton.outlined(
                   onPressed: () => _openNavigation(order),
-                  icon: const Icon(Icons.navigation_rounded, size: 18),
+                  icon: const Icon(Icons.navigation_rounded, size: 20),
                   tooltip: 'Navigate',
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppUi.bluePrimary,
-                    side: BorderSide(color: AppUi.borderOf(context)),
+                    foregroundColor: AppUi.brandOf(context),
+                    side: BorderSide(color: AppUi.borderOf(context), width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.controlRadius,
                     ),
-                    fixedSize: const Size(48, 48),
+                    fixedSize: const Size(
+                      AppUi.kRiderTouchTarget,
+                      AppUi.kRiderTouchTarget,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton.outlined(
                   onPressed: () => _contactCustomer(order),
-                  icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+                  icon: const Icon(Icons.chat_bubble_rounded, size: 20),
                   tooltip: 'Chat',
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppUi.textSecondaryOf(context),
-                    side: BorderSide(color: AppUi.borderOf(context)),
+                    side: BorderSide(color: AppUi.borderOf(context), width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.controlRadius,
                     ),
-                    fixedSize: const Size(48, 48),
+                    fixedSize: const Size(
+                      AppUi.kRiderTouchTarget,
+                      AppUi.kRiderTouchTarget,
+                    ),
                   ),
                 ),
                 if (phone.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   IconButton.outlined(
                     onPressed: () => url.launchUrl(Uri.parse('tel:$phone')),
-                    icon: const Icon(Icons.phone_rounded, size: 18),
+                    icon: const Icon(Icons.phone_rounded, size: 20),
                     tooltip: 'Call Customer',
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF10B981),
-                      side: BorderSide(color: AppUi.borderOf(context)),
+                      foregroundColor: AppColors.uiSuccess,
+                      side: BorderSide(
+                        color: AppColors.uiSuccess.withValues(alpha: 0.5),
+                        width: 1.5,
+                      ),
+                      backgroundColor: AppUi.successBg,
                       shape: RoundedRectangleBorder(
                         borderRadius: AppUi.controlRadius,
                       ),
-                      fixedSize: const Size(48, 48),
+                      fixedSize: const Size(
+                        AppUi.kRiderTouchTarget,
+                        AppUi.kRiderTouchTarget,
+                      ),
                     ),
                   ),
                 ],
@@ -1785,7 +1789,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                               _updateOrderStatus(orderId, 'out_for_delivery'),
                         )
                       : SizedBox(
-                          height: 48,
+                          height: AppUi.kRiderTouchTarget,
                           child: ElevatedButton.icon(
                             onPressed: () {
                               if (status == 'preparing') {
@@ -1798,20 +1802,21 @@ class _RiderDashboardState extends State<RiderDashboard>
                               status == 'out_for_delivery'
                                   ? Icons.check_circle_rounded
                                   : Icons.arrow_forward_rounded,
-                              size: 18,
+                              size: 20,
                             ),
                             label: Text(
                               status == 'preparing'
                                   ? 'Start Delivery'
                                   : 'Complete Delivery',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
                                 letterSpacing: 0.5,
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: status == 'out_for_delivery'
-                                  ? const Color(0xFF10B981)
+                                  ? AppColors.uiSuccess
                                   : AppUi.bluePrimary,
                               foregroundColor: Colors.white,
                               elevation: 0,
@@ -1825,6 +1830,7 @@ class _RiderDashboardState extends State<RiderDashboard>
               ],
             ),
           ),
+
         ],
       ),
     );
@@ -1921,9 +1927,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                     steps[i]['title'] as String,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: i == currentStep
-                          ? FontWeight.w800
+                          ? FontWeight.w700
                           : FontWeight.w600,
                       color: i <= currentStep ? statusColor : AppUi.textMuted,
                     ),
@@ -1986,7 +1992,7 @@ class _RiderDashboardState extends State<RiderDashboard>
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error updating profile: ${FriendlyErrors.message(e)}')));
       }
       return false;
     }
@@ -2071,7 +2077,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                           'Edit Profile',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -2094,7 +2100,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: AppUi.pageBgOf(context),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     border: Border.all(color: AppUi.borderOf(context)),
                   ),
                   child: Row(
@@ -2157,7 +2163,7 @@ class _RiderDashboardState extends State<RiderDashboard>
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? AppUi.surfaceOf(context) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppUi.radiusControl),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
@@ -2175,7 +2181,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                 icon,
                 size: 15,
                 color: isSelected
-                    ? AppUi.bluePrimary
+                    ? AppUi.brandOf(context)
                     : AppUi.textSecondaryOf(context),
               ),
               const SizedBox(width: 5),
@@ -2183,7 +2189,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected
                       ? AppUi.textPrimaryOf(context)
                       : AppUi.textSecondaryOf(context),
@@ -2472,7 +2478,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                               icon: Icons.account_balance_wallet_outlined,
                               title: 'Earnings breakdown',
                               subtitle:
-                                  '₱${_totalEarnings.toStringAsFixed(2)} total payout earned',
+                                  '${formatPeso(_totalEarnings)} total payout earned',
                               onTap: _showEarningsStatement,
                             ),
                           ],
@@ -2525,18 +2531,18 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ),
                             AccountNavTile(
                               icon: Icons.logout_rounded,
-                              iconColor: const Color(0xFFEF4444),
+                              iconColor: AppColors.uiError,
                               title: 'Sign out',
-                              titleColor: const Color(0xFFEF4444),
+                              titleColor: AppColors.uiError,
                               subtitle:
                                   'Log out of your account on this device',
                               onTap: () => _showLogoutConfirmation(context),
                             ),
                             AccountNavTile(
                               icon: Icons.delete_outline_rounded,
-                              iconColor: const Color(0xFFDC2626),
+                              iconColor: AppColors.uiError,
                               title: 'Delete account',
-                              titleColor: const Color(0xFFDC2626),
+                              titleColor: AppColors.uiError,
                               subtitle:
                                   'Permanently remove your account and data',
                               onTap: () => _showDeleteAccountDialog(context),
@@ -2590,7 +2596,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                   children: [
                     const Icon(
                       Icons.warning_amber_rounded,
-                      color: Color(0xFFEF4444),
+                      color: AppColors.uiError,
                       size: 48,
                     ),
                     const SizedBox(height: 16),
@@ -2598,7 +2604,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       'Delete account',
                       style: TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -2647,14 +2653,14 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   setSheetState(() => isDeleting = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deletion failed: $e'),
-                                      backgroundColor: Colors.red,
+                                      content: Text('Deletion failed: ${FriendlyErrors.message(e)}'),
+                                      backgroundColor: AppColors.uiError,
                                     ),
                                   );
                                 }
                               },
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
+                          backgroundColor: AppColors.uiError,
                         ),
                         child: isDeleting
                             ? const CircularProgressIndicator(
@@ -2662,7 +2668,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                               )
                             : const Text(
                                 'Delete everything',
-                                style: TextStyle(fontWeight: FontWeight.w800),
+                                style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
                     ),
@@ -2735,7 +2741,7 @@ class _RiderDashboardState extends State<RiderDashboard>
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
             ),
             child: Icon(icon, size: 18, color: color),
           ),
@@ -2744,7 +2750,7 @@ class _RiderDashboardState extends State<RiderDashboard>
             label,
             style: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: AppUi.textMuted,
               letterSpacing: 0,
             ),
@@ -2754,7 +2760,7 @@ class _RiderDashboardState extends State<RiderDashboard>
             value,
             style: const TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppUi.textPrimary,
             ),
           ),
@@ -2834,14 +2840,14 @@ class _RiderDashboardState extends State<RiderDashboard>
         });
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Avatar updated! ✨')));
+        ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Upload failed: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Upload failed: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -2884,7 +2890,7 @@ class _RiderHomeOverview extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(
           color: isOnline
               ? AppUi.accentGreen.withValues(alpha: 0.3)
@@ -2929,7 +2935,7 @@ class _RiderHomeOverview extends StatelessWidget {
                   isOnline ? "YOU'RE ONLINE" : "YOU'RE OFFLINE",
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: isOnline ? AppUi.accentGreen : AppUi.textSecondary,
                     letterSpacing: 0.5,
                   ),
@@ -2970,7 +2976,7 @@ class _RiderHomeOverview extends StatelessWidget {
           RiderHeroHeader(
             greeting: '$_greeting, $firstName',
             subtitle:
-                '$completedCount completed · ₱${totalEarnings.toStringAsFixed(0)} earned',
+                '$completedCount completed · ${formatPeso(totalEarnings, whole: true)} earned',
             onNotificationTap: () => showNotificationPreviewSheet(
               context,
               onViewAll: () => context.openInbox(),
@@ -3020,7 +3026,7 @@ class _RiderHomeOverview extends StatelessWidget {
                                   child: DashboardStatCard(
                                     label: 'Total earnings',
                                     value:
-                                        '₱${totalEarnings.toStringAsFixed(0)}',
+                                        formatPeso(totalEarnings, whole: true),
                                     icon: Icons.payments_rounded,
                                     color: AppUi.accentGreen,
                                   ),
@@ -3112,7 +3118,7 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
   Widget build(BuildContext context) {
     if (_accepted) {
       return Container(
-        height: 48,
+        height: AppUi.kRiderTouchTarget,
         decoration: BoxDecoration(
           color: AppUi.accentGreen,
           borderRadius: AppUi.controlRadius,
@@ -3121,14 +3127,14 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
             SizedBox(width: 8),
             Text(
               'Accepted & Starting!',
               style: TextStyle(
                 color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ],
@@ -3138,10 +3144,11 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxSlide = (constraints.maxWidth - 48).clamp(0.0, 500.0);
+        final maxSlide =
+            (constraints.maxWidth - AppUi.kRiderTouchTarget).clamp(0.0, 500.0);
 
         return Container(
-          height: 48,
+          height: AppUi.kRiderTouchTarget,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
@@ -3160,15 +3167,15 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
                     const Icon(
                       Icons.chevron_right_rounded,
                       color: Colors.white70,
-                      size: 18,
+                      size: 20,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       widget.label,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -3203,11 +3210,11 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
                     }
                   },
                   child: Container(
-                    width: 44,
-                    height: 44,
+                    width: AppUi.kRiderTouchTarget - 4,
+                    height: AppUi.kRiderTouchTarget - 4,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x33000000),
@@ -3216,10 +3223,10 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
                         ),
                       ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.double_arrow_rounded,
-                      color: AppUi.bluePrimary,
-                      size: 20,
+                      color: AppUi.brandOf(context),
+                      size: 22,
                     ),
                   ),
                 ),
@@ -3230,4 +3237,5 @@ class _RiderSwipeToAcceptSliderState extends State<_RiderSwipeToAcceptSlider> {
       },
     );
   }
+
 }

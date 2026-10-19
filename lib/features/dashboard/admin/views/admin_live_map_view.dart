@@ -113,7 +113,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
               'Live Fleet Dispatch',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),
@@ -254,8 +254,8 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                                   '$activeCount',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -402,7 +402,7 @@ class _AdminLiveMapViewState extends State<AdminLiveMapView> {
                               Text(
                                 _selectedRider!['full_name'] ?? 'Unnamed Rider',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 15,
                                   color: AppUi.textPrimaryOf(context),
                                 ),

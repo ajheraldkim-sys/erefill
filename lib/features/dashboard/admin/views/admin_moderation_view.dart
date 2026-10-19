@@ -4,6 +4,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 class AdminModerationView extends StatefulWidget {
   const AdminModerationView({super.key});
 
@@ -104,7 +105,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Dispute #${dispute['id']?.toString().substring(0, 8) ?? ""}'),
+            Text('Dispute #${(dispute['id']?.toString() ?? "").length >= 8 ? (dispute['id']?.toString() ?? "").substring(0, 8) : (dispute['id']?.toString() ?? "")}'),
             const SizedBox(height: 12),
             TextField(
               controller: notesController,
@@ -157,7 +158,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -203,7 +204,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting review: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error deleting review: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -219,13 +220,13 @@ class _AdminModerationViewState extends State<AdminModerationView>
           'Moderation & Disputes',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(context),
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppUi.bluePrimary,
+          labelColor: AppUi.brandOf(context),
           unselectedLabelColor: AppUi.textMuted,
           indicatorColor: AppUi.bluePrimary,
           tabs: [
@@ -253,7 +254,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppUi.bluePrimary))
+          ? Center(child: CircularProgressIndicator(color: AppUi.brandOf(context)))
           : _error != null && _disputes.isEmpty && _reviews.isEmpty
               ? Center(
                   child: Padding(
@@ -351,27 +352,33 @@ class _AdminModerationViewState extends State<AdminModerationView>
                                 decoration: BoxDecoration(
                                   color: (isOpen ? AppColors.statusPending : AppColors.statusDelivered)
                                       .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
                                 ),
                                 child: Text(
                                   status.toUpperCase(),
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                     color: isOpen ? AppColors.statusPending : AppColors.statusDelivered,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  'Order #${(d['order_id'] ?? d['id']).toString().substring(0, 8)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                    color: AppUi.textPrimaryOf(context),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                                child: Builder(
+                                  builder: (context) {
+                                    final id = (d['order_id'] ?? d['id']).toString();
+                                    final shortId = id.length >= 8 ? id.substring(0, 8) : id;
+                                    return Text(
+                                      'Order #$shortId',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: AppUi.textPrimaryOf(context),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    );
+                                  },
                                 ),
                               ),
                             ],
@@ -391,7 +398,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: AppUi.pageBgOf(context),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(AppUi.radiusSm),
                               ),
                               child: Text(
                                 'Resolution: ${d['resolution_notes']}',
@@ -440,7 +447,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.star_rounded, size: 48, color: Color(0xFFF59E0B)),
+            const Icon(Icons.star_rounded, size: 48, color: AppColors.uiWarning),
             const SizedBox(height: 12),
             Text(
               'No low-rating reviews',
@@ -486,7 +493,7 @@ class _AdminModerationViewState extends State<AdminModerationView>
                       (i) => Icon(
                         Icons.star_rounded,
                         size: 16,
-                        color: i < rating ? const Color(0xFFF59E0B) : AppUi.textMuted.withValues(alpha: 0.3),
+                        color: i < rating ? AppColors.uiWarning : AppUi.textMuted.withValues(alpha: 0.3),
                       ),
                     ),
                   ),
@@ -528,12 +535,12 @@ class _AdminModerationViewState extends State<AdminModerationView>
         AppHaptics.selection();
         setState(() => _disputeFilter = value);
       },
-      selectedColor: AppUi.blueSoft,
+      selectedColor: AppUi.brandSoftOf(context),
       checkmarkColor: AppUi.bluePrimary,
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: selected ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
+        color: selected ? AppUi.brandOf(context) : AppUi.textSecondaryOf(context),
       ),
     );
   }

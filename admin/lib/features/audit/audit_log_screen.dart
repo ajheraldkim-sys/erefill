@@ -120,9 +120,9 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   height: 40,
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
-                  child: const Icon(Icons.bolt_outlined, color: AppUi.bluePrimary, size: 20),
+                  child: Icon(Icons.bolt_outlined, color: AppUi.brandOf(context), size: 20),
                 ),
                 title: Text(
                   log['action']?.toString() ?? '—',

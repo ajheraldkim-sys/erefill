@@ -5,6 +5,7 @@ import 'animations/pulsing_dot.dart';
 import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
+import 'package:erefill/core/utils/money.dart';
 double _safeDouble(dynamic value, {double fallback = 0}) {
   if (value == null) return fallback;
   if (value is num) return value.toDouble();
@@ -95,7 +96,7 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         ),
                         child: const Icon(
                           Icons.local_shipping_rounded,
@@ -119,7 +120,7 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                       'Active delivery',
                       style: TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
                     ),
@@ -136,7 +137,7 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                 customerName,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 18,
                 ),
               ),
@@ -155,10 +156,10 @@ class RiderActiveDeliveryCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '₱${total.toStringAsFixed(0)}',
+                    formatPeso(total, whole: true),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
                     ),
                   ),
@@ -170,11 +171,11 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isPaid
-                          ? const Color(0xFF10B981)
+                          ? AppColors.uiSuccess
                           : isCod
-                          ? const Color(0xFFF59E0B)
-                          : const Color(0xFFEF4444),
-                      borderRadius: BorderRadius.circular(6),
+                          ? AppColors.uiWarning
+                          : AppColors.uiError,
+                      borderRadius: BorderRadius.circular(AppUi.radiusSm),
                     ),
                     child: Text(
                       isPaid
@@ -184,8 +185,8 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                           : 'UNPAID',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -204,7 +205,7 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                       'View delivery',
                       style: TextStyle(
                         color: statusColor,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
                     ),

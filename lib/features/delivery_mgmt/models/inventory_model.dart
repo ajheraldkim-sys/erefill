@@ -61,4 +61,22 @@ class DmInventoryTx {
     'notes': notes,
     'delivery_id': deliveryId,
   };
+
+  /// Serializes model for Supabase cloud upsert, ensuring nullable UUIDs are clean
+  Map<String, dynamic> toCloudJson() {
+    final cleanDeliveryId =
+        (deliveryId != null && deliveryId!.trim().isNotEmpty)
+            ? deliveryId!.trim()
+            : null;
+    return {
+      'id': id,
+      'owner_id': ownerId,
+      'transaction_date':
+          '${transactionDate.year}-${transactionDate.month.toString().padLeft(2, '0')}-${transactionDate.day.toString().padLeft(2, '0')}',
+      'transaction_type': transactionType.name,
+      'gallons': gallons,
+      'notes': notes,
+      'delivery_id': cleanDeliveryId,
+    };
+  }
 }

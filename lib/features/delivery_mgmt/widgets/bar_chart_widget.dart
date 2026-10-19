@@ -3,6 +3,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/report_provider.dart';
 
+import 'package:erefill/core/utils/money.dart';
 class DmBarChart extends StatelessWidget {
   final List<DailyPoint> points;
 
@@ -47,10 +48,10 @@ class DmBarChart extends StatelessWidget {
                   ),
                   children: [
                     TextSpan(
-                      text: '₱${point.income.toStringAsFixed(0)}',
+                      text: formatPeso(point.income, whole: true),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
                     ),
@@ -82,7 +83,7 @@ class DmBarChart extends StatelessWidget {
                     child: Text(
                       _shortLabel(points[idx].date),
                       style: const TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: AppUi.textMuted,
                       ),
@@ -103,7 +104,7 @@ class DmBarChart extends StatelessWidget {
                   toY: points[i].income,
                   width: points.length > 14 ? 8 : 16,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(8),
+                    top: Radius.circular(AppUi.radiusControl),
                   ),
                   color: AppUi.bluePrimary,
                 ),

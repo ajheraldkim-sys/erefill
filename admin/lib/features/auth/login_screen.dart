@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 36,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.15,
                           letterSpacing: -0.5,
                         ),
@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: errorColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 border: Border.all(
                                   color: errorColor.withValues(alpha: 0.45),
                                 ),
@@ -194,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       _error!,
                                       style: TextStyle(
                                         color: errorColor,
-                                        fontSize: 13.5,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -237,7 +237,7 @@ class _FeatureChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
         border: Border.all(color: Colors.white24),
       ),
       child: Row(

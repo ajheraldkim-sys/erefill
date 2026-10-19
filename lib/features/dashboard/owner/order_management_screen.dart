@@ -1,3 +1,4 @@
+import 'package:erefill/core/widgets/app_ui_kit.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,7 +19,10 @@ import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/offline_queue_service.dart';
 import 'package:erefill/core/widgets/press_bounce.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
+import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import 'owner_order_queue.dart';
+import 'package:erefill/core/services/owner_inventory_service.dart';
+import 'widgets/new_order_alert_sheet.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -32,6 +36,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   final supabase = Supabase.instance.client;
   bool _isAssigning = false;
   bool _isKanbanView = false;
+  int _phoneKanbanStageIndex = 0;
   List<Map<String, dynamic>> _riders = [];
   String _selectedStatus = 'all';
   String _searchQuery = '';
@@ -183,21 +188,43 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
             if (payload.eventType == PostgresChangeEvent.insert) {
               AppHaptics.orderAlert();
               if (mounted) {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.bolt, color: Colors.amber),
-                        SizedBox(width: 8),
-                        Text('New incoming refill order received!'),
-                      ],
+                final status = (record['status'] ?? '').toString();
+                if (status == 'pending') {
+                  NewOrderAlertSheet.show(
+                    context,
+                    order: record,
+                    onAccept: (orderId) async {
+                      await SafeSupabase.transitionOrderStatus(
+                        orderId: orderId,
+                        newStatus: 'accepted',
+                      );
+                      _refreshOrders();
+                    },
+                    onDecline: (orderId) async {
+                      await SafeSupabase.transitionOrderStatus(
+                        orderId: orderId,
+                        newStatus: 'cancelled',
+                      );
+                      _refreshOrders();
+                    },
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.bolt, color: AppColors.uiWarning),
+                          SizedBox(width: 8),
+                          Text('New incoming refill order received!'),
+                        ],
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: Color(0xFF0077B6),
+                      duration: Duration(seconds: 4),
                     ),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: Color(0xFF0077B6),
-                    duration: Duration(seconds: 4),
-                  ),
-                );
+                  );
+                }
               }
             }
             _refreshOrders();
@@ -259,7 +286,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
   String _formatPeso(dynamic value) {
     final numVal = value is num ? value : num.tryParse('${value ?? 0}') ?? 0;
-    return '₱${numVal.toStringAsFixed(2)}';
+    return formatPeso(numVal);
   }
 
   String _formatStatus(dynamic status) {
@@ -322,10 +349,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$riderName assigned successfully'),
-          backgroundColor: const Color(0xFF10B981),
+          backgroundColor: AppColors.uiSuccess,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppUi.radiusCard),
           ),
           margin: const EdgeInsets.all(12),
         ),
@@ -335,11 +362,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to assign rider: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Failed to assign rider: ${FriendlyErrors.message(e)}'),
+          backgroundColor: AppColors.uiError,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppUi.radiusCard),
           ),
           margin: const EdgeInsets.all(12),
         ),
@@ -347,6 +374,99 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     } finally {
       if (mounted) setState(() => _isAssigning = false);
     }
+  }
+
+  Future<void> _showRiderAssignmentModal(String orderId) async {
+    if (_riders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active riders found. Add or approve riders first in the Riders tab.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Material(
+        color: AppUi.surfaceOf(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: SafeArea(
+            child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Assign Rider to Order',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ..._riders.map((rider) {
+                final riderId = (rider['id'] ?? '').toString();
+                final riderName =
+                    (rider['full_name'] ?? rider['username'] ?? 'Rider').toString();
+                final score = (rider['reliability_score'] ?? 5.0).toString();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: AppUi.bluePrimary.withValues(alpha: 0.15),
+                    child: Icon(Icons.delivery_dining, color: AppUi.brandOf(context)),
+                  ),
+                  title: Text(
+                    riderName,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      const Icon(Icons.star_rounded, size: 14, color: AppColors.uiWarning),
+                      const SizedBox(width: 4),
+                      Text('Score: $score', style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                  trailing: ElevatedButton(
+                    onPressed: _isAssigning
+                        ? null
+                        : () async {
+                            Navigator.pop(ctx);
+                            await _assignRider(
+                              orderId: orderId,
+                              riderId: riderId,
+                              riderName: riderName,
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppUi.bluePrimary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(80, 44),
+                    ),
+                    child: const Text('Assign'),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
   }
 
   Future<String> _getRiderAssignmentFailureReason({
@@ -450,6 +570,26 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         }
       }
 
+      if (newStatus == 'delivered' && originalOrder != null) {
+        final ownerId = originalOrder['owner_id']?.toString() ?? supabase.auth.currentUser?.id;
+        final qty = (originalOrder['quantity'] as num?)?.toInt() ?? 1;
+        final waterType = originalOrder['water_type']?.toString();
+        final productId = originalOrder['water_option_id']?.toString();
+        final emptyReturned = (originalOrder['empty_gallons_returned'] as num?)?.toInt() ?? 0;
+        if (ownerId != null) {
+          unawaited(
+            OwnerInventoryService().recordDeliveryCompletion(
+              ownerId: ownerId,
+              orderId: orderId,
+              gallons: qty,
+              waterType: waterType,
+              productId: productId,
+              emptyGallonsReturned: emptyReturned,
+            ),
+          );
+        }
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -457,7 +597,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
           backgroundColor: _statusColor(newStatus),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppUi.radiusCard),
           ),
           margin: const EdgeInsets.all(12),
         ),
@@ -493,10 +633,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               content: const Text(
                 'Status updated locally. Changes will sync once connected.',
               ),
-              backgroundColor: const Color(0xFFF59E0B),
+              backgroundColor: AppColors.uiWarning,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
               ),
               margin: const EdgeInsets.all(12),
             ),
@@ -518,7 +658,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               fallback: 'Could not update this order status. Please try again.',
             ),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
     }
@@ -568,7 +708,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               SizedBox(width: 8),
               Text(
                 'Decline / Cancel Order',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
               ),
             ],
           ),
@@ -586,7 +726,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                   final isSelected = selectedReason == r;
                   return InkWell(
                     onTap: () => setDialogState(() => selectedReason = r),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: 6,
@@ -600,7 +740,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 : Icons.radio_button_off,
                             size: 20,
                             color: isSelected
-                                ? AppUi.bluePrimary
+                                ? AppUi.brandOf(context)
                                 : AppUi.textMuted,
                           ),
                           const SizedBox(width: 10),
@@ -691,7 +831,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Manual refill order recorded successfully!'),
-              backgroundColor: Color(0xFF10B981),
+              backgroundColor: AppColors.uiSuccess,
             ),
           );
         },
@@ -748,7 +888,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                   margin: const EdgeInsets.only(top: 12, bottom: 20),
                   decoration: BoxDecoration(
                     color: AppUi.borderOf(context),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppUi.radiusFull),
                   ),
                 ),
 
@@ -766,7 +906,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             Text(
                               _shortOrderId(orderId),
                               style: TextStyle(
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 22,
                                 color: AppUi.textPrimaryOf(context),
                               ),
@@ -795,15 +935,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
+                                      color: AppColors.uiError.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(AppUi.radiusXs),
                                     ),
                                     child: const Text(
                                       'SLA breach',
                                       style: TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
+                                        color: AppColors.uiError,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ),
@@ -840,7 +980,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             Text(
                               customerName,
                               style: TextStyle(
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 18,
                                 color: AppUi.textPrimaryOf(context),
                               ),
@@ -848,10 +988,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             const SizedBox(height: 4),
                             Text(
                               phone,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                               ),
                             ),
                           ],
@@ -879,7 +1019,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                               Text(
                                 'Brgy. $barangay',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 14,
                                   color: AppUi.textPrimaryOf(context),
                                 ),
@@ -893,15 +1033,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppUi.blueSoft,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: AppUi.brandSoftOf(context),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.assistant_direction_rounded,
                                       size: 16,
-                                      color: AppUi.bluePrimary,
+                                      color: AppUi.brandOf(context),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -954,15 +1094,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                         width: 28,
                                         height: 28,
                                         decoration: BoxDecoration(
-                                          color: AppUi.blueSoft,
+                                          color: AppUi.brandSoftOf(context),
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.water_drop,
                                           size: 14,
-                                          color: AppUi.bluePrimary,
+                                          color: AppUi.brandOf(context),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -978,7 +1118,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                       Text(
                                         _formatPeso(item['subtotal']),
                                         style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w700,
                                           color: AppUi.textPrimary,
                                         ),
                                       ),
@@ -1001,7 +1141,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                               Text(
                                 '${(order['empty_gallons_returned'] as num?)?.toInt() ?? 0} gallon(s) returned',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 16,
                                   color: AppUi.textPrimary,
                                 ),
@@ -1047,7 +1187,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 Text(
                                   total,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 20,
                                     color: AppUi.textPrimary,
                                   ),
@@ -1093,15 +1233,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFFBEB),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFFDE68A)),
+                            color: AppUi.warningBg,
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            border: Border.all(color: AppUi.warningBorder),
                           ),
                           child: Row(
                             children: [
                               const Icon(
                                 Icons.warning_amber_rounded,
-                                color: Color(0xFFD97706),
+                                color: AppColors.uiWarning,
                                 size: 20,
                               ),
                               const SizedBox(width: 10),
@@ -1122,7 +1262,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFFB45309),
+                                    color: AppColors.uiWarning,
                                   ),
                                 ),
                               ),
@@ -1139,7 +1279,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         const Text(
                           'Assign Rider',
                           style: TextStyle(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontSize: 14,
                             color: AppUi.textPrimary,
                           ),
@@ -1173,7 +1313,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 ),
                                 decoration: BoxDecoration(
                                   color: AppUi.bluePrimary,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppUi.bluePrimary.withValues(
@@ -1197,7 +1337,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                       riderName.split(' ').first,
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w700,
                                         fontSize: 13,
                                       ),
                                     ),
@@ -1212,14 +1352,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                         color: Colors.white.withValues(
                                           alpha: 0.2,
                                         ),
-                                        borderRadius: BorderRadius.circular(4),
+                                        borderRadius: BorderRadius.circular(AppUi.radiusXs),
                                       ),
                                       child: Row(
                                         children: [
                                           const Icon(
                                             Icons.star_rounded,
                                             size: 10,
-                                            color: Colors.amber,
+                                            color: AppColors.uiWarning,
                                           ),
                                           const SizedBox(width: 2),
                                           Text(
@@ -1227,7 +1367,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                                 .toString(),
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontSize: 10,
+                                              fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -1281,22 +1421,22 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
+                            color: AppUi.successBg,
                             borderRadius: AppUi.controlRadius,
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                            border: Border.all(color: AppUi.successBorder),
                           ),
                           child: Row(
                             children: [
                               const Icon(
                                 Icons.check_circle,
-                                color: Color(0xFF10B981),
+                                color: AppColors.uiSuccess,
                                 size: 18,
                               ),
                               const SizedBox(width: 10),
                               Text(
                                 'Rider Assigned',
                                 style: const TextStyle(
-                                  color: Color(0xFF065F46),
+                                  color: AppUi.successFg,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1364,7 +1504,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 label: const Text(
                                   'Accept Order',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -1427,7 +1567,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 label: const Text(
                                   'Start Preparing',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -1457,7 +1597,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             label: const Text(
                               'Mark Ready for Pickup',
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 15,
                               ),
                             ),
@@ -1494,7 +1634,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               title,
               style: const TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textMuted,
                 letterSpacing: 0,
               ),
@@ -1548,16 +1688,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
           bg = Colors.white.withValues(alpha: 0.22);
           border = Colors.white.withValues(alpha: 0.35);
         } else {
-          label = 'COD • Collect';
+          label = 'COD · Collect';
           icon = Icons.payments_outlined;
           bg = Colors.black.withValues(alpha: 0.18);
           border = Colors.white.withValues(alpha: 0.25);
         }
       } else if (isFailed) {
-        label = 'Payment Failed';
+        label = 'Payment failed';
         icon = Icons.error_outline_rounded;
         bg = Colors.black.withValues(alpha: 0.3);
-        border = const Color(0xFFFCA5A5).withValues(alpha: 0.5);
+        border = AppUi.errorFgDark.withValues(alpha: 0.5);
       } else {
         label = 'Awaiting ${CheckoutRules.paymentLabel(method)}';
         icon = Icons.schedule_rounded;
@@ -1569,21 +1709,20 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppUi.radiusSm),
           border: Border.all(color: border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 11, color: Colors.white),
+            Icon(icon, size: 13, color: Colors.white),
             const SizedBox(width: 4),
             Text(
               label,
               style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
                 color: Colors.white,
-                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -1591,61 +1730,43 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       );
     }
 
+    // Neutral surfaces: shared status pill so payment states look the same
+    // here, in the rider app and in the admin console.
     if (isPaid) {
-      return Text(
-        'Paid (${CheckoutRules.paymentLabel(method)})',
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFF10B981),
-          letterSpacing: 0.3,
-        ),
+      return AppStatusPill(
+        label: 'Paid (${CheckoutRules.paymentLabel(method)})',
+        tone: StatusTone.success,
+        icon: Icons.check_circle_rounded,
       );
     }
 
     if (isCod) {
       if (orderStatus == 'delivered') {
-        return const Text(
-          'Paid (COD)',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF10B981),
-            letterSpacing: 0.3,
-          ),
+        return const AppStatusPill(
+          label: 'Paid (COD)',
+          tone: StatusTone.success,
+          icon: Icons.check_circle_rounded,
         );
       }
-      return const Text(
-        'COD • Collect',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFD97706),
-          letterSpacing: 0.3,
-        ),
+      return const AppStatusPill(
+        label: 'COD · Collect',
+        tone: StatusTone.warning,
+        icon: Icons.payments_outlined,
       );
     }
 
     if (isFailed) {
-      return const Text(
-        'Payment Failed',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: Color(0xFFEF4444),
-          letterSpacing: 0.3,
-        ),
+      return const AppStatusPill(
+        label: 'Payment failed',
+        tone: StatusTone.danger,
+        icon: Icons.error_outline_rounded,
       );
     }
 
-    return Text(
-      'Awaiting ${CheckoutRules.paymentLabel(method)}',
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w900,
-        color: Color(0xFFF59E0B),
-        letterSpacing: 0.3,
-      ),
+    return AppStatusPill(
+      label: 'Awaiting ${CheckoutRules.paymentLabel(method)}',
+      tone: StatusTone.warning,
+      icon: Icons.schedule_rounded,
     );
   }
 
@@ -1671,32 +1792,32 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     final String label;
 
     if (isPaid) {
-      bgColor = const Color(0xFFECFDF5);
-      borderColor = const Color(0xFFA7F3D0);
-      textColor = const Color(0xFF059669);
+      bgColor = AppUi.successBg;
+      borderColor = AppUi.successBorder;
+      textColor = AppColors.uiSuccess;
       label =
           'PAID ONLINE (${CheckoutRules.paymentLabel(method).toUpperCase()})';
     } else if (isCod) {
       if (orderStatus == 'delivered') {
-        bgColor = const Color(0xFFECFDF5);
-        borderColor = const Color(0xFFA7F3D0);
-        textColor = const Color(0xFF059669);
+        bgColor = AppUi.successBg;
+        borderColor = AppUi.successBorder;
+        textColor = AppColors.uiSuccess;
         label = 'PAID (CASH ON DELIVERY)';
       } else {
-        bgColor = const Color(0xFFFFFBEB);
-        borderColor = const Color(0xFFFDE68A);
-        textColor = const Color(0xFFD97706);
+        bgColor = AppUi.warningBg;
+        borderColor = AppUi.warningBorder;
+        textColor = AppColors.uiWarning;
         label = 'COLLECT CASH ON DELIVERY';
       }
     } else if (isFailed) {
-      bgColor = const Color(0xFFFEF2F2);
-      borderColor = const Color(0xFFFECACA);
-      textColor = const Color(0xFFDC2626);
+      bgColor = AppUi.errorBg;
+      borderColor = AppUi.errorBorder;
+      textColor = AppColors.uiError;
       label = 'PAYMENT FAILED';
     } else {
-      bgColor = const Color(0xFFFFFBEB);
-      borderColor = const Color(0xFFFDE68A);
-      textColor = const Color(0xFFD97706);
+      bgColor = AppUi.warningBg;
+      borderColor = AppUi.warningBorder;
+      textColor = AppColors.uiWarning;
       label =
           'AWAITING PAYMENT (${CheckoutRules.paymentLabel(method).toUpperCase()})';
     }
@@ -1705,7 +1826,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppUi.radiusControl),
         border: Border.all(color: borderColor),
       ),
       child: Text(
@@ -1715,7 +1836,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
           color: textColor,
           letterSpacing: 0.3,
         ),
@@ -1739,12 +1860,85 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     final elapsed = _elapsedLabel(order['created_at']);
     final payment = (order['payment_method'] ?? 'COD').toString().toUpperCase();
 
+    final rawItems = order['order_items'];
+    String itemsSummary;
+    if (rawItems is List && rawItems.isNotEmpty) {
+      itemsSummary = rawItems
+          .map((i) => '${i['quantity'] ?? 1}× ${i['product_name'] ?? 'Refill'}')
+          .join(', ');
+    } else {
+      final qty = (order['quantity'] as num?)?.toInt() ?? 1;
+      final type = (order['water_type'] ?? 'Refill').toString();
+      itemsSummary = '$qty× $type';
+    }
+
     final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '');
     final minutesAgo = createdAt != null
         ? DateTime.now().difference(createdAt).inMinutes
         : 0;
     final isSlaUrgent =
         (rawStatus == 'pending' || rawStatus == 'in_prep') && minutesAgo >= 15;
+
+    final isPickup = (order['delivery_type'] ?? '').toString() == 'pickup';
+    String primaryLabel;
+    IconData primaryIcon;
+    Color primaryBgColor;
+    Color primaryFgColor;
+    VoidCallback primaryAction;
+
+    switch (rawStatus) {
+      case 'pending':
+        primaryLabel = 'Accept Order';
+        primaryIcon = Icons.check_circle_outline;
+        primaryBgColor = AppColors.uiSuccess;
+        primaryFgColor = Colors.white;
+        primaryAction = () => _updateStatus(orderId, 'accepted');
+        break;
+      case 'accepted':
+        primaryLabel = 'Start Preparing';
+        primaryIcon = Icons.play_arrow_rounded;
+        primaryBgColor = AppUi.bluePrimary;
+        primaryFgColor = Colors.white;
+        primaryAction = () => _updateStatus(orderId, 'preparing');
+        break;
+      case 'preparing':
+        primaryLabel = 'Mark Ready';
+        primaryIcon = Icons.done_all_rounded;
+        primaryBgColor = AppColors.statusReady;
+        primaryFgColor = Colors.white;
+        primaryAction = () => _updateStatus(orderId, 'ready_for_pickup');
+        break;
+      case 'ready_for_pickup':
+        if (isPickup) {
+          primaryLabel = 'Complete Refill';
+          primaryIcon = Icons.check_circle_rounded;
+          primaryBgColor = AppColors.uiSuccess;
+          primaryFgColor = Colors.white;
+          primaryAction = () => _updateStatus(orderId, 'delivered');
+        } else {
+          primaryLabel = 'Assign Rider';
+          primaryIcon = Icons.delivery_dining_rounded;
+          primaryBgColor = AppUi.bluePrimary;
+          primaryFgColor = Colors.white;
+          primaryAction = () => _showRiderAssignmentModal(orderId);
+        }
+        break;
+      case 'assigned_to_rider':
+      case 'out_for_delivery':
+        primaryLabel = 'Track Delivery';
+        primaryIcon = Icons.navigation_rounded;
+        primaryBgColor = Colors.white;
+        primaryFgColor = style.primaryColor;
+        primaryAction = () => _showOrderDetail(order);
+        break;
+      default:
+        primaryLabel = 'View Details';
+        primaryIcon = Icons.visibility_outlined;
+        primaryBgColor = Colors.white;
+        primaryFgColor = style.primaryColor;
+        primaryAction = () => _showOrderDetail(order);
+        break;
+    }
 
     return RepaintBoundary(
       child: PressBounce(
@@ -1757,7 +1951,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: style.cardBackground,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             boxShadow: [
               BoxShadow(
                 color: style.primaryColor.withValues(alpha: 0.28),
@@ -1785,12 +1979,12 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: Text(
                             _shortOrderId(orderId),
                             style: const TextStyle(
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               fontSize: 11,
                               color: Colors.white,
                               letterSpacing: 0.5,
@@ -1805,8 +1999,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(8),
+                              color: AppColors.uiError,
+                              borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1821,8 +2015,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                   '${minutesAgo}m',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -1840,7 +2034,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                 ),
                 const SizedBox(height: 14),
 
-                // Middle: Customer icon + Name & Elapsed + Total & Payment badge
+                // Middle: Customer icon + Name & Items + Total & Payment badge
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -1867,7 +2061,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           Text(
                             customerName,
                             style: const TextStyle(
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               fontSize: 16,
                               color: Colors.white,
                               letterSpacing: -0.2,
@@ -1877,12 +2071,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '$elapsed • $payment',
+                            '$itemsSummary • $elapsed • $payment',
                             style: TextStyle(
                               color: style.cardSecondaryText,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -1894,7 +2090,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         Text(
                           total,
                           style: const TextStyle(
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             fontSize: 17,
                             color: Colors.white,
                           ),
@@ -1913,7 +2109,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.18),
                     ),
@@ -1972,47 +2168,110 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
-                // Bottom Row: Manage action pill
+                // Bottom Row: Primary Action (min 48dp) + Secondary Actions Menu (48dp)
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(99),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.14),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: primaryAction,
+                          icon: Icon(primaryIcon, size: 18),
+                          label: Text(
+                            primaryLabel,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Manage Order',
-                            style: TextStyle(
-                              color: style.primaryColor,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryBgColor,
+                            foregroundColor: primaryFgColor,
+                            elevation: 2,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 13,
-                            color: style.primaryColor,
-                          ),
-                        ],
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    PopupMenuButton<String>(
+                      tooltip: 'More actions',
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      ),
+                      icon: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                        ),
+                        child: const Icon(
+                          Icons.more_vert_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onSelected: (val) {
+                        if (val == 'details') {
+                          _showOrderDetail(order);
+                        } else if (val == 'decline' || val == 'cancel') {
+                          _showDeclineOrderDialog(orderId);
+                        } else if (val == 'assign') {
+                          _showRiderAssignmentModal(orderId);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'details',
+                          child: Row(
+                            children: [
+                              Icon(Icons.visibility_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('Full Details'),
+                            ],
+                          ),
+                        ),
+                        if (rawStatus == 'pending')
+                          const PopupMenuItem(
+                            value: 'decline',
+                            child: Row(
+                              children: [
+                                Icon(Icons.cancel_outlined, size: 18, color: AppColors.uiError),
+                                SizedBox(width: 8),
+                                Text('Decline Order', style: TextStyle(color: AppColors.uiError)),
+                              ],
+                            ),
+                          ),
+                        if (rawStatus != 'delivered' && rawStatus != 'cancelled' && rawStatus != 'pending')
+                          const PopupMenuItem(
+                            value: 'cancel',
+                            child: Row(
+                              children: [
+                                Icon(Icons.close_rounded, size: 18, color: AppColors.uiError),
+                                SizedBox(width: 8),
+                                Text('Cancel Order', style: TextStyle(color: AppColors.uiError)),
+                              ],
+                            ),
+                          ),
+                        if (_riders.isNotEmpty && (rawStatus == 'ready_for_pickup' || rawStatus == 'accepted' || rawStatus == 'assigned_to_rider'))
+                          const PopupMenuItem(
+                            value: 'assign',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delivery_dining, size: 18),
+                                SizedBox(width: 8),
+                                Text('Assign Rider'),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -2038,13 +2297,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(AppUi.radiusFull),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                   color: color,
                 ),
               ),
@@ -2333,15 +2592,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           ? Colors.white.withValues(alpha: 0.08)
                           : Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(AppUi.radiusFull),
                         borderSide: BorderSide(color: AppUi.borderOf(context)),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(AppUi.radiusFull),
                         borderSide: BorderSide(color: AppUi.borderOf(context)),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(AppUi.radiusFull),
                         borderSide: const BorderSide(
                           color: AppUi.bluePrimary,
                           width: 1.5,
@@ -2360,17 +2619,17 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     indicatorSize: TabBarIndicatorSize.label,
-                    indicator: const UnderlineTabIndicator(
+                    indicator: UnderlineTabIndicator(
                       borderSide: BorderSide(
                         width: 3,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                    labelColor: AppUi.bluePrimary,
+                    labelColor: AppUi.brandOf(context),
                     unselectedLabelColor: AppUi.textMuted,
                     labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontSize: 13,
                     ),
                     unselectedLabelStyle: const TextStyle(
@@ -2382,6 +2641,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         .toList(),
                   ),
                 ),
+              const OfflineSyncStatusPill(),
               if (_ordersLoadError != null && allOrders.isNotEmpty)
                 _buildStaleOrdersBanner(),
               Expanded(
@@ -2458,35 +2718,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
   }
 
   Widget _buildOrdersLoadError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.cloud_off_rounded,
-              color: AppUi.textMuted,
-              size: 44,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _ordersLoadError ?? 'Orders could not be loaded.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppUi.textPrimaryOf(context),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _isRefreshingOrders ? null : _refreshOrders,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
+    return AppErrorState(
+      icon: Icons.cloud_off_rounded,
+      title: 'Orders could not be loaded',
+      message: _ordersLoadError ?? 'Check your connection and try again.',
+      onRetry: _isRefreshingOrders ? null : _refreshOrders,
     );
   }
 
@@ -2526,8 +2762,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       },
     ];
 
-    return RefreshIndicator(
-      onRefresh: () async {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return _buildPhoneKanban(orders, stages);
+        }
+        return RefreshIndicator(
+          onRefresh: () async {
         await _loadRiders();
         await _refreshOrders();
       },
@@ -2553,7 +2794,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
             },
             onAcceptWithDetails: (details) {
               HapticFeedback.heavyImpact();
-              _handleKanbanDrop(details.data, stage['id'] as String);
+              handleKanbanDrop(details.data, stage['id'] as String);
             },
             builder: (context, candidateData, rejectedData) {
               final isHovered = candidateData.isNotEmpty;
@@ -2565,7 +2806,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                   color: isHovered
                       ? color.withValues(alpha: 0.08)
                       : AppUi.surfaceOf(context),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                   border: Border.all(
                     color: isHovered ? color : AppUi.borderOf(context),
                     width: isHovered ? 2 : 1,
@@ -2609,7 +2850,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           Text(
                             title,
                             style: TextStyle(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               fontSize: 14,
                               color: AppUi.textPrimaryOf(context),
                             ),
@@ -2622,13 +2863,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             ),
                             decoration: BoxDecoration(
                               color: color.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(99),
+                              borderRadius: BorderRadius.circular(AppUi.radiusFull),
                             ),
                             child: Text(
                               '${stageOrders.length}',
                               style: TextStyle(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 color: color,
                               ),
                             ),
@@ -2690,9 +2931,187 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         },
       ),
     );
+      },
+    );
   }
 
-  void _handleKanbanDrop(Map<String, dynamic> order, String targetStageId) {
+  Widget _buildPhoneKanban(
+    List<Map<String, dynamic>> orders,
+    List<Map<String, dynamic>> stages,
+  ) {
+    if (_phoneKanbanStageIndex >= stages.length) {
+      _phoneKanbanStageIndex = 0;
+    }
+    final activeStage = stages[_phoneKanbanStageIndex];
+    final activeColor = activeStage['color'] as Color;
+    final activeFilter =
+        activeStage['filter'] as bool Function(Map<String, dynamic>);
+    final stageOrders = orders.where(activeFilter).toList();
+
+    return Column(
+      children: [
+        // Phone Segmented Control with count badges
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppUi.surfaceOf(context),
+            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+            border: Border.all(color: AppUi.borderOf(context)),
+          ),
+          child: Row(
+            children: List.generate(stages.length, (idx) {
+              final stage = stages[idx];
+              final isSelected = _phoneKanbanStageIndex == idx;
+              final color = stage['color'] as Color;
+              final count = orders
+                  .where(
+                    stage['filter'] as bool Function(Map<String, dynamic>),
+                  )
+                  .length;
+
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _phoneKanbanStageIndex = idx);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? color : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: color.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          stage['title'] as String,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w600,
+                            color: isSelected
+                                ? Colors.white
+                                : AppUi.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.25)
+                                : color.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(AppUi.radiusFull),
+                          ),
+                          child: Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+
+        // Active Stage Orders
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _loadRiders();
+              await _refreshOrders();
+            },
+            color: AppUi.bluePrimary,
+            child: stageOrders.isEmpty
+                ? ListView(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 40,
+                      horizontal: 20,
+                    ),
+                    children: [
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: activeColor.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.inventory_2_outlined,
+                                size: 32,
+                                color: activeColor,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'No ${activeStage['title']} Orders',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Orders in the "${activeStage['title']}" pipeline stage will appear here.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppUi.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    itemCount: stageOrders.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildOrderCard(stageOrders[index]),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void handleKanbanDrop(Map<String, dynamic> order, String targetStageId) {
     final orderId = (order['id'] ?? '').toString();
     final currentStatus = (order['status'] ?? 'pending').toString();
 

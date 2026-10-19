@@ -84,6 +84,28 @@ class DmDelivery {
     'local_id': localId,
   };
 
+  /// Serializes model for Supabase cloud upsert, removing local-only columns and handling nullable UUIDs
+  Map<String, dynamic> toCloudJson() {
+    final cleanRiderId =
+        (riderId != null && riderId!.trim().isNotEmpty) ? riderId!.trim() : null;
+    return {
+      'id': id,
+      'owner_id': ownerId,
+      'rider_id': cleanRiderId,
+      'delivery_date':
+          '${deliveryDate.year}-${deliveryDate.month.toString().padLeft(2, '0')}-${deliveryDate.day.toString().padLeft(2, '0')}',
+      'gallons': gallons,
+      'price_per_gallon': pricePerGallon,
+      'expenses': expenses,
+      'notes': notes,
+      'empty_gallons_returned': emptyGallonsReturned,
+      'commission': commission,
+      'credit_amount': creditAmount,
+      'is_synced': true,
+      'local_id': localId ?? id,
+    };
+  }
+
   DmDelivery copyWith({
     String? id,
     String? ownerId,

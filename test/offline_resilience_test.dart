@@ -13,7 +13,7 @@ void main() {
       final presentation = OrderStatusPresentation.fromStatus('pending_sync');
       expect(presentation.label, 'Queued Offline');
       expect(presentation.icon, Icons.cloud_upload_outlined);
-      expect(presentation.color, const Color(0xFFE58A16));
+      expect(presentation.color, const Color(0xFFB45309));
     });
 
     test('RefillOrderStatusTimeline maps pending_sync to initial order step', () {

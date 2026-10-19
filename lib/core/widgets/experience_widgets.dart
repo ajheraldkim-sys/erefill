@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import 'brand/axo_states.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 enum ExperienceRole { customer, owner, rider, support }
 
 enum ExperienceScene {
@@ -131,8 +132,8 @@ class FriendlyHeroCard extends StatelessWidget {
                     eyebrow.toUpperCase(),
                     style: TextStyle(
                       color: roleColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 0.6,
                     ),
                   ),
@@ -140,7 +141,7 @@ class FriendlyHeroCard extends StatelessWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
@@ -166,7 +167,7 @@ class FriendlyHeroCard extends StatelessWidget {
                           actionLabel!,
                           style: TextStyle(
                             color: roleColor,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
                         ),
@@ -242,7 +243,7 @@ class GuidedSetupCard extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -261,7 +262,7 @@ class GuidedSetupCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: BorderRadius.circular(AppUi.radiusFull),
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
@@ -275,7 +276,7 @@ class GuidedSetupCard extends StatelessWidget {
             style: TextStyle(
               color: color,
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 12),
@@ -339,7 +340,7 @@ class _SetupStepRow extends StatelessWidget {
                       color: step.isComplete
                           ? AppUi.textPrimaryOf(context)
                           : AppUi.textSecondaryOf(context),
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontSize: 13,
                     ),
                   ),
@@ -409,7 +410,7 @@ class FriendlyFeedbackBanner extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: color,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
                 ),
@@ -448,7 +449,7 @@ Color _roleColor(ExperienceRole role) {
     ExperienceRole.customer => AppUi.bluePrimary,
     ExperienceRole.owner => AppUi.accentGreen,
     ExperienceRole.rider => AppUi.accentCyan,
-    ExperienceRole.support => const Color(0xFF8B5CF6),
+    ExperienceRole.support => AppColors.statusPreparing,
   };
 }
 
@@ -566,7 +567,7 @@ class _ExperiencePainter extends CustomPainter {
   }) {
     final house = Paint()..color = color;
     final roof = Paint()
-      ..color = const Color(0xFF0F172A).withValues(alpha: 0.84);
+      ..color = AppUi.textPrimary.withValues(alpha: 0.84);
     final x = compact ? size.width * 0.45 : size.width * 0.22;
     final y = compact ? size.height * 0.45 : size.height * 0.36;
     final width = compact ? size.width * 0.28 : size.width * 0.5;
@@ -593,7 +594,7 @@ class _ExperiencePainter extends CustomPainter {
           width * 0.22,
           height * 0.2,
         ),
-        Radius.circular(8),
+        Radius.circular(AppUi.radiusControl),
       ),
       Paint()..color = Colors.white.withValues(alpha: 0.9),
     );
@@ -605,7 +606,7 @@ class _ExperiencePainter extends CustomPainter {
           width * 0.18,
           height * 0.55,
         ),
-        Radius.circular(8),
+        Radius.circular(AppUi.radiusControl),
       ),
       Paint()..color = Colors.white.withValues(alpha: 0.92),
     );
@@ -614,7 +615,7 @@ class _ExperiencePainter extends CustomPainter {
   void _drawDelivery(Canvas canvas, Size size, Color color) {
     final truck = Paint()..color = color;
     final dark = Paint()
-      ..color = const Color(0xFF0F172A).withValues(alpha: 0.86);
+      ..color = AppUi.textPrimary.withValues(alpha: 0.86);
     final x = size.width * 0.2;
     final y = size.height * 0.44;
     canvas.drawRRect(
@@ -666,7 +667,7 @@ class _ExperiencePainter extends CustomPainter {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(baseX + i * size.width * 0.14, baseY - h, widths, h),
-          Radius.circular(10),
+          Radius.circular(AppUi.radiusControl),
         ),
         Paint()
           ..color = i == 1 ? AppUi.accentGreen : color.withValues(alpha: 0.82),
@@ -694,7 +695,7 @@ class _ExperiencePainter extends CustomPainter {
             size.width * (0.38 + i * 0.08),
             size.height * 0.05,
           ),
-          Radius.circular(99),
+          Radius.circular(AppUi.radiusFull),
         ),
         Paint()..color = color.withValues(alpha: i < 2 ? 0.52 : 0.22),
       );
@@ -836,7 +837,7 @@ class QuickGuide extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppUi.blueSoft,
+            color: AppUi.brandSoftOf(context),
           ),
           child: Icon(
             pose == AxoPose.success
@@ -844,7 +845,7 @@ class QuickGuide extends StatelessWidget {
                 : pose == AxoPose.delivery
                 ? Icons.local_shipping_rounded
                 : Icons.water_drop_rounded,
-            color: AppUi.bluePrimary,
+            color: AppUi.brandOf(context),
             size: 24,
           ),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:erefill/core/constants.dart';
 class WelcomeOnboardingScreen extends StatelessWidget {
   final VoidCallback onFinish;
   const WelcomeOnboardingScreen({super.key, required this.onFinish});
@@ -64,7 +65,7 @@ class WelcomeOnboardingScreen extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 48,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         height: 1.05,
                         letterSpacing: -1.5,
                       ),
@@ -73,7 +74,7 @@ class WelcomeOnboardingScreen extends StatelessWidget {
                     const Text(
                       'Pristine purified water, right to\nyour doorstep.',
                       style: TextStyle(
-                        color: Color(0xFFE2E8F0),
+                        color: AppUi.borderLight,
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                         height: 1.4,
@@ -119,7 +120,7 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
           padding: const EdgeInsets.all(4.0),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppUi.radiusFull),
             border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           ),
           child: Stack(
@@ -129,8 +130,8 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
                 width: _dragPosition + thumbSize,
                 height: thumbSize,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(999),
+                  color: AppUi.infoFgDark.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 ),
               ),
               Center(
@@ -185,7 +186,7 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
                   child: Container(
                     width: thumbSize,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF38BDF8),
+                      color: AppUi.infoFgDark,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(

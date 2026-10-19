@@ -223,7 +223,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -252,7 +252,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
         bottom: TabBar(
           controller: _tabs,
           isScrollable: false,
-          labelColor: AppUi.bluePrimary,
+          labelColor: AppUi.brandOf(context),
           indicatorColor: AppUi.bluePrimary,
           tabs: const [
             Tab(icon: Icon(LucideIcons.store, size: 16), text: 'Station Info'),
@@ -457,10 +457,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       children: [
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               LucideIcons.mapPin,
                               size: 18,
-                              color: AppUi.bluePrimary,
+                              color: AppUi.brandOf(context),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -474,7 +474,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           SizedBox(
                             height: 220,
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                               child: AdminSingleStationMap(
                                 latitude: lat,
                                 longitude: lng,
@@ -623,11 +623,11 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             LucideIcons.droplets,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                             size: 18,
                           ),
                         ),
@@ -647,10 +647,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           children: [
                             Text(
                               formatPeso(p['price']),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
                                 fontSize: 15,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -722,7 +722,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           l['tx_type']?.toString() ?? 'Inventory Refill',
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 13.5,
+                            fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
@@ -733,7 +733,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                         trailing: Text(
                           '${l['gallons'] ?? 0} gal',
                           style: const TextStyle(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontSize: 14,
                           ),
                         ),
@@ -781,10 +781,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           ),
                         ],
                       ),
-                      const Icon(
+                      Icon(
                         LucideIcons.bike,
                         size: 20,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                     ],
                   ),
@@ -864,10 +864,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       LucideIcons.history,
                       size: 18,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1059,14 +1059,44 @@ class _StationDetailScreenState extends State<StationDetailScreen>
     }
   }
 
-  Future<String?> _promptReason(BuildContext context, String action) {
-    return showAdminPromptDialog(
+  Future<String?> _promptReason(BuildContext context, String action) async {
+    final isSuspension = action == 'suspended';
+    final name = _profile['station_name']?.toString() ?? 'this station';
+    final activeOrders = (_stats['active_orders'] as num?)?.toInt() ?? 0;
+
+    final consequenceMsg = isSuspension
+        ? (activeOrders > 0
+            ? 'Warning: Suspending "$name" will interrupt $activeOrders active in-flight customer orders!\nDeliveries currently on the road will be paused.'
+            : 'Are you sure you want to suspend "$name"? New orders and dispatch will be blocked.')
+        : 'Setting station availability to "$action"';
+
+    final reason = await showAdminPromptDialog(
       context,
-      title: 'Update Station Status',
-      subtitle: 'Setting station availability to "$action"',
-      label: 'Audit note / reason (optional)',
-      confirmLabel: 'Update Status',
+      title: isSuspension ? 'Suspend Station: $name' : 'Update Station Status',
+      subtitle: consequenceMsg,
+      icon: isSuspension ? LucideIcons.triangleAlert : LucideIcons.messageSquare,
+      iconColor: isSuspension ? adminSemanticErrorColor(context) : null,
+      label: isSuspension
+          ? 'Audit note / suspension reason (required)'
+          : 'Audit note / reason (optional)',
+      confirmLabel: isSuspension ? 'Confirm Suspension' : 'Update Status',
     );
+
+    if (isSuspension && (reason == null || reason.trim().isEmpty)) {
+      if (context.mounted && reason != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'A suspension reason is strictly required for audit safety.',
+            ),
+            backgroundColor: AppUi.error,
+          ),
+        );
+      }
+      return null;
+    }
+
+    return reason;
   }
 }
 

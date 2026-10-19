@@ -13,6 +13,8 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/utils/profile_query_helpers.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -166,8 +168,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Update failed: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Update failed: ${FriendlyErrors.message(e)}'),
+          backgroundColor: AppColors.uiError,
         ),
       );
     } finally {
@@ -245,8 +247,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Who are you?',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w700,
+              color: AppUi.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -313,7 +315,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     title,
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: OnboardingPalette.textPrimary,
                     ),
                   ),
@@ -350,8 +352,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Where are you located?',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w700,
+              color: AppUi.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -397,8 +399,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Precise Details',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w700,
+              color: AppUi.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -482,7 +484,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Pin Precise Location',
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: OnboardingPalette.textMuted,
               letterSpacing: 1.5,
             ),
@@ -663,7 +665,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _currentStep == 2 ? 'Let\'s Get Started' : 'Next Step',
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),

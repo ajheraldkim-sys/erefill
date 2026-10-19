@@ -6,6 +6,7 @@ import '../../services/admin_api_service.dart';
 import '../../utils/csv_export.dart';
 import '../../widgets/admin_ui.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 /// Simplified, minimal, and super user-friendly Platform Settings & Service Fee screen.
 class PlatformFeesScreen extends StatefulWidget {
   const PlatformFeesScreen({super.key});
@@ -138,7 +139,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -182,7 +183,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     } finally {
       if (mounted) setState(() => _savingDeliveryFee = false);
@@ -193,9 +194,9 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(LucideIcons.history, color: AppUi.bluePrimary, size: 20),
+            Icon(LucideIcons.history, color: AppUi.brandOf(context), size: 20),
             SizedBox(width: 10),
             Text('Delivery Fee Audit History', style: TextStyle(fontSize: 16)),
           ],
@@ -244,7 +245,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                             Text(
                               created.length >= 16 ? created.substring(0, 16) : created,
                               style: const TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 12,
                                 color: AppUi.textMuted,
                               ),
                             ),
@@ -253,14 +254,14 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Rate: ₱$rate/km • Min: ₱$minFee • Rule: $rule • Status: ${enabled ? "Active" : "Disabled"}',
-                          style: const TextStyle(fontSize: 12, color: AppUi.bluePrimary),
+                          style: TextStyle(fontSize: 12, color: AppUi.brandOf(context)),
                         ),
                         if (details['reason'] != null &&
                             details['reason'].toString().isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
                             'Note: ${details['reason']}',
-                            style: const TextStyle(fontSize: 11.5, fontStyle: FontStyle.italic),
+                            style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                           ),
                         ],
                       ],
@@ -330,7 +331,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -386,11 +387,11 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     LucideIcons.lightbulb,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                     size: 22,
                   ),
                 ),
@@ -412,7 +413,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         'Water refill stations keep 100% of their refill price.',
                         style: adminBodyTextStyle(
                           context,
-                        ).copyWith(fontSize: 13.5, height: 1.45),
+                        ).copyWith(fontSize: 14, height: 1.45),
                       ),
                     ],
                   ),
@@ -438,11 +439,11 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             LucideIcons.slidersHorizontal,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                             size: 20,
                           ),
                         ),
@@ -463,7 +464,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         'Charge Service Fee on Customer Orders',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 14.5,
+                          fontSize: 15,
                         ),
                       ),
                       subtitle: Text(
@@ -471,7 +472,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                             ? 'Currently active. Customers pay a small platform fee at checkout.'
                             : 'Currently disabled. Customers pay only refill + delivery fee.',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 13,
                           color: AppUi.textSecondaryOf(context),
                         ),
                       ),
@@ -498,14 +499,14 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: Text(
                             '${_percent.toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
                               fontSize: 16,
-                              color: AppUi.bluePrimary,
+                              color: AppUi.brandOf(context),
                             ),
                           ),
                         ),
@@ -531,7 +532,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                                 ? Colors.white
                                 : AppUi.textPrimaryOf(context),
                             fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
+                            fontSize: 13,
                           ),
                         );
                       }).toList(),
@@ -560,7 +561,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         color: Theme.of(
                           context,
                         ).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         border: Border.all(color: AppUi.borderOf(context)),
                       ),
                       child: Column(
@@ -568,10 +569,10 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 LucideIcons.calculator,
                                 size: 16,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -587,9 +588,9 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           const SizedBox(height: 8),
                           if (_enabled)
                             Text(
-                              'On a ₱${sampleOrder.toStringAsFixed(0)} order, the customer pays '
-                              '₱${calculatedFee.toStringAsFixed(2)} platform fee. '
-                              'Total customer checkout: ₱${totalCustomerPays.toStringAsFixed(2)}.',
+                              'On a ${formatPeso(sampleOrder, whole: true)} order, the customer pays '
+                              '${formatPeso(calculatedFee)} platform fee. '
+                              'Total customer checkout: ${formatPeso(totalCustomerPays)}.',
                               style: TextStyle(
                                 fontSize: 13,
                                 height: 1.4,
@@ -637,7 +638,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                                         ? AppUi.warningFg
                                         : AppUi.accentGreen)
                                     .withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: Icon(
                             _maintenanceMode
@@ -670,7 +671,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         color: (_maintenanceMode
                             ? AppUi.warningBg
                             : AppUi.surfaceOf(context)),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         border: Border.all(
                           color: _maintenanceMode
                               ? AppUi.warningFg
@@ -696,8 +697,8 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                                   ? 'MAINTENANCE ACTIVE (Orders Paused)'
                                   : 'SYSTEM OPERATIONAL (Normal)',
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
                                 color: _maintenanceMode
                                     ? AppUi.warningFg
                                     : AppUi.accentGreen,
@@ -764,11 +765,11 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(
+                child: Icon(
                   LucideIcons.truck,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 20,
                 ),
               ),
@@ -785,7 +786,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                     Text(
                       'Global rate per kilometer across all stations. Water station owners cannot customize or override rates.',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13,
                         color: AppUi.textSecondaryOf(context),
                       ),
                     ),
@@ -796,15 +797,15 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   border: Border.all(color: AppUi.bluePrimary.withValues(alpha: 0.3)),
                 ),
-                child: const Text(
+                child: Text(
                   'Admin-Controlled',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                   ),
                 ),
               ),
@@ -819,7 +820,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
               'Enable Distance-Based Delivery Fee',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                fontSize: 14.5,
+                fontSize: 15,
               ),
             ),
             subtitle: Text(
@@ -827,7 +828,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                   ? 'Currently active. Checkout calculates delivery fee by customer route distance.'
                   : 'Currently disabled. Free delivery (₱0.00) applied across all stations.',
               style: TextStyle(
-                fontSize: 12.5,
+                fontSize: 13,
                 color: AppUi.textSecondaryOf(context),
               ),
             ),
@@ -856,20 +857,20 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           children: [
                             const Text(
                               'Rate per Kilometer (₱/km):',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               ),
                               child: Text(
                                 '₱${_deliveryRatePerKm.toStringAsFixed(1)} / km',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 15,
-                                  color: AppUi.bluePrimary,
+                                  color: AppUi.brandOf(context),
                                 ),
                               ),
                             ),
@@ -894,9 +895,9 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                               onSelected: (_) => setState(() => _deliveryRatePerKm = preset),
                               selectedColor: AppUi.bluePrimary.withValues(alpha: 0.2),
                               labelStyle: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 12,
                                 fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                                color: isSel ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
+                                color: isSel ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
                               ),
                             );
                           }).toList(),
@@ -916,22 +917,22 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           children: [
                             const Text(
                               'Minimum Delivery Fee (₱):',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               ),
                               child: Text(
                                 _deliveryMinFee > 0
-                                    ? '₱${_deliveryMinFee.toStringAsFixed(0)}'
+                                    ? formatPeso(_deliveryMinFee, whole: true)
                                     : 'None (₱0)',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 15,
-                                  color: AppUi.bluePrimary,
+                                  color: AppUi.brandOf(context),
                                 ),
                               ),
                             ),
@@ -943,12 +944,12 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           max: 50.0,
                           divisions: 50,
                           activeColor: AppUi.bluePrimary,
-                          label: '₱${_deliveryMinFee.toStringAsFixed(0)}',
+                          label: formatPeso(_deliveryMinFee, whole: true),
                           onChanged: (v) => setState(() => _deliveryMinFee = v),
                         ),
                         Text(
                           'Floor price for short-distance orders. Set to ₱0 to charge pure distance fee.',
-                          style: TextStyle(fontSize: 11.5, color: AppUi.textSecondaryOf(context)),
+                          style: TextStyle(fontSize: 12, color: AppUi.textSecondaryOf(context)),
                         ),
                       ],
                     ),
@@ -965,20 +966,20 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                           children: [
                             const Text(
                               'Minimum Billable Distance:',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               ),
                               child: Text(
                                 '${_deliveryMinDistance.toStringAsFixed(1)} km',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 15,
-                                  color: AppUi.bluePrimary,
+                                  color: AppUi.brandOf(context),
                                 ),
                               ),
                             ),
@@ -995,7 +996,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         ),
                         Text(
                           'Deliveries closer than this distance are billed at this minimum distance.',
-                          style: TextStyle(fontSize: 11.5, color: AppUi.textSecondaryOf(context)),
+                          style: TextStyle(fontSize: 12, color: AppUi.textSecondaryOf(context)),
                         ),
                       ],
                     ),
@@ -1009,7 +1010,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                       children: [
                         const Text(
                           'Distance Rounding Rule:',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                         ),
                         const SizedBox(height: 10),
                         Wrap(
@@ -1042,8 +1043,8 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                               ? 'Round up: 3.2 km is rounded up to 4.0 km.'
                               : _deliveryRoundingRule == 'round'
                                   ? 'Round nearest: 3.2 km → 3.0 km, 3.6 km → 4.0 km.'
-                                  : 'Proportional: Partial kilometers charged accurately (e.g. 3.5 km × ₱${_deliveryRatePerKm.toStringAsFixed(0)} = ₱${(3.5 * _deliveryRatePerKm).toStringAsFixed(2)}).',
-                          style: TextStyle(fontSize: 11.5, color: AppUi.textSecondaryOf(context)),
+                                  : 'Proportional: Partial kilometers charged accurately (e.g. 3.5 km × ${formatPeso(_deliveryRatePerKm, whole: true)} = ${formatPeso((3.5 * _deliveryRatePerKm))}).',
+                          style: TextStyle(fontSize: 12, color: AppUi.textSecondaryOf(context)),
                         ),
                       ],
                     ),
@@ -1059,7 +1060,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppUi.surfaceOf(context),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
               border: Border.all(color: AppUi.borderOf(context)),
             ),
             child: Column(
@@ -1068,13 +1069,13 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(LucideIcons.calculator, size: 18, color: AppUi.bluePrimary),
+                        Icon(LucideIcons.calculator, size: 18, color: AppUi.brandOf(context)),
                         SizedBox(width: 8),
                         Text(
                           'Live Delivery Rate Simulator & Sample Matrix',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                         ),
                       ],
                     ),
@@ -1096,8 +1097,8 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                         margin: const EdgeInsets.only(right: 12),
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: AppUi.blueSoft,
-                          borderRadius: BorderRadius.circular(10),
+                          color: AppUi.brandSoftOf(context),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           border: Border.all(color: AppUi.bluePrimary.withValues(alpha: 0.15)),
                         ),
                         child: Column(
@@ -1108,11 +1109,11 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '₱${fee.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14.5,
-                                color: AppUi.bluePrimary,
+                              formatPeso(fee),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppUi.brandOf(context),
                               ),
                             ),
                           ],
@@ -1131,10 +1132,10 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                     Text(
-                      'Calculated Fee: ₱${_calculateSimulatedFee(_simulatedDistance).toStringAsFixed(2)}',
+                      'Calculated Fee: ${formatPeso(_calculateSimulatedFee(_simulatedDistance))}',
                       style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
                         color: AppUi.accentGreen,
                       ),
                     ),
@@ -1174,7 +1175,7 @@ class _PlatformFeesScreenState extends State<PlatformFeesScreen> {
                       Text(
                         'Reason: $_deliveryFeeReason',
                         style: const TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontStyle: FontStyle.italic,
                           color: AppUi.textMuted,
                         ),

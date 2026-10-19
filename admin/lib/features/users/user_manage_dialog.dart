@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../../services/admin_api_service.dart';
 import '../../widgets/admin_ui.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 Future<bool?> showUserManageDialog(
   BuildContext context, {
   required String userId,
@@ -139,7 +141,7 @@ class _UserManageDialogState extends State<_UserManageDialog> {
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -176,7 +178,7 @@ class _UserManageDialogState extends State<_UserManageDialog> {
       } catch (e) {
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       } finally {
         if (mounted) setState(() => _saving = false);
@@ -211,7 +213,7 @@ class _UserManageDialogState extends State<_UserManageDialog> {
       } catch (e) {
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       } finally {
         if (mounted) setState(() => _saving = false);
@@ -243,7 +245,7 @@ class _UserManageDialogState extends State<_UserManageDialog> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -303,7 +305,7 @@ class _UserManageDialogState extends State<_UserManageDialog> {
                       color: Theme.of(
                         context,
                       ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     ),
                     child: Row(
                       children: [
@@ -314,10 +316,10 @@ class _UserManageDialogState extends State<_UserManageDialog> {
                           ),
                           child: Text(
                             initial,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppUi.bluePrimary,
+                              fontWeight: FontWeight.w700,
+                              color: AppUi.brandOf(context),
                             ),
                           ),
                         ),
@@ -329,14 +331,14 @@ class _UserManageDialogState extends State<_UserManageDialog> {
                               Text(
                                 name,
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 16,
                                 ),
                               ),
                               Text(
                                 email,
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: 13,
                                   color: AppUi.textSecondaryOf(context),
                                 ),
                               ),
@@ -346,13 +348,13 @@ class _UserManageDialogState extends State<_UserManageDialog> {
                         if (_isSuspended)
                           const AdminBadge(
                             label: 'SUSPENDED',
-                            color: Color(0xFFDC2626),
+                            color: AppColors.uiError,
                             icon: LucideIcons.ban,
                           )
                         else
                           const AdminBadge(
                             label: 'ACTIVE',
-                            color: Color(0xFF059669),
+                            color: AppColors.uiSuccess,
                             icon: LucideIcons.circleCheck,
                           ),
                       ],
@@ -447,13 +449,13 @@ class _UserManageDialogState extends State<_UserManageDialog> {
                       icon: const Icon(
                         LucideIcons.trash2,
                         size: 14,
-                        color: Color(0xFFEF4444),
+                        color: AppColors.uiError,
                       ),
                       label: const Text(
                         'Delete User Permanently',
                         style: TextStyle(
-                          color: Color(0xFFEF4444),
-                          fontSize: 12.5,
+                          color: AppColors.uiError,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

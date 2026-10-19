@@ -14,7 +14,7 @@ void main() {
     test(
       'canonical semantic status colors match exact required specification',
       () {
-        expect(OrderStatusColors.pending, const Color(0xFFE58A16));
+        expect(OrderStatusColors.pending, const Color(0xFFB45309));
         expect(OrderStatusColors.confirmed, const Color(0xFF2563EB));
         expect(OrderStatusColors.preparing, const Color(0xFF7C3AED));
         expect(OrderStatusColors.readyForDelivery, const Color(0xFF0F766E));
@@ -29,10 +29,10 @@ void main() {
       'normalizes synonymous and database status strings to canonical colors',
       () {
         // Pending
-        expect(OrderStatusColors.getColor('pending'), const Color(0xFFE58A16));
+        expect(OrderStatusColors.getColor('pending'), const Color(0xFFB45309));
         expect(
           OrderStatusColors.getColor('pending_sync'),
-          const Color(0xFFE58A16),
+          const Color(0xFFB45309),
         );
 
         // Confirmed / Accepted

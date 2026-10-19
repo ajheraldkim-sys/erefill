@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../core/providers/user_provider.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/widgets/skeleton.dart';
 import 'rider_settings_service.dart';
@@ -254,6 +256,67 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 18),
+                      _buildSection(
+                        title: 'Display & Sunlight',
+                        icon: Icons.wb_sunny_outlined,
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Outdoor high-contrast theme'),
+                              subtitle: const Text(
+                                'Pure white background and pitch-black text for direct sunlight on the road.',
+                              ),
+                              value: context.select<ThemeProvider, bool>(
+                                (p) => p.isOutdoorMode,
+                              ),
+                              onChanged: (value) => context
+                                  .read<ThemeProvider>()
+                                  .setOutdoorMode(value),
+                            ),
+                          ),
+                          const Divider(height: 20),
+                          const Text(
+                            'Language / Wika / Pinulongan',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Preferred language for notifications & dispatch',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppUi.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Consumer<AppLanguageProvider>(
+                            builder: (context, langProvider, _) {
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: AppLanguage.values.map((lang) {
+                                  final isSelected = langProvider.language == lang;
+                                  return ChoiceChip(
+                                    label: Text('${lang.label} (${lang.subtitle})'),
+                                    selected: isSelected,
+                                    onSelected: (_) => langProvider.setLanguage(lang),
+                                    selectedColor: AppUi.bluePrimary.withValues(alpha: 0.15),
+                                    labelStyle: TextStyle(
+                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                      color: isSelected ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
                       AppFormSubmitButton(
                         text: 'Save Changes',
@@ -288,13 +351,13 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(icon, size: 18, color: AppUi.bluePrimary),
+                Icon(icon, size: 18, color: AppUi.brandOf(context)),
                 const SizedBox(width: 8),
                 Text(
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],

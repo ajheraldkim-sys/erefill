@@ -9,6 +9,7 @@ import '../../services/admin_api_service.dart';
 import '../../widgets/admin_ui.dart';
 import 'order_detail_screen.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 enum OrderViewMode { cards, table }
 
 class OrdersScreen extends StatefulWidget {
@@ -133,7 +134,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not export orders: $e'),
+          content: Text('Could not export orders: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
         ),
       );
@@ -274,7 +275,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
       sidePanel: _selected == null
           ? null
           : AdminDetailPanel(
-              title: 'Order #${_selected!['id']?.toString().substring(0, 8)}',
+              title:
+                  'Order #${(_selected!['id']?.toString() ?? "").length >= 8 ? (_selected!['id']?.toString() ?? "").substring(0, 8) : (_selected!['id']?.toString() ?? "")}',
               onClose: () => setState(() => _selected = null),
               actions: [
                 Expanded(
@@ -442,7 +444,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: statusColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                                 ),
                                 child: Icon(
                                   LucideIcons.packageCheck,
@@ -454,8 +456,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               Text(
                                 '#$idShort',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
                                   fontFamily: 'monospace',
                                 ),
                               ),
@@ -481,7 +483,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               o['station_name']?.toString() ?? 'Station',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 13.5,
+                                fontSize: 14,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -493,7 +495,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       Text(
                         adminFormatDateTime(o['created_at']),
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12,
                           color: AppUi.textSecondaryOf(context),
                         ),
                       ),
@@ -507,7 +509,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           color: Theme.of(
                             context,
                           ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Row(
@@ -544,10 +546,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 ),
                                 Text(
                                   formatPeso(o['total_amount']),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppUi.bluePrimary,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppUi.brandOf(context),
                                   ),
                                 ),
                               ],

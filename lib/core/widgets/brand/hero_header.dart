@@ -83,7 +83,7 @@ class CustomerHeroHeader extends StatelessWidget {
                         greeting,
                         style: TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: onHero,
                           height: 1.15,
                         ),
@@ -91,7 +91,7 @@ class CustomerHeroHeader extends StatelessWidget {
                       const SizedBox(height: 6),
                       InkWell(
                         onTap: onLocationTap,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Row(
@@ -205,8 +205,8 @@ class _HeroIconButton extends StatelessWidget {
                   badge > 9 ? '9+' : '$badge',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -223,6 +223,8 @@ class OwnerHeroHeader extends StatelessWidget {
   final String location;
   final String availability;
   final VoidCallback? onNotificationTap;
+  final VoidCallback? onChatTap;
+  final int unreadChatCount;
 
   const OwnerHeroHeader({
     super.key,
@@ -230,6 +232,8 @@ class OwnerHeroHeader extends StatelessWidget {
     required this.location,
     required this.availability,
     this.onNotificationTap,
+    this.onChatTap,
+    this.unreadChatCount = 0,
   });
 
   String get _statusLabel => switch (availability) {
@@ -272,7 +276,7 @@ class OwnerHeroHeader extends StatelessWidget {
                         stationName,
                         style: TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: titleColor,
                         ),
                       ),
@@ -302,6 +306,16 @@ class OwnerHeroHeader extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onChatTap != null) ...[
+                  _HeroIconButton(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    label: 'Messages',
+                    onTap: onChatTap,
+                    badge: unreadChatCount,
+                    color: titleColor,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 _NotificationHeroButton(onTap: onNotificationTap),
               ],
             ),
@@ -386,7 +400,7 @@ class RiderHeroHeader extends StatelessWidget {
                     greeting,
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: titleColor,
                     ),
                   ),
@@ -478,7 +492,7 @@ class StationDiscoverHeader extends StatelessWidget {
                         title,
                         style: TextStyle(
                           fontSize: 20,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: titleColor,
                         ),
                       ),
@@ -560,7 +574,7 @@ class TabScreenHeroHeader extends StatelessWidget {
                         title,
                         style: TextStyle(
                           fontSize: 20,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: titleColor,
                         ),
                       ),
@@ -628,7 +642,7 @@ class RefillPromoBanner extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.15,
                       ),
                     ),

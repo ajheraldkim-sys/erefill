@@ -280,16 +280,16 @@ class ERefillHeader extends StatelessWidget implements PreferredSizeWidget {
             height: 34,
             margin: const EdgeInsets.only(left: 8),
             decoration: BoxDecoration(
-              color: AppUi.blueSoft,
+              color: AppUi.brandSoftOf(context),
               shape: BoxShape.circle,
               border: Border.all(color: AppUi.blueBorder, width: 1),
             ),
             child: Center(
               child: Text(
                 initial,
-                style: const TextStyle(
-                  color: AppUi.bluePrimary,
-                  fontWeight: FontWeight.w800,
+                style: TextStyle(
+                  color: AppUi.brandOf(context),
+                  fontWeight: FontWeight.w700,
                   fontSize: 14,
                 ),
               ),
@@ -335,8 +335,8 @@ class ERefillHeader extends StatelessWidget implements PreferredSizeWidget {
                       count > 9 ? '9+' : '$count',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),

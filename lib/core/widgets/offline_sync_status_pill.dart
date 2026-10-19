@@ -1,15 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
+import '../constants.dart';
+import '../services/offline_queue_service.dart';
 import '../../features/dashboard/rider/services/offline_delivery_queue_service.dart';
 
 /// Floating indicator displaying realtime sync status and pending offline operations.
 class OfflineSyncStatusPill extends StatefulWidget {
   final VoidCallback? onSyncTap;
+  final bool showAlways;
 
-  const OfflineSyncStatusPill({super.key, this.onSyncTap});
+  const OfflineSyncStatusPill({
+    super.key,
+    this.onSyncTap,
+    this.showAlways = false,
+  });
 
   @override
   State<OfflineSyncStatusPill> createState() => _OfflineSyncStatusPillState();
@@ -56,9 +64,10 @@ class _OfflineSyncStatusPillState extends State<OfflineSyncStatusPill> {
 
   Future<void> _checkPendingQueue() async {
     try {
-      final count = await OfflineDeliveryQueueService.instance.getPendingCount();
+      final riderCount = await OfflineDeliveryQueueService.instance.getPendingCount();
+      final generalCount = await OfflineQueueService.getPendingCount();
       if (mounted) {
-        setState(() => _pendingCount = count);
+        setState(() => _pendingCount = riderCount + generalCount);
       }
     } catch (_) {}
   }
@@ -72,6 +81,11 @@ class _OfflineSyncStatusPillState extends State<OfflineSyncStatusPill> {
       final syncer = OfflineDeliveryQueueService.instance.onSyncTriggered;
       if (syncer != null) {
         await syncer();
+      }
+      try {
+        await OfflineQueueService.processQueue(Supabase.instance.client);
+      } catch (err) {
+        debugPrint('General offline queue process error: $err');
       }
       widget.onSyncTap?.call();
       await _checkPendingQueue();
@@ -87,32 +101,46 @@ class _OfflineSyncStatusPillState extends State<OfflineSyncStatusPill> {
 
   @override
   Widget build(BuildContext context) {
-    // Only show pill if user is offline OR has pending operations queued
-    if (_isOnline && _pendingCount == 0 && !_isSyncing) {
+    if (!widget.showAlways && _isOnline && _pendingCount == 0 && !_isSyncing) {
       return const SizedBox.shrink();
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // WCAG AA compliant palette:
+    // Green (All synced): 0xFF065F46 text on 0xFFECFDF5 bg (> 7:1)
+    // Amber (Offline or waiting): 0xFF92400E text on 0xFFFEF3C7 bg (> 8:1)
+    final isSynced = _isOnline && _pendingCount == 0 && !_isSyncing;
+
+    final bgColor = isSynced
+        ? (isDark ? const Color(0xFF064E3B) : AppUi.successBg)
+        : (isDark ? const Color(0xFF451A03) : AppUi.warningBg);
+
+    final borderColor = isSynced
+        ? AppColors.uiSuccess.withValues(alpha: 0.6)
+        : AppColors.uiWarning.withValues(alpha: 0.6);
+
+    final fgColor = isSynced
+        ? (isDark ? AppUi.successBorder : AppUi.successFg)
+        : (isDark ? AppUi.warningBorder : AppUi.warningFg);
+
+    final iconColor = isSynced ? AppColors.uiSuccess : AppColors.uiWarning;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: !_isOnline
-            ? (isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB))
-            : (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5)),
-        borderRadius: BorderRadius.circular(20),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(
-          color: !_isOnline
-              ? const Color(0xFFF59E0B).withValues(alpha: 0.6)
-              : const Color(0xFF10B981).withValues(alpha: 0.6),
+          color: borderColor,
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -132,25 +160,27 @@ class _OfflineSyncStatusPillState extends State<OfflineSyncStatusPill> {
             )
           else
             Icon(
-              !_isOnline ? Icons.cloud_off_rounded : Icons.cloud_sync_rounded,
+              isSynced
+                  ? Icons.check_circle_rounded
+                  : (!_isOnline ? Icons.cloud_off_rounded : Icons.cloud_upload_outlined),
               size: 16,
-              color: !_isOnline ? const Color(0xFFD97706) : const Color(0xFF059669),
+              color: iconColor,
             ),
           const SizedBox(width: 8),
           Text(
-            !_isOnline
-                ? (_pendingCount > 0
-                    ? 'Offline Mode • $_pendingCount items queued'
-                    : 'Offline Mode')
-                : (_isSyncing
-                    ? 'Syncing with cloud...'
-                    : 'Online • Sync completed'),
+            isSynced
+                ? 'All synced'
+                : (!_isOnline
+                    ? (_pendingCount > 0
+                        ? 'Offline • $_pendingCount queued'
+                        : 'Offline Mode')
+                    : (_isSyncing
+                        ? 'Syncing with cloud...'
+                        : '$_pendingCount waiting to sync')),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: !_isOnline
-                  ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
-                  : (isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46)),
+              color: fgColor,
             ),
           ),
           if (_pendingCount > 0 && !_isSyncing && _isOnline) ...[
@@ -158,16 +188,18 @@ class _OfflineSyncStatusPillState extends State<OfflineSyncStatusPill> {
             GestureDetector(
               onTap: _triggerSync,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                constraints: const BoxConstraints(minHeight: AppUi.kMinTouchTarget),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.brandPrimary,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
                 child: const Text(
                   'Sync Now',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),

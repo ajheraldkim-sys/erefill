@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 /// A breathing / radar pulsing indicator for live status, active riders, and GPS tracking.
 class PulsingDot extends StatefulWidget {
   final Color color;
@@ -9,7 +10,7 @@ class PulsingDot extends StatefulWidget {
 
   const PulsingDot({
     super.key,
-    this.color = const Color(0xFF16803D), // Emerald green default
+    this.color = AppColors.uiSuccess, // Emerald green default
     this.size = 10,
     this.duration = const Duration(milliseconds: 1600),
     this.showRipple = true,

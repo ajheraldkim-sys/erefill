@@ -133,13 +133,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(LucideIcons.user, size: 18, color: AppUi.bluePrimary),
+                child: Icon(LucideIcons.user, size: 18, color: AppUi.brandOf(context)),
               ),
               title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               subtitle: phone.isNotEmpty
-                  ? Text(phone, style: TextStyle(fontSize: 12.5, color: AppUi.textSecondaryOf(context)))
+                  ? Text(phone, style: TextStyle(fontSize: 13, color: AppUi.textSecondaryOf(context)))
                   : null,
               trailing: const Icon(LucideIcons.chevronRight, size: 16),
               onTap: () => Navigator.pop(ctx, r['id'] as String),

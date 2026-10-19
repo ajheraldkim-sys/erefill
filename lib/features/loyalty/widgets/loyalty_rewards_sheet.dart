@@ -5,6 +5,8 @@ import '../../../core/constants.dart';
 import '../models/loyalty_model.dart';
 import '../services/loyalty_service.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class LoyaltyRewardsSheet extends StatefulWidget {
   final String userId;
 
@@ -95,7 +97,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Friend code applied! +50 bonus points added.'),
-            backgroundColor: Color(0xFF10B981),
+            backgroundColor: AppColors.uiSuccess,
           ),
         );
       }
@@ -115,7 +117,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
         title: const Text('Redeem Reward'),
         content: Text(
           'Redeem "${template.title}" for ${template.pointsCost} points?',
@@ -150,7 +152,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Claimed "${voucher.title}"! Apply it at checkout.'),
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: AppColors.uiSuccess,
             ),
           );
           _tabController.animateTo(1); // switch to My Vouchers tab
@@ -164,7 +166,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Redemption failed: $e')),
+          SnackBar(content: Text('Redemption failed: ${FriendlyErrors.message(e)}')),
         );
       }
     }
@@ -178,8 +180,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: isDark ? AppUi.darkSurfaceRaised : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
       ),
       child: Column(
         children: [
@@ -205,12 +207,12 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(10),
+                        color: AppUi.warningBg,
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                       child: const Icon(
                         Icons.military_tech_rounded,
-                        color: Color(0xFFD97706),
+                        color: AppColors.uiWarning,
                         size: 24,
                       ),
                     ),
@@ -222,7 +224,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                           'Loyalty Rewards',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
@@ -270,7 +272,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                           // Tab Bar
                           TabBar(
                             controller: _tabController,
-                            labelColor: AppUi.bluePrimary,
+                            labelColor: AppUi.brandOf(context),
                             unselectedLabelColor: Colors.grey,
                             indicatorColor: AppUi.bluePrimary,
                             indicatorWeight: 3,
@@ -311,15 +313,11 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: AppUi.bluePrimary,
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+            color: AppUi.bluePrimary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -343,12 +341,12 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                    Icon(Icons.star_rounded, color: AppColors.uiWarning, size: 14),
                     SizedBox(width: 4),
                     Text(
                       'Member Tier',
@@ -373,7 +371,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 38,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: -1,
                 ),
               ),
@@ -421,9 +419,9 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF86EFAC)),
+        color: AppUi.successBg,
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+        border: Border.all(color: AppUi.successBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,7 +430,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
             children: [
               const Icon(
                 Icons.people_alt_rounded,
-                color: Color(0xFF16A34A),
+                color: AppColors.uiSuccess,
                 size: 22,
               ),
               const SizedBox(width: 8),
@@ -440,8 +438,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 child: Text(
                   'Refer Friends & Earn 50 Points Each!',
                   style: TextStyle(
-                    color: Color(0xFF15803D),
-                    fontWeight: FontWeight.w800,
+                    color: AppColors.uiSuccess,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
                 ),
@@ -452,7 +450,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           const Text(
             'Share your unique code with family or neighbors. When they enter it, both of you receive +50 points!',
             style: TextStyle(
-              color: Color(0xFF166534),
+              color: AppUi.successFg,
               fontSize: 11,
               height: 1.35,
             ),
@@ -465,8 +463,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF86EFAC)),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                    border: Border.all(color: AppUi.successBorder),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -474,10 +472,10 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       Text(
                         refCode,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                           fontSize: 15,
                           letterSpacing: 1.5,
-                          color: Color(0xFF15803D),
+                          color: AppColors.uiSuccess,
                         ),
                       ),
                       InkWell(
@@ -493,7 +491,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                         child: const Icon(
                           Icons.copy_rounded,
                           size: 18,
-                          color: Color(0xFF15803D),
+                          color: AppColors.uiSuccess,
                         ),
                       ),
                     ],
@@ -514,11 +512,11 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
+                  backgroundColor: AppColors.uiSuccess,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(0, 42),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
@@ -537,7 +535,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF15803D),
+                    color: AppColors.uiSuccess,
                   ),
                 ),
               ),
@@ -561,8 +559,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF86EFAC)),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                        borderSide: const BorderSide(color: AppUi.successBorder),
                       ),
                     ),
                   ),
@@ -571,11 +569,11 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 ElevatedButton(
                   onPressed: _isRedeemingCode ? null : _redeemFriendCode,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF15803D),
+                    backgroundColor: AppColors.uiSuccess,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(0, 42),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                   ),
                   child: _isRedeemingCode
@@ -599,8 +597,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   style: TextStyle(
                     fontSize: 11,
                     color: _codeRedemptionMsg!.contains('Success')
-                        ? const Color(0xFF15803D)
-                        : Colors.redAccent,
+                        ? AppColors.uiSuccess
+                        : AppColors.uiError,
                   ),
                 ),
               ),
@@ -625,7 +623,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             border: Border.all(
               color: canAfford
                   ? AppUi.bluePrimary.withValues(alpha: 0.3)
@@ -646,7 +644,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   reward.isDeliveryDiscount
                       ? Icons.local_shipping_rounded
                       : Icons.local_offer_rounded,
-                  color: canAfford ? AppUi.bluePrimary : Colors.grey,
+                  color: canAfford ? AppUi.brandOf(context) : Colors.grey,
                   size: 24,
                 ),
               ),
@@ -659,7 +657,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       reward.title,
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -675,7 +673,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       children: [
                         const Icon(
                           Icons.stars_rounded,
-                          color: Color(0xFFD97706),
+                          color: AppColors.uiWarning,
                           size: 14,
                         ),
                         const SizedBox(width: 4),
@@ -684,7 +682,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFD97706),
+                            color: AppColors.uiWarning,
                           ),
                         ),
                       ],
@@ -702,7 +700,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   disabledForegroundColor: Colors.grey,
                   minimumSize: const Size(0, 36),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -735,7 +733,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
             const SizedBox(height: 12),
             const Text(
               'No active vouchers yet',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
             const SizedBox(height: 4),
             const Text(
@@ -758,8 +756,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+            border: Border.all(color: AppColors.uiSuccess.withValues(alpha: 0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -772,21 +770,21 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       v.title,
                       style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
+                      color: AppColors.uiSuccess.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppUi.radiusSm),
                     ),
                     child: const Text(
                       'Ready to Use',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF10B981),
+                        color: AppColors.uiSuccess,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -806,7 +804,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                     'Code: ${v.code}',
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 1.0,
                     ),
                   ),
@@ -845,11 +843,11 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           leading: CircleAvatar(
             radius: 16,
             backgroundColor: isPositive
-                ? const Color(0xFF10B981).withValues(alpha: 0.1)
-                : Colors.redAccent.withValues(alpha: 0.1),
+                ? AppColors.uiSuccess.withValues(alpha: 0.1)
+                : AppColors.uiError.withValues(alpha: 0.1),
             child: Icon(
               isPositive ? Icons.add_rounded : Icons.remove_rounded,
-              color: isPositive ? const Color(0xFF10B981) : Colors.redAccent,
+              color: isPositive ? AppColors.uiSuccess : AppColors.uiError,
               size: 16,
             ),
           ),
@@ -864,8 +862,8 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           trailing: Text(
             '${isPositive ? '+' : ''}${tx.points} pts',
             style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: isPositive ? const Color(0xFF10B981) : Colors.redAccent,
+              fontWeight: FontWeight.w700,
+              color: isPositive ? AppColors.uiSuccess : AppColors.uiError,
               fontSize: 13,
             ),
           ),

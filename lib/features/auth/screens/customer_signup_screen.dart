@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class CustomerSignupScreen extends StatefulWidget {
   const CustomerSignupScreen({super.key});
 
@@ -60,7 +61,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
+        backgroundColor: isError ? AppColors.uiError : null,
       ),
     );
   }
@@ -134,7 +135,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
         title: Text(
           'Account Already Exists',
           style: TextStyle(
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(ctx),
           ),
         ),
@@ -273,34 +274,157 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
     super.dispose();
   }
 
+  Future<bool> _showLocationPermissionRationale() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
+            backgroundColor: AppUi.surfaceOf(ctx),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppUi.blueSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.location_on_rounded,
+                    color: AppUi.brandOf(context),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Location Access',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: AppUi.textPrimaryOf(ctx),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'We use your location to find open refill stations nearest to your home in Cantilan and Madrid, calculate accurate delivery fees, and guide riders directly to your doorstep.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppUi.textSecondaryOf(ctx),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'If you decline, you can easily pick your Municipality, Barangay, and Purok manually.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppUi.textPrimaryOf(ctx),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Select Manually'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppUi.bluePrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppUi.controlRadius,
+                  ),
+                ),
+                child: const Text('Allow Location'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   Future<void> _locateMe() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Location service is turned off. Please select your barangay and purok manually below.',
+          ),
+        ),
+      );
+      return;
     }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      final proceed = await _showLocationPermissionRationale();
+      if (!proceed) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No problem! You can select your Municipality and Barangay from the list.',
+            ),
+          ),
+        );
+        return;
+      }
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location permission declined. Please select your Barangay and Purok manually below.',
+            ),
+          ),
+        );
+        return;
+      }
+    } else if (permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Location is disabled in app settings. Please select your Barangay manually below.',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Locating you...'),
+        content: Text('Locating your home in Cantilan/Madrid...'),
         duration: Duration(seconds: 1),
       ),
     );
 
-    final position = await Geolocator.getCurrentPosition();
-    if (!mounted) return;
-    final newLoc = LatLng(position.latitude, position.longitude);
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      final newLoc = LatLng(position.latitude, position.longitude);
 
-    setState(() => _pickedLocation = newLoc);
-    _mapController.move(newLoc, 16);
+      setState(() => _pickedLocation = newLoc);
+      _mapController.move(newLoc, 16);
+    } catch (e) {
+      debugPrint('Location lookup failed: $e');
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -436,13 +560,13 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                   selected: selected,
                   onSelected: (_) =>
                       setState(() => _selectedWaterType = type.name),
-                  selectedColor: AppUi.blueSoft,
+                  selectedColor: AppUi.brandSoftOf(context),
                   labelStyle: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: selected ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
+                    color: selected ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
                   ),
                   side: BorderSide(
-                    color: selected ? AppUi.bluePrimary : Colors.transparent,
+                    color: selected ? AppUi.brandOf(context) : Colors.transparent,
                   ),
                 );
               }).toList(),
@@ -463,6 +587,64 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppUi.brandSoftOf(context),
+                borderRadius: AppUi.cardRadius,
+                border: Border.all(color: AppUi.blueBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        color: AppUi.brandOf(context),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Delivery Address Setup',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: AppUi.bluePrimaryDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Use GPS to locate your home, or select your Barangay and Purok manually below.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppUi.textSecondaryOf(context),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 40,
+                    child: OutlinedButton.icon(
+                      onPressed: _locateMe,
+                      icon: const Icon(Icons.my_location_rounded, size: 16),
+                      label: const Text('Use My GPS Location'),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppUi.brandOf(context),
+                        side: const BorderSide(color: AppUi.bluePrimary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             _sectionHeader('Area Selection'),
             const SizedBox(height: 16),
             _buildDropdownField(
@@ -519,7 +701,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                       padding: EdgeInsets.only(bottom: 35),
                       child: Icon(
                         Icons.location_on_rounded,
-                        color: Colors.red,
+                        color: AppColors.uiError,
                         size: 42,
                         shadows: [
                           Shadow(
@@ -537,7 +719,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                     child: FloatingActionButton.small(
                       onPressed: _locateMe,
                       backgroundColor: AppUi.surfaceOf(context),
-                      foregroundColor: Colors.red,
+                      foregroundColor: AppColors.uiError,
                       child: const Icon(Icons.my_location_rounded, size: 20),
                     ),
                   ),
@@ -549,7 +731,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               child: Text(
                 "Slide map to point the exact location",
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   color: AppUi.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
@@ -623,7 +805,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                     'or fast signup',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textSecondaryOf(context),
                       letterSpacing: 0,
                     ),
@@ -720,7 +902,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                     child: ElevatedButton(
                       onPressed: _nextStep,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: AppColors.uiSuccess,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppUi.radiusControl),
@@ -733,7 +915,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                             : "Continue to Next Step",
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -762,12 +944,12 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                         context.openLogin();
                       }
                     },
-                    child: const Text(
+                    child: Text(
                       "Sign In",
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppUi.bluePrimary,
-                        fontWeight: FontWeight.w800,
+                        color: AppUi.brandOf(context),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -785,7 +967,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
       title,
       style: TextStyle(
         fontSize: 11,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         color: AppUi.textSecondaryOf(context),
         letterSpacing: 0,
       ),
@@ -845,8 +1027,8 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
           decoration: InputDecoration(
             labelText: label,
             floatingLabelBehavior: FloatingLabelBehavior.auto,
-            floatingLabelStyle: const TextStyle(
-              color: AppUi.bluePrimary,
+            floatingLabelStyle: TextStyle(
+              color: AppUi.brandOf(context),
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -938,7 +1120,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
         labelStyle: TextStyle(
           color: AppUi.textSecondaryOf(context),
           fontSize: 12,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
           letterSpacing: 0,
         ),
         prefixIcon: Icon(
@@ -996,7 +1178,7 @@ class _SocialSignupTile extends StatelessWidget {
           label,
           style: TextStyle(
             color: AppUi.textPrimaryOf(context),
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             fontSize: 14,
           ),
         ),

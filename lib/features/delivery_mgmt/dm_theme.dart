@@ -43,19 +43,19 @@ class DmColors {
 class DmText {
   static TextStyle h1Of(BuildContext context) => TextStyle(
     fontSize: 24,
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w700,
     color: DmColors.textPrimaryOf(context),
     letterSpacing: 0,
   );
   static TextStyle h2Of(BuildContext context) => TextStyle(
     fontSize: 18,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w700,
     color: DmColors.textPrimaryOf(context),
     letterSpacing: 0,
   );
   static TextStyle h3Of(BuildContext context) => TextStyle(
     fontSize: 15,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w700,
     color: DmColors.textPrimaryOf(context),
   );
   static TextStyle bodyOf(BuildContext context) => TextStyle(
@@ -76,19 +76,19 @@ class DmText {
 
   static const h1 = TextStyle(
     fontSize: 24,
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w700,
     color: DmColors.textPrimary,
     letterSpacing: 0,
   );
   static const h2 = TextStyle(
     fontSize: 18,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w700,
     color: DmColors.textPrimary,
     letterSpacing: 0,
   );
   static const h3 = TextStyle(
     fontSize: 15,
-    fontWeight: FontWeight.w800,
+    fontWeight: FontWeight.w700,
     color: DmColors.textPrimary,
   );
   static const body = TextStyle(
@@ -254,7 +254,7 @@ class DmUi {
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppUi.radiusControl),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -325,7 +325,7 @@ class DmUi {
                   label,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -361,7 +361,7 @@ class DmUi {
           name.isNotEmpty ? name[0].toUpperCase() : '?',
           style: TextStyle(
             fontSize: size * 0.42,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: color,
           ),
         ),

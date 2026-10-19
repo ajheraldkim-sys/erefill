@@ -119,15 +119,20 @@ class AppConstants {
   };
 }
 
+/// eRefill design tokens — the single source of truth for color, radius,
+/// spacing, type, motion and elevation. See `design-system/MASTER.md`.
+///
+/// Every text/background pair below is verified against WCAG 2.2 AA
+/// (4.5:1 for body text, 3:1 for icons and large text).
 class AppUi {
-  // Premium coastal palette
-  static const Color bluePrimary = Color(0xFF0F71C3);
+  // ── Brand (water blue) ─────────────────────────────────────────
+  static const Color bluePrimary = Color(0xFF0F71C3); // 5.0:1 on white
   static const Color bluePrimaryDark = Color(0xFF0C5BA0);
-  static const Color blueSoft = Color(0xFFE8F3FC);
+  static const Color blueSoft = Color(0xFFEEF6FD); // brand text 4.6:1
   static const Color blueBorder = Color(0xFFBAD7F2);
   static const Color bluePale = Color(0xFFF1F7FD);
   static const Color deepBlue = Color(0xFF10283B);
-  static const Color accentCyan = Color(0xFF42C2C8);
+  static const Color accentCyan = Color(0xFF42C2C8); // dark-mode primary
   static const Color accentGreen = Color(0xFF21866A);
 
   /// Legacy aliases
@@ -137,38 +142,104 @@ class AppUi {
   static const Color tealBorder = blueBorder;
   static const Color tealPale = bluePale;
 
+  // ── Neutrals (slate) ───────────────────────────────────────────
   static const Color surface = Colors.white;
-  static const Color pageBg = Color(0xFFF5F7F8);
-  static const Color lightSurfaceRaised = Color(0xFFEDF2F3);
-  static const Color darkPageBg = Color(0xFF0B1215);
-  static const Color darkSurface = Color(0xFF121D21);
-  static const Color darkSurfaceRaised = Color(0xFF1B2A2F);
-  static const Color textPrimary = Color(0xFF17252A);
-  static const Color textSecondary = Color(0xFF64777D);
-  static const Color textMuted = Color(0xFF829398);
-  static const Color textDisabled = Color(0xFFC9D1DD);
-  static const Color navUnselected = Color(0xFFA0B2B7);
+  static const Color pageBg = Color(0xFFF8FAFC);
+  static const Color lightSurfaceRaised = Color(0xFFF1F5F9);
+  static const Color darkPageBg = Color(0xFF0B1220);
+  static const Color darkSurface = Color(0xFF111A2B);
+  static const Color darkSurfaceRaised = Color(0xFF1A2538);
+  static const Color textPrimary = Color(0xFF0F172A); // 17.9:1
+  static const Color textSecondary = Color(0xFF475569); // 7.6:1
+  static const Color textMuted = Color(0xFF5B6B80); // 5.0:1 on raised
+  static const Color textDisabled = Color(0xFF94A3B8);
+  static const Color navUnselected = Color(0xFF5B6B80);
+  static const Color darkTextPrimary = Color(0xFFF1F5F9);
+  static const Color darkTextSecondary = Color(0xFFA8B4C6);
+  static const Color darkTextMuted = Color(0xFF8E9BB0);
 
-  static const Color successBg = Color(0xFFE8F5EF);
-  static const Color successFg = Color(0xFF17664F);
-  static const Color warningBg = Color(0xFFFFF4DF);
-  static const Color warningFg = Color(0xFF85520F);
-  static const Color error = Color(0xFFC2414B);
+  // ── Semantic feedback ──────────────────────────────────────────
+  static const Color successBg = Color(0xFFDCFCE7);
+  static const Color successFg = Color(0xFF166534);
+  static const Color warningBg = Color(0xFFFEF3C7);
+  static const Color warningFg = Color(0xFF92400E);
+  static const Color errorBg = Color(0xFFFEE2E2);
+  static const Color error = Color(0xFFDC2626); // 4.8:1 on white
+  static const Color errorFg = Color(0xFFB91C1C); // 5.3:1 on errorBg
+  static const Color infoBg = blueSoft;
+  static const Color info = bluePrimary;
+  // Tint borders (light) and readable foregrounds on dark surfaces.
+  static const Color successBorder = Color(0xFFBBF7D0);
+  static const Color warningBorder = Color(0xFFFDE68A);
+  static const Color errorBorder = Color(0xFFFECACA);
+  static const Color successFgDark = Color(0xFF6EE7B7);
+  static const Color warningFgDark = Color(0xFFFCD34D);
+  static const Color errorFgDark = Color(0xFFFCA5A5);
+  static const Color infoFgDark = Color(0xFF93C5FD);
 
+  // ── Radius scale ───────────────────────────────────────────────
+  // xs 4 · sm 6 · control 8 · card 12 · sheet 16 · pill 24 · full 999
+  static const double radiusXs = 4;
   static const double radius = 8;
   static const double radiusSm = 6;
   static const double radiusMd = 8;
   static const double radiusLgValue = 12;
   static const double radiusControl = 8;
   static const double radiusCard = 12;
-  static const double radiusDialog = 12;
+  static const double radiusDialog = 16;
   static const double radiusPill = 24;
   static const double radiusSheet = 16;
+  static const double radiusFull = 999;
   static const double cardElevation = 0;
-  static const double spacingXs = 6;
-  static const double spacingSm = 10;
-  static const double spacingMd = 14;
-  static const double spacingLg = 18;
+  static const double space4 = 4.0;
+  static const double space8 = 8.0;
+  static const double space12 = 12.0;
+  static const double space16 = 16.0;
+  static const double space24 = 24.0;
+  static const double space32 = 32.0;
+
+  /// Standard touch target dimensions:
+  /// - kMinTouchTarget (48dp): WCAG AA minimum for all interactive elements
+  /// - kRiderTouchTarget (56dp): Large target for one-handed rider & transit operation
+  static const double kMinTouchTarget = 48.0;
+  static const double kRiderTouchTarget = 56.0;
+
+  // ── Control dimensions ─────────────────────────────────────────
+  static const double buttonHeightSm = 40;
+  static const double buttonHeight = 48;
+  static const double buttonHeightLg = 56;
+  static const double inputHeight = 48;
+  static const double iconSm = 16;
+  static const double iconMd = 20;
+  static const double iconLg = 24;
+
+  // ── Motion ─────────────────────────────────────────────────────
+  static const Duration motionFast = Duration(milliseconds: 150);
+  static const Duration motionBase = Duration(milliseconds: 200);
+  static const Duration motionSlow = Duration(milliseconds: 300);
+  static const Curve motionCurve = Curves.easeOutCubic;
+
+  /// Honors the OS "reduce motion" setting; use [Duration.zero] when true.
+  static bool reduceMotion(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  static Duration motion(BuildContext context, [Duration d = motionBase]) =>
+      reduceMotion(context) ? Duration.zero : d;
+
+  // ── Elevation ──────────────────────────────────────────────────
+  // Borders do the separation work; shadows are reserved for overlays.
+  static const List<BoxShadow> shadowSm = [
+    BoxShadow(color: Color(0x0A0F172A), blurRadius: 4, offset: Offset(0, 1)),
+  ];
+  static const List<BoxShadow> shadowMd = [
+    BoxShadow(color: Color(0x140F172A), blurRadius: 16, offset: Offset(0, 4)),
+  ];
+
+  // ── Spacing (4pt grid) ─────────────────────────────────────────
+  static const double spacingXs = 4;
+  static const double spacingSm = 8;
+  static const double spacingMd = 12;
+  static const double spacingLg = 16;
   static const double spacingXl = 24;
   static const double spacing2xl = 32;
   static const double screenPadding = 16;
@@ -213,6 +284,7 @@ class AppUi {
   static BorderRadius get cardRadius => BorderRadius.circular(radiusCard);
   static BorderRadius get dialogRadius => BorderRadius.circular(radiusDialog);
   static BorderRadius get pillRadius => BorderRadius.circular(radiusPill);
+  static BorderRadius get fullRadius => BorderRadius.circular(radiusFull);
   static const BorderRadius radiusSheetTop = BorderRadius.vertical(
     top: Radius.circular(radiusSheet),
   );
@@ -222,8 +294,8 @@ class AppUi {
 
   static const TextStyle headerTitleStyle = TextStyle(
     fontSize: 19,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.2,
   );
 
   static const TextStyle headerSubtitleStyle = TextStyle(
@@ -235,18 +307,18 @@ class AppUi {
   /// Consistent typography scale for screens and sections.
   static const TextStyle screenTitle = TextStyle(
     fontSize: 19,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.2,
   );
   static const TextStyle sectionTitle = TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w800,
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
     letterSpacing: 0,
   );
   static const TextStyle bodyText = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w500,
-    height: 1.4,
+    height: 1.5,
   );
   static const TextStyle captionText = TextStyle(
     fontSize: 12,
@@ -257,26 +329,37 @@ class AppUi {
 
   static BoxDecoration cardDecoration = BoxDecoration(
     color: surface,
-    borderRadius: radiusLg,
-    boxShadow: const [
-      BoxShadow(color: Color(0x08000000), blurRadius: 12, offset: Offset(0, 4)),
-    ],
+    borderRadius: cardRadius,
+    border: Border.all(color: borderLight),
   );
 
   static BoxDecoration flatCardDecoration = BoxDecoration(
     color: surface,
-    borderRadius: radiusLg,
+    borderRadius: cardRadius,
   );
 
   static BoxDecoration flatCardDecorationOf(BuildContext context) =>
-      BoxDecoration(color: surfaceOf(context), borderRadius: radiusLg);
+      BoxDecoration(color: surfaceOf(context), borderRadius: cardRadius);
 
   /// Refined 1px border tokens for crisp contrast across light and dark modes.
   static const Color borderLight = Color(0xFFE2E8F0);
-  static const Color borderDark = Color(0xFF243237);
+  static const Color borderStrongLight = Color(0xFFCBD5E1);
+  static const Color borderDark = Color(0xFF26334A);
   static const Color borderColor = borderLight;
   static bool isDark(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark;
+
+  /// Brand accent that stays readable in both modes (cyan on dark).
+  static Color brandOf(BuildContext context) =>
+      isDark(context) ? accentCyan : bluePrimary;
+
+  /// Soft brand tint for icon tiles, selected chips and tonal buttons.
+  static Color brandSoftOf(BuildContext context) =>
+      isDark(context) ? accentCyan.withValues(alpha: 0.16) : blueSoft;
+
+  /// Text/icon color on [brandSoftOf].
+  static Color onBrandSoftOf(BuildContext context) =>
+      isDark(context) ? accentCyan : bluePrimaryDark;
 
   static Color surfaceOf(BuildContext context) =>
       Theme.of(context).colorScheme.surface;
@@ -304,11 +387,11 @@ class AppUi {
     final themeColor = Theme.of(context).textTheme.bodyLarge?.color;
     if (themeColor != null) {
       if (isDark && themeColor.computeLuminance() < 0.25) {
-        return const Color(0xFFF0F4F6);
+        return darkTextPrimary;
       }
       return themeColor;
     }
-    return isDark ? const Color(0xFFF0F4F6) : textPrimary;
+    return isDark ? darkTextPrimary : textPrimary;
   }
 
   static Color textSecondaryOf(BuildContext context) {
@@ -316,11 +399,11 @@ class AppUi {
     final themeColor = Theme.of(context).textTheme.bodyMedium?.color;
     if (themeColor != null) {
       if (isDark && themeColor.computeLuminance() < 0.25) {
-        return const Color(0xFFA0B2B7);
+        return darkTextSecondary;
       }
       return themeColor;
     }
-    return isDark ? const Color(0xFFA0B2B7) : textSecondary;
+    return isDark ? darkTextSecondary : textSecondary;
   }
 
   static Color chipBgOf(BuildContext context) =>
@@ -386,29 +469,29 @@ class AppUi {
       filled: true,
       fillColor: surfaceOf(context),
       border: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: BorderSide(color: borderOf(context)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: BorderSide(color: borderOf(context)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: BorderSide(
           color: isDark ? accentCyan : bluePrimary,
           width: 2,
         ),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: error),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: error, width: 2),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 
@@ -437,7 +520,7 @@ class AppUi {
       prefixIcon: prefixIcon,
       labelText: hint,
       labelStyle: const TextStyle(
-        color: textMuted,
+        color: textSecondary,
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
@@ -449,33 +532,33 @@ class AppUi {
         letterSpacing: 0,
       ),
       hintStyle: const TextStyle(
-        color: textMuted,
+        color: textSecondary,
         fontWeight: FontWeight.w500,
         fontSize: 14,
       ),
       filled: true,
       fillColor: surface,
       border: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: bluePrimary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: error),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: cardRadius,
+        borderRadius: controlRadius,
         borderSide: const BorderSide(color: error, width: 2),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }
 }

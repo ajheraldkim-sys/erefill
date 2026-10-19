@@ -274,8 +274,8 @@ class NotificationProvider extends ChangeNotifier {
         );
         return;
       }
-    } catch (e) {
-      debugPrint('Error invoking get_user_notification_counts RPC: $e (using fallback)');
+    } catch (_) {
+      // get_user_notification_counts RPC not present; fallback below takes over
     }
 
     // Resilient Fallback 1: get_total_unread_chat_count RPC

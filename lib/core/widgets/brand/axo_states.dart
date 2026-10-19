@@ -60,7 +60,7 @@ class EmptyStateCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           Text(
@@ -135,11 +135,11 @@ class QuickTipCard extends StatelessWidget {
                 height: 52,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppUi.blueSoft,
+                  color: AppUi.brandSoftOf(context),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.water_drop_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 26,
                 ),
               ),
@@ -152,8 +152,8 @@ class QuickTipCard extends StatelessWidget {
                       'Quick tip',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppUi.bluePrimary,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.brandOf(context),
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -168,7 +168,7 @@ class QuickTipCard extends StatelessWidget {
                 ),
               ),
               if (trailingIcon != null)
-                Icon(trailingIcon, color: AppUi.bluePrimary, size: 22),
+                Icon(trailingIcon, color: AppUi.brandOf(context), size: 22),
             ],
           ),
         ),

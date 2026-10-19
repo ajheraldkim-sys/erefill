@@ -7,6 +7,7 @@ import 'app_cached_image.dart';
 import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
+import 'package:erefill/core/utils/money.dart';
 /// Full-width search field for finding nearby water stations.
 class RefillSearchBar extends StatelessWidget {
   final String hint;
@@ -178,20 +179,24 @@ class StationCard extends StatelessWidget {
         ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
     final photoUrl = station['station_photo_url']?.toString();
 
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: AppUi.cardRadius,
-      child: InkWell(
-        onTap: onTap,
+    final bool isClosed = availability.toLowerCase() == 'closed';
+
+    return Opacity(
+      opacity: isClosed ? 0.65 : 1.0,
+      child: Material(
+        color: AppUi.surfaceOf(context),
         borderRadius: AppUi.cardRadius,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: AppUi.cardRadius,
-            border: Border.all(color: AppUi.borderOf(context)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppUi.cardRadius,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: AppUi.cardRadius,
+              border: Border.all(color: AppUi.borderOf(context)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Expanded(
                 child: Stack(
                   children: [
@@ -199,7 +204,7 @@ class StationCard extends StatelessWidget {
                       width: double.infinity,
                       clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
-                        color: AppUi.blueSoft,
+                        color: AppUi.brandSoftOf(context),
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(AppUi.radiusCard),
                         ),
@@ -251,11 +256,23 @@ class StationCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppUi.sectionTitle.copyWith(fontSize: 13),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppUi.sectionTitle.copyWith(fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Icon(
+                          Icons.verified_rounded,
+                          size: 13,
+                          color: AppUi.brandOf(context),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -269,7 +286,7 @@ class StationCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+                        const Icon(Icons.star_rounded, size: 14, color: AppColors.uiWarning),
                         const SizedBox(width: 3),
                         Text(
                           rating > 0 ? rating.toStringAsFixed(1) : 'New',
@@ -281,10 +298,10 @@ class StationCard extends StatelessWidget {
                           const Spacer(),
                           Text(
                             '₱${_formatPrice(price)}/gal',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
                               fontSize: 11,
-                              color: AppUi.bluePrimary,
+                              color: AppUi.brandOf(context),
                             ),
                           ),
                         ] else ...[
@@ -305,6 +322,7 @@ class StationCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -319,21 +337,24 @@ class StationCard extends StatelessWidget {
         station['station_availability']?.toString() ??
         ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
     final photoUrl = station['station_photo_url']?.toString();
+    final bool isClosed = availability.toLowerCase() == 'closed';
 
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: AppUi.cardRadius,
-      child: InkWell(
-        onTap: onTap,
+    return Opacity(
+      opacity: isClosed ? 0.65 : 1.0,
+      child: Material(
+        color: AppUi.surfaceOf(context),
         borderRadius: AppUi.cardRadius,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: AppUi.cardDecorationOf(context),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppUi.cardRadius,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: AppUi.cardDecorationOf(context),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 child: SizedBox(
                   width: 68,
                   height: 68,
@@ -400,17 +421,46 @@ class StationCard extends StatelessWidget {
                     ],
                     const SizedBox(height: 8),
                     Wrap(
-                      spacing: 10,
+                      spacing: 8,
                       runSpacing: 6,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         StationAvailabilityBadge(availability: availability),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppUi.bluePrimary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(AppUi.radiusSm),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_rounded,
+                                size: 12,
+                                color: AppUi.brandOf(context),
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Sanitary Verified',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0369A1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         _StationCardMeta(
                           icon: Icons.star_rounded,
                           label: reviewCount > 0
                               ? '${rating.toStringAsFixed(1)} · $reviewCount reviews'
                               : 'New station',
-                          iconColor: const Color(0xFFF59E0B),
+                          iconColor: AppColors.uiWarning,
                         ),
                         if (distanceLabel != null &&
                             distanceLabel!.isNotEmpty)
@@ -427,7 +477,7 @@ class StationCard extends StatelessWidget {
                           : 'Price not listed',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             color: price != null && price > 0
-                                ? AppUi.bluePrimary
+                                ? AppUi.brandOf(context)
                                 : AppUi.textSecondaryOf(context),
                             fontWeight: FontWeight.w700,
                           ),
@@ -444,6 +494,7 @@ class StationCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -473,14 +524,14 @@ class StationCard extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.water_drop_rounded,
                 size: 28,
                 color: AppUi.bluePrimary,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Water Station',
               style: TextStyle(
                 fontSize: 11,
@@ -567,12 +618,31 @@ class StationAvailabilityBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppUi.radiusSm),
         border: Border.all(color: fg.withValues(alpha: 0.25), width: 1),
       ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: fg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            normalized == 'open'
+                ? Icons.check_circle_rounded
+                : (normalized == 'busy'
+                    ? Icons.access_time_rounded
+                    : Icons.circle),
+            size: 9,
+            color: fg,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -607,7 +677,7 @@ class QuickOrderCard extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
                 child: const Icon(
                   Icons.flash_on_rounded,
@@ -624,7 +694,7 @@ class QuickOrderCard extends StatelessWidget {
                       'Quick order',
                       style: TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 16,
                       ),
                     ),
@@ -713,7 +783,7 @@ class DashboardStatCard extends StatelessWidget {
                     colors: [accent, accent.withValues(alpha: 0.35)],
                   ),
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
+                    top: Radius.circular(AppUi.radiusCard),
                   ),
                 ),
               ),
@@ -728,7 +798,7 @@ class DashboardStatCard extends StatelessWidget {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: Icon(icon, size: 18, color: accent),
                         ),
@@ -743,13 +813,13 @@ class DashboardStatCard extends StatelessWidget {
                               color: isPositive
                                   ? AppUi.accentGreen.withValues(alpha: 0.12)
                                   : AppUi.error.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(99),
+                              borderRadius: BorderRadius.circular(AppUi.radiusFull),
                             ),
                             child: Text(
                               delta!,
                               style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
                                 color: isPositive
                                     ? AppUi.accentGreen
                                     : AppUi.error,
@@ -778,7 +848,7 @@ class DashboardStatCard extends StatelessWidget {
                         key: ValueKey(value),
                         style: TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textPrimaryOf(context),
                         ),
                       ),
@@ -937,7 +1007,7 @@ class ActiveOrderCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 15,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -945,9 +1015,9 @@ class ActiveOrderCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '₱${total.toStringAsFixed(0)}',
+                    formatPeso(total, whole: true),
                     style: TextStyle(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
                       color: statusColor,
                     ),
@@ -1019,7 +1089,7 @@ class ActiveOrderCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppColors.uiWarningBg,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                   child: const Row(
                     children: [
@@ -1028,7 +1098,7 @@ class ActiveOrderCard extends StatelessWidget {
                       Text(
                         'Awaiting online payment',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.uiWarning,
                         ),
@@ -1083,7 +1153,7 @@ class ActiveOrderCard extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: isDone ? FontWeight.w700 : FontWeight.w500,
             color: isDone ? AppUi.textPrimaryOf(context) : AppUi.textMuted,
           ),

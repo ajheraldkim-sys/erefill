@@ -6,6 +6,7 @@ import '../constants.dart';
 import '../routing/app_navigation.dart';
 import '../providers/theme_provider.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 class RoleMenuAction {
   final IconData icon;
   final String title;
@@ -47,7 +48,7 @@ void showRoleMenuSheet(
             child: Material(
               color: AppUi.surfaceOf(sheetContext),
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(26),
+                top: Radius.circular(AppUi.radiusPill),
               ),
               clipBehavior: Clip.antiAlias,
               child: SingleChildScrollView(
@@ -62,7 +63,7 @@ void showRoleMenuSheet(
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(
                           color: AppUi.textMuted.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(99),
+                          borderRadius: BorderRadius.circular(AppUi.radiusFull),
                         ),
                       ),
                       Row(
@@ -82,9 +83,9 @@ void showRoleMenuSheet(
                               backgroundColor: AppUi.bluePrimary.withValues(
                                 alpha: 0.12,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.person_rounded,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -100,7 +101,7 @@ void showRoleMenuSheet(
                                   style: TextStyle(
                                     color: AppUi.textPrimaryOf(sheetContext),
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 if (subtitle != null && subtitle.isNotEmpty)
@@ -203,6 +204,6 @@ Future<void> _confirmSignOut(BuildContext context) async {
     if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Could not sign out: $error')));
+    ).showSnackBar(SnackBar(content: Text('Could not sign out: ${FriendlyErrors.message(error)}')));
   }
 }

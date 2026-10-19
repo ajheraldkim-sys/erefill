@@ -4,6 +4,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 Future<bool?> showCreateStationSheet(BuildContext context) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -106,7 +107,7 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
       AppHaptics.error();
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create station: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Failed to create station: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -122,7 +123,7 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
       ),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
       ),
       child: Form(
         key: _formKey,
@@ -146,7 +147,7 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
                 'Onboard New Water Station',
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -277,7 +278,7 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppUi.bluePrimary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
                   ),
                   icon: _saving
                       ? const SizedBox(
@@ -288,7 +289,7 @@ class _CreateStationSheetState extends State<_CreateStationSheet> {
                       : const Icon(Icons.check_rounded, size: 20),
                   label: Text(
                     _saving ? 'Creating Station...' : 'Create & Verify Station',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                 ),
               ),
@@ -371,7 +372,7 @@ class _CreateUserSheetState extends State<_CreateUserSheet> {
       AppHaptics.error();
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create account: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Failed to create account: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -387,7 +388,7 @@ class _CreateUserSheetState extends State<_CreateUserSheet> {
       ),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
       ),
       child: Form(
         key: _formKey,
@@ -411,7 +412,7 @@ class _CreateUserSheetState extends State<_CreateUserSheet> {
                 'Register Marketplace Account',
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -510,7 +511,7 @@ class _CreateUserSheetState extends State<_CreateUserSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppUi.bluePrimary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
                   ),
                   icon: _saving
                       ? const SizedBox(
@@ -521,7 +522,7 @@ class _CreateUserSheetState extends State<_CreateUserSheet> {
                       : const Icon(Icons.person_add_rounded, size: 20),
                   label: Text(
                     _saving ? 'Registering Account...' : 'Create ${_role.toUpperCase()} Account',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                 ),
               ),

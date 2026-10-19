@@ -35,6 +35,10 @@ class CreditProvider extends ChangeNotifier {
     if (_ownerId.isEmpty) return;
     _isLoading = true;
     _error = null;
+    // Yield first so callers in initState/build don't trigger
+    // "setState() or markNeedsBuild() called during build".
+    await Future<void>.delayed(Duration.zero);
+    if (_disposed) return;
     notifyListeners();
     try {
       _credits = await _service.getCredits(
@@ -45,8 +49,16 @@ class CreditProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
+  }
+
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   Future<DmCredit> addCredit(DmCredit credit) async {

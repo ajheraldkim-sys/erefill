@@ -50,6 +50,13 @@ class CheckoutRules {
 
   static const cashOnlyPaymentMethods = [cashPaymentOption];
 
+  static const creditPaymentOption = CheckoutPaymentOption(
+    type: 'credit',
+    label: 'Store Credit / Utang',
+    available: true,
+    reason: 'Charge to customer credit ledger with station approval',
+  );
+
   static const standardPaymentMethods = [
     CheckoutPaymentOption(
       type: 'cod',
@@ -89,6 +96,8 @@ class CheckoutRules {
         return 'Maya';
       case 'card':
         return 'Credit/Debit Card';
+      case 'credit':
+        return 'Store Credit / Utang';
       default:
         return 'Cash on Delivery';
     }

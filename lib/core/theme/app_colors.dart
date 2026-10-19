@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../constants.dart';
+
 /// Centralized, single source of truth for all brand, semantic status,
 /// UI state, and neutral surface colors across the eRefill application.
+///
+/// Raw values live in [AppUi]; this class names them by role.
 class AppColors {
   // ── 1. BRAND COLORS (Primary brand identity & actions) ──────────
-  static const Color brandPrimary = Color(0xFF0F71C3);
-  static const Color brandPrimaryDark = Color(0xFF0C5BA0);
+  static const Color brandPrimary = AppUi.bluePrimary;
+  static const Color brandPrimaryDark = AppUi.bluePrimaryDark;
   static const Color brandSecondary = Color(0xFF087E8B);
-  static const Color brandSoft = Color(0xFFE8F3FC);
-  static const Color brandBorder = Color(0xFFBAD7F2);
-  static const Color brandPale = Color(0xFFF1F7FD);
-  static const Color deepNavy = Color(0xFF10283B);
-  static const Color accentCyan = Color(0xFF42C2C8);
+  static const Color brandSoft = AppUi.blueSoft;
+  static const Color brandBorder = AppUi.blueBorder;
+  static const Color brandPale = AppUi.bluePale;
+  static const Color deepNavy = AppUi.deepBlue;
+  static const Color accentCyan = AppUi.accentCyan;
 
   // ── 2. GLOBAL SEMANTIC STATUS PALETTE ───────────────────────────
   // Strictly defined for order lifecycles across Customer, Owner, Rider & Admin.
-  static const Color statusPending = Color(0xFFE58A16);        // Premium Amber
+  // Each color carries white text at ≥ 5:1 and reads at ≥ 4.5:1 on white.
+  static const Color statusPending = Color(0xFFB45309);        // Amber 700
   static const Color statusConfirmed = Color(0xFF2563EB);      // Royal Blue (accepted)
   static const Color statusPreparing = Color(0xFF7C3AED);      // Rich Violet
   static const Color statusReady = Color(0xFF0F766E);          // Deep Teal (ready for delivery/pickup)
@@ -28,35 +33,184 @@ class AppColors {
   static const Color statusNeutral = Color(0xFF64748B);        // Slate fallback
 
   // ── 3. UI STATE COLORS (System feedback, separate from order status)
-  static const Color uiSuccess = Color(0xFF16A34A);
-  static const Color uiSuccessBg = Color(0xFFDCFCE7);
-  static const Color uiWarning = Color(0xFFD97706);
-  static const Color uiWarningBg = Color(0xFFFEF3C7);
-  static const Color uiError = Color(0xFFDC2626);
-  static const Color uiErrorBg = Color(0xFFFEE2E2);
-  static const Color uiInfo = Color(0xFF2563EB);
-  static const Color uiInfoBg = Color(0xFFEFF6FF);
+  static const Color uiSuccess = Color(0xFF15803D);
+  static const Color uiSuccessBg = AppUi.successBg;
+  static const Color uiWarning = Color(0xFFB45309);
+  static const Color uiWarningBg = AppUi.warningBg;
+  static const Color uiError = AppUi.error;
+  static const Color uiErrorBg = AppUi.errorBg;
+  static const Color uiInfo = AppUi.info;
+  static const Color uiInfoBg = AppUi.infoBg;
 
   // ── 4. NEUTRAL & SURFACE COLORS ─────────────────────────────────
-  static const Color surfaceLight = Colors.white;
-  static const Color surfaceDark = Color(0xFF121D21);
-  static const Color surfaceDarkRaised = Color(0xFF1B2A2F);
-  static const Color pageBgLight = Color(0xFFF5F7F8);
-  static const Color pageBgDark = Color(0xFF0B1215);
+  static const Color surfaceLight = AppUi.surface;
+  static const Color surfaceDark = AppUi.darkSurface;
+  static const Color surfaceDarkRaised = AppUi.darkSurfaceRaised;
+  static const Color pageBgLight = AppUi.pageBg;
+  static const Color pageBgDark = AppUi.darkPageBg;
 
-  static const Color textPrimaryLight = Color(0xFF17252A);
-  static const Color textSecondaryLight = Color(0xFF64777D);
-  static const Color textMutedLight = Color(0xFF829398);
-  static const Color textDisabledLight = Color(0xFFC9D1DD);
+  static const Color textPrimaryLight = AppUi.textPrimary;
+  static const Color textSecondaryLight = AppUi.textSecondary;
+  static const Color textMutedLight = AppUi.textMuted;
+  static const Color textDisabledLight = AppUi.textDisabled;
 
-  static const Color textPrimaryDark = Color(0xFFF1F5F9);
-  static const Color textSecondaryDark = Color(0xFF94A3B8);
-  static const Color textMutedDark = Color(0xFF64748B);
+  static const Color textPrimaryDark = AppUi.darkTextPrimary;
+  static const Color textSecondaryDark = AppUi.darkTextSecondary;
+  static const Color textMutedDark = AppUi.darkTextMuted;
 
-  static const Color borderLight = Color(0xFFE2E8F0);
-  static const Color borderDark = Color(0xFF1E293B);
-  static const Color dividerLight = Color(0xFFE2E8F0);
-  static const Color dividerDark = Color(0xFF1E293B);
+  static const Color borderLight = AppUi.borderLight;
+  static const Color borderDark = AppUi.borderDark;
+  static const Color dividerLight = AppUi.borderLight;
+  static const Color dividerDark = AppUi.borderDark;
+}
+
+/// Semantic tone shared by every non-order status surface (payments,
+/// accounts, stations, payouts, alerts) so a "success" looks identical in
+/// the customer app, the owner tools, the rider app and the admin console.
+enum StatusTone { neutral, info, success, warning, danger, progress }
+
+/// Contrast-safe badge colors for a [StatusTone] (WCAG AA in both themes).
+class StatusToneStyle {
+  final Color background;
+  final Color foreground;
+  final Color border;
+
+  const StatusToneStyle({
+    required this.background,
+    required this.foreground,
+    required this.border,
+  });
+
+  factory StatusToneStyle.of(StatusTone tone, {bool isDark = false}) {
+    switch (tone) {
+      case StatusTone.success:
+        return isDark
+            ? const StatusToneStyle(
+                background: Color(0x80064E3B),
+                foreground: AppUi.successFgDark,
+                border: Color(0xFF065F46),
+              )
+            : const StatusToneStyle(
+                background: AppUi.successBg,
+                foreground: AppUi.successFg,
+                border: AppUi.successBorder,
+              );
+      case StatusTone.warning:
+        return isDark
+            ? const StatusToneStyle(
+                background: Color(0xB3451A03),
+                foreground: AppUi.warningFgDark,
+                border: Color(0xFF78350F),
+              )
+            : const StatusToneStyle(
+                background: AppUi.warningBg,
+                foreground: AppUi.warningFg,
+                border: AppUi.warningBorder,
+              );
+      case StatusTone.danger:
+        return isDark
+            ? const StatusToneStyle(
+                background: Color(0x807F1D1D),
+                foreground: AppUi.errorFgDark,
+                border: Color(0xFF991B1B),
+              )
+            : const StatusToneStyle(
+                background: AppUi.errorBg,
+                foreground: AppUi.errorFg,
+                border: AppUi.errorBorder,
+              );
+      case StatusTone.info:
+        return isDark
+            ? const StatusToneStyle(
+                background: Color(0x801E3A8A),
+                foreground: AppUi.infoFgDark,
+                border: Color(0xFF1E40AF),
+              )
+            : const StatusToneStyle(
+                background: Color(0xFFDBEAFE),
+                foreground: Color(0xFF1E40AF),
+                border: Color(0xFFBFDBFE),
+              );
+      case StatusTone.progress:
+        return isDark
+            ? const StatusToneStyle(
+                background: Color(0x80312E81),
+                foreground: Color(0xFFA5B4FC),
+                border: Color(0xFF3730A3),
+              )
+            : const StatusToneStyle(
+                background: Color(0xFFE0E7FF),
+                foreground: Color(0xFF3730A3),
+                border: Color(0xFFC7D2FE),
+              );
+      case StatusTone.neutral:
+        return isDark
+            ? const StatusToneStyle(
+                background: AppUi.darkSurfaceRaised,
+                foreground: AppUi.darkTextSecondary,
+                border: AppUi.borderDark,
+              )
+            : const StatusToneStyle(
+                background: AppUi.lightSurfaceRaised,
+                foreground: Color(0xFF334155),
+                border: AppUi.borderLight,
+              );
+    }
+  }
+
+  /// Payment states (`paid`, `pending`, `failed`, `refunded`, …).
+  static StatusTone paymentTone(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case 'paid':
+      case 'success':
+      case 'succeeded':
+      case 'completed':
+      case 'approved':
+        return StatusTone.success;
+      case 'pending':
+      case 'unpaid':
+      case 'awaiting_payment':
+      case 'processing':
+        return StatusTone.warning;
+      case 'failed':
+      case 'declined':
+      case 'expired':
+      case 'cancelled':
+      case 'canceled':
+      case 'rejected':
+        return StatusTone.danger;
+      case 'refunded':
+      case 'partially_refunded':
+        return StatusTone.info;
+      default:
+        return StatusTone.neutral;
+    }
+  }
+
+  /// Account / station / rider lifecycle states.
+  static StatusTone accountTone(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case 'active':
+      case 'approved':
+      case 'verified':
+      case 'online':
+      case 'open':
+        return StatusTone.success;
+      case 'pending':
+      case 'pending_approval':
+      case 'under_review':
+      case 'busy':
+        return StatusTone.warning;
+      case 'suspended':
+      case 'banned':
+      case 'rejected':
+      case 'blocked':
+      case 'maintenance':
+        return StatusTone.danger;
+      default:
+        return StatusTone.neutral;
+    }
+  }
 }
 
 /// Centralized mapping between order statuses and their exact semantic colors,
@@ -121,17 +275,15 @@ class OrderStatusColors {
       case 'pending':
         return 'Pending';
       case 'accepted':
-        return 'Accepted';
       case 'confirmed':
-        return 'Confirmed';
+        return 'Accepted';
       case 'preparing':
       case 'in_prep':
         return 'Preparing';
       case 'ready':
       case 'ready_for_pickup':
-        return 'Ready for Pickup';
       case 'ready_for_delivery':
-        return 'Ready for Delivery';
+        return 'Ready for Pickup';
       case 'assigned_to_rider':
       case 'rider_assigned':
         return 'Assigned to Rider';
@@ -140,9 +292,8 @@ class OrderStatusColors {
       case 'dispatched':
         return 'Out for Delivery';
       case 'delivered':
-        return 'Delivered';
       case 'completed':
-        return 'Completed';
+        return 'Delivered';
       case 'cancelled':
       case 'canceled':
         return 'Cancelled';
@@ -222,6 +373,15 @@ class OrderStatusStyle {
   /// Subtle border for outline elements.
   final Color subtleBorder;
 
+  /// Contrast-safe background for chips/badges on neutral or light surfaces (WCAG AA).
+  final Color badgeBackground;
+
+  /// Contrast-safe text & icon color for chips/badges on neutral or light surfaces (WCAG AA).
+  final Color badgeForeground;
+
+  /// Contrast-safe border for chips/badges on neutral or light surfaces.
+  final Color badgeBorder;
+
   /// Representative icon for the status.
   final IconData icon;
 
@@ -238,6 +398,9 @@ class OrderStatusStyle {
     required this.chipBorder,
     required this.subtleBackground,
     required this.subtleBorder,
+    required this.badgeBackground,
+    required this.badgeForeground,
+    required this.badgeBorder,
     required this.icon,
     required this.label,
   });
@@ -250,6 +413,71 @@ class OrderStatusStyle {
     final color = OrderStatusColors.getColor(rawStatus);
     final label = OrderStatusColors.getLabel(rawStatus);
     final icon = OrderStatusColors.getIcon(rawStatus);
+    final norm = OrderStatusColors.normalize(rawStatus);
+
+    Color badgeBg;
+    Color badgeFg;
+    Color badgeBrd;
+
+    switch (norm) {
+      case 'pending':
+      case 'pending_sync':
+        badgeBg = isDark
+            ? const Color(0xFF451A03).withValues(alpha: 0.7)
+            : const Color(0xFFFEF3C7);
+        badgeFg = isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E);
+        badgeBrd = isDark ? const Color(0xFF78350F) : const Color(0xFFFDE68A);
+        break;
+      case 'accepted':
+        badgeBg = isDark
+            ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
+            : const Color(0xFFDBEAFE);
+        badgeFg = isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF);
+        badgeBrd = isDark ? const Color(0xFF1E40AF) : const Color(0xFFBFDBFE);
+        break;
+      case 'preparing':
+        badgeBg = isDark
+            ? const Color(0xFF3B0764).withValues(alpha: 0.5)
+            : const Color(0xFFEDE9FE);
+        badgeFg = isDark ? const Color(0xFFC4B5FD) : const Color(0xFF5B21B6);
+        badgeBrd = isDark ? const Color(0xFF5B21B6) : const Color(0xFFDDD6FE);
+        break;
+      case 'ready_for_pickup':
+        badgeBg = isDark
+            ? const Color(0xFF134E4A).withValues(alpha: 0.5)
+            : const Color(0xFFCCFBF1);
+        badgeFg = isDark ? const Color(0xFF5EEAD4) : const Color(0xFF115E59);
+        badgeBrd = isDark ? const Color(0xFF115E59) : const Color(0xFF99F6E4);
+        break;
+      case 'out_for_delivery':
+        badgeBg = isDark
+            ? const Color(0xFF312E81).withValues(alpha: 0.5)
+            : const Color(0xFFE0E7FF);
+        badgeFg = isDark ? const Color(0xFFA5B4FC) : const Color(0xFF3730A3);
+        badgeBrd = isDark ? const Color(0xFF3730A3) : const Color(0xFFC7D2FE);
+        break;
+      case 'delivered':
+        badgeBg = isDark
+            ? const Color(0xFF064E3B).withValues(alpha: 0.5)
+            : const Color(0xFFD1FAE5);
+        badgeFg = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46);
+        badgeBrd = isDark ? const Color(0xFF065F46) : const Color(0xFFA7F3D0);
+        break;
+      case 'cancelled':
+      case 'rejected':
+        badgeBg = isDark
+            ? const Color(0xFF7F1D1D).withValues(alpha: 0.5)
+            : const Color(0xFFFEE2E2);
+        badgeFg = isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B);
+        badgeBrd = isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA);
+        break;
+      default:
+        badgeBg = isDark
+            ? const Color(0xFF1E293B)
+            : const Color(0xFFF1F5F9);
+        badgeFg = isDark ? const Color(0xFF94A3B8) : const Color(0xFF334155);
+        badgeBrd = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    }
 
     return OrderStatusStyle(
       primaryColor: color,
@@ -261,6 +489,9 @@ class OrderStatusStyle {
       chipBorder: Colors.white.withValues(alpha: 0.35),
       subtleBackground: color.withValues(alpha: isDark ? 0.18 : 0.09),
       subtleBorder: color.withValues(alpha: isDark ? 0.35 : 0.22),
+      badgeBackground: badgeBg,
+      badgeForeground: badgeFg,
+      badgeBorder: badgeBrd,
       icon: icon,
       label: label,
     );

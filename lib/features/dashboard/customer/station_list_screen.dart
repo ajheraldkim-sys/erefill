@@ -24,6 +24,8 @@ import '../../../core/utils/station_orderability.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/services/local_data_cache.dart';
 
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class StationListScreen extends StatefulWidget {
   const StationListScreen({super.key, this.initialFilter});
 
@@ -516,7 +518,7 @@ class _StationListScreenState extends State<StationListScreen> {
                           Text(
                             'Station filters',
                             style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w800),
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           TextButton(
                             onPressed: () {
@@ -543,9 +545,9 @@ class _StationListScreenState extends State<StationListScreen> {
                           ),
                           Text(
                             '₱${_filterMaxPrice.toInt()}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: AppUi.bluePrimary,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppUi.brandOf(context),
                               fontSize: 16,
                             ),
                           ),
@@ -586,7 +588,7 @@ class _StationListScreenState extends State<StationListScreen> {
                                 onTap: () => setBottomState(
                                   () => _filterMinRating = rating,
                                 ),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 10,
@@ -600,7 +602,7 @@ class _StationListScreenState extends State<StationListScreen> {
                                           ? AppUi.bluePrimary
                                           : AppUi.borderOf(context),
                                     ),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                   ),
                                   alignment: Alignment.center,
                                   child: Text(
@@ -610,7 +612,7 @@ class _StationListScreenState extends State<StationListScreen> {
                                           ? Colors.white
                                           : AppUi.textPrimaryOf(context),
                                       fontWeight: isSelected
-                                          ? FontWeight.w800
+                                          ? FontWeight.w700
                                           : FontWeight.w600,
                                       fontSize: 13,
                                     ),
@@ -677,7 +679,7 @@ class _StationListScreenState extends State<StationListScreen> {
                             style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                           ),
                         ),
@@ -771,7 +773,7 @@ class _StationListScreenState extends State<StationListScreen> {
     final highlighted = _highlightedMapStationIndex == index;
 
     return Material(
-      color: highlighted ? AppUi.blueSoft : AppUi.surfaceOf(context),
+      color: highlighted ? AppUi.brandSoftOf(context) : AppUi.surfaceOf(context),
       borderRadius: AppUi.cardRadius,
       child: InkWell(
         onTap: () => _openStationDetails(s),
@@ -791,11 +793,11 @@ class _StationListScreenState extends State<StationListScreen> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.water_drop_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 22,
                 ),
               ),
@@ -809,7 +811,7 @@ class _StationListScreenState extends State<StationListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
                     ),
@@ -827,10 +829,10 @@ class _StationListScreenState extends State<StationListScreen> {
                     Row(
                       children: [
                         Text(
-                          '₱${price.toStringAsFixed(0)}/gal',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppUi.bluePrimary,
+                          '${formatPeso(price, whole: true)}/gal',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: AppUi.brandOf(context),
                             fontSize: 12,
                           ),
                         ),
@@ -842,7 +844,7 @@ class _StationListScreenState extends State<StationListScreen> {
                           const Icon(
                             Icons.star_rounded,
                             size: 12,
-                            color: Colors.amber,
+                            color: AppColors.uiWarning,
                           ),
                           Text(
                             avgRating.toStringAsFixed(1),
@@ -885,7 +887,10 @@ class _StationListScreenState extends State<StationListScreen> {
               child: AxoEmptyState(
                 pose: AxoPose.thinking,
                 title: 'Could not load stations',
-                message: snapshot.error.toString(),
+                message: FriendlyErrors.message(
+                  snapshot.error!,
+                  fallback: 'Check your connection and try again.',
+                ),
                 actionLabel: 'Retry',
                 onAction: () => _fetchStations(isRefresh: true),
                 compact: true,
@@ -991,7 +996,7 @@ class _StationListScreenState extends State<StationListScreen> {
                             Icons.location_on_rounded,
                             color: selected
                                 ? AppUi.accentGreen
-                                : AppUi.bluePrimary,
+                                : AppUi.brandOf(context),
                             size: selected ? 48 : 44,
                             shadows: const [
                               Shadow(
@@ -1036,7 +1041,7 @@ class _StationListScreenState extends State<StationListScreen> {
                           height: 4,
                           decoration: BoxDecoration(
                             color: AppUi.borderOf(context),
-                            borderRadius: BorderRadius.circular(99),
+                            borderRadius: BorderRadius.circular(AppUi.radiusFull),
                           ),
                         ),
                         Padding(
@@ -1177,7 +1182,7 @@ class _StationListScreenState extends State<StationListScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 9),
                             decoration: BoxDecoration(
                               color: AppUi.surfaceOf(context),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                               border: Border.all(
                                 color: AppUi.borderOf(context),
                               ),
@@ -1195,7 +1200,7 @@ class _StationListScreenState extends State<StationListScreen> {
                                     }.contains(_selectedFilter)
                                     ? _selectedFilter
                                     : 'All',
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 icon: const Icon(
                                   Icons.expand_more_rounded,
                                   size: 18,
@@ -1265,22 +1270,22 @@ class _StationListScreenState extends State<StationListScreen> {
                           const SizedBox(width: 8),
                           Material(
                             color: AppUi.surfaceOf(context),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
                             child: InkWell(
                               onTap: _showAdvancedFilters,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                               child: Container(
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                   border: Border.all(
                                     color: AppUi.borderOf(context),
                                   ),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.tune_rounded,
-                                  color: AppUi.bluePrimary,
+                                  color: AppUi.brandOf(context),
                                 ),
                               ),
                             ),
@@ -1313,7 +1318,7 @@ class _StationListScreenState extends State<StationListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1341,9 +1346,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                           ),
                                           Text(
                                             prefLabel,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
-                                              color: AppUi.bluePrimary,
+                                              color: AppUi.brandOf(context),
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
@@ -1352,9 +1357,9 @@ class _StationListScreenState extends State<StationListScreen> {
                                         if (_searchQuery.isNotEmpty)
                                           Text(
                                             '"$_searchQuery"',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
-                                              color: AppUi.bluePrimary,
+                                              color: AppUi.brandOf(context),
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),

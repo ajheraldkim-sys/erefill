@@ -10,6 +10,7 @@ import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class RiderManagementScreen extends StatefulWidget {
   const RiderManagementScreen({super.key});
 
@@ -31,12 +32,12 @@ class RiderManagementScreen extends StatefulWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.uiError.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
               child: const Icon(
                 Icons.person_remove_rounded,
-                color: Color(0xFFEF4444),
+                color: AppColors.uiError,
                 size: 22,
               ),
             ),
@@ -44,7 +45,7 @@ class RiderManagementScreen extends StatefulWidget {
             const Expanded(
               child: Text(
                 'Unlink Rider',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
               ),
             ),
           ],
@@ -64,10 +65,10 @@ class RiderManagementScreen extends StatefulWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.uiError,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -101,7 +102,7 @@ class RiderManagementScreen extends StatefulWidget {
                 fallback: 'Could not unlink rider. Please try again.',
               ),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -130,13 +131,13 @@ class RiderManagementScreen extends StatefulWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: (willSuspend ? Colors.orange : const Color(0xFF10B981))
+                color: (willSuspend ? AppColors.uiWarning : AppColors.uiSuccess)
                     .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
               child: Icon(
                 willSuspend ? Icons.block_rounded : Icons.check_circle_rounded,
-                color: willSuspend ? Colors.orange : const Color(0xFF10B981),
+                color: willSuspend ? AppColors.uiWarning : AppColors.uiSuccess,
                 size: 22,
               ),
             ),
@@ -145,7 +146,7 @@ class RiderManagementScreen extends StatefulWidget {
               child: Text(
                 willSuspend ? 'Suspend Rider' : 'Activate Rider',
                 style: const TextStyle(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 18,
                 ),
               ),
@@ -174,7 +175,7 @@ class RiderManagementScreen extends StatefulWidget {
                   labelText: 'Reason for suspension (optional)',
                   hintText: 'e.g. Temporary leave, policy review',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -193,11 +194,11 @@ class RiderManagementScreen extends StatefulWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: willSuspend
-                  ? Colors.orange
-                  : const Color(0xFF10B981),
+                  ? AppColors.uiWarning
+                  : AppColors.uiSuccess,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -224,8 +225,8 @@ class RiderManagementScreen extends StatefulWidget {
               '$riderName is now ${willSuspend ? "suspended" : "active"}.',
             ),
             backgroundColor: willSuspend
-                ? Colors.orange
-                : const Color(0xFF10B981),
+                ? AppColors.uiWarning
+                : AppColors.uiSuccess,
           ),
         );
       }
@@ -241,7 +242,7 @@ class RiderManagementScreen extends StatefulWidget {
                 fallback: 'Could not update rider status. Please try again.',
               ),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -408,9 +409,9 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                         ),
                                         borderRadius: AppUi.cardRadius,
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.two_wheeler_rounded,
-                                        color: AppUi.bluePrimary,
+                                        color: AppUi.brandOf(context),
                                         size: 24,
                                       ),
                                     ),
@@ -424,7 +425,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                             rider['full_name'] ??
                                                 'Rider Profile',
                                             style: TextStyle(
-                                              fontWeight: FontWeight.w800,
+                                              fontWeight: FontWeight.w700,
                                               fontSize: 16,
                                               color: AppUi.textPrimaryOf(
                                                 context,
@@ -472,10 +473,10 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                             style: TextStyle(
                                               color:
                                                   rider['is_suspended'] == true
-                                                  ? const Color(0xFFEF4444)
-                                                  : const Color(0xFF10B981),
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w900,
+                                                  ? AppColors.uiError
+                                                  : AppColors.uiSuccess,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
                                               letterSpacing: 0.5,
                                             ),
                                           ),
@@ -511,14 +512,14 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                             }
                                           },
                                           itemBuilder: (ctx) => [
-                                            const PopupMenuItem(
+                                            PopupMenuItem(
                                               value: 'edit',
                                               child: Row(
                                                 children: [
                                                   Icon(
                                                     Icons.edit_outlined,
                                                     size: 18,
-                                                    color: AppUi.bluePrimary,
+                                                    color: AppUi.brandOf(context),
                                                   ),
                                                   SizedBox(width: 10),
                                                   Text('Edit Credentials'),
@@ -542,7 +543,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                                         ? const Color(
                                                             0xFF10B981,
                                                           )
-                                                        : Colors.orange,
+                                                        : AppColors.uiWarning,
                                                   ),
                                                   const SizedBox(width: 10),
                                                   Text(
@@ -562,13 +563,13 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                                     Icons
                                                         .person_remove_outlined,
                                                     size: 18,
-                                                    color: Color(0xFFEF4444),
+                                                    color: AppColors.uiError,
                                                   ),
                                                   const SizedBox(width: 10),
                                                   Text(
                                                     'Unlink from Station',
                                                     style: TextStyle(
-                                                      color: Color(0xFFEF4444),
+                                                      color: AppColors.uiError,
                                                     ),
                                                   ),
                                                 ],
@@ -595,7 +596,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
         shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
         label: const Text(
           "Register Rider",
-          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.2),
+          style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
         ),
         icon: const Icon(Icons.person_add_rounded, size: 20),
       ),
@@ -727,7 +728,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                   "Edit Rider Credentials",
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(sheetContext),
                   ),
                 ),
@@ -1040,7 +1041,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                   "Register New Rider",
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                 ),
@@ -1249,7 +1250,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
       );
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.uiError));
     }
   }
 
@@ -1263,14 +1264,14 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
           children: [
             const Icon(
               Icons.check_circle_rounded,
-              color: Color(0xFF10B981),
+              color: AppColors.uiSuccess,
               size: 28,
             ),
             const SizedBox(width: 12),
             Text(
               'Rider Registered!',
               style: TextStyle(
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),
@@ -1295,11 +1296,11 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 border: Border.all(color: const Color(0xFFFFEDD5)),
               ),
               child: const Text(
-                '⚠️ Share these credentials with the rider securely. They will need them to log in.',
+                'Share these credentials with the rider securely. They will need them to log in.',
                 style: TextStyle(
                   color: Color(0xFF9A3412),
                   fontSize: 12,
@@ -1315,11 +1316,11 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
               Navigator.pop(context);
               _setupRidersListener();
             },
-            child: const Text(
+            child: Text(
               'Got it',
               style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppUi.bluePrimary,
+                fontWeight: FontWeight.w700,
+                color: AppUi.brandOf(context),
               ),
             ),
           ),
@@ -1345,7 +1346,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
             value,
             style: TextStyle(
               color: AppUi.textPrimaryOf(context),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               fontSize: 13,
             ),
           ),

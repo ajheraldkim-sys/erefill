@@ -4,6 +4,7 @@ import 'package:erefill/core/constants.dart';
 import '../checkout_rules.dart';
 import 'payment_brand_mark.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class PaymentMethodSelector extends StatelessWidget {
   final String selectedMethod;
   final List<CheckoutPaymentOption> methods;
@@ -24,7 +25,7 @@ class PaymentMethodSelector extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppUi.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
         ),
         child: const Text(
           'Payment options are unavailable right now. Please try again.',
@@ -72,10 +73,10 @@ class PaymentMethodSelector extends StatelessWidget {
         : isAvailable
         ? (isDark
               ? Colors.white.withValues(alpha: 0.04)
-              : const Color(0xFFF8FAFC))
+              : AppUi.pageBg)
         : (isDark
               ? Colors.white.withValues(alpha: 0.02)
-              : const Color(0xFFF1F5F9));
+              : AppUi.lightSurfaceRaised);
 
     final borderColor = isSelected
         ? brandColor
@@ -93,13 +94,13 @@ class PaymentMethodSelector extends StatelessWidget {
         hint: isAvailable ? _helperText(id) : (option.reason ?? 'Unavailable'),
         child: InkWell(
           onTap: isAvailable ? () => onSelected(id) : null,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
               border: Border.all(
                 color: borderColor,
                 width: isSelected ? 1.5 : 1,
@@ -154,7 +155,7 @@ class PaymentMethodSelector extends StatelessWidget {
                     color: isAvailable
                         ? AppUi.textPrimaryOf(context)
                         : AppUi.textMuted,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w700,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w700,
                     fontSize: 13,
                   ),
                 ),
@@ -169,7 +170,7 @@ class PaymentMethodSelector extends StatelessWidget {
                     color: isAvailable
                         ? AppUi.textSecondaryOf(context)
                         : AppUi.textMuted,
-                    fontSize: 10.5,
+                    fontSize: 11,
                     height: 1.25,
                   ),
                 ),
@@ -195,7 +196,7 @@ class PaymentMethodSelector extends StatelessWidget {
       'gcash' => const Color(0xFF007DFE),
       'maya' => const Color(0xFF00A86B),
       'card' => const Color(0xFF1E3A8A),
-      _ => const Color(0xFFB45309),
+      _ => AppColors.uiWarning,
     };
   }
 }

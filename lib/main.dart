@@ -32,6 +32,7 @@ import 'core/providers/connectivity_provider.dart';
 import 'core/widgets/offline_banner.dart';
 import 'core/services/local_data_cache.dart';
 import 'core/services/app_update_service.dart';
+import 'core/localization/app_strings.dart';
 import 'features/update/screens/mandatory_update_screen.dart';
 
 void main() async {
@@ -156,6 +157,7 @@ class _ERefillAppState extends State<ERefillApp> {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => AppLanguageProvider()),
         ChangeNotifierProvider(create: (_) => UserSettingsService()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
@@ -178,9 +180,15 @@ class _ERefillAppState extends State<ERefillApp> {
             child: MaterialApp.router(
               title: 'eRefill',
               debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
-              themeMode: themeProvider.themeMode,
+              theme: themeProvider.isOutdoorMode
+                  ? AppTheme.outdoorTheme
+                  : AppTheme.lightTheme,
+              darkTheme: themeProvider.isOutdoorMode
+                  ? AppTheme.outdoorTheme
+                  : AppTheme.darkTheme,
+              themeMode: themeProvider.isOutdoorMode
+                  ? ThemeMode.light
+                  : themeProvider.themeMode,
               routerConfig: _router,
               scrollBehavior: const AppScrollBehavior(),
               localizationsDelegates: const [
@@ -196,11 +204,13 @@ class _ERefillAppState extends State<ERefillApp> {
                     colorScheme: shadcn.ColorSchemes.darkZinc,
                     radius: 0.5,
                   ),
-                  themeMode: switch (themeProvider.themeMode) {
-                    ThemeMode.dark => shadcn.ThemeMode.dark,
-                    ThemeMode.system => shadcn.ThemeMode.system,
-                    _ => shadcn.ThemeMode.light,
-                  },
+                  themeMode: themeProvider.isOutdoorMode
+                      ? shadcn.ThemeMode.light
+                      : switch (themeProvider.themeMode) {
+                          ThemeMode.dark => shadcn.ThemeMode.dark,
+                          ThemeMode.system => shadcn.ThemeMode.system,
+                          _ => shadcn.ThemeMode.light,
+                        },
                   child: Column(
                     children: [
                       const OfflineBanner(),

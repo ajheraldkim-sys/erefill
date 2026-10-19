@@ -19,6 +19,7 @@ import 'package:erefill/core/models/app_version_models.dart';
 import 'package:erefill/features/update/screens/mandatory_update_screen.dart';
 import 'package:erefill/features/update/widgets/optional_update_dialog.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -45,7 +46,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not sign out right now. Please try again.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
     }
@@ -153,12 +154,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     width: 72,
                     height: 72,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFFEF3C7),
+                      color: AppUi.warningBg,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.cloud_off_rounded,
-                      color: Color(0xFFD97706),
+                      color: AppColors.uiWarning,
                       size: 38,
                     ),
                   ),
@@ -166,7 +167,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   const Text(
                     'Unable to Load Profile',
                     style: TextStyle(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontSize: 18,
                     ),
                     textAlign: TextAlign.center,
@@ -176,7 +177,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     'We could not connect to sync your profile. Please check your internet connection and tap Retry, or return to login.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Color(0xFF64748B),
+                      color: AppUi.textMuted,
                       fontSize: 13,
                       height: 1.45,
                     ),
@@ -197,7 +198,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                             vertical: 12,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                         ),
                       ),
@@ -213,7 +214,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                             vertical: 12,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                         ),
                       ),
@@ -242,12 +243,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     width: 80,
                     height: 80,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFFEE2E2),
+                      color: AppUi.errorBg,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.lock_person_rounded,
-                      color: Color(0xFFDC2626),
+                      color: AppColors.uiError,
                       size: 44,
                     ),
                   ),
@@ -256,7 +257,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     'Account Suspended',
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
@@ -282,7 +283,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         ),
                       ),
                       icon: const Icon(Icons.logout_rounded, size: 20),
@@ -317,7 +318,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const Icon(Icons.error_outline, color: AppColors.uiError, size: 48),
             const SizedBox(height: 16),
             const Text(
               'Unexpected role',
@@ -416,7 +417,7 @@ class _SplashScreenState extends State<_SplashScreen>
                 child: ScaleTransition(
                   scale: _scale,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(AppUi.radiusPill),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                       child: Container(
@@ -433,14 +434,14 @@ class _SplashScreenState extends State<_SplashScreen>
                               const Color(0xFF0A0F1A).withValues(alpha: 0.55),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(AppUi.radiusPill),
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.22),
                             width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+                              color: AppUi.infoFgDark.withValues(alpha: 0.12),
                               blurRadius: 32,
                               spreadRadius: 2,
                             ),
@@ -460,7 +461,7 @@ class _SplashScreenState extends State<_SplashScreen>
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 42,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: -1.5,
                               ),
                             ),
@@ -468,7 +469,7 @@ class _SplashScreenState extends State<_SplashScreen>
                             const Text(
                               'Smart Water Delivery',
                               style: TextStyle(
-                                color: Color(0xFFCBD5E1),
+                                color: AppUi.borderStrongLight,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 letterSpacing: 0.5,
@@ -481,7 +482,7 @@ class _SplashScreenState extends State<_SplashScreen>
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: Color(0xFF38BDF8),
+                                color: AppUi.infoFgDark,
                               ),
                             ),
                           ],

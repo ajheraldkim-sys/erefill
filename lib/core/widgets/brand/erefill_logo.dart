@@ -108,7 +108,7 @@ class _Wordmark extends StatelessWidget {
             text: 'e',
             style: TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: primary,
               letterSpacing: -0.5,
             ),
@@ -117,7 +117,7 @@ class _Wordmark extends StatelessWidget {
             text: 'Refill',
             style: TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: fg,
               letterSpacing: -0.8,
             ),

@@ -136,7 +136,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                       subtitle: Text(a['email']?.toString() ?? '—'),
                       trailing: AdminBadge(
                         label: a['admin_tier']?.toString() ?? 'super',
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                     ),
                   ),
@@ -187,9 +187,9 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(LucideIcons.send, size: 18, color: AppUi.bluePrimary),
+                child: Icon(LucideIcons.send, size: 18, color: AppUi.brandOf(context)),
               ),
               const SizedBox(width: 10),
               Text('Send to Specific User', style: adminSectionTitleStyle(context)),
@@ -254,7 +254,7 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppUi.accentGreen.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
                 child: const Icon(LucideIcons.radio, size: 18, color: AppUi.accentGreen),
               ),
@@ -279,17 +279,17 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
               border: Border.all(color: AppUi.borderOf(context)),
             ),
             child: Row(
               children: [
-                const Icon(LucideIcons.info, size: 16, color: AppUi.bluePrimary),
+                Icon(LucideIcons.info, size: 16, color: AppUi.brandOf(context)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Broadcasting dispatches using the Title and Message composed in the left panel.',
-                    style: TextStyle(fontSize: 12.5, color: AppUi.textSecondaryOf(context)),
+                    style: TextStyle(fontSize: 13, color: AppUi.textSecondaryOf(context)),
                   ),
                 ),
               ],

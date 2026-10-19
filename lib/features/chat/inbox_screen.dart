@@ -124,9 +124,9 @@ class _InboxScreenState extends State<InboxScreen> {
                   ]
                 : [
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.done_all_rounded,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                       onPressed: _markAllAsRead,
                     ),
@@ -219,7 +219,7 @@ class _InboxScreenState extends State<InboxScreen> {
                   });
                 }
               },
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
@@ -237,7 +237,7 @@ class _InboxScreenState extends State<InboxScreen> {
                     color: isSelected
                         ? Colors.white
                         : AppUi.textSecondaryOf(context),
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
                 ),
@@ -370,7 +370,7 @@ class _InboxScreenState extends State<InboxScreen> {
                             _getRoomTitle(room),
                             style: TextStyle(
                               fontWeight: hasUnread
-                                  ? FontWeight.w900
+                                  ? FontWeight.w700
                                   : FontWeight.w700,
                               fontSize: 15,
                               color: AppUi.textPrimaryOf(context),
@@ -383,11 +383,11 @@ class _InboxScreenState extends State<InboxScreen> {
                           _formatTime(room.updatedAt),
                           style: TextStyle(
                             color: hasUnread
-                                ? AppUi.bluePrimary
+                                ? AppUi.brandOf(context)
                                 : AppUi.textSecondaryOf(context),
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: hasUnread
-                                ? FontWeight.w900
+                                ? FontWeight.w700
                                 : FontWeight.w600,
                           ),
                         ),
@@ -489,9 +489,9 @@ class _InboxScreenState extends State<InboxScreen> {
         child: Center(
           child: Text(
             initials.isNotEmpty ? initials : '?',
-            style: const TextStyle(
-              color: AppUi.bluePrimary,
-              fontWeight: FontWeight.w800,
+            style: TextStyle(
+              color: AppUi.brandOf(context),
+              fontWeight: FontWeight.w700,
               fontSize: 16,
             ),
           ),
@@ -608,7 +608,7 @@ class _InboxScreenState extends State<InboxScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(
           isArchivedTab ? 'Restore Conversations' : 'Archive Conversations',
-          style: const TextStyle(fontWeight: FontWeight.w900),
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         content: Text(
           isArchivedTab
@@ -632,8 +632,8 @@ class _InboxScreenState extends State<InboxScreen> {
             child: Text(
               isArchivedTab ? 'Restore' : 'Archive',
               style: TextStyle(
-                color: isArchivedTab ? AppUi.bluePrimary : const Color(0xFFEF4444),
-                fontWeight: FontWeight.w900,
+                color: isArchivedTab ? AppUi.brandOf(context) : AppColors.uiError,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),

@@ -75,7 +75,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
           'System Audit Trail',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(context),
           ),
         ),
@@ -105,7 +105,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                     filled: true,
                     fillColor: AppUi.pageBgOf(context),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       borderSide: BorderSide(color: AppUi.borderOf(context)),
                     ),
                   ),
@@ -204,15 +204,15 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
-                                            color: AppUi.blueSoft,
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: AppUi.brandSoftOf(context),
+                                            borderRadius: BorderRadius.circular(AppUi.radiusSm),
                                           ),
                                           child: Text(
                                             action.toUpperCase(),
-                                            style: const TextStyle(
-                                              color: AppUi.bluePrimary,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
+                                            style: TextStyle(
+                                              color: AppUi.brandOf(context),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ),
@@ -228,7 +228,7 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
                                         const Spacer(),
                                         Text(
                                           '$date $time',
-                                          style: TextStyle(fontSize: 10, color: AppUi.textMuted),
+                                          style: TextStyle(fontSize: 11, color: AppUi.textMuted),
                                         ),
                                       ],
                                     ),
@@ -273,12 +273,12 @@ class _AdminAuditLogViewState extends State<AdminAuditLogView> {
         AppHaptics.selection();
         setState(() => _actionFilter = value);
       },
-      selectedColor: AppUi.blueSoft,
+      selectedColor: AppUi.brandSoftOf(context),
       checkmarkColor: AppUi.bluePrimary,
       labelStyle: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w700,
-        color: selected ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
+        color: selected ? AppUi.brandOf(context) : AppUi.textSecondaryOf(context),
       ),
     );
   }

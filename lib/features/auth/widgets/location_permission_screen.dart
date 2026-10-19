@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:erefill/core/constants.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class LocationPermissionScreen extends StatefulWidget {
   final Widget child;
   const LocationPermissionScreen({super.key, required this.child});
@@ -152,7 +153,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                 !_isServiceEnabled ? 'GPS is Off' : 'Permission Required',
                 style: TextStyle(
                   fontSize: 24,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -221,17 +222,17 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isOk ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
+        color: isOk ? AppUi.successBg : AppUi.errorBg,
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(
-          color: isOk ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+          color: isOk ? AppUi.successBg : AppUi.errorBg,
         ),
       ),
       child: Row(
         children: [
           Icon(
             isOk ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            color: isOk ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+            color: isOk ? AppColors.uiSuccess : AppColors.uiError,
             size: 18,
           ),
           const SizedBox(width: 12),
@@ -240,7 +241,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: isOk ? const Color(0xFF166534) : const Color(0xFF991B1B),
+              color: isOk ? AppUi.successFg : AppUi.errorFg,
             ),
           ),
           const Spacer(),
@@ -248,9 +249,9 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
             isOk ? 'Enabled' : 'Required',
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               letterSpacing: 0,
-              color: isOk ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+              color: isOk ? AppColors.uiSuccess : AppColors.uiError,
             ),
           ),
         ],

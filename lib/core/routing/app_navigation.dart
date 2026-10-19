@@ -91,6 +91,8 @@ extension AppNavigation on BuildContext {
 
   void openOwnerInventory() => push(AppRoutes.ownerInventory);
 
+  void openDeliveryManagement() => push(AppRoutes.deliveryManagement);
+
   void openPaymentAccounts(PaymentAccountScope scope) {
     push(
       Uri(

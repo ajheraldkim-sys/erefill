@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class OwnerSignupScreen extends StatefulWidget {
   const OwnerSignupScreen({super.key});
 
@@ -103,7 +104,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
+        backgroundColor: isError ? AppColors.uiError : null,
       ),
     );
   }
@@ -117,7 +118,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
         title: Text(
           'Account Already Exists',
           style: TextStyle(
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(ctx),
           ),
         ),
@@ -448,7 +449,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
                       padding: const EdgeInsets.only(bottom: 35),
                       child: Icon(
                         Icons.location_on_rounded,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                         size: 42,
                         shadows: const [
                           Shadow(
@@ -466,7 +467,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
                     child: FloatingActionButton.small(
                       onPressed: _locateMe,
                       backgroundColor: AppUi.surfaceOf(context),
-                      foregroundColor: AppUi.bluePrimary,
+                      foregroundColor: AppUi.brandOf(context),
                       child: const Icon(Icons.my_location_rounded),
                     ),
                   ),
@@ -478,7 +479,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
               child: Text(
                 "Slide map to point the exact station location",
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   color: AppUi.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
@@ -624,7 +625,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
                             : "Continue to Next Step",
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -653,12 +654,12 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
                         context.openLogin();
                       }
                     },
-                    child: const Text(
+                    child: Text(
                       "Sign In",
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppUi.bluePrimary,
-                        fontWeight: FontWeight.w800,
+                        color: AppUi.brandOf(context),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -676,7 +677,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
       title,
       style: TextStyle(
         fontSize: 11,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         color: AppUi.textSecondaryOf(context),
         letterSpacing: 0,
       ),
@@ -736,8 +737,8 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
           decoration: InputDecoration(
             labelText: label,
             floatingLabelBehavior: FloatingLabelBehavior.auto,
-            floatingLabelStyle: const TextStyle(
-              color: AppUi.bluePrimary,
+            floatingLabelStyle: TextStyle(
+              color: AppUi.brandOf(context),
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -832,7 +833,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
         labelStyle: TextStyle(
           color: AppUi.textSecondaryOf(context),
           fontSize: 12,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
           letterSpacing: 0,
         ),
         prefixIcon: Icon(

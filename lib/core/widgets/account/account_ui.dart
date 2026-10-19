@@ -33,7 +33,7 @@ class AccountSectionLabel extends StatelessWidget {
         textAlign: textAlign,
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
           color: AppUi.textSecondaryOf(context),
         ),
@@ -145,7 +145,7 @@ class AccountNavTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: badgeBgColor ??
                         (badgeColor ?? AppUi.bluePrimary).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     border: Border.all(
                       color: (badgeColor ?? AppUi.bluePrimary).withValues(alpha: 0.3),
                       width: 1,
@@ -155,8 +155,8 @@ class AccountNavTile extends StatelessWidget {
                     badgeText!,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: badgeColor ?? AppUi.bluePrimary,
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor ?? AppUi.brandOf(context),
                       letterSpacing: 0.2,
                     ),
                   ),
@@ -277,7 +277,7 @@ class AccountIdentityBlock extends StatelessWidget {
 
     Widget avatar = CircleAvatar(
       radius: 32,
-      backgroundColor: AppUi.blueSoft,
+      backgroundColor: AppUi.brandSoftOf(context),
       backgroundImage: hasAvatar
           ? ResizeImage(NetworkImage(avatarUrl!), width: 128, height: 128)
           : null,
@@ -285,10 +285,10 @@ class AccountIdentityBlock extends StatelessWidget {
           ? null
           : Text(
               initial,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: AppUi.bluePrimary,
+                fontWeight: FontWeight.w700,
+                color: AppUi.brandOf(context),
               ),
             ),
     );
@@ -337,7 +337,7 @@ class AccountIdentityBlock extends StatelessWidget {
                     Text(
                       name.isNotEmpty ? name : 'Customer',
                       style: TextStyle(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 18,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -401,7 +401,7 @@ class _StatCell extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             fontSize: 16,
             color: AppUi.textPrimaryOf(context),
           ),
@@ -436,7 +436,7 @@ class AccountCompletenessHint extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Material(
-        color: AppUi.blueSoft,
+        color: AppUi.brandSoftOf(context),
         borderRadius: AppUi.cardRadius,
         child: InkWell(
           onTap: onTap,
@@ -445,26 +445,26 @@ class AccountCompletenessHint extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.info_outline_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 20,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     message,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                       height: 1.35,
                     ),
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 20,
                 ),
               ],

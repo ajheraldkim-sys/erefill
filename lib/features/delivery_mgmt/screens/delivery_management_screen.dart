@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants.dart';
+import '../../../core/services/owner_inventory_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/report_export_service.dart';
@@ -19,6 +21,7 @@ import '../widgets/bar_chart_widget.dart';
 import '../widgets/dm_offline_banner.dart';
 import '../widgets/dm_screen_header.dart';
 
+import 'package:erefill/core/utils/money.dart';
 /// Complete Offline Delivery & Credit Management screen for station owners.
 class DeliveryManagementScreen extends StatefulWidget {
   const DeliveryManagementScreen({super.key});
@@ -47,7 +50,9 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen>
   }
 
   void _initProviders() {
-    final ownerId = Supabase.instance.client.auth.currentUser?.id;
+    if (!mounted) return;
+    final ownerId = Supabase.instance.client.auth.currentUser?.id ??
+        context.read<UserProvider>().user?.id;
     if (ownerId == null || ownerId.isEmpty) return;
 
     context.read<DeliveryProvider>().initialize(ownerId);
@@ -107,9 +112,9 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen>
           body: TabBarView(
             controller: _tabController,
             children: [
-              _CreditLedgerTab(uuid: _uuid),
-              _DeliveryLogsTab(uuid: _uuid),
-              const _ReportsAnalyticsTab(),
+              DmCreditLedgerTab(uuid: _uuid),
+              DmDeliveryLogsTab(uuid: _uuid),
+              const DmReportsAnalyticsTab(),
             ],
           ),
         ),
@@ -121,15 +126,15 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 1: CREDIT & UTANG LEDGER
 // ─────────────────────────────────────────────────────────────────────────────
-class _CreditLedgerTab extends StatefulWidget {
+class DmCreditLedgerTab extends StatefulWidget {
   final Uuid uuid;
-  const _CreditLedgerTab({required this.uuid});
+  const DmCreditLedgerTab({super.key, required this.uuid});
 
   @override
-  State<_CreditLedgerTab> createState() => _CreditLedgerTabState();
+  State<DmCreditLedgerTab> createState() => _DmCreditLedgerTabState();
 }
 
-class _CreditLedgerTabState extends State<_CreditLedgerTab> {
+class _DmCreditLedgerTabState extends State<DmCreditLedgerTab> {
   int _filterIndex = 0; // 0 = All, 1 = Customer, 2 = Rider
 
   @override
@@ -165,7 +170,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
             Container(
               padding: AppUi.cardPadding,
               decoration: BoxDecoration(
-                color: AppUi.blueSoft,
+                color: AppUi.brandSoftOf(context),
                 borderRadius: AppUi.radiusLg,
                 border: Border.all(
                   color: AppUi.bluePrimary.withValues(alpha: 0.2),
@@ -187,11 +192,11 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '₱${totalOutstanding.toStringAsFixed(2)}',
-                        style: const TextStyle(
+                        formatPeso(totalOutstanding),
+                        style: TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppUi.bluePrimary,
+                          fontWeight: FontWeight.w700,
+                          color: AppUi.brandOf(context),
                         ),
                       ),
                     ],
@@ -203,17 +208,17 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                     ),
                     decoration: BoxDecoration(
                       color: AppUi.surfaceOf(context),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                       border: Border.all(
                         color: AppUi.bluePrimary.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Text(
                       '${filteredCredits.where((c) => !c.isPaid).length} unpaid',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppUi.bluePrimary,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.brandOf(context),
                       ),
                     ),
                   ),
@@ -277,7 +282,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
         fontSize: 12,
         fontWeight: FontWeight.w700,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
     );
   }
 
@@ -294,7 +299,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
     final badgeText = isPaid
         ? 'PAID'
         : isPartial
-        ? 'PARTIAL (₱${credit.remaining.toStringAsFixed(0)} left)'
+        ? 'PARTIAL (${formatPeso(credit.remaining, whole: true)} left)'
         : 'UNPAID';
 
     return Container(
@@ -327,7 +332,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                                 : 'Rider Advance'),
                         style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -352,7 +357,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Original: ₱${credit.amount.toStringAsFixed(2)}',
+                    'Original: ${formatPeso(credit.amount)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppUi.textSecondaryOf(context),
@@ -361,7 +366,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                   ),
                   if (credit.paidAmount > 0)
                     Text(
-                      'Paid: ₱${credit.paidAmount.toStringAsFixed(2)}',
+                      'Paid: ${formatPeso(credit.paidAmount)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppUi.successFg,
@@ -374,13 +379,13 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: badgeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
                 child: Text(
                   badgeText,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: badgeColor,
                   ),
                 ),
@@ -408,7 +413,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                   label: const Text('Record Payment'),
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    foregroundColor: AppUi.bluePrimary,
+                    foregroundColor: AppUi.brandOf(context),
                     side: const BorderSide(color: AppUi.bluePrimary),
                   ),
                   onPressed: () => _showRecordPaymentDialog(context, credit),
@@ -447,7 +452,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Remaining balance: ₱${credit.remaining.toStringAsFixed(2)}'),
+            Text('Remaining balance: ${formatPeso(credit.remaining)}'),
             const SizedBox(height: 12),
             AppFormField(
               controller: amountCtrl,
@@ -470,10 +475,11 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
             onPressed: () async {
               final paid = double.tryParse(amountCtrl.text.trim()) ?? 0;
               if (paid > 0) {
+                final cappedPaid = paid > credit.remaining ? credit.remaining : paid;
                 Navigator.pop(dialogCtx);
                 await context.read<CreditProvider>().applyPartialPayment(
                       credit.id,
-                      paid,
+                      cappedPaid,
                     );
               }
             },
@@ -481,7 +487,7 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() => amountCtrl.dispose());
   }
 
   void _showAddCreditDialog(BuildContext context) {
@@ -561,7 +567,9 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
                 final name = nameCtrl.text.trim();
                 if (amt > 0 && name.isNotEmpty) {
                   final ownerId =
-                      Supabase.instance.client.auth.currentUser?.id ?? '';
+                      Supabase.instance.client.auth.currentUser?.id ??
+                      context.read<UserProvider>().user?.id ??
+                      '';
                   final newCredit = DmCredit(
                     id: widget.uuid.v4(),
                     ownerId: ownerId,
@@ -581,16 +589,20 @@ class _CreditLedgerTabState extends State<_CreditLedgerTab> {
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      amountCtrl.dispose();
+      notesCtrl.dispose();
+    });
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 2: OFFLINE DELIVERY LOGS
 // ─────────────────────────────────────────────────────────────────────────────
-class _DeliveryLogsTab extends StatelessWidget {
+class DmDeliveryLogsTab extends StatelessWidget {
   final Uuid uuid;
-  const _DeliveryLogsTab({required this.uuid});
+  const DmDeliveryLogsTab({super.key, required this.uuid});
 
   @override
   Widget build(BuildContext context) {
@@ -644,12 +656,12 @@ class _DeliveryLogsTab extends StatelessWidget {
                               d.riderName ?? 'Station Refill',
                               style: const TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${d.gallons.toStringAsFixed(0)} gal · ₱${d.pricePerGallon.toStringAsFixed(0)}/gal',
+                              '${d.gallons.toStringAsFixed(0)} gal · ${formatPeso(d.pricePerGallon, whole: true)}/gal',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppUi.textSecondaryOf(context),
@@ -658,9 +670,9 @@ class _DeliveryLogsTab extends StatelessWidget {
                             if (d.emptyGallonsReturned > 0)
                               Text(
                                 'Empties returned: ${d.emptyGallonsReturned.toStringAsFixed(0)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppUi.bluePrimary,
+                                  color: AppUi.brandOf(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -671,11 +683,11 @@ class _DeliveryLogsTab extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '₱${d.income.toStringAsFixed(2)}',
-                            style: const TextStyle(
+                            formatPeso(d.income),
+                            style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: AppUi.bluePrimary,
+                              fontWeight: FontWeight.w700,
+                              color: AppUi.brandOf(context),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -763,7 +775,9 @@ class _DeliveryLogsTab extends StatelessWidget {
                 final empties =
                     double.tryParse(emptyReturnedCtrl.text.trim()) ?? 0;
                 final ownerId =
-                    Supabase.instance.client.auth.currentUser?.id ?? '';
+                    Supabase.instance.client.auth.currentUser?.id ??
+                    context.read<UserProvider>().user?.id ??
+                    '';
 
                 final delivery = DmDelivery(
                   id: uuid.v4(),
@@ -783,21 +797,34 @@ class _DeliveryLogsTab extends StatelessWidget {
                       delivery: delivery,
                       commissionPerGallon: 0,
                     );
+                if (ownerId.isNotEmpty) {
+                  unawaited(OwnerInventoryService().recordDeliveryCompletion(
+                    ownerId: ownerId,
+                    orderId: delivery.id,
+                    gallons: gallons.round(),
+                    emptyGallonsReturned: empties.round(),
+                  ));
+                }
               },
               child: const Text('Record Delivery'),
             ),
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      noteCtrl.dispose();
+      gallonsCtrl.dispose();
+      priceCtrl.dispose();
+      emptyReturnedCtrl.dispose();
+    });
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 3: REPORTS & ANALYTICS
 // ─────────────────────────────────────────────────────────────────────────────
-class _ReportsAnalyticsTab extends StatelessWidget {
-  const _ReportsAnalyticsTab();
+class DmReportsAnalyticsTab extends StatelessWidget {
+  const DmReportsAnalyticsTab({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -844,61 +871,115 @@ class _ReportsAnalyticsTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: AppUi.blueSoft,
+              color: AppUi.brandSoftOf(context),
               borderRadius: BorderRadius.circular(AppUi.radiusControl),
               border: Border.all(color: AppUi.blueBorder),
             ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.picture_as_pdf_rounded,
-                  color: AppUi.bluePrimary,
-                  size: 22,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 420;
+                final actions = Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => _exportPdf(context, reportProv, share: false),
+                      icon: const Icon(Icons.print_rounded, size: 15),
+                      label: const Text('Print/Save'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppUi.bluePrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: () => _exportPdf(context, reportProv, share: true),
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      tooltip: 'Share PDF',
+                      color: AppUi.brandOf(context),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                );
+
+                if (isNarrow) {
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${_getRangeLabel(reportProv.range)} PDF Report',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppUi.bluePrimary,
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.picture_as_pdf_rounded,
+                            color: AppUi.brandOf(context),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${_getRangeLabel(reportProv.range)} PDF Report',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppUi.brandOf(context),
+                                  ),
+                                ),
+                                const Text(
+                                  'Official sales, deliveries & tax statement',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppUi.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const Text(
-                        'Official sales, deliveries & tax statement',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
+                      const SizedBox(height: 10),
+                      actions,
                     ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _exportPdf(context, reportProv, share: false),
-                  icon: const Icon(Icons.print_rounded, size: 15),
-                  label: const Text('Print/Save'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppUi.bluePrimary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                IconButton(
-                  onPressed: () => _exportPdf(context, reportProv, share: true),
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  tooltip: 'Share PDF',
-                  color: AppUi.bluePrimary,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Icon(
+                      Icons.picture_as_pdf_rounded,
+                      color: AppUi.brandOf(context),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_getRangeLabel(reportProv.range)} PDF Report',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppUi.brandOf(context),
+                            ),
+                          ),
+                          const Text(
+                            'Official sales, deliveries & tax statement',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppUi.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    actions,
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -920,7 +1001,7 @@ class _ReportsAnalyticsTab extends StatelessWidget {
                 child: _buildMetricCard(
                   context,
                   title: 'Gross Income',
-                  value: '₱${reportProv.totalIncome.toStringAsFixed(0)}',
+                  value: formatPeso(reportProv.totalIncome, whole: true),
                   color: AppUi.successFg,
                   icon: Icons.payments_rounded,
                 ),
@@ -944,7 +1025,7 @@ class _ReportsAnalyticsTab extends StatelessWidget {
                 child: _buildMetricCard(
                   context,
                   title: 'Net Profit',
-                  value: '₱${reportProv.netProfit.toStringAsFixed(0)}',
+                  value: formatPeso(reportProv.netProfit, whole: true),
                   color: AppColors.statusCompleted,
                   icon: Icons.trending_up_rounded,
                 ),
@@ -962,7 +1043,7 @@ class _ReportsAnalyticsTab extends StatelessWidget {
               children: [
                 const Text(
                   'Daily Income Trend',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 16),
                 DmBarChart(points: reportProv.dailySeries),
@@ -1027,7 +1108,7 @@ class _ReportsAnalyticsTab extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: color,
             ),
           ),

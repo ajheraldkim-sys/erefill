@@ -28,6 +28,9 @@ import '../../../core/utils/app_haptics.dart';
 import '../../../core/widgets/live_order_progress_tracker.dart';
 import '../../../core/widgets/offline_sync_status_pill.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
 
@@ -185,12 +188,15 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
   void _startHomeBannerTimer() {
     _homeBannerTimer?.cancel();
-    _homeBannerTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    // 6 s gives time to read; no auto-rotation when the OS asks for reduced
+    // motion (WCAG 2.2.2). Swipe and the page dots still work.
+    _homeBannerTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!_homeBannerController.hasClients || !mounted) return;
+      if (AppUi.reduceMotion(context)) return;
       _homeBannerController.animateToPage(
         (_homeBannerIndex + 1) % 3,
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeInOutCubic,
+        duration: AppUi.motionSlow,
+        curve: AppUi.motionCurve,
       );
     });
   }
@@ -331,12 +337,24 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
             final name = p['name']?.toString().trim();
             if (cat != null && cat.isNotEmpty) {
               types.add(cat);
+              final lowerCat = cat.toLowerCase();
+              if (lowerCat.contains('container') ||
+                  lowerCat.contains('accessor') ||
+                  lowerCat == 'products') {
+                types.add('Accessories');
+              }
             }
             if (name != null) {
               final lower = name.toLowerCase();
               if (lower.contains('purified')) types.add('Purified');
               if (lower.contains('alkaline')) types.add('Alkaline');
               if (lower.contains('mineral')) types.add('Mineral');
+              if (lower.contains('container') ||
+                  lower.contains('bottle') ||
+                  lower.contains('pump') ||
+                  lower.contains('cap')) {
+                types.add('Accessories');
+              }
             }
           }
         }
@@ -360,12 +378,26 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
             if (prod is Map) {
               final c = prod['category']?.toString();
               final n = prod['name']?.toString();
-              if (c != null && c.isNotEmpty) types.add(c);
+              if (c != null && c.isNotEmpty) {
+                types.add(c);
+                final lowerCat = c.toLowerCase();
+                if (lowerCat.contains('container') ||
+                    lowerCat.contains('accessor') ||
+                    lowerCat == 'products') {
+                  types.add('Accessories');
+                }
+              }
               if (n != null) {
                 final lower = n.toLowerCase();
                 if (lower.contains('purified')) types.add('Purified');
                 if (lower.contains('alkaline')) types.add('Alkaline');
                 if (lower.contains('mineral')) types.add('Mineral');
+                if (lower.contains('container') ||
+                    lower.contains('bottle') ||
+                    lower.contains('pump') ||
+                    lower.contains('cap')) {
+                  types.add('Accessories');
+                }
               }
             }
           }
@@ -736,8 +768,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                 onTap: () {
                   _homeBannerController.animateToPage(
                     index,
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
+                    duration: AppUi.motion(context, AppUi.motionSlow),
+                    curve: AppUi.motionCurve,
                   );
                 },
                 child: AnimatedContainer(
@@ -754,7 +786,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                           ? AppUi.bluePrimary
                           : AppUi.textMuted.withValues(alpha: 0.25),
                     ),
-                    borderRadius: BorderRadius.circular(99),
+                    borderRadius: BorderRadius.circular(AppUi.radiusFull),
                   ),
                 ),
               ),
@@ -783,7 +815,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         action = 'Explore stations';
         icon = Icons.explore_rounded;
         scene = ExperienceScene.discover;
-        colors = const [Color(0xFF1686D9), Color(0xFF0756A5)];
+        colors = const [AppUi.bluePrimary, AppUi.bluePrimaryDark];
         onTap = () => _openStations(context);
         break;
       case 1:
@@ -799,7 +831,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         action = _quickOrderStation == null ? 'Find a station' : 'Order again';
         icon = Icons.water_drop_rounded;
         scene = ExperienceScene.delivery;
-        colors = const [Color(0xFF12A99A), Color(0xFF087F8C)];
+        colors = const [AppUi.bluePrimary, AppUi.bluePrimaryDark];
         onTap = _quickOrderStation == null
             ? () => _openStations(context)
             : () => _handleQuickOrder(
@@ -817,7 +849,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         action = 'View favorites';
         icon = Icons.favorite_rounded;
         scene = ExperienceScene.station;
-        colors = const [Color(0xFF8864E8), Color(0xFF6042B5)];
+        colors = const [AppUi.bluePrimary, AppUi.bluePrimaryDark];
         onTap = () => _showFavorites(context);
         break;
       default:
@@ -828,44 +860,17 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       padding: const EdgeInsets.symmetric(horizontal: 1),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
           child: Ink(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: colors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.22),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.last.withValues(alpha: 0.28),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              color: colors.first,
+              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             ),
             child: Stack(
               children: [
-                Positioned(
-                  right: -34,
-                  top: -58,
-                  child: Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
-                  ),
-                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(17, 13, 13, 13),
                   child: Row(
@@ -881,7 +886,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(99),
+                                borderRadius: BorderRadius.circular(AppUi.radiusFull),
                                 border: Border.all(
                                   color: Colors.white.withValues(alpha: 0.28),
                                   width: 0.8,
@@ -893,8 +898,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 0.8,
                                 ),
                               ),
@@ -908,7 +913,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                 color: Colors.white,
                                 fontSize: 16,
                                 height: 1.1,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: -0.25,
                               ),
                             ),
@@ -918,9 +923,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.86),
-                                fontSize: 11,
-                                height: 1.2,
+                                color: Colors.white.withValues(alpha: 0.92),
+                                fontSize: 12,
+                                height: 1.3,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -932,14 +937,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(99),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                borderRadius: BorderRadius.circular(AppUi.radiusFull),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -951,8 +949,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: colors.last,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ),
@@ -990,15 +988,6 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 0.94),
                                   shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.12,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
                                 ),
                                 child: Icon(icon, color: colors.last, size: 17),
                               ),
@@ -1074,9 +1063,12 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         } catch (_) {}
       }
 
+      // Only reuse items whose product and price are known. The server prices
+      // orders from product_id, so an invented price would only mislead.
       final validItems = items
           .whereType<Map<String, dynamic>>()
           .where((raw) => OrderProductHelpers.isValidProductId(raw['product_id']))
+          .where((raw) => raw['price_at_purchase'] is num)
           .toList();
 
       if (validItems.isNotEmpty) {
@@ -1084,8 +1076,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           final productId = raw['product_id'].toString();
           final productName =
               (raw['product_name'] ?? 'Purified Water Refill').toString();
-          final price =
-              ((raw['price_at_purchase'] as num?) ?? 25.0).toDouble();
+          final price = (raw['price_at_purchase'] as num).toDouble();
           final qty = ((raw['quantity'] as num?) ?? 1).toInt();
 
           cart.addItem(productId, productName, price);
@@ -1096,7 +1087,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         itemsPopulated = true;
       }
 
-      // 2. Fallback: if no past items or new station quick order, fetch primary product
+      // 2. Fallback: the station's cheapest available product, if it has a price.
       if (!itemsPopulated) {
         Map<String, dynamic>? defaultProduct;
         try {
@@ -1112,16 +1103,21 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           }
         } catch (_) {}
 
-        final prodId = defaultProduct?['id']?.toString() ??
-            'default_${stationId}_purified';
-        final prodName = defaultProduct?['name']?.toString() ??
-            station['primary_water_type']?.toString() ??
-            'Purified Water Refill';
-        final price = (defaultProduct?['price'] as num?)?.toDouble() ??
-            (station['price_per_gallon'] as num?)?.toDouble() ??
-            25.0;
-
-        cart.addItem(prodId, prodName, price);
+        final prodId = defaultProduct?['id']?.toString();
+        final price = (defaultProduct?['price'] as num?)?.toDouble();
+        if (prodId == null || price == null) {
+          // No priced product to prefill: let the customer choose on the
+          // station page instead of guessing.
+          cart.clearCart();
+          if (!mounted) return;
+          context.openStationDetails(station);
+          return;
+        }
+        cart.addItem(
+          prodId,
+          defaultProduct?['name']?.toString() ?? 'Water refill',
+          price,
+        );
         cart.updateQuantity(prodId, 1);
       }
 
@@ -1136,8 +1132,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not start quick order: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Could not start quick order: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -1183,29 +1179,45 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   }
 
   List<Map<String, dynamic>> get _filteredStations {
-    if (_selectedCategory == 'All') return _stations;
-    final cat = _selectedCategory.toLowerCase();
-
-    return _stations.where((s) {
-      final types = s['available_water_types'];
-      if (types is Set<String>) {
-        if (types.any((t) => t.toLowerCase() == cat || t.toLowerCase().contains(cat))) {
-          return true;
+    List<Map<String, dynamic>> base;
+    if (_selectedCategory == 'All') {
+      base = List<Map<String, dynamic>>.from(_stations);
+    } else {
+      final cat = _selectedCategory.toLowerCase();
+      base = _stations.where((s) {
+        final types = s['available_water_types'];
+        if (types is Set<String>) {
+          if (types.any((t) => t.toLowerCase() == cat || t.toLowerCase().contains(cat))) {
+            return true;
+          }
+        } else if (types is Iterable) {
+          if (types.any((t) => t.toString().toLowerCase() == cat || t.toString().toLowerCase().contains(cat))) {
+            return true;
+          }
         }
-      } else if (types is Iterable) {
-        if (types.any((t) => t.toString().toLowerCase() == cat || t.toString().toLowerCase().contains(cat))) {
-          return true;
-        }
-      }
 
-      final primaryType = (s['primary_water_type'] ?? '').toString().toLowerCase();
-      if (primaryType.contains(cat)) return true;
+        final primaryType = (s['primary_water_type'] ?? '').toString().toLowerCase();
+        if (primaryType.contains(cat)) return true;
 
-      final name = (s['station_name'] ?? s['full_name'] ?? '').toString().toLowerCase();
-      if (name.contains(cat)) return true;
+        final name = (s['station_name'] ?? s['full_name'] ?? '').toString().toLowerCase();
+        if (name.contains(cat)) return true;
 
-      return false;
-    }).toList();
+        return false;
+      }).toList();
+    }
+
+    // Sort: open stations first, closed stations moved to the bottom
+    base.sort((a, b) {
+      final aAvail = (a['station_availability'] ?? (a['is_open'] == false ? 'closed' : 'open')).toString().toLowerCase();
+      final bAvail = (b['station_availability'] ?? (b['is_open'] == false ? 'closed' : 'open')).toString().toLowerCase();
+      final aClosed = aAvail == 'closed';
+      final bClosed = bAvail == 'closed';
+      if (aClosed && !bClosed) return 1;
+      if (!aClosed && bClosed) return -1;
+      return 0;
+    });
+
+    return base;
   }
 
   Widget _buildQuickOrderButton(BuildContext context) {
@@ -1228,9 +1240,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppUi.radiusSheet),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         onTap: _isProcessingQuickOrder
             ? null
             : () {
@@ -1244,15 +1256,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             border: Border.all(color: AppUi.borderOf(context)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Row(
             children: [
@@ -1260,8 +1265,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppUi.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
                 child: _isProcessingQuickOrder
                     ? const Center(
@@ -1276,7 +1281,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       )
                     : Icon(
                         isReorder ? Icons.replay_rounded : Icons.bolt_rounded,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                         size: 24,
                       ),
               ),
@@ -1289,19 +1294,19 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       children: [
                         Text(
                           isReorder ? 'REPEAT LAST ORDER' : 'QUICK REFILL',
-                          style: const TextStyle(
-                            color: AppUi.bluePrimary,
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w800,
+                          style: TextStyle(
+                            color: AppUi.brandOf(context),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
                           ),
                         ),
                         if (isReorder && totalAmount != null) ...[
                           Text(
-                            ' · ₱${totalAmount.toStringAsFixed(0)}',
+                            ' · ${formatPeso(totalAmount, whole: true)}',
                             style: const TextStyle(
                               color: AppUi.textSecondary,
-                              fontSize: 9.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1319,7 +1324,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.2,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -1346,7 +1351,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                 ),
                 decoration: BoxDecoration(
                   color: AppUi.bluePrimary,
-                  borderRadius: BorderRadius.circular(99),
+                  borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1355,8 +1360,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       isReorder ? 'Reorder' : 'Order',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 3),
@@ -1386,6 +1391,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       {'label': 'Purified', 'icon': Icons.water_drop_rounded, 'filter': 'Purified'},
       {'label': 'Alkaline', 'icon': Icons.science_rounded, 'filter': 'Alkaline'},
       {'label': 'Mineral', 'icon': Icons.spa_rounded, 'filter': 'Mineral'},
+      {'label': 'Accessories', 'icon': Icons.inventory_2_outlined, 'filter': 'Accessories'},
     ];
 
     return SizedBox(
@@ -1403,9 +1409,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
           return Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: BorderRadius.circular(AppUi.radiusFull),
             child: InkWell(
-              borderRadius: BorderRadius.circular(99),
+              borderRadius: BorderRadius.circular(AppUi.radiusFull),
               onTap: () {
                 AppHaptics.selection();
                 setState(() => _selectedCategory = filterKey);
@@ -1422,7 +1428,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       : (isPreferred
                           ? AppUi.bluePrimary.withValues(alpha: 0.08)
                           : AppUi.surfaceOf(context)),
-                  borderRadius: BorderRadius.circular(99),
+                  borderRadius: BorderRadius.circular(AppUi.radiusFull),
                   border: Border.all(
                     color: isSelected
                         ? AppUi.bluePrimary
@@ -1450,7 +1456,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight:
-                            isSelected || isPreferred ? FontWeight.w800 : FontWeight.w600,
+                            isSelected || isPreferred ? FontWeight.w700 : FontWeight.w600,
                         color: isSelected
                             ? Colors.white
                             : (isPreferred
@@ -1463,7 +1469,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                       Icon(
                         Icons.star_rounded,
                         size: 13,
-                        color: isSelected ? Colors.white : AppUi.bluePrimary,
+                        color: isSelected ? Colors.white : AppUi.brandOf(context),
                       ),
                     ],
                   ],
@@ -1651,7 +1657,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
           ),
           child: SafeArea(
             top: false,
@@ -1667,7 +1673,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                           'Favorite stations',
                           style: TextStyle(
                             fontSize: 19,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -1721,9 +1727,9 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                           final price = station['price_per_gallon'];
                           return Material(
                             color: AppUi.pageBgOf(context),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                               onTap: () {
                                 Navigator.pop(sheetContext);
                                 context.openStationDetails(station);
@@ -1733,7 +1739,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                 child: Row(
                                   children: [
                                     ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                       child: SizedBox(
                                         width: 54,
                                         height: 54,
@@ -1760,7 +1766,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
@@ -1778,10 +1784,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                     if (price is num) ...[
                                       const SizedBox(width: 8),
                                       Text(
-                                        '₱${price.toStringAsFixed(0)}/gal',
-                                        style: const TextStyle(
-                                          color: AppUi.bluePrimary,
-                                          fontWeight: FontWeight.w800,
+                                        '${formatPeso(price, whole: true)}/gal',
+                                        style: TextStyle(
+                                          color: AppUi.brandOf(context),
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ],
@@ -1919,7 +1925,7 @@ class _SheetHandle extends StatelessWidget {
       margin: const EdgeInsets.only(top: 10, bottom: 8),
       decoration: BoxDecoration(
         color: AppUi.textMuted.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
       ),
     );
   }
@@ -1962,8 +1968,8 @@ class _StationThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppUi.blueSoft,
-      child: const Icon(Icons.water_drop_rounded, color: AppUi.bluePrimary),
+      color: AppUi.brandSoftOf(context),
+      child: Icon(Icons.water_drop_rounded, color: AppUi.brandOf(context)),
     );
   }
 }

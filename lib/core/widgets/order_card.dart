@@ -3,6 +3,7 @@ import '../constants.dart';
 import '../theme/app_colors.dart';
 import 'press_bounce.dart';
 
+import 'package:erefill/core/utils/money.dart';
 /// Role-aware variants for the reusable [OrderCard].
 enum OrderCardRole { customer, owner, rider, admin }
 
@@ -28,38 +29,46 @@ class OrderStatusChip extends StatelessWidget {
 
     final bg = onFullColorSurface
         ? style.chipBackground
-        : style.subtleBackground;
+        : style.badgeBackground;
     final fg = onFullColorSurface
         ? style.chipForeground
-        : style.primaryColor;
+        : style.badgeForeground;
     final border = onFullColorSurface
         ? style.chipBorder
-        : style.subtleBorder;
+        : style.badgeBorder;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: border, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showIcon) ...[
-            Icon(style.icon, size: 12, color: fg),
-            const SizedBox(width: 5),
-          ],
-          Text(
-            uppercase ? style.label.toUpperCase() : style.label,
-            style: TextStyle(
-              fontSize: uppercase ? 10 : 11,
-              color: fg,
-              fontWeight: FontWeight.w800,
-              letterSpacing: uppercase ? 0.6 : 0.2,
+    return Semantics(
+      label: 'Order status: ${style.label}',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: AppUi.fullRadius,
+          border: Border.all(color: border, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showIcon) ...[
+              Icon(style.icon, size: 14, color: fg),
+              const SizedBox(width: 4),
+            ],
+            Flexible(
+              child: Text(
+                uppercase ? style.label.toUpperCase() : style.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: uppercase ? 11 : 12,
+                  color: fg,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: uppercase ? 0.5 : 0,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -155,7 +164,7 @@ class OrderCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: style.cardBackground,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             boxShadow: [
               BoxShadow(
                 color: style.primaryColor.withValues(alpha: 0.28),
@@ -175,7 +184,7 @@ class OrderCard extends StatelessWidget {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                     child: Icon(titleIcon, color: Colors.white, size: 18),
                   ),
@@ -191,7 +200,7 @@ class OrderCard extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -232,13 +241,13 @@ class OrderCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                     child: Text(
-                      '₱${total.toStringAsFixed(0)}',
+                      formatPeso(total, whole: true),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),
                     ),
@@ -250,7 +259,7 @@ class OrderCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(AppUi.radiusFull),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -259,8 +268,8 @@ class OrderCard extends StatelessWidget {
                             role == OrderCardRole.customer ? 'View Details' : 'Manage',
                             style: TextStyle(
                               color: style.primaryColor,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -332,15 +341,8 @@ class OrderCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: AppUi.surfaceOf(context),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
             border: Border.all(color: style.primaryColor.withValues(alpha: 0.3), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -353,7 +355,7 @@ class OrderCard extends StatelessWidget {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: style.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                       child: Icon(titleIcon, color: style.primaryColor, size: 18),
                     ),
@@ -369,7 +371,7 @@ class OrderCard extends StatelessWidget {
                             style: TextStyle(
                               color: AppUi.textPrimaryOf(context),
                               fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
@@ -390,10 +392,10 @@ class OrderCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '₱${total.toStringAsFixed(0)}',
+                      formatPeso(total, whole: true),
                       style: TextStyle(
                         color: style.primaryColor,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),
                     ),

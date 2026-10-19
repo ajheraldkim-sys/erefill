@@ -7,6 +7,8 @@ import '../../../widgets/app_widgets.dart';
 import 'checkout_rules.dart';
 import '../../../core/routing/app_navigation.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/money.dart';
 class PaymentReturnScreen extends StatefulWidget {
   final bool isSuccess;
   final String? orderId;
@@ -183,7 +185,7 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
         ? AppUi.error
         : widget.isSuccess
         ? AppUi.bluePrimary
-        : const Color(0xFFF59E0B);
+        : AppColors.uiWarning;
     final icon = isError
         ? Icons.error_outline_rounded
         : widget.isSuccess
@@ -219,7 +221,7 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: color,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 AppUi.vGapXs,
@@ -261,7 +263,7 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
             _summaryRow('Station', stationName.trim()),
             AppUi.vGapMd,
           ],
-          _summaryRow('Amount', '₱${total.toStringAsFixed(2)}'),
+          _summaryRow('Amount', formatPeso(total)),
           AppUi.vGapMd,
           _summaryRow('Payment method', method),
           if (createdAt != null) ...[

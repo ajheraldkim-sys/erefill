@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:erefill/core/constants.dart';
-import 'package:erefill/core/widgets/app_form_fields.dart';
+import '../../../../core/constants.dart';
+import '../../../../core/widgets/app_form_fields.dart';
+import '../../../../core/utils/app_haptics.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class AddOrderDialog extends StatefulWidget {
   final String ownerId;
   final List<Map<String, dynamic>> riders;
@@ -23,9 +27,9 @@ class AddOrderDialog extends StatefulWidget {
 
 class _AddOrderDialogState extends State<AddOrderDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _customerNameController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _gallonsController = TextEditingController();
+  final _customerNameController = TextEditingController(text: 'Walk-in Customer');
+  final _addressController = TextEditingController(text: 'Station Counter');
+  final _gallonsController = TextEditingController(text: '1');
   final _pricePerGallonController = TextEditingController();
   final _phoneController = TextEditingController();
   final _notesController = TextEditingController();
@@ -33,6 +37,8 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
   String? _selectedRiderId;
   bool _isCredit = false;
   bool _isLoading = false;
+  bool _isWalkIn = true;
+  List<String> _recentCustomers = [];
 
   @override
   void initState() {
@@ -42,6 +48,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
     if (widget.initialPrice == null) {
       _loadStationPrice();
     }
+    _loadRecentCustomers();
   }
 
   Future<void> _loadStationPrice() async {
@@ -58,6 +65,30 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
             _pricePerGallonController.text = p.toStringAsFixed(2);
           });
         }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadRecentCustomers() async {
+    try {
+      final res = await Supabase.instance.client
+          .from('orders')
+          .select('customer_name')
+          .eq('owner_id', widget.ownerId)
+          .order('created_at', ascending: false)
+          .limit(25);
+      if (mounted) {
+        final names = res
+            .map((r) => r['customer_name']?.toString().trim())
+            .whereType<String>()
+            .where((name) =>
+                name.isNotEmpty &&
+                name.toLowerCase() != 'walk-in customer' &&
+                name.toLowerCase() != 'walk-in')
+            .toSet()
+            .take(5)
+            .toList();
+        setState(() => _recentCustomers = names);
       }
     } catch (_) {}
   }
@@ -79,6 +110,28 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
     return gallons * price;
   }
 
+  void _adjustGallons(int delta) {
+    AppHaptics.light();
+    final current = int.tryParse(_gallonsController.text.trim()) ?? 1;
+    final next = (current + delta).clamp(1, 999);
+    setState(() {
+      _gallonsController.text = next.toString();
+    });
+  }
+
+  void _selectCustomer(String name) {
+    AppHaptics.selection();
+    setState(() {
+      _customerNameController.text = name;
+      if (name != 'Walk-in Customer') {
+        _isWalkIn = false;
+        if (_addressController.text == 'Station Counter') {
+          _addressController.text = '';
+        }
+      }
+    });
+  }
+
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -86,20 +139,29 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
 
     try {
       final supabase = Supabase.instance.client;
+      final custName = _customerNameController.text.trim().isEmpty
+          ? 'Walk-in Customer'
+          : _customerNameController.text.trim();
+      final addr = _addressController.text.trim().isEmpty
+          ? 'Station Counter'
+          : _addressController.text.trim();
+      final phone = _phoneController.text.trim().isEmpty
+          ? 'N/A'
+          : _phoneController.text.trim();
 
       // Create the order
       final orderData = {
         'owner_id': widget.ownerId,
-        'customer_name': _customerNameController.text,
-        'delivery_address': _addressController.text,
-        'phone': _phoneController.text,
+        'customer_name': custName,
+        'delivery_address': addr,
+        'phone': phone,
         'gallons': double.parse(_gallonsController.text),
         'price_per_gallon': double.parse(_pricePerGallonController.text),
         'total_amount': _totalAmount,
-        'status': 'pending',
+        'status': _isWalkIn ? 'accepted' : 'pending',
         'is_credit': _isCredit,
         'notes': _notesController.text,
-        'payment_method': 'cod',
+        'payment_method': _isCredit ? 'credit' : 'cash',
         'payment_status': _isCredit ? 'pending' : 'success',
         'rider_id': _selectedRiderId,
         'assigned_rider_id': _selectedRiderId,
@@ -113,7 +175,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
         widget.onOrderAdded();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Order created successfully! 🎉'),
+            content: Text('Refill recorded'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -122,7 +184,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to create order: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to record order: ${FriendlyErrors.message(e)}')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -134,8 +196,8 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: AppUi.dialogRadius),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 500),
-        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(maxWidth: 520),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -143,64 +205,195 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Create New Order',
+                      'Quick Walk-in / Order',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimary,
                       ),
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
 
-                const AppFormSectionHeader(
-                  title: 'Customer Information',
-                  topPadding: 8,
+                // Order Type Selector
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          AppHaptics.selection();
+                          setState(() {
+                            _isWalkIn = true;
+                            _customerNameController.text = 'Walk-in Customer';
+                            _addressController.text = 'Station Counter';
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 150),
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _isWalkIn
+                                ? AppUi.bluePrimary
+                                : AppUi.surfaceRaisedOf(context),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Walk-in refill',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _isWalkIn
+                                  ? Colors.white
+                                  : AppUi.textSecondaryOf(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          AppHaptics.selection();
+                          setState(() {
+                            _isWalkIn = false;
+                            if (_customerNameController.text == 'Walk-in Customer') {
+                              _customerNameController.text = '';
+                            }
+                            if (_addressController.text == 'Station Counter') {
+                              _addressController.text = '';
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 150),
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: !_isWalkIn
+                                ? AppUi.bluePrimary
+                                : AppUi.surfaceRaisedOf(context),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Delivery request',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: !_isWalkIn
+                                  ? Colors.white
+                                  : AppUi.textSecondaryOf(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                SizedBox(height: 14),
+
+                // Recent customer chips
+                if (_recentCustomers.isNotEmpty) ...[
+                  Text(
+                    'Recent Customers:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ActionChip(
+                          label: const Text('Walk-in'),
+                          avatar: const Icon(Icons.person, size: 14),
+                          onPressed: () => _selectCustomer('Walk-in Customer'),
+                        ),
+                        const SizedBox(width: 6),
+                        ..._recentCustomers.map(
+                          (name) => Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              label: Text(name),
+                              onPressed: () => _selectCustomer(name),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Customer Name
                 AppFormField(
                   controller: _customerNameController,
                   label: 'Customer Name',
                   icon: Icons.person_outline_rounded,
                   textCapitalization: TextCapitalization.words,
                   compact: true,
-                  validator: (v) => v?.isEmpty == true ? 'Required' : null,
+                  validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
                 ),
-                const SizedBox(height: 12),
-                AppFormField(
-                  controller: _phoneController,
-                  label: 'Phone Number',
-                  icon: Icons.phone_android_rounded,
-                  keyboardType: TextInputType.phone,
-                  compact: true,
-                  validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                AppFormField(
-                  controller: _addressController,
-                  label: 'Delivery Address',
-                  icon: Icons.location_on_outlined,
-                  textCapitalization: TextCapitalization.words,
-                  maxLines: 2,
-                  compact: true,
-                  validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
+                if (!_isWalkIn) ...[
+                  const SizedBox(height: 10),
+                  AppFormField(
+                    controller: _phoneController,
+                    label: 'Phone Number',
+                    icon: Icons.phone_android_rounded,
+                    keyboardType: TextInputType.phone,
+                    compact: true,
+                  ),
+                  const SizedBox(height: 10),
+                  AppFormField(
+                    controller: _addressController,
+                    label: 'Delivery Address',
+                    icon: Icons.location_on_outlined,
+                    textCapitalization: TextCapitalization.words,
+                    compact: true,
+                    validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+                  ),
+                ],
+                const SizedBox(height: 14),
 
-                const AppFormSectionHeader(
-                  title: 'Refill Quantity & Pricing',
-                  topPadding: 4,
+                // Gallons Quantity Steppers
+                Text(
+                  'Quantity (Gallons)',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
+                SizedBox(height: 6),
                 Row(
                   children: [
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => _adjustGallons(-1),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                          ),
+                        ),
+                        child: Text('-1', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    SizedBox(width: 8),
                     Expanded(
                       child: AppFormField(
                         controller: _gallonsController,
@@ -212,125 +405,224 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
                         onChanged: (_) => setState(() {}),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: AppFormField(
-                        controller: _pricePerGallonController,
-                        label: 'Price / Gal (₱)',
-                        icon: Icons.payments_outlined,
-                        keyboardType: TextInputType.number,
-                        compact: true,
-                        validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                        onChanged: (_) => setState(() {}),
+                    SizedBox(width: 8),
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => _adjustGallons(1),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                          ),
+                        ),
+                        child: Text('+1', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    SizedBox(
+                      width: 52,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () => _adjustGallons(5),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppUi.bluePrimary,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                          ),
+                        ),
+                        child: Text('+5', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 12),
 
-                // Total Amount Display
+                // Price per gallon
+                AppFormField(
+                  controller: _pricePerGallonController,
+                  label: 'Price per Gallon (₱)',
+                  icon: Icons.payments_outlined,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  compact: true,
+                  validator: (v) => v?.isEmpty == true ? 'Required' : null,
+                  onChanged: (_) => setState(() {}),
+                ),
+                SizedBox(height: 14),
+
+                // Cash vs Credit Toggle
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          AppHaptics.selection();
+                          setState(() => _isCredit = false);
+                        },
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !_isCredit
+                                ? AppUi.successBg
+                                : AppUi.surfaceRaisedOf(context),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                            border: Border.all(
+                              color: !_isCredit
+                                  ? AppColors.uiSuccess
+                                  : Colors.transparent,
+                              width: 1.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.payments_rounded,
+                                size: 18,
+                                color: !_isCredit
+                                    ? AppUi.successFg
+                                    : AppUi.textSecondaryOf(context),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Cash (paid)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: !_isCredit
+                                      ? AppUi.successFg
+                                      : AppUi.textSecondaryOf(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          AppHaptics.selection();
+                          setState(() => _isCredit = true);
+                        },
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _isCredit
+                                ? AppUi.warningBg
+                                : AppUi.surfaceRaisedOf(context),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                            border: Border.all(
+                              color: _isCredit
+                                  ? AppColors.uiWarning
+                                  : Colors.transparent,
+                              width: 1.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_long_rounded,
+                                size: 18,
+                                color: _isCredit
+                                    ? AppUi.warningFg
+                                    : AppUi.textSecondaryOf(context),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Credit (utang)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _isCredit
+                                      ? AppUi.warningFg
+                                      : AppUi.textSecondaryOf(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+
+                // Total Summary Bar
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: AppUi.blueSoft,
-                    borderRadius: AppUi.cardRadius,
-                    border: Border.all(color: AppUi.bluePrimary.withValues(alpha: 0.15)),
+                    color: AppUi.brandSoftOf(context),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                    border: Border.all(
+                      color: AppUi.bluePrimary.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Total Amount:',
+                      Text(
+                        'Total Payable:',
                         style: TextStyle(
-                          fontWeight: FontWeight.w700,
                           fontSize: 14,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textPrimary,
                         ),
                       ),
                       Text(
-                        '₱${_totalAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: AppUi.bluePrimary,
+                        formatPeso(_totalAmount),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppUi.brandOf(context),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 18),
 
-                const AppFormSectionHeader(
-                  title: 'Dispatch & Settings',
-                  topPadding: 4,
-                ),
-                if (widget.riders.isNotEmpty) ...[
-                  AppDropdownField<String>(
-                    label: 'Assign Rider (Optional)',
-                    icon: Icons.delivery_dining_rounded,
-                    value: _selectedRiderId,
-                    compact: true,
-                    items: widget.riders.map((rider) {
-                      final name =
-                          rider['full_name'] ?? rider['username'] ?? 'Unknown';
-                      return DropdownMenuItem(
-                        value: rider['id'] as String,
-                        child: Text(
-                          name,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (v) => setState(() => _selectedRiderId = v),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // Credit Toggle
-                Material(
-                  color: AppUi.surfaceOf(context),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppUi.cardRadius,
-                    side: BorderSide(color: AppUi.borderOf(context)),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: SwitchListTile(
-                      title: const Text(
-                        'Credit Order',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                // Single Tap Save Button
+                SizedBox(
+                  width: double.infinity,
+                  height: AppUi.kRiderTouchTarget,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _submitOrder,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.uiSuccess,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       ),
-                      subtitle: const Text(
-                        'Customer will pay at a later date',
-                        style: TextStyle(fontSize: 12, color: AppUi.textMuted),
-                      ),
-                      value: _isCredit,
-                      thumbColor: WidgetStateProperty.resolveWith((states) {
-                        if (states.contains(WidgetState.selected)) {
-                          return AppUi.bluePrimary;
-                        }
-                        return null;
-                      }),
-                      onChanged: (v) => setState(() => _isCredit = v),
                     ),
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Save Refill (${formatPeso(_totalAmount)})',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                AppFormField(
-                  controller: _notesController,
-                  label: 'Special Instructions (Optional)',
-                  icon: Icons.notes_rounded,
-                  maxLines: 2,
-                  compact: true,
-                ),
-                const SizedBox(height: 24),
-
-                AppFormSubmitButton(
-                  label: 'Record Refill Order',
-                  isLoading: _isLoading,
-                  onPressed: _submitOrder,
-                  icon: Icons.add_circle_outline_rounded,
                 ),
               ],
             ),

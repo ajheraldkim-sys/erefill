@@ -9,6 +9,7 @@ import '../../core/routing/app_routes.dart';
 import '../../core/widgets/app_form_fields.dart';
 import '../../core/services/external_notification_service.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 class AccountSecurityScreen extends StatefulWidget {
   const AccountSecurityScreen({super.key, required this.role});
 
@@ -104,7 +105,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Unable to resend email: $e'),
+          content: Text('Unable to resend email: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -185,7 +186,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update password: $e'),
+          content: Text('Failed to update password: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -208,14 +209,14 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: AppUi.surfaceOf(dialogCtx),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: AppUi.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
                 child: const Icon(Icons.warning_amber_rounded, color: AppUi.error, size: 24),
               ),
@@ -223,7 +224,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
               const Expanded(
                 child: Text(
                   'Delete Account',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                 ),
               ),
             ],
@@ -242,7 +243,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppUi.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     border: Border.all(color: AppUi.error.withValues(alpha: 0.2)),
                   ),
                   child: Column(
@@ -252,7 +253,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                         'Consequences of deletion:',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.error,
                         ),
                       ),
@@ -282,7 +283,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                       isDense: true,
                       prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                   ),
@@ -290,7 +291,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                 ],
                 const Text(
                   'Type DELETE to confirm:',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -300,7 +301,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                     hintText: 'DELETE',
                     isDense: true,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       borderSide: const BorderSide(color: AppUi.error),
                     ),
                   ),
@@ -322,7 +323,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppUi.error,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
               ),
               onPressed: (!confirmedText || isAuthenticating)
                   ? null
@@ -453,7 +454,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: AppUi.surfaceOf(context),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         border: Border.all(color: AppUi.borderOf(context)),
                       ),
                       child: Column(
@@ -462,8 +463,8 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                           Text(
                             'ACCOUNT EMAIL ADDRESS',
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: 0.8,
                               color: AppUi.textSecondaryOf(context),
                             ),
@@ -474,7 +475,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                               Icon(
                                 Icons.email_outlined,
                                 size: 20,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -502,7 +503,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                                   color: _isEmailVerified
                                       ? AppUi.successBg
                                       : AppUi.warningBg,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                                   border: Border.all(
                                     color: _isEmailVerified
                                         ? AppUi.successFg.withValues(alpha: 0.3)
@@ -548,7 +549,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                                   padding: const EdgeInsets.symmetric(vertical: 12),
                                   side: BorderSide(color: AppUi.bluePrimary),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                                   ),
                                 ),
                                 onPressed: (_isResendingVerification || _resendCooldown > 0)
@@ -599,13 +600,13 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppUi.blueSoft,
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppUi.brandSoftOf(context),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             border: Border.all(color: AppUi.blueBorder),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.g_mobiledata_rounded, size: 28, color: AppUi.bluePrimary),
+                              Icon(Icons.g_mobiledata_rounded, size: 28, color: AppUi.brandOf(context)),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -718,7 +719,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: AppUi.error.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: const Icon(
                             Icons.delete_forever_rounded,
@@ -731,7 +732,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                           'DANGER ZONE',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: 1.0,
                             color: AppUi.error,
                           ),
@@ -766,7 +767,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                           side: const BorderSide(color: AppUi.error),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                         ),
                         icon: _isDeleting
@@ -781,7 +782,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                             : const Icon(Icons.delete_outline_rounded, size: 20),
                         label: Text(
                           _isDeleting ? 'Deleting Account...' : 'Delete Account',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         onPressed: _isDeleting ? null : _promptAccountDeletion,
                       ),

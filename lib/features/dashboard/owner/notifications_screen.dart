@@ -313,10 +313,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ? [
                     TextButton(
                       onPressed: _markAllAsRead,
-                      child: const Text(
+                      child: Text(
                         'Mark all read',
                         style: TextStyle(
-                          color: AppUi.bluePrimary,
+                          color: AppUi.brandOf(context),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -338,7 +338,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             'System Alerts',
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               color: AppUi.textPrimaryOf(context),
                             ),
                           ),
@@ -357,7 +357,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               'Recent Notifications',
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 color: AppUi.textPrimaryOf(context),
                               ),
                             ),
@@ -368,8 +368,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: AppColors.uiError,
+                                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 ),
                                 child: Text(
                                   '$unreadCount new',
@@ -482,7 +482,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                               style: TextStyle(
                                                 fontWeight: isRead
                                                     ? FontWeight.w600
-                                                    : FontWeight.w800,
+                                                    : FontWeight.w700,
                                                 fontSize: 15,
                                                 color: AppUi.textPrimaryOf(context),
                                               ),
@@ -549,7 +549,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: (alert['color'] as Color).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
             ),
             child: Icon(
               alert['icon'] as IconData,
@@ -565,7 +565,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 Text(
                   alert['title'],
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 15,
                     color: AppUi.textPrimaryOf(context),
                   ),

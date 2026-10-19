@@ -19,7 +19,7 @@ class CustomerOrdersLoadNotice extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppUi.warningBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.warningFg.withValues(alpha: 0.25)),
       ),
       child: Row(
@@ -37,7 +37,7 @@ class CustomerOrdersLoadNotice extends StatelessWidget {
                       : 'Could not load your orders',
                   style: const TextStyle(
                     color: AppUi.warningFg,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
                 ),

@@ -9,6 +9,8 @@ import '../onboarding/create_dialogs.dart';
 import '../stations/station_detail_screen.dart';
 import 'user_manage_dialog.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 enum UserViewMode { cards, list }
 
 class UsersScreen extends StatefulWidget {
@@ -147,7 +149,7 @@ class _UsersScreenState extends State<UsersScreen> {
       } catch (e) {
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       }
     } else {
@@ -187,7 +189,7 @@ class _UsersScreenState extends State<UsersScreen> {
       } catch (e) {
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       }
     }
@@ -233,10 +235,10 @@ class _UsersScreenState extends State<UsersScreen> {
       switch (role.toLowerCase()) {
         'owner' =>
           Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF56D6A6)
+              ? AppUi.successFgDark
               : AppUi.accentGreen,
         'rider' => AppUi.accentCyan,
-        'admin' => const Color(0xFF6366F1),
+        'admin' => AppColors.statusOutForDelivery,
         'customer' => Theme.of(context).colorScheme.primary,
         _ => adminMutedTextColor(context),
       };
@@ -586,7 +588,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                   initial,
                                   style: TextStyle(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     color: roleCol,
                                   ),
                                 ),
@@ -600,7 +602,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                       fullName,
                                       style: const TextStyle(
                                         fontSize: 15,
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -821,7 +823,7 @@ class _UsersScreenState extends State<UsersScreen> {
                 child: Text(
                   initial,
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: _roleColor(context, role),
                   ),
                 ),

@@ -105,3 +105,59 @@ class RiderPayoutRequest {
   }
 }
 
+class OwnerWalletSummary {
+  final double totalDigitalEarnings;
+  final double pendingRiderDisbursements;
+  final double completedRiderDisbursements;
+  final double availableBalance;
+  final int totalDigitalOrders;
+  final List<Map<String, dynamic>> recentTransactions;
+
+  const OwnerWalletSummary({
+    required this.totalDigitalEarnings,
+    required this.pendingRiderDisbursements,
+    required this.completedRiderDisbursements,
+    required this.availableBalance,
+    required this.totalDigitalOrders,
+    required this.recentTransactions,
+  });
+
+  factory OwnerWalletSummary.empty() => const OwnerWalletSummary(
+        totalDigitalEarnings: 0,
+        pendingRiderDisbursements: 0,
+        completedRiderDisbursements: 0,
+        availableBalance: 0,
+        totalDigitalOrders: 0,
+        recentTransactions: [],
+      );
+
+  factory OwnerWalletSummary.fromJson(Map<String, dynamic> json) {
+    return OwnerWalletSummary(
+      totalDigitalEarnings:
+          (json['total_digital_earnings'] as num?)?.toDouble() ?? 0.0,
+      pendingRiderDisbursements:
+          (json['pending_rider_disbursements'] as num?)?.toDouble() ?? 0.0,
+      completedRiderDisbursements:
+          (json['completed_rider_disbursements'] as num?)?.toDouble() ?? 0.0,
+      availableBalance:
+          (json['available_balance'] as num?)?.toDouble() ?? 0.0,
+      totalDigitalOrders:
+          (json['total_digital_orders'] as num?)?.toInt() ?? 0,
+      recentTransactions: (json['recent_transactions'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'total_digital_earnings': totalDigitalEarnings,
+      'pending_rider_disbursements': pendingRiderDisbursements,
+      'completed_rider_disbursements': completedRiderDisbursements,
+      'available_balance': availableBalance,
+      'total_digital_orders': totalDigitalOrders,
+      'recent_transactions': recentTransactions,
+    };
+  }
+}

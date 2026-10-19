@@ -113,6 +113,83 @@ class OwnerInventoryService {
     }
   }
 
+  Future<void> recordDeliveryCompletion({
+    required String ownerId,
+    required String orderId,
+    required int gallons,
+    String? waterType,
+    String? productId,
+    int emptyGallonsReturned = 0,
+  }) async {
+    if (gallons <= 0 && emptyGallonsReturned <= 0) return;
+
+    try {
+      // 1. If product ID is provided or can be found by waterType, deduct stock level
+      String? resolvedProductId = productId;
+      if (resolvedProductId == null && waterType != null && waterType.isNotEmpty) {
+        final res = await _client
+            .from(DbTables.waterOptions)
+            .select('id, stock_level')
+            .eq('owner_id', ownerId)
+            .ilike('name', '%$waterType%')
+            .limit(1)
+            .maybeSingle();
+        if (res != null) {
+          resolvedProductId = res['id']?.toString();
+          final currentStock = (res['stock_level'] as num?)?.toInt() ?? 0;
+          final newStock = (currentStock - gallons).clamp(0, 999999);
+          await _client
+              .from(DbTables.waterOptions)
+              .update({'stock_level': newStock})
+              .eq('id', resolvedProductId!);
+        }
+      } else if (resolvedProductId != null) {
+        final res = await _client
+            .from(DbTables.waterOptions)
+            .select('stock_level')
+            .eq('id', resolvedProductId)
+            .maybeSingle();
+        if (res != null) {
+          final currentStock = (res['stock_level'] as num?)?.toInt() ?? 0;
+          final newStock = (currentStock - gallons).clamp(0, 999999);
+          await _client
+              .from(DbTables.waterOptions)
+              .update({'stock_level': newStock})
+              .eq('id', resolvedProductId);
+        }
+      }
+
+      // 2. If empty gallons were returned, increment empty_gallons_stock
+      if (emptyGallonsReturned > 0) {
+        final sett = await _client
+            .from('owner_settings')
+            .select('empty_gallons_stock')
+            .eq('owner_id', ownerId)
+            .maybeSingle();
+        final currentEmpty = (sett?['empty_gallons_stock'] as num?)?.toInt() ?? 0;
+        await _client
+            .from('owner_settings')
+            .upsert({
+              'owner_id': ownerId,
+              'empty_gallons_stock': currentEmpty + emptyGallonsReturned,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'owner_id');
+      }
+
+      // 3. Log into owner_inventory_ledger
+      final shortId = orderId.length >= 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
+      await _client.from('owner_inventory_ledger').insert({
+        'owner_id': ownerId,
+        'tx_type': 'order_delivery',
+        'gallons': gallons,
+        'product_id': resolvedProductId,
+        'notes': 'Online Order #$shortId fulfilled ($gallons gal delivered${emptyGallonsReturned > 0 ? ', $emptyGallonsReturned empty returned' : ''})',
+      });
+    } catch (e) {
+      debugPrint('[OwnerInventoryService] Auto-deduction fallback notice: $e');
+    }
+  }
+
   static String labelForTxType(String? type) {
     switch (type) {
       case 'load_filled':
@@ -125,6 +202,8 @@ class OwnerInventoryService {
         return 'Empty adjustment';
       case 'empty_return':
         return 'Empty return';
+      case 'order_delivery':
+        return 'Order delivery';
       default:
         return type ?? 'Update';
     }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import 'package:erefill/core/utils/money.dart' as money;
 export 'package:erefill/core/widgets/shadcn_widgets.dart';
 export 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
@@ -22,18 +23,18 @@ TextStyle adminCaptionTextStyle(BuildContext context) =>
 
 Color adminMutedTextColor(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  return isDark ? const Color(0xFFB8C9CE) : AppUi.textMuted;
+  return isDark ? AppUi.darkTextSecondary : AppUi.textMuted;
 }
 
 Color adminSemanticErrorColor(BuildContext context) {
   return Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFFFF7B83)
+      ? AppUi.errorFgDark
       : AppUi.error;
 }
 
 Color adminDestructiveButtonColor(BuildContext context) {
   return Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFFFCA5A5)
+      ? AppUi.errorFgDark
       : AppUi.error;
 }
 
@@ -43,24 +44,34 @@ Color adminDestructiveButtonForeground(BuildContext context) {
       : Colors.white;
 }
 
+/// Foreground color for any status shown in the console. Order statuses use
+/// the same canonical mapping as the customer, owner and rider apps; account,
+/// station and payment states use the shared [StatusTone] palette.
 Color adminStatusColor(BuildContext context, String status) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final s = status.toLowerCase().replaceAll(' ', '_');
-  return switch (s) {
-    'delivered' || 'completed' || 'open' || 'processed' =>
-      isDark ? const Color(0xFF10B981) : AppColors.statusDelivered,
-    'out_for_delivery' || 'on_the_way' || 'in_transit' =>
-      isDark ? const Color(0xFFFB923C) : AppColors.statusOutForDelivery,
-    'preparing' || 'in_preparation' =>
-      isDark ? const Color(0xFFA78BFA) : AppColors.statusPreparing,
-    'accepted' =>
-      isDark ? const Color(0xFF60A5FA) : AppColors.statusAccepted,
-    'pending' || 'pending_verification' || 'busy' || 'processing' =>
-      isDark ? const Color(0xFFFBBF24) : AppColors.statusPending,
-    'cancelled' || 'failed' || 'rejected' || 'suspended' || 'maintenance' =>
-      isDark ? const Color(0xFFF87171) : AppColors.statusCancelled,
-    _ => isDark ? AppUi.accentCyan : AppUi.bluePrimary,
+  const orderStatuses = {
+    'pending', 'pending_sync', 'accepted', 'confirmed', 'preparing',
+    'in_prep', 'ready', 'ready_for_pickup', 'ready_for_delivery',
+    'assigned_to_rider', 'rider_assigned', 'out_for_delivery', 'delivering',
+    'dispatched', 'delivered', 'completed', 'cancelled', 'canceled', 'rejected',
   };
+  if (orderStatuses.contains(s)) {
+    return isDark
+        ? OrderStatusStyle.resolve(s, isDark: true).badgeForeground
+        : OrderStatusColors.getColor(s);
+  }
+  final tone = switch (s) {
+    'open' || 'processed' || 'active' || 'approved' || 'paid' =>
+      StatusTone.success,
+    'on_the_way' || 'in_transit' => StatusTone.progress,
+    'in_preparation' => StatusTone.info,
+    'pending_verification' || 'busy' || 'processing' => StatusTone.warning,
+    'failed' || 'suspended' || 'maintenance' => StatusTone.danger,
+    _ => StatusTone.info,
+  };
+  if (!isDark && tone == StatusTone.info) return AppUi.bluePrimary;
+  return StatusToneStyle.of(tone, isDark: isDark).foreground;
 }
 
 /// Advanced desktop & tablet layout primitives for eRefill Admin console.
@@ -96,7 +107,7 @@ class AdminGlassCard extends StatelessWidget {
               width: 4,
               decoration: BoxDecoration(
                 color: accent,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(AppUi.radiusXs),
               ),
             ),
           ),
@@ -108,7 +119,7 @@ class AdminGlassCard extends StatelessWidget {
     return Container(
       width: expand ? double.infinity : null,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.035),
@@ -121,13 +132,13 @@ class AdminGlassCard extends StatelessWidget {
         color: AppUi.surfaceOf(context),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
           side: BorderSide(color: AppUi.borderOf(context)),
         ),
         child: onTap != null
             ? InkWell(
                 onTap: onTap,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                 child: content,
               )
             : content,
@@ -212,7 +223,7 @@ class AdminKpiTile extends StatelessWidget {
             padding: EdgeInsets.all(compact ? 10 : 12),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: compact ? 20 : 24),
@@ -226,7 +237,7 @@ class AdminKpiTile extends StatelessWidget {
                   value,
                   style: TextStyle(
                     fontSize: compact ? 22 : 26,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.5,
                     color: AppUi.textPrimaryOf(context),
                   ),
@@ -246,7 +257,7 @@ class AdminKpiTile extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppUi.radiusSm),
                     ),
                     child: Text(
                       delta!,
@@ -296,15 +307,7 @@ class AdminWorkspaceLayout extends StatelessWidget {
         final horizontalPadding = compact ? 16.0 : 28.0;
         return DecoratedBox(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-                AppUi.pageBgOf(context),
-                AppUi.pageBgOf(context),
-              ],
-            ),
+            color: AppUi.pageBgOf(context),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -399,14 +402,7 @@ class AdminPageScaffold extends StatelessWidget {
         final heading = header ?? const SizedBox.shrink();
         return DecoratedBox(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                AppUi.pageBgOf(context),
-              ],
-            ),
+            color: AppUi.pageBgOf(context),
           ),
           child: RefreshIndicator(
             onRefresh: onRefresh ?? () async {},
@@ -606,7 +602,7 @@ class AdminDetailPanel extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
+                top: Radius.circular(AppUi.radiusSheet),
               ),
             ),
             child: Row(
@@ -655,7 +651,7 @@ class AdminDetailRow extends StatelessWidget {
           final valueText = Text(
             value,
             style: TextStyle(
-              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
               color: AppUi.textPrimaryOf(context),
             ),
           );
@@ -726,7 +722,7 @@ class AdminFilterPills<T> extends StatelessWidget {
                   ? AppUi.bluePrimary
                   : AppUi.surfaceOf(context),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 side: BorderSide(
                   color: isSelected
                       ? AppUi.bluePrimary
@@ -734,7 +730,7 @@ class AdminFilterPills<T> extends StatelessWidget {
                 ),
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 onTap: () => onSelected(item.value),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -765,13 +761,13 @@ class AdminFilterPills<T> extends StatelessWidget {
                             color: isSelected
                                 ? Colors.white.withValues(alpha: 0.22)
                                 : Theme.of(context).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(AppUi.radiusFull),
                           ),
                           child: Text(
                             '${item.count}',
                             style: TextStyle(
                               fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: isSelected ? Colors.white : AppUi.textSecondaryOf(context),
                             ),
                           ),
@@ -808,10 +804,10 @@ class AdminBadge extends StatelessWidget {
     final borderAlpha =
         Theme.of(context).brightness == Brightness.dark ? 0.36 : 0.26;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: backgroundAlpha),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
         border: Border.all(color: color.withValues(alpha: borderAlpha)),
       ),
       child: Row(
@@ -828,9 +824,8 @@ class AdminBadge extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
-                fontWeight: FontWeight.w700,
-                fontSize: 11,
-                letterSpacing: 0.2,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
               ),
             ),
           ),
@@ -951,7 +946,7 @@ class AdminErrorState extends StatelessWidget {
               Text(
                 'Something went wrong',
                 style: TextStyle(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 16,
                   color: AppUi.textPrimaryOf(context),
                 ),
@@ -1070,8 +1065,9 @@ int safeInt(dynamic value, {int fallback = 0}) {
   return safeNum(value, fallback: fallback).toInt();
 }
 
-String formatPeso(dynamic value) {
-  return '₱${safeDouble(value).toStringAsFixed(2)}';
+/// Admin accepts raw database values; formatting is shared with the apps.
+String formatPeso(dynamic value, {bool whole = false}) {
+  return money.formatPeso(safeDouble(value), whole: whole);
 }
 
 String adminFormatDateTime(dynamic raw) {
@@ -1148,16 +1144,16 @@ class AdminTextField extends StatelessWidget {
       autofillHints: autofillHints,
       style: TextStyle(
         fontWeight: FontWeight.w600,
-        fontSize: 14.5,
+        fontSize: 15,
         color: AppUi.textPrimaryOf(context),
       ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         floatingLabelBehavior: FloatingLabelBehavior.auto,
-        floatingLabelStyle: const TextStyle(
-          color: AppUi.bluePrimary,
-          fontSize: 12.5,
+        floatingLabelStyle: TextStyle(
+          color: AppUi.brandOf(context),
+          fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
         labelStyle: TextStyle(
@@ -1167,7 +1163,7 @@ class AdminTextField extends StatelessWidget {
         ),
         hintStyle: TextStyle(
           color: adminMutedTextColor(context),
-          fontSize: 13.5,
+          fontSize: 14,
         ),
         filled: true,
         fillColor: AppUi.surfaceOf(context),
@@ -1177,26 +1173,26 @@ class AdminTextField extends StatelessWidget {
                 : null),
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(color: AppUi.borderOf(context), width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(color: AppUi.borderOf(context), width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: const BorderSide(color: AppUi.bluePrimary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(
             color: adminSemanticErrorColor(context),
             width: 1.2,
           ),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(
             color: adminSemanticErrorColor(context),
             width: 2,
@@ -1242,7 +1238,7 @@ class AdminDropdownFormField<T> extends StatelessWidget {
       validator: validator,
       style: TextStyle(
         fontWeight: FontWeight.w600,
-        fontSize: 14.5,
+        fontSize: 15,
         color: AppUi.textPrimaryOf(context),
       ),
       icon: const Icon(LucideIcons.chevronDown, size: 16),
@@ -1251,9 +1247,9 @@ class AdminDropdownFormField<T> extends StatelessWidget {
         labelText: label,
         hintText: hint,
         floatingLabelBehavior: FloatingLabelBehavior.auto,
-        floatingLabelStyle: const TextStyle(
-          color: AppUi.bluePrimary,
-          fontSize: 12.5,
+        floatingLabelStyle: TextStyle(
+          color: AppUi.brandOf(context),
+          fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
         labelStyle: TextStyle(
@@ -1263,7 +1259,7 @@ class AdminDropdownFormField<T> extends StatelessWidget {
         ),
         hintStyle: TextStyle(
           color: adminMutedTextColor(context),
-          fontSize: 13.5,
+          fontSize: 14,
         ),
         filled: true,
         fillColor: AppUi.surfaceOf(context),
@@ -1272,26 +1268,26 @@ class AdminDropdownFormField<T> extends StatelessWidget {
                 ? Icon(icon, size: 18, color: AppUi.textSecondaryOf(context))
                 : null),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(color: AppUi.borderOf(context), width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(color: AppUi.borderOf(context), width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: const BorderSide(color: AppUi.bluePrimary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(
             color: adminSemanticErrorColor(context),
             width: 1.2,
           ),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           borderSide: BorderSide(
             color: adminSemanticErrorColor(context),
             width: 2,
@@ -1339,7 +1335,7 @@ class AdminModalDialog extends StatelessWidget {
         vertical: compact ? 12 : 24,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         side: BorderSide(color: AppUi.borderOf(context)),
       ),
       backgroundColor: AppUi.surfaceOf(context),
@@ -1362,7 +1358,7 @@ class AdminModalDialog extends StatelessWidget {
                       padding: const EdgeInsets.all(9),
                       decoration: BoxDecoration(
                         color: effectiveIconColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                       child: Icon(icon, size: 20, color: effectiveIconColor),
                     ),
@@ -1376,7 +1372,7 @@ class AdminModalDialog extends StatelessWidget {
                           title,
                           style: const TextStyle(
                             fontSize: 16.5,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: -0.3,
                           ),
                         ),
@@ -1385,7 +1381,7 @@ class AdminModalDialog extends StatelessWidget {
                           Text(
                             subtitle!,
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 13,
                               color: AppUi.textSecondaryOf(context),
                             ),
                           ),
@@ -1545,7 +1541,7 @@ class AdminManageButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const blueColor = Color(0xFF2563EB); // Vivid Tailwind Blue-600
+    const blueColor = AppUi.bluePrimary; // Vivid Tailwind Blue-600
     if (compact) {
       return Tooltip(
         message: text,
@@ -1559,7 +1555,7 @@ class AdminManageButton extends StatelessWidget {
               foregroundColor: Colors.white,
               padding: EdgeInsets.zero,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
             ),
             child: isLoading
                 ? const SizedBox(
@@ -1581,7 +1577,7 @@ class AdminManageButton extends StatelessWidget {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
         ),
         child: isLoading
             ? const SizedBox(
@@ -1636,7 +1632,7 @@ class AdminSuspendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const redColor = Color(0xFFDC2626); // Vivid Tailwind Red-600
+    const redColor = AppColors.uiError; // Vivid Tailwind Red-600
     if (compact) {
       return Tooltip(
         message: text,
@@ -1650,7 +1646,7 @@ class AdminSuspendButton extends StatelessWidget {
               foregroundColor: Colors.white,
               padding: EdgeInsets.zero,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
             ),
             child: isLoading
                 ? const SizedBox(
@@ -1672,7 +1668,7 @@ class AdminSuspendButton extends StatelessWidget {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
         ),
         child: isLoading
             ? const SizedBox(
@@ -1727,7 +1723,7 @@ class AdminActivateButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const greenColor = Color(0xFF059669); // Vivid Tailwind Emerald-600
+    const greenColor = AppColors.uiSuccess; // Vivid Tailwind Emerald-600
     if (compact) {
       return Tooltip(
         message: text,
@@ -1741,7 +1737,7 @@ class AdminActivateButton extends StatelessWidget {
               foregroundColor: Colors.white,
               padding: EdgeInsets.zero,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
             ),
             child: isLoading
                 ? const SizedBox(
@@ -1763,7 +1759,7 @@ class AdminActivateButton extends StatelessWidget {
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
         ),
         child: isLoading
             ? const SizedBox(

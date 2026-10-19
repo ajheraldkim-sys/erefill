@@ -10,6 +10,8 @@ import '../onboarding/create_dialogs.dart';
 import '../orders/order_detail_screen.dart';
 import '../stations/station_detail_screen.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -114,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to approve station: $e'),
+            content: Text('Failed to approve station: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -158,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -175,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final stats = _stats ?? {};
     final maintenance = stats['maintenance_mode'] == true;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final warningColor = isDark ? const Color(0xFFFBBF24) : AppUi.warningFg;
+    final warningColor = isDark ? AppUi.warningFgDark : AppUi.warningFg;
     final maintenanceSurface = isDark ? AppUi.darkSurfaceRaised : AppUi.warningBg;
     final now = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now());
 
@@ -189,7 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           spacing: 10,
           children: [
             InkWell(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
               onTap: () => _toggleMaintenanceMode(!maintenance),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -197,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: maintenance
                       ? maintenanceSurface
                       : AppUi.accentGreen.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                   border: Border.all(
                     color: maintenance ? warningColor : AppUi.accentGreen,
                   ),
@@ -218,7 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       maintenance ? 'MAINTENANCE MODE' : 'SYSTEM OPERATIONAL',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 0.3,
                         color: maintenance ? warningColor : AppUi.accentGreen,
                       ),
@@ -242,8 +244,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (_pendingStations.isNotEmpty) ...[
             AdminGlassCard(
               accent: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFFFBBF24)
-                  : const Color(0xFFF59E0B),
+                  ? AppUi.warningFgDark
+                  : AppColors.uiWarning,
               padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,16 +256,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: (Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFFFBBF24)
-                                  : const Color(0xFFF59E0B))
+                                  ? AppUi.warningFgDark
+                                  : AppColors.uiWarning)
                               .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         ),
                         child: Icon(
                           LucideIcons.shieldAlert,
                           color: Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xFFFBBF24)
-                              : const Color(0xFFD97706),
+                              ? AppUi.warningFgDark
+                              : AppColors.uiWarning,
                           size: 20,
                         ),
                       ),
@@ -273,10 +275,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           '${_pendingStations.length} Water Station(s) Waiting for Approval',
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFFFDE68A)
-                                : const Color(0xFF92400E),
+                                ? AppUi.warningBorder
+                                : AppUi.warningFg,
                           ),
                         ),
                       ),
@@ -296,7 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: AppUi.surfaceOf(context),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         border: Border.all(color: AppUi.borderOf(context)),
                       ),
                       child: Row(
@@ -308,8 +310,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 Text(
                                   s['name'] ?? s['station_name'] ?? 'Water Station',
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -384,7 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: 'Orders Today',
                 value: '${stats['orders_today'] ?? stats['orders_count'] ?? 0}',
                 icon: LucideIcons.shoppingBag,
-                color: const Color(0xFF6366F1),
+                color: AppColors.statusOutForDelivery,
                 delta:
                     '${stats['pending_orders'] ?? 0} pending • ${stats['delivered_orders'] ?? 0} delivered',
                 compact: true,
@@ -423,7 +425,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(LucideIcons.sparkles, size: 18, color: AppUi.bluePrimary),
+                    Icon(LucideIcons.sparkles, size: 18, color: AppUi.brandOf(context)),
                     const SizedBox(width: 8),
                     Text(
                       'Quick Actions',
@@ -491,7 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ],
                           ),
-                          const Icon(LucideIcons.shoppingBag, size: 18, color: AppUi.bluePrimary),
+                          Icon(LucideIcons.shoppingBag, size: 18, color: AppUi.brandOf(context)),
                         ],
                       ),
                     ),
@@ -536,7 +538,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               ),
                               child: Icon(LucideIcons.packageCheck, size: 16, color: statusColor),
                             ),
@@ -545,9 +547,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 Text(
                                   '#$shortId',
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     fontFamily: 'monospace',
-                                    fontSize: 13.5,
+                                    fontSize: 14,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -627,13 +629,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         border: Border.all(color: AppUi.borderOf(context)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(LucideIcons.info, size: 16, color: AppUi.bluePrimary),
+                          Icon(LucideIcons.info, size: 16, color: AppUi.brandOf(context)),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -685,7 +687,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final color = isGood
         ? (Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF56D6A6)
+            ? AppUi.successFgDark
             : AppUi.accentGreen)
         : adminSemanticErrorColor(context);
 

@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../services/admin_api_service.dart';
 import '../../widgets/admin_ui.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 Future<bool?> showCreateUserDialog(BuildContext context) {
   return showDialog<bool>(
     context: context,
@@ -449,7 +450,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                 SizedBox(
                   height: 180,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     child: FlutterMap(
                       mapController: _mapController,
                       options: MapOptions(
@@ -469,7 +470,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                             child: Icon(
                               Icons.location_on_rounded,
                               size: 38,
-                              color: Colors.red,
+                              color: AppColors.uiError,
                               shadows: [
                                 Shadow(
                                   color: Colors.black54,
@@ -607,15 +608,15 @@ class _SearchableOwnerField extends StatelessWidget {
                 filled: true,
                 fillColor: AppUi.surfaceOf(context),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   borderSide: BorderSide(color: AppUi.borderOf(context)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   borderSide: BorderSide(color: AppUi.borderOf(context)),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   borderSide: BorderSide(
                     color: Theme.of(context).colorScheme.primary,
                     width: 2,
@@ -630,7 +631,7 @@ class _SearchableOwnerField extends StatelessWidget {
               child: Material(
                 elevation: 8,
                 color: AppUi.surfaceOf(context),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 clipBehavior: Clip.antiAlias,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(

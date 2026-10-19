@@ -8,7 +8,10 @@ import '../../widgets/admin_map.dart';
 import '../../widgets/admin_ui.dart';
 import '../onboarding/create_dialogs.dart';
 import 'station_detail_screen.dart';
+import 'widgets/station_approval_review_dialog.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 enum StationViewMode { cards, table, map }
 
 class StationsScreen extends StatefulWidget {
@@ -28,6 +31,7 @@ class _StationsScreenState extends State<StationsScreen> {
   String _statusPill = 'all';
   String? _regionFilter;
   List<Map<String, dynamic>> _regions = [];
+  final Set<String> _selectedStationIds = {};
 
   @override
   void initState() {
@@ -88,6 +92,32 @@ class _StationsScreenState extends State<StationsScreen> {
   }
 
   Future<void> _approveStation(Map<String, dynamic> station) async {
+    final rawStatus = station['status']?.toString().toLowerCase();
+    final isPending =
+        rawStatus == 'pending' || rawStatus == 'pending_verification';
+
+    if (isPending) {
+      await StationApprovalReviewDialog.show(
+        context,
+        station: station,
+        onApproved: () {
+          _load();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Station "${station['station_name'] ?? station['name'] ?? 'Station'}" verified and approved!',
+              ),
+              backgroundColor: AppUi.accentGreen,
+            ),
+          );
+        },
+        onRejected: () {
+          _load();
+        },
+      );
+      return;
+    }
+
     final ownerId =
         station['owner_id']?.toString() ?? station['id']?.toString() ?? '';
     final name = station['name'] ?? station['station_name'] ?? 'Station';
@@ -110,7 +140,7 @@ class _StationsScreenState extends State<StationsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error approving station: $e'),
+            content: Text('Error approving station: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -121,21 +151,65 @@ class _StationsScreenState extends State<StationsScreen> {
   Future<void> _toggleStationSuspend(Map<String, dynamic> station) async {
     final ownerId =
         station['owner_id']?.toString() ?? station['id']?.toString() ?? '';
+    final name = station['station_name'] ?? station['name'] ?? 'Station';
     final isSuspended =
         station['status']?.toString().toLowerCase() == 'suspended' ||
         station['station_availability']?.toString().toLowerCase() ==
             'suspended';
     final newStatus = isSuspended ? 'open' : 'suspended';
+
+    String? reason;
+    if (!isSuspended) {
+      final activeOrders = (station['active_orders'] as num?)?.toInt() ?? 0;
+      final consequenceMsg = activeOrders > 0
+          ? 'Warning: Suspending "$name" will disrupt $activeOrders active in-flight customer orders!\nDeliveries currently on the road will be paused.'
+          : 'Are you sure you want to suspend "$name"? New customer orders will be blocked.';
+
+      reason = await showAdminPromptDialog(
+        context,
+        title: 'Suspend Station: $name',
+        subtitle: consequenceMsg,
+        icon: LucideIcons.triangleAlert,
+        iconColor: adminSemanticErrorColor(context),
+        label: 'Audit note / suspension reason (required)',
+        confirmLabel: 'Confirm Suspension',
+      );
+
+      if (reason == null || reason.trim().isEmpty) {
+        if (mounted && reason != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('A suspension reason is strictly required for audit safety.'),
+              backgroundColor: AppUi.error,
+            ),
+          );
+        }
+        return;
+      }
+    } else {
+      reason = await showAdminPromptDialog(
+        context,
+        title: 'Reactivate Station: $name',
+        subtitle: 'Restores ordering and dispatch for this station.',
+        icon: LucideIcons.circleCheck,
+        iconColor: AppUi.accentGreen,
+        label: 'Audit note (optional)',
+        confirmLabel: 'Reactivate',
+      );
+      if (reason == null) return;
+    }
+
+    if (!mounted) return;
     try {
       await context.read<AdminApiService>().setStationAvailability(
         ownerId,
         newStatus,
-        reason: 'Admin toggle from Stations Screen',
+        reason: reason.trim().isEmpty ? 'Admin status toggle' : reason.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Station status updated to $newStatus'),
+            content: Text('Station "$name" status updated to $newStatus'),
             backgroundColor: isSuspended ? AppUi.accentGreen : AppUi.warningFg,
           ),
         );
@@ -144,10 +218,85 @@ class _StationsScreenState extends State<StationsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppUi.error),
+          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
         );
       }
     }
+  }
+
+  Future<void> _bulkApproveSelected() async {
+    final selectedRows = _allRows
+        .where((s) => _selectedStationIds.contains(s['id']?.toString()))
+        .toList();
+    if (selectedRows.isEmpty) return;
+
+    final api = context.read<AdminApiService>();
+    final confirmed = await showAdminConfirmDialog(
+      context,
+      title: 'Bulk Approve Stations?',
+      message:
+          'Approve and activate ${selectedRows.length} selected stations across the network?',
+      confirmLabel: 'Approve (${selectedRows.length})',
+      icon: LucideIcons.checkCheck,
+    );
+    if (confirmed != true || !mounted) return;
+
+    int successCount = 0;
+    for (final s in selectedRows) {
+      final ownerId = s['owner_id']?.toString() ?? s['id']?.toString() ?? '';
+      try {
+        await api.setStationAvailability(
+          ownerId,
+          'open',
+          reason: 'Bulk admin approval',
+        );
+        successCount++;
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() => _selectedStationIds.clear());
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Approved $successCount stations successfully.'),
+        backgroundColor: AppUi.accentGreen,
+      ),
+    );
+    _load();
+  }
+
+  Future<void> _exportCsvSelected() async {
+    final rows = _allRows
+        .where((s) => _selectedStationIds.contains(s['id']?.toString()))
+        .toList();
+    if (rows.isEmpty) return;
+    final csv = CsvExport.build(
+      ['id', 'station', 'owner', 'town', 'status', 'riders', 'lat', 'lng'],
+      rows
+          .map(
+            (s) => [
+              s['id']?.toString() ?? '',
+              s['station_name']?.toString() ?? '',
+              s['full_name']?.toString() ?? '',
+              s['town']?.toString() ?? '',
+              s['station_availability']?.toString() ?? '',
+              '${s['rider_count'] ?? 0}',
+              '${s['latitude'] ?? ''}',
+              '${s['longitude'] ?? ''}',
+            ],
+          )
+          .toList(),
+    );
+    await CsvExport.copyToClipboard(csv);
+    final path = await CsvExport.saveToFile(csv, 'selected_stations.csv');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          path != null ? 'Saved to $path' : 'CSV copied to clipboard',
+        ),
+      ),
+    );
   }
 
   List<Map<String, dynamic>> get _allRows => _page?.rows ?? [];
@@ -166,10 +315,16 @@ class _StationsScreenState extends State<StationsScreen> {
           !isPending &&
           !isSuspended;
 
+      final town = (s['town'] ?? '').toString().toLowerCase();
+      final isCantilan = town.contains('cantilan');
+      final isMadrid = town.contains('madrid');
+
       return switch (_statusPill) {
         'pending' => isPending,
         'open' => isOpen,
         'suspended' => isSuspended,
+        'cantilan' => isCantilan,
+        'madrid' => isMadrid,
         _ => true,
       };
     }).toList();
@@ -194,6 +349,16 @@ class _StationsScreenState extends State<StationsScreen> {
     final st = s['status']?.toString().toLowerCase();
     return st == 'suspended' ||
         s['station_availability']?.toString().toLowerCase() == 'suspended';
+  }).length;
+
+  int get _cantilanCount => _allRows.where((s) {
+    final t = (s['town'] ?? '').toString().toLowerCase();
+    return t.contains('cantilan');
+  }).length;
+
+  int get _madridCount => _allRows.where((s) {
+    final t = (s['town'] ?? '').toString().toLowerCase();
+    return t.contains('madrid');
   }).length;
 
   Future<void> _exportCsv() async {
@@ -369,6 +534,18 @@ class _StationsScreenState extends State<StationsScreen> {
                   label: 'Suspended',
                   count: _suspendedCount,
                 ),
+                AdminFilterPillItem(
+                  value: 'cantilan',
+                  label: 'Cantilan',
+                  icon: LucideIcons.mapPin,
+                  count: _cantilanCount,
+                ),
+                AdminFilterPillItem(
+                  value: 'madrid',
+                  label: 'Madrid',
+                  icon: LucideIcons.mapPin,
+                  count: _madridCount,
+                ),
               ],
             ),
           ],
@@ -511,12 +688,12 @@ class _StationsScreenState extends State<StationsScreen> {
                                   : 'Closed')));
               final statusColor = isPending
                   ? (Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xFFFBBF24)
-                        : const Color(0xFFD97706))
+                        ? AppUi.warningFgDark
+                        : AppColors.uiWarning)
                   : (isSuspended
                         ? adminSemanticErrorColor(context)
                         : (Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xFF56D6A6)
+                              ? AppUi.successFgDark
                               : AppUi.accentGreen));
               final isSelected = _selected?['id'] == s['id'];
 
@@ -536,7 +713,7 @@ class _StationsScreenState extends State<StationsScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                             ),
                             child: Icon(
                               LucideIcons.store,
@@ -556,7 +733,7 @@ class _StationsScreenState extends State<StationsScreen> {
                                       'Station',
                                   style: const TextStyle(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: -0.3,
                                   ),
                                   maxLines: 1,
@@ -592,7 +769,7 @@ class _StationsScreenState extends State<StationsScreen> {
                             child: Text(
                               '${s['town'] ?? '—'} · ${s['barangay'] ?? '—'}',
                               style: const TextStyle(
-                                fontSize: 12.5,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w500,
                               ),
                               maxLines: 1,
@@ -611,7 +788,7 @@ class _StationsScreenState extends State<StationsScreen> {
                           color: Theme.of(
                             context,
                           ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Row(
@@ -722,39 +899,136 @@ class _StationsScreenState extends State<StationsScreen> {
   }
 
   Widget _tableBody(List<Map<String, dynamic>> rows) {
+    final allSelectedInView = rows.isNotEmpty &&
+        rows.every((r) => _selectedStationIds.contains(r['id']?.toString()));
+
     return AdminDataPanel(
       title: 'Station Registry',
       subtitle: '${rows.length} stations found',
       isEmpty: rows.isEmpty,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SingleChildScrollView(
-          child: DataTable(
-            showCheckboxColumn: false,
-            columns: const [
-              DataColumn(label: Text('Station')),
-              DataColumn(label: Text('Location')),
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('Delivery Fee')),
-              DataColumn(label: Text('Rate/Gal')),
-              DataColumn(label: Text('Riders')),
-              DataColumn(label: Text('Actions')),
-            ],
-            rows: rows.map((s) {
-              final rawStatus = s['status']?.toString().toLowerCase();
-              final isPending =
-                  rawStatus == 'pending' || rawStatus == 'pending_verification';
-              final isSuspended = rawStatus == 'suspended';
-              final status = isPending
-                  ? 'pending'
-                  : (isSuspended
-                        ? 'suspended'
-                        : (s['station_availability']?.toString() ?? 'open'));
-              final selected = _selected?['id'] == s['id'];
+      trailing: _selectedStationIds.isNotEmpty
+          ? Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '${_selectedStationIds.length} selected',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                ShadcnPrimaryButton(
+                  height: 32,
+                  onPressed: _bulkApproveSelected,
+                  icon: LucideIcons.checkCheck,
+                  text: 'Approve',
+                ),
+                ShadcnOutlineButton(
+                  height: 32,
+                  onPressed: _exportCsvSelected,
+                  icon: LucideIcons.download,
+                  text: 'Export CSV',
+                ),
+                IconButton(
+                  tooltip: 'Clear selection',
+                  icon: const Icon(LucideIcons.x, size: 16),
+                  onPressed: () => setState(() => _selectedStationIds.clear()),
+                ),
+              ],
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_selectedStationIds.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppUi.bluePrimary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                border: Border.all(
+                  color: AppUi.bluePrimary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: allSelectedInView,
+                    tristate: !allSelectedInView && _selectedStationIds.isNotEmpty,
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          for (final r in rows) {
+                            final id = r['id']?.toString();
+                            if (id != null) _selectedStationIds.add(id);
+                          }
+                        } else {
+                          for (final r in rows) {
+                            final id = r['id']?.toString();
+                            if (id != null) _selectedStationIds.remove(id);
+                          }
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_selectedStationIds.length} stations selected across this page',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  ShadcnPrimaryButton(
+                    height: 32,
+                    onPressed: _bulkApproveSelected,
+                    icon: LucideIcons.checkCheck,
+                    text: 'Approve Selected (${_selectedStationIds.length})',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                child: DataTable(
+                  showCheckboxColumn: true,
+                  columns: const [
+                    DataColumn(label: Text('Station')),
+                    DataColumn(label: Text('Location')),
+                    DataColumn(label: Text('Status')),
+                    DataColumn(label: Text('Delivery Fee')),
+                    DataColumn(label: Text('Rate/Gal')),
+                    DataColumn(label: Text('Riders')),
+                    DataColumn(label: Text('Actions')),
+                  ],
+                  rows: rows.map((s) {
+                    final rawStatus = s['status']?.toString().toLowerCase();
+                    final isPending =
+                        rawStatus == 'pending' || rawStatus == 'pending_verification';
+                    final isSuspended = rawStatus == 'suspended';
+                    final status = isPending
+                        ? 'pending'
+                        : (isSuspended
+                              ? 'suspended'
+                              : (s['station_availability']?.toString() ?? 'open'));
+                    final sId = s['id']?.toString() ?? '';
+                    final isRowChecked = _selectedStationIds.contains(sId);
 
-              return DataRow(
-                selected: selected,
-                onSelectChanged: (_) => setState(() => _selected = s),
+                    return DataRow(
+                      selected: isRowChecked,
+                      onSelectChanged: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedStationIds.add(sId);
+                          } else {
+                            _selectedStationIds.remove(sId);
+                          }
+                          _selected = s;
+                        });
+                      },
                 cells: [
                   DataCell(
                     Column(
@@ -822,13 +1096,16 @@ class _StationsScreenState extends State<StationsScreen> {
                     ),
                   ),
                 ],
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),
-    );
-  }
+    ],
+  ),
+);
+}
 
   Widget _mapBody(List<Map<String, dynamic>> rows) {
     final mapped = rows

@@ -85,6 +85,31 @@ class DmCredit {
     'local_id': localId,
   };
 
+  /// Serializes model for Supabase cloud upsert, removing local-only columns and handling nullable UUIDs
+  Map<String, dynamic> toCloudJson() {
+    final cleanRiderId =
+        (riderId != null && riderId!.trim().isNotEmpty) ? riderId!.trim() : null;
+    final cleanDeliveryId =
+        (deliveryId != null && deliveryId!.trim().isNotEmpty)
+            ? deliveryId!.trim()
+            : null;
+    return {
+      'id': id,
+      'owner_id': ownerId,
+      'rider_id': cleanRiderId,
+      'delivery_id': cleanDeliveryId,
+      'credit_type': creditType == CreditType.rider ? 'rider' : 'customer',
+      'debtor_name': debtorName,
+      'amount': amount,
+      'paid_amount': paidAmount,
+      'is_paid': isPaid,
+      'payment_date': paymentDate?.toIso8601String().split('T').first,
+      'notes': notes,
+      'is_synced': true,
+      'local_id': localId ?? id,
+    };
+  }
+
   DmCredit copyWith({
     String? id,
     String? ownerId,

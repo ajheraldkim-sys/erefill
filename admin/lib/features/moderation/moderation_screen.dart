@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../services/admin_api_service.dart';
 import '../../widgets/admin_ui.dart';
+import 'widgets/dispute_details_view.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 class ModerationScreen extends StatefulWidget {
   const ModerationScreen({super.key});
 
@@ -59,28 +61,6 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
     }
   }
 
-  Future<void> _updateDispute(String status) async {
-    final d = _selectedDispute;
-    if (d == null) return;
-    final notes = await _promptNotes('Resolution notes');
-    if (!mounted) return;
-    try {
-      await context.read<AdminApiService>().updateDispute(
-            d['id'] as String,
-            status,
-            resolutionNotes: notes,
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dispute set to $status')));
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppUi.error),
-      );
-    }
-  }
-
   Future<void> _deleteReview() async {
     final r = _selectedReview;
     if (r == null) return;
@@ -106,19 +86,6 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
     }
   }
 
-  Future<String?> _promptNotes(String label) {
-    return showAdminPromptDialog(
-      context,
-      title: label,
-      subtitle: 'Moderator notes are saved alongside the review moderation log',
-      icon: LucideIcons.fileText,
-      label: 'Moderation notes',
-      cancelLabel: 'Skip',
-      confirmLabel: 'Save Notes',
-      maxLines: 3,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -134,7 +101,7 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
         ),
         TabBar(
           controller: _tabs,
-          labelColor: AppUi.bluePrimary,
+          labelColor: AppUi.brandOf(context),
           tabs: [
             Tab(text: 'Disputes (${_disputes?.total ?? 0})'),
             Tab(text: 'Low reviews (${_reviews?.total ?? 0})'),
@@ -179,23 +146,38 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
       ),
       sidePanel: _selectedDispute == null
           ? null
-          : AdminDetailPanel(
-              title: 'Dispute',
+          : DisputeDetailsView(
+              dispute: _selectedDispute!,
               onClose: () => setState(() => _selectedDispute = null),
-              actions: [
-                Expanded(child: OutlinedButton(onPressed: () => _updateDispute('investigating'), child: const Text('Investigate'))),
-                AppUi.hGapSm,
-                Expanded(child: FilledButton(onPressed: () => _updateDispute('resolved'), child: const Text('Resolve'))),
-              ],
-              children: [
-                AdminDetailRow('Reason', _selectedDispute!['reason']?.toString() ?? '—'),
-                AdminDetailRow('Description', _selectedDispute!['description']?.toString() ?? '—'),
-                AdminDetailRow('Reporter', _selectedDispute!['reporter_name']?.toString() ?? '—'),
-                AdminDetailRow('Station', _selectedDispute!['station_name']?.toString() ?? '—'),
-                AdminDetailRow('Amount', formatPeso(_selectedDispute!['total_amount'])),
-                AdminDetailRow('Status', _selectedDispute!['status']?.toString() ?? '—'),
-                AdminDetailRow('Created', adminFormatDateTime(_selectedDispute!['created_at'])),
-              ],
+              onResolve: (status, notes) async {
+                final d = _selectedDispute!;
+                try {
+                  await context.read<AdminApiService>().updateDispute(
+                        d['id'] as String,
+                        status,
+                        resolutionNotes: notes,
+                      );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Dispute resolved: $status'),
+                        backgroundColor: AppUi.accentGreen,
+                      ),
+                    );
+                    setState(() => _selectedDispute = null);
+                    await _load();
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error updating dispute: ${FriendlyErrors.message(e)}'),
+                        backgroundColor: AppUi.error,
+                      ),
+                    );
+                  }
+                }
+              },
             ),
       body: AdminDataPanel(
         title: 'Disputes',
@@ -270,7 +252,7 @@ class _ModerationScreenState extends State<ModerationScreen> with SingleTickerPr
                   '${r['rating']}',
                   style: TextStyle(
                     color: adminSemanticErrorColor(context),
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),

@@ -31,14 +31,14 @@ class OptionalUpdateDialog extends StatelessWidget {
 
     return AlertDialog(
       backgroundColor: AppUi.surfaceOf(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
       title: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: primaryColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),
             child: Icon(Icons.system_update_alt_rounded, color: primaryColor, size: 24),
           ),
@@ -46,7 +46,7 @@ class OptionalUpdateDialog extends StatelessWidget {
           const Expanded(
             child: Text(
               'Update Available',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
             ),
           ),
         ],
@@ -67,7 +67,7 @@ class OptionalUpdateDialog extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppUi.pageBgOf(context),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   border: Border.all(color: AppUi.borderOf(context)),
                 ),
                 child: Column(
@@ -77,7 +77,7 @@ class OptionalUpdateDialog extends StatelessWidget {
                       'Highlights:',
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -114,7 +114,7 @@ class OptionalUpdateDialog extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: primaryColor,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
           ),
           onPressed: () {
             HapticFeedback.lightImpact();

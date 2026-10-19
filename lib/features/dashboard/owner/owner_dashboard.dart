@@ -5,28 +5,33 @@ import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
+import 'package:erefill/core/widgets/app_ui_kit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
-import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/notification_preview_sheet.dart';
 import 'package:erefill/core/widgets/role_bottom_nav_bar.dart';
 import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
 import 'order_management_screen.dart';
 import 'riders_screen.dart';
-import '../../chat/inbox_screen.dart';
 import '../../chat/services/chat_service.dart';
 import '../../chat/models/system_notification.dart';
 import 'owner_menu_screen.dart';
+import 'stock_credits_hub_screen.dart';
 import 'services/station_setup_service.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import '../../subscriptions/services/subscription_service.dart';
+import '../../payouts/widgets/owner_wallet_sheet.dart';
+import 'widgets/new_order_alert_sheet.dart';
+import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
+import '../../delivery_mgmt/providers/credit_provider.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -53,6 +58,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   StreamSubscription? _settingsSub;
   bool _setupStatusLoadInProgress = false;
   bool _setupStatusNeedsRefresh = false;
+  int _stockCreditsTab = 0;
 
   @override
   void initState() {
@@ -81,17 +87,23 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     if (user == null) return;
     _ownerId = user.id;
 
+    // Auto-process due recurring subscriptions for this station in background
+    unawaited(
+      SubscriptionService().processDueSubscriptions(stationId: user.id),
+    );
+    if (mounted) {
+      context.read<CreditProvider>().initialize(user.id);
+    }
+
     _profileSub = SafeSupabase.listen(
-      supabase
-          .from('profiles')
-          .stream(primaryKey: ['id'])
-          .eq('id', user.id),
+      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', user.id),
       (data) {
         if (data.isNotEmpty && mounted) {
           setState(() {
             ownerProfile = data.first;
             _isOpen = ownerProfile?['is_open'] ?? true;
-            _availability = ownerProfile?['station_availability']?.toString() ??
+            _availability =
+                ownerProfile?['station_availability']?.toString() ??
                 (_isOpen ? 'open' : 'closed');
             _isLoading = false;
           });
@@ -114,9 +126,11 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           final settings = data.first;
           setState(() {
             _baseDeliveryFee =
-                (settings['base_delivery_fee'] as num?)?.toDouble() ?? _baseDeliveryFee;
+                (settings['base_delivery_fee'] as num?)?.toDouble() ??
+                _baseDeliveryFee;
             _pricePerGallon =
-                (settings['price_per_gallon'] as num?)?.toDouble() ?? _pricePerGallon;
+                (settings['price_per_gallon'] as num?)?.toDouble() ??
+                _pricePerGallon;
           });
           _loadOwnerSetupStatus();
         }
@@ -140,7 +154,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       _loadOwnerSetupStatus();
     }
   }
-
 
   Future<void> _loadOwnerSetupStatus() async {
     if (_setupStatusLoadInProgress) return;
@@ -221,7 +234,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           content: Text(
             'Cannot open station: ${_setupStatus.completedCount} of 5 required setup sections completed. Missing: ${_setupStatus.missingFields.join(", ")}',
           ),
-          backgroundColor: const Color(0xFFEF4444),
+          backgroundColor: AppColors.uiError,
         ),
       );
       return;
@@ -245,7 +258,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(FriendlyErrors.message(e)),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: AppColors.uiError,
           ),
         );
       }
@@ -285,12 +298,23 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         hasLocationPin: _stationHasLocation,
         onAvailabilityChanged: _setStationAvailability,
         onViewOrders: () => _changeTab(1),
-        onOpenInventory: () => context.openOwnerInventory(),
+        onOpenInventory: () {
+          setState(() => _stockCreditsTab = 0);
+          _changeTab(2);
+        },
+        onOpenCredits: () {
+          setState(() => _stockCreditsTab = 1);
+          _changeTab(2);
+        },
         onOpenAccount: () => _changeTab(4),
+        onOpenRiders: () => _changeTab(3),
       ),
       const OrderManagementScreen(),
+      StockCreditsHubScreen(
+        key: ValueKey('stock_credits_$_stockCreditsTab'),
+        initialTab: _stockCreditsTab,
+      ),
       RidersScreen(ownerId: _ownerId ?? ''),
-      const InboxScreen(), // Use unified inbox
       const OwnerMenuScreen(),
     ];
 
@@ -326,15 +350,14 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   badgeCount: notif.newOrdersCount,
                 ),
                 const RoleBottomNavItem(
+                  icon: Icons.inventory_2_outlined,
+                  activeIcon: Icons.inventory_2_rounded,
+                  label: 'Stock & Credits',
+                ),
+                const RoleBottomNavItem(
                   icon: Icons.delivery_dining_outlined,
                   activeIcon: Icons.delivery_dining_rounded,
                   label: 'Riders',
-                ),
-                RoleBottomNavItem(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  activeIcon: Icons.chat_bubble_rounded,
-                  label: 'Messages',
-                  badgeCount: notif.unreadChatCount,
                 ),
                 const RoleBottomNavItem(
                   icon: Icons.storefront_outlined,
@@ -366,29 +389,29 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: const Skeleton(height: 120, borderRadius: 20),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: const Skeleton(height: 120, borderRadius: 20),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const Skeleton(
-                    height: 200,
-                    width: double.infinity,
-                    borderRadius: 24,
-                  ),
-                  const SizedBox(height: 24),
-                  const Skeleton(
-                    height: 300,
-                    width: double.infinity,
-                    borderRadius: 24,
-                  ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: const Skeleton(height: 120, borderRadius: 20),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: const Skeleton(height: 120, borderRadius: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Skeleton(
+                      height: 200,
+                      width: double.infinity,
+                      borderRadius: 24,
+                    ),
+                    const SizedBox(height: 24),
+                    const Skeleton(
+                      height: 300,
+                      width: double.infinity,
+                      borderRadius: 24,
+                    ),
                   ],
                 ),
               ),
@@ -416,7 +439,9 @@ class _OwnerHomeOverview extends StatefulWidget {
   final ValueChanged<String> onAvailabilityChanged;
   final VoidCallback onViewOrders;
   final VoidCallback onOpenInventory;
+  final VoidCallback onOpenCredits;
   final VoidCallback onOpenAccount;
+  final VoidCallback? onOpenRiders;
 
   const _OwnerHomeOverview({
     this.fullName,
@@ -434,7 +459,9 @@ class _OwnerHomeOverview extends StatefulWidget {
     required this.onAvailabilityChanged,
     required this.onViewOrders,
     required this.onOpenInventory,
+    required this.onOpenCredits,
     required this.onOpenAccount,
+    this.onOpenRiders,
   });
 
   @override
@@ -461,7 +488,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
     WidgetsBinding.instance.addObserver(this);
     final user = supabase.auth.currentUser;
     if (user != null) {
-      final mem = LocalDataCache.instance.getMemory<Map<String, dynamic>>('owner_overview_${user.id}');
+      final mem = LocalDataCache.instance.getMemory<Map<String, dynamic>>(
+        'owner_overview_${user.id}',
+      );
       if (mem != null) {
         _stats = Map<String, dynamic>.from(mem['stats'] as Map? ?? {});
         _recentOrders = List<dynamic>.from(mem['recentOrders'] as List? ?? []);
@@ -540,7 +569,6 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
     int acceptedCount = 0;
     int preparingCount = 0;
     int readyCount = 0;
-    int assignedCount = 0;
     int deliveringCount = 0;
     int deliveredTodayCount = 0;
 
@@ -549,22 +577,28 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
       final dt = rawCreated != null
           ? DateTime.tryParse(rawCreated)?.toLocal()
           : null;
-      final isToday = dt != null &&
+      final isToday =
+          dt != null &&
           dt.year == now.year &&
           dt.month == now.month &&
           dt.day == now.day;
 
+      // Canonical status so aliases (confirmed, completed, ready_for_delivery,
+      // assigned_to_rider, canceled) land in the same bucket as everywhere else.
+      final status = OrderStatusColors.normalize(o['status']?.toString());
+      final isVoid = status == 'cancelled' || status == 'rejected';
+
       if (isToday) {
         todayOrdersCount++;
-        todayRevenue += (o['total_amount'] ?? 0).toDouble();
+        if (!isVoid) {
+          todayRevenue += (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+        }
       }
 
-      final status = o['status'];
       if (status == 'pending') pendingCount++;
       if (status == 'accepted') acceptedCount++;
       if (status == 'preparing') preparingCount++;
       if (status == 'ready_for_pickup') readyCount++;
-      if (status == 'assigned_to_rider') assignedCount++;
       if (status == 'out_for_delivery') deliveringCount++;
       if (status == 'delivered' && isToday) deliveredTodayCount++;
     }
@@ -572,33 +606,56 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
     if (!_isFirstOrdersLoad && pendingCount > _previousPendingCount) {
       HapticFeedback.heavyImpact();
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.bolt, color: Colors.amber),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    pendingCount - _previousPendingCount == 1
-                        ? 'New refill order received!'
-                        : '${pendingCount - _previousPendingCount} new refill orders received!',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            action: SnackBarAction(
-              label: 'VIEW',
-              textColor: Colors.white,
-              onPressed: widget.onViewOrders,
-            ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF0077B6),
-            duration: const Duration(seconds: 5),
-          ),
+        final newestPending = data.firstWhere(
+          (o) => (o['status'] ?? '') == 'pending',
+          orElse: () => null,
         );
+        if (newestPending is Map<String, dynamic>) {
+          NewOrderAlertSheet.show(
+            context,
+            order: newestPending,
+            onAccept: (orderId) async {
+              await SafeSupabase.transitionOrderStatus(
+                orderId: orderId,
+                newStatus: 'accepted',
+              );
+              _refreshOrdersSnapshot();
+            },
+            onDecline: (orderId) async {
+              await SafeSupabase.transitionOrderStatus(
+                orderId: orderId,
+                newStatus: 'cancelled',
+              );
+              _refreshOrdersSnapshot();
+            },
+          );
+        } else {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.bolt, color: AppColors.uiWarning),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      pendingCount - _previousPendingCount == 1
+                          ? 'New refill order received!'
+                          : '${pendingCount - _previousPendingCount} new refill orders received!',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              action: SnackBarAction(
+                label: 'View',
+                onPressed: widget.onViewOrders,
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
     }
     _isFirstOrdersLoad = false;
@@ -608,9 +665,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
     try {
       final res = await supabase
           .from('orders')
-          .select(
-            '*, profiles!orders_customer_id_fkey(full_name, avatar_url)',
-          )
+          .select('*, profiles!orders_customer_id_fkey(full_name, avatar_url)')
           .eq('owner_id', user.id)
           .order('created_at', ascending: false)
           .limit(5);
@@ -652,10 +707,10 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
 
       if (dayOffset >= 0 && dayOffset < 7) {
         final amount = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
-        final status = o['status']?.toString();
+        final status = OrderStatusColors.normalize(o['status']?.toString());
 
         ordersTrend7Days[dayOffset] += 1;
-        if (status != 'cancelled') {
+        if (status != 'cancelled' && status != 'rejected') {
           revenueTrend7Days[dayOffset] += amount;
         }
         if (status == 'delivered') {
@@ -667,10 +722,14 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
       }
     }
 
-    final double calculatedWeeklyRevenue =
-        revenueTrend7Days.fold<double>(0.0, (sum, val) => sum + val);
-    final int calculatedWeeklyOrders =
-        ordersTrend7Days.fold<int>(0, (sum, val) => sum + val.toInt());
+    final double calculatedWeeklyRevenue = revenueTrend7Days.fold<double>(
+      0.0,
+      (sum, val) => sum + val,
+    );
+    final int calculatedWeeklyOrders = ordersTrend7Days.fold<int>(
+      0,
+      (sum, val) => sum + val.toInt(),
+    );
 
     if (mounted) {
       setState(() {
@@ -681,7 +740,6 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
           'accepted': acceptedCount,
           'preparing': preparingCount,
           'ready': readyCount,
-          'assigned': assignedCount,
           'delivering': deliveringCount,
           'delivered': deliveredTodayCount,
           'weeklyRevenue': calculatedWeeklyRevenue,
@@ -760,8 +818,16 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         });
   }
 
-  String _formatCurrency(double amount) {
-    return '₱${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}';
+  int _stat(String key) => (_stats[key] as num?)?.toInt() ?? 0;
+  double _amount(String key) => (_stats[key] as num?)?.toDouble() ?? 0.0;
+
+  /// Today vs. yesterday from the real 7-day trend (last = today). Null when
+  /// there is no basis for a comparison, so no percentage is invented.
+  int? _dayOverDayPct(List<double> trend) {
+    if (trend.length < 2) return null;
+    final yesterday = trend[trend.length - 2];
+    if (yesterday <= 0) return null;
+    return ((trend.last - yesterday) / yesterday * 100).round();
   }
 
   List<double> _parseTrend(dynamic rawTrend) {
@@ -772,7 +838,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
       final list = rawTrend
           .map((e) => (e as num?)?.toDouble() ?? 0.0)
           .toList(growable: false);
-      return list.length >= 2 ? list : const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+      return list.length >= 2
+          ? list
+          : const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     } catch (_) {
       return const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     }
@@ -780,121 +848,84 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
 
   Widget _buildInventoryCard() {
     final inventory = _inventory;
-    return Material(
-      color: AppUi.surfaceOf(context),
-      borderRadius: AppUi.cardRadius,
-      child: InkWell(
-        onTap: widget.onOpenInventory,
-        borderRadius: AppUi.cardRadius,
-        child: Container(
-          width: double.infinity,
-          padding: AppUi.cardPaddingLoose,
-          decoration: AppUi.cardDecorationOf(context),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Inventory & containers',
-                      style: AppUi.sectionTitle.copyWith(fontSize: 16),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppUi.textMuted,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (inventory == null)
-                Text(
-                  'Loading stock levels…',
-                  style: TextStyle(color: AppUi.textSecondaryOf(context)),
-                )
-              else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: _inventoryStat(
-                        'Filled',
-                        '${inventory.filledGallons} gal',
-                        inventory.hasLowFilledStock,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _inventoryStat(
-                        'Empty',
-                        '${inventory.emptyGallons} gal',
-                        false,
-                      ),
-                    ),
-                  ],
-                ),
-                if (inventory.hasLowFilledStock) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Low filled stock — restock before peak hours.',
-                    style: TextStyle(
-                      color: Colors.orange.shade800,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ],
-            ],
-          ),
-        ),
-      ),
+    final theme = Theme.of(context);
+    final warn = StatusToneStyle.of(
+      StatusTone.warning,
+      isDark: AppUi.isDark(context),
     );
-  }
-
-  Widget _inventoryStat(String label, String value, bool warning) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: AppUi.cardRadius,
-      ),
+    return AppCard(
+      onTap: widget.onOpenInventory,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppUi.captionText),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              color: warning
-                  ? Colors.orange.shade800
-                  : AppUi.textPrimaryOf(context),
+          _SectionHeader(
+            title: 'Inventory',
+            action: Icon(
+              Icons.chevron_right_rounded,
+              color: AppUi.textSecondaryOf(context),
             ),
           ),
+          const SizedBox(height: AppUi.spacingMd),
+          if (inventory == null)
+            Text('Loading stock levels…', style: theme.textTheme.bodyMedium)
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _InventoryStat(
+                    label: 'Filled',
+                    value: '${inventory.filledGallons} gal',
+                    warning: inventory.hasLowFilledStock,
+                  ),
+                ),
+                const SizedBox(width: AppUi.spacingMd),
+                Expanded(
+                  child: _InventoryStat(
+                    label: 'Empty',
+                    value: '${inventory.emptyGallons} gal',
+                  ),
+                ),
+              ],
+            ),
+            if (inventory.hasLowFilledStock) ...[
+              const SizedBox(height: AppUi.spacingMd),
+              Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: AppUi.iconSm,
+                    color: warn.foreground,
+                  ),
+                  const SizedBox(width: AppUi.spacingSm),
+                  Expanded(
+                    child: Text(
+                      'Low filled stock — restock before peak hours.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: warn.foreground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ],
       ),
     );
   }
 
   Widget _buildGuidedSetupCard() {
+    // Only shown until setup is complete; the station card covers the rest.
     final status = widget.setupStatus;
-    final isAllDone = widget.setupReady;
 
     return GuidedSetupCard(
       role: ExperienceRole.owner,
-      title: isAllDone
-          ? 'Station is ready to open'
-          : 'Complete Your Station Setup (${status.percentage}%)',
-      message: isAllDone
-          ? (widget.availability == 'open'
-              ? 'Station is OPEN and actively accepting orders.'
-              : 'Setup is complete! Switch station availability to OPEN when ready.')
-          : '${status.completedCount} of 5 required setup sections completed. Complete remaining sections to open.',
-      actionLabel: isAllDone ? null : 'Continue setup',
-      onAction: isAllDone ? null : widget.onOpenAccount,
+      title: 'Finish station setup · ${status.percentage}%',
+      message:
+          '${status.completedCount} of 5 sections done. Customers can order once everything is complete.',
+      actionLabel: 'Continue setup',
+      onAction: widget.onOpenAccount,
       steps: [
         ExperienceStep(
           label: 'Station profile',
@@ -916,7 +947,8 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         ),
         ExperienceStep(
           label: 'Products & catalog',
-          helper: 'At least 1 active orderable refill, container, or accessory.',
+          helper:
+              'At least 1 active orderable refill, container, or accessory.',
           isComplete: status.isProductsComplete,
           onTap: () => context.openOwnerServiceCatalog(),
         ),
@@ -967,20 +999,15 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                   children: [
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.campaign_rounded,
-                          color: AppUi.bluePrimary,
+                          color: AppUi.brandOf(context),
                           size: 28,
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Flash Broadcast',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: AppUi.textPrimaryOf(context),
-                            letterSpacing: 0,
-                          ),
+                          'Alert riders',
+                          style: Theme.of(context).textTheme.headlineSmall,
                         ),
                       ],
                     ),
@@ -1017,25 +1044,26 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                         fontWeight: FontWeight.w500,
                         color: AppUi.textPrimaryOf(context),
                       ),
-                      decoration: AppUi.fieldDecorationOf(
-                        context,
-                        'Type your message...',
-                        prefixIcon: const Icon(
-                          Icons.chat_bubble_outline_rounded,
-                        ),
-                      ).copyWith(
-                        alignLabelWithHint: true,
-                        counterStyle: TextStyle(
-                          color: AppUi.textSecondaryOf(context),
-                          fontSize: 12,
-                        ),
-                      ),
+                      decoration:
+                          AppUi.fieldDecorationOf(
+                            context,
+                            'Type your message...',
+                            prefixIcon: const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                            ),
+                          ).copyWith(
+                            alignLabelWithHint: true,
+                            counterStyle: TextStyle(
+                              color: AppUi.textSecondaryOf(context),
+                              fontSize: 12,
+                            ),
+                          ),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
-                      height: 60,
-                      child: ElevatedButton(
+                      height: AppUi.buttonHeight,
+                      child: FilledButton(
                         onPressed:
                             isSending || messageController.text.trim().isEmpty
                             ? null
@@ -1055,7 +1083,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                                       content: Text(
                                         'Broadcast sent successfully!',
                                       ),
-                                      backgroundColor: Colors.green,
+                                      backgroundColor: AppColors.uiSuccess,
                                     ),
                                   );
                                 } catch (e) {
@@ -1063,42 +1091,22 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                                   setState(() => isSending = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Failed: $e'),
-                                      backgroundColor: Colors.red,
+                                      content: Text(
+                                        'Failed: ${FriendlyErrors.message(e)}',
+                                      ),
+                                      backgroundColor: AppColors.uiError,
                                     ),
                                   );
                                 }
                               },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppUi.bluePrimary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor:
-                              Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF1E293B)
-                                  : const Color(0xFFE2E8F0),
-                          disabledForegroundColor:
-                              Theme.of(context).brightness == Brightness.dark
-                                  ? const Color(0xFF64748B)
-                                  : const Color(0xFF94A3B8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppUi.pillRadius,
-                          ),
-                          elevation: 0,
-                        ),
                         child: isSending
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
-                              )
-                            : const Text(
-                                'Send to all riders',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  letterSpacing: 0,
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
                                 ),
-                              ),
+                              )
+                            : const Text('Send to all riders'),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1118,401 +1126,852 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
       if (widget.barangay != null) widget.barangay,
       if (widget.town != null) widget.town,
     ].join(', ');
+    final pending = _stat('pending');
 
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
       body: Column(
         children: [
-          OwnerHeroHeader(
-            stationName: widget.stationName ?? 'Water Station',
-            location: location.isEmpty ? 'Set your location' : location,
-            availability: widget.availability,
-            onNotificationTap: () => showNotificationPreviewSheet(
-              context,
-              onViewAll: () => context.openNotifications(),
-            ),
+          Consumer<NotificationProvider>(
+            builder: (context, notif, _) {
+              return OwnerHeroHeader(
+                stationName: widget.stationName ?? 'Water Station',
+                location: location.isEmpty ? 'Set your location' : location,
+                availability: widget.availability,
+                onNotificationTap: () => showNotificationPreviewSheet(
+                  context,
+                  onViewAll: () => context.openNotifications(),
+                ),
+                onChatTap: () => context.openInbox(),
+                unreadChatCount: notif.unreadChatCount,
+              );
+            },
           ),
+          const OfflineSyncStatusPill(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
                 _ordersSub?.cancel();
                 _setupOrdersListener();
-                await _loadInventorySnapshot();
+                await Future.wait([
+                  _loadInventorySnapshot(),
+                  _refreshOrdersSnapshot(),
+                ]);
               },
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
-                ),
-                slivers: [
-                  SliverPadding(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= AppBreakpoints.expanded;
+
+                  final callout = pending > 0
+                      ? _PendingOrdersCallout(
+                          count: pending,
+                          onReview: widget.onViewOrders,
+                        )
+                      : null;
+                  final station = _StationStatusCard(
+                    availability: widget.availability,
+                    totalRiders: widget.totalRiders,
+                    pricingSet:
+                        widget.baseDeliveryFee > 0 &&
+                        widget.pricePerGallon > 0 &&
+                        widget.hasOrderableProduct,
+                    onChanged: widget.onAvailabilityChanged,
+                  );
+                  final setup = widget.setupReady
+                      ? null
+                      : _buildGuidedSetupCard();
+
+                  final main = <Widget>[
+                    ?callout,
+                    _buildTodaySection(),
+                    _buildPipelineCard(),
+                    _buildRecentOrders(),
+                  ];
+                  final side = <Widget>[
+                    station,
+                    ?setup,
+                    _buildInventoryCard(),
+                    _buildQuickActions(),
+                  ];
+                  final phone = <Widget>[
+                    ?callout,
+                    station,
+                    ?setup,
+                    _buildTodaySection(),
+                    _buildPipelineCard(),
+                    _buildInventoryCard(),
+                    _buildQuickActions(),
+                    _buildRecentOrders(),
+                  ];
+
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
                     padding: AppUi.pagePaddingLoose.copyWith(
-                      top: AppUi.spacingMd,
+                      top: AppUi.spacingLg,
                     ),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        if (!widget.setupReady)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppUi.spacingLg,
-                            ),
-                            child: FriendlyFeedbackBanner(
-                              title: 'Finish setup before opening',
-                              message:
-                                  'Customers can order confidently once your profile, location, and pricing are complete.',
-                              icon: Icons.lightbulb_outline_rounded,
-                              color: AppColors.uiWarning,
-                              actionLabel: 'Open account setup',
-                              onAction: widget.onOpenAccount,
-                            ),
-                          ),
+                    children: [
+                      ResponsiveCenter(
+                        child: wide
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(flex: 3, child: _stack(main)),
+                                  const SizedBox(width: AppUi.spacingXl),
+                                  Expanded(flex: 2, child: _stack(side)),
+                                ],
+                              )
+                            : _stack(phone),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                        Container(
-                          width: double.infinity,
-                          padding: AppUi.cardPaddingLoose,
-                          decoration: AppUi.cardDecorationOf(context),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppUi.bluePrimary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: AppUi.cardRadius,
-                                ),
-                                child: const Icon(
-                                  Icons.water_drop_rounded,
-                                  color: AppUi.bluePrimary,
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Station status',
-                                      style: AppUi.sectionTitle.copyWith(
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${widget.totalRiders} riders · Pricing ${widget.baseDeliveryFee > 0 && widget.pricePerGallon > 0 && widget.hasOrderableProduct ? 'set' : 'missing'}',
-                                      style: AppUi.captionText,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              _buildStationSwitch(),
-                            ],
-                          ),
-                        ),
+  Widget _stack(List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SizedBox(height: AppUi.spacingXl),
+          children[i],
+        ],
+      ],
+    );
+  }
 
-                        const SizedBox(height: AppUi.spacingLg),
+  Widget _buildTodaySection() {
+    final revenueTrend = _parseTrend(_stats['revenueTrend']);
+    final ordersTrend = _parseTrend(_stats['ordersTrend']);
+    final deliveredTrend = _parseTrend(_stats['deliveredTrend']);
+    final weeklyOrders = _stat('weeklyOrders');
 
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: "Today's revenue",
-                                    value: _formatCurrency(
-                                      (_stats['revenueToday'] as num?)?.toDouble() ?? 0.0,
-                                    ),
-                                    icon: Icons.payments_outlined,
-                                    color: AppUi.bluePrimary,
-                                    delta: '+12%',
-                                    trend: _parseTrend(_stats['revenueTrend']),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: "Today's orders",
-                                    value: '${_stats['ordersToday'] ?? 0}',
-                                    icon: Icons.water_drop_outlined,
-                                    color: const Color(0xFFF59E0B),
-                                    delta: '+8%',
-                                    trend: _parseTrend(_stats['ordersTrend']),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: 'Pending',
-                                    value: '${_stats['pending'] ?? 0}',
-                                    icon: Icons.schedule_rounded,
-                                    color: AppUi.accentCyan,
-                                    onTap: widget.onViewOrders,
-                                    delta: ((_stats['pending'] as num?)?.toInt() ?? 0) > 0 ? 'Active' : 'Clear',
-                                    trend: _parseTrend(_stats['pendingTrend']),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: DashboardStatCard(
-                                    label: 'Delivered today',
-                                    value: '${_stats['delivered'] ?? 0}',
-                                    icon: Icons.check_circle_outline_rounded,
-                                    color: AppUi.accentGreen,
-                                    delta: '+15%',
-                                    trend: _parseTrend(_stats['deliveredTrend']),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          title: 'Today',
+          subtitle:
+              'Last 7 days: ${formatPeso(_amount('weeklyRevenue'), whole: true)}'
+              ' · $weeklyOrders order${weeklyOrders == 1 ? '' : 's'}',
+        ),
+        const SizedBox(height: AppUi.spacingMd),
+        Consumer<CreditProvider>(
+          builder: (context, creditProv, _) {
+            final unpaid = creditProv.credits.where((c) => !c.isPaid);
+            final utang = unpaid.fold<double>(0, (sum, c) => sum + c.remaining);
+            final unpaidCount = unpaid.length;
+            return _ResponsiveGrid(
+              minTileWidth: 150,
+              maxColumns: 4,
+              children: [
+                _KpiTile(
+                  label: 'Revenue',
+                  value: formatPeso(_amount('revenueToday'), whole: true),
+                  icon: Icons.payments_outlined,
+                  deltaPct: _dayOverDayPct(revenueTrend),
+                ),
+                _KpiTile(
+                  label: 'Orders',
+                  value: '${_stat('ordersToday')}',
+                  icon: Icons.receipt_long_outlined,
+                  deltaPct: _dayOverDayPct(ordersTrend),
+                ),
+                _KpiTile(
+                  label: 'Delivered',
+                  value: '${_stat('delivered')}',
+                  icon: Icons.check_circle_outline_rounded,
+                  deltaPct: _dayOverDayPct(deliveredTrend),
+                ),
+                _KpiTile(
+                  label: 'Unpaid utang',
+                  value: formatPeso(utang, whole: true),
+                  icon: Icons.account_balance_wallet_outlined,
+                  footnote: unpaidCount > 0
+                      ? '$unpaidCount customer${unpaidCount == 1 ? '' : 's'}'
+                      : 'All settled',
+                  footnoteTone: unpaidCount > 0 ? StatusTone.warning : null,
+                  onTap: widget.onOpenCredits,
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
 
-                        const SizedBox(height: AppUi.spacingLg),
+  Widget _buildPipelineCard() {
+    const stages = [
+      ('pending', 'Pending'),
+      ('accepted', 'Accepted'),
+      ('preparing', 'Preparing'),
+      ('ready_for_pickup', 'Ready'),
+      ('out_for_delivery', 'On the way'),
+    ];
+    final counts = {
+      'pending': _stat('pending'),
+      'accepted': _stat('accepted'),
+      'preparing': _stat('preparing'),
+      'ready_for_pickup': _stat('ready'),
+      'out_for_delivery': _stat('delivering'),
+    };
+    final active = counts.values.fold<int>(0, (a, b) => a + b);
 
-                        _buildInventoryCard(),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SectionHeader(
+            title: 'Order pipeline',
+            subtitle: active == 0
+                ? 'No active orders'
+                : '$active active order${active == 1 ? '' : 's'}',
+            action: TextButton(
+              onPressed: widget.onViewOrders,
+              child: const Text('Manage'),
+            ),
+          ),
+          const SizedBox(height: AppUi.spacingMd),
+          _ResponsiveGrid(
+            minTileWidth: 96,
+            maxColumns: 5,
+            spacing: AppUi.spacingSm,
+            children: [
+              for (final (status, label) in stages)
+                _PipelineStage(
+                  label: label,
+                  count: counts[status] ?? 0,
+                  color: OrderStatusColors.getColor(status),
+                  onTap: widget.onViewOrders,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-                        const SizedBox(height: AppUi.spacingMd),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    _showBroadcastBottomSheet(context),
-                                icon: const Icon(
-                                  Icons.campaign_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('Flash alert'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppUi.bluePrimary,
-                                  side: BorderSide(
-                                    color: AppUi.borderOf(context),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppUi.controlRadius,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    context.openOwnerServiceCatalog(),
-                                icon: const Icon(
-                                  Icons.water_drop_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('Water catalog'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppUi.textPrimaryOf(context),
-                                  side: BorderSide(
-                                    color: AppUi.borderOf(context),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppUi.controlRadius,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => {},
-                            icon: const Icon(
-                              Icons.receipt_long_outlined,
-                              size: 18,
-                              color: Color(0xFFF59E0B),
-                            ),
-                            label: const Text(
-                              'Customer Credits & Utang Ledger',
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppUi.textPrimaryOf(context),
-                              side: BorderSide(color: AppUi.borderOf(context)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppUi.controlRadius,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                          ),
-                        ),
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _SectionHeader(title: 'Quick actions'),
+        const SizedBox(height: AppUi.spacingMd),
+        _QuickActionList(
+          children: [
+            _QuickAction(
+              icon: Icons.water_drop_outlined,
+              label: 'Water catalog',
+              onTap: () => context.openOwnerServiceCatalog(),
+            ),
+            _QuickAction(
+              icon: Icons.receipt_long_outlined,
+              label: 'Credits & utang',
+              onTap: widget.onOpenCredits,
+            ),
+            _QuickAction(
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Digital wallet',
+              onTap: () {
+                final uid = supabase.auth.currentUser?.id;
+                if (uid != null) {
+                  OwnerWalletSheet.show(
+                    context,
+                    ownerId: uid,
+                    onManageRiderPayouts: widget.onOpenRiders,
+                  );
+                }
+              },
+            ),
+            _QuickAction(
+              icon: Icons.campaign_outlined,
+              label: 'Alert riders',
+              onTap: () => _showBroadcastBottomSheet(context),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-                        const SizedBox(height: AppUi.spacingLg),
-                        _buildGuidedSetupCard(),
-                        const SizedBox(height: AppUi.spacingLg),
+  Widget _buildRecentOrders() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader(
+          title: 'Recent orders',
+          action: TextButton(
+            onPressed: widget.onViewOrders,
+            child: const Text('View all'),
+          ),
+        ),
+        const SizedBox(height: AppUi.spacingSm),
+        if (_recentOrders.isEmpty)
+          AxoEmptyState(
+            pose: AxoPose.empty,
+            title: 'No orders yet',
+            message:
+                'When customers place refill orders, they will appear here instantly.',
+            compact: true,
+          )
+        else
+          ..._recentOrders.map(
+            (o) => _OrderListItem(order: o, onTap: widget.onViewOrders),
+          ),
+      ],
+    );
+  }
+}
 
-                        const Text(
-                          'Live refill orders',
-                          style: AppUi.sectionTitle,
-                        ),
-                        const SizedBox(height: 12),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const ClampingScrollPhysics(),
-                          child: Row(
-                            children: [
-                              _buildLogisticsChip(
-                                'Pending',
-                                (_stats['pending'] as num?)?.toInt() ?? 0,
-                                OrderStatusColors.getColor('pending'),
-                              ),
-                              const SizedBox(width: 8),
-                              _buildLogisticsChip(
-                                'Preparing',
-                                (_stats['preparing'] as num?)?.toInt() ?? 0,
-                                OrderStatusColors.getColor('preparing'),
-                              ),
-                              const SizedBox(width: 8),
-                              _buildLogisticsChip(
-                                'Ready',
-                                (_stats['ready'] as num?)?.toInt() ?? 0,
-                                OrderStatusColors.getColor('ready_for_pickup'),
-                              ),
-                              const SizedBox(width: 8),
-                              _buildLogisticsChip(
-                                'Delivering',
-                                (_stats['delivering'] as num?)?.toInt() ?? 0,
-                                OrderStatusColors.getColor('out_for_delivery'),
-                              ),
-                            ],
-                          ),
-                        ),
+/// Title row used by every overview section: title, optional one-line
+/// context and an optional trailing action.
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget? action;
 
-                        const SizedBox(height: AppUi.spacingLg),
-                        AxoTipCard(
-                          title: 'Peak hours tip',
-                          message:
-                              'Most refill orders come between 8 AM and 11 AM. Keep riders ready during peak hours.',
-                          trailingIcon: Icons.insights_rounded,
-                        ),
+  const _SectionHeader({required this.title, this.subtitle, this.action});
 
-                        const SizedBox(height: AppUi.spacingLg),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Recent orders',
-                              style: AppUi.sectionTitle,
-                            ),
-                            TextButton(
-                              onPressed: widget.onViewOrders,
-                              child: const Text('View all'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (_recentOrders.isEmpty)
-                          AxoEmptyState(
-                            pose: AxoPose.empty,
-                            title: 'No orders yet today',
-                            message:
-                                'When customers place refill orders, they will appear here instantly.',
-                            compact: true,
-                          )
-                        else
-                          ..._recentOrders.map(
-                            (o) => _OrderListItem(
-                              order: o,
-                              onTap: widget.onViewOrders,
-                            ),
-                          ),
-                      ]),
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                header: true,
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(subtitle!, style: theme.textTheme.bodySmall),
+              ],
+            ],
+          ),
+        ),
+        ?action,
+      ],
+    );
+  }
+}
+
+/// Lays children out in equal-width columns: as many as fit at
+/// [minTileWidth], capped at [maxColumns].
+class _ResponsiveGrid extends StatelessWidget {
+  final List<Widget> children;
+  final double minTileWidth;
+  final int maxColumns;
+  final double spacing;
+
+  const _ResponsiveGrid({
+    required this.children,
+    required this.minTileWidth,
+    required this.maxColumns,
+    this.spacing = AppUi.spacingMd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fit =
+            ((constraints.maxWidth + spacing) / (minTileWidth + spacing))
+                .floor();
+        final columns = fit.clamp(1, maxColumns);
+        double widthFor(int perRow) =>
+            (constraints.maxWidth - spacing * (perRow - 1)) / perRow;
+        // A short last row stretches to the full width instead of leaving a
+        // hole (e.g. 5 pipeline stages on a phone become 3 + 2).
+        final lastRowStart = children.length - children.length % columns;
+        final lastRowCount = children.length % columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (var i = 0; i < children.length; i++)
+              SizedBox(
+                width: lastRowCount > 0 && i >= lastRowStart
+                    ? widthFor(lastRowCount)
+                    : widthFor(columns),
+                child: children[i],
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _KpiTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  /// Real day-over-day change; null when yesterday had no data.
+  final int? deltaPct;
+  final String? footnote;
+  final StatusTone? footnoteTone;
+  final VoidCallback? onTap;
+
+  const _KpiTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.deltaPct,
+    this.footnote,
+    this.footnoteTone,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = AppUi.isDark(context);
+    final secondary = AppUi.textSecondaryOf(context);
+
+    Widget foot;
+    if (deltaPct != null) {
+      final up = deltaPct! >= 0;
+      final tone = StatusToneStyle.of(
+        up ? StatusTone.success : StatusTone.danger,
+        isDark: isDark,
+      );
+      foot = Row(
+        children: [
+          Icon(
+            up ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+            size: AppUi.iconSm,
+            color: tone.foreground,
+          ),
+          const SizedBox(width: AppUi.spacingXs),
+          Flexible(
+            child: Text(
+              '${up ? '+' : ''}$deltaPct% vs yesterday',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: tone.foreground,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      final color = footnoteTone == null
+          ? secondary
+          : StatusToneStyle.of(footnoteTone!, isDark: isDark).foreground;
+      foot = Text(
+        footnote ?? 'No data yesterday',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall?.copyWith(color: color),
+      );
+    }
+
+    return Semantics(
+      container: true,
+      button: onTap != null,
+      child: AppCard(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: AppUi.iconSm, color: secondary),
+                const SizedBox(width: AppUi.spacingSm - 2),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: secondary,
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppUi.spacingSm),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: AppUi.textPrimaryOf(context),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppUi.spacingXs),
+            foot,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PipelineStage extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _PipelineStage({
+    required this.label,
+    required this.count,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final idle = count == 0;
+    return Semantics(
+      button: onTap != null,
+      label: '$count $label',
+      excludeSemantics: true,
+      child: Material(
+        color: AppUi.surfaceRaisedOf(context),
+        borderRadius: AppUi.controlRadius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppUi.controlRadius,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
+            child: Padding(
+              padding: const EdgeInsets.all(AppUi.spacingMd),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$count',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: idle
+                          ? AppUi.textSecondaryOf(context)
+                          : AppUi.textPrimaryOf(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: idle ? AppUi.borderOf(context) : color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildLogisticsChip(String label, int count, Color color) {
+class _InventoryStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool warning;
+
+  const _InventoryStat({
+    required this.label,
+    required this.value,
+    this.warning = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(AppUi.spacingMd),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: AppUi.cardRadius,
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: AppUi.surfaceRaisedOf(context),
+        borderRadius: AppUi.controlRadius,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(label, style: theme.textTheme.bodySmall),
+          const SizedBox(height: AppUi.spacingXs),
           Text(
-            '$count',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              color: color.withValues(alpha: 0.8),
+            value,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: warning
+                  ? StatusToneStyle.of(
+                      StatusTone.warning,
+                      isDark: AppUi.isDark(context),
+                    ).foreground
+                  : AppUi.textPrimaryOf(context),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStationSwitch() {
-    return _buildStatusToggle();
-  }
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
 
-  Widget _buildStatusToggle() {
-    return PopupMenuButton<String>(
-      tooltip: 'Set station availability',
-      initialValue: widget.availability,
-      onSelected: widget.onAvailabilityChanged,
-      itemBuilder: (context) => const [
-        PopupMenuItem(value: 'open', child: Text('Open')),
-        PopupMenuItem(value: 'busy', child: Text('Busy')),
-        PopupMenuItem(value: 'maintenance', child: Text('Maintenance')),
-        PopupMenuItem(value: 'closed', child: Text('Closed')),
-      ],
-      child: Container(
-        margin: const EdgeInsets.only(left: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppUi.blueSoft,
-          borderRadius: AppUi.controlRadius,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.tune_rounded, size: 18, color: AppUi.bluePrimary),
-            const SizedBox(width: 6),
-            Text(
-              widget.availability.replaceAll('_', ' '),
-              style: const TextStyle(
-                color: AppUi.bluePrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
+  const _QuickAction({required this.icon, required this.label, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: AppUi.buttonHeightLg),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppUi.spacingLg),
+          child: Row(
+            children: [
+              Icon(icon, size: AppUi.iconMd, color: AppUi.brandOf(context)),
+              const SizedBox(width: AppUi.spacingMd),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
-            ),
-          ],
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppUi.textSecondaryOf(context),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// One bordered card holding the quick actions as full-width rows, so labels
+/// never wrap into uneven tiles.
+class _QuickActionList extends StatelessWidget {
+  final List<_QuickAction> children;
+
+  const _QuickActionList({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                indent: AppUi.spacingLg + AppUi.iconMd + AppUi.spacingMd,
+                color: AppUi.dividerOf(context),
+              ),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Station availability: the status the customers see, the open/closed
+/// switch, and the less common states (busy, maintenance) in a menu.
+class _StationStatusCard extends StatelessWidget {
+  final String availability;
+  final int totalRiders;
+  final bool pricingSet;
+  final ValueChanged<String> onChanged;
+
+  const _StationStatusCard({
+    required this.availability,
+    required this.totalRiders,
+    required this.pricingSet,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = AppUi.isDark(context);
+    final isOpen = availability == 'open';
+    final (tone, icon, title, subtitle) = switch (availability) {
+      'open' => (
+        StatusTone.success,
+        Icons.storefront_rounded,
+        'Open for orders',
+        'Customers can place refill orders',
+      ),
+      'busy' => (
+        StatusTone.warning,
+        Icons.hourglass_top_rounded,
+        'Busy',
+        'Refill queue is full',
+      ),
+      'maintenance' => (
+        StatusTone.danger,
+        Icons.build_rounded,
+        'Under maintenance',
+        'Equipment servicing',
+      ),
+      _ => (
+        StatusTone.neutral,
+        Icons.storefront_outlined,
+        'Closed',
+        'Not accepting orders',
+      ),
+    };
+    final style = StatusToneStyle.of(tone, isDark: isDark);
+    final warn = StatusToneStyle.of(StatusTone.warning, isDark: isDark);
+    final secondary = AppUi.textSecondaryOf(context);
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: style.background,
+                  borderRadius: AppUi.controlRadius,
+                  border: Border.all(color: style.border),
+                ),
+                child: Icon(icon, color: style.foreground, size: AppUi.iconLg),
+              ),
+              const SizedBox(width: AppUi.spacingMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              Semantics(
+                label: 'Accept orders',
+                child: Switch.adaptive(
+                  value: isOpen,
+                  onChanged: (val) {
+                    HapticFeedback.mediumImpact();
+                    onChanged(val ? 'open' : 'closed');
+                  },
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'More status options',
+                initialValue: availability,
+                onSelected: onChanged,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'open', child: Text('Open')),
+                  PopupMenuItem(value: 'busy', child: Text('Busy')),
+                  PopupMenuItem(
+                    value: 'maintenance',
+                    child: Text('Maintenance'),
+                  ),
+                  PopupMenuItem(value: 'closed', child: Text('Closed')),
+                ],
+                icon: Icon(Icons.more_vert_rounded, color: secondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppUi.spacingMd),
+          Divider(height: 1, color: AppUi.dividerOf(context)),
+          const SizedBox(height: AppUi.spacingMd),
+          Wrap(
+            spacing: AppUi.spacingLg,
+            runSpacing: AppUi.spacingSm,
+            children: [
+              _MetaItem(
+                icon: Icons.delivery_dining_outlined,
+                label: '$totalRiders rider${totalRiders == 1 ? '' : 's'}',
+                color: secondary,
+              ),
+              _MetaItem(
+                icon: pricingSet
+                    ? Icons.sell_outlined
+                    : Icons.error_outline_rounded,
+                label: pricingSet ? 'Pricing set' : 'Pricing missing',
+                color: pricingSet ? secondary : warn.foreground,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _MetaItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: AppUi.iconSm, color: color),
+        const SizedBox(width: AppUi.spacingXs + 2),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1532,6 +1991,71 @@ class _OrderListItem extends StatelessWidget {
         role: OrderCardRole.owner,
         isFullColor: true,
         onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Top-of-dashboard call to action whenever orders are waiting for the
+/// station to accept or decline — the owner's most time-sensitive job.
+class _PendingOrdersCallout extends StatelessWidget {
+  final int count;
+  final VoidCallback? onReview;
+
+  const _PendingOrdersCallout({required this.count, this.onReview});
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = StatusToneStyle.of(
+      StatusTone.warning,
+      isDark: AppUi.isDark(context),
+    );
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        decoration: BoxDecoration(
+          color: tone.background,
+          borderRadius: AppUi.cardRadius,
+          border: Border.all(color: tone.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.notifications_active_rounded, color: tone.foreground),
+            const SizedBox(width: AppUi.spacingMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    count == 1
+                        ? '1 order is waiting'
+                        : '$count orders are waiting',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: tone.foreground,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Accept or decline so customers know what to expect.',
+                    style: TextStyle(fontSize: 13, color: tone.foreground),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppUi.spacingSm),
+            FilledButton(
+              onPressed: onReview,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              child: const Text('Review'),
+            ),
+          ],
+        ),
       ),
     );
   }

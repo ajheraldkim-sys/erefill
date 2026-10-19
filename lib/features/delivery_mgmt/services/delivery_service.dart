@@ -27,7 +27,7 @@ class DeliveryService {
       try {
         await _supabase
             .from('dm_riders')
-            .upsert(saved.toJson(), onConflict: 'id');
+            .upsert(saved.toCloudJson(), onConflict: 'id');
       } catch (_) {}
     }
     return saved;
@@ -39,7 +39,7 @@ class DeliveryService {
       try {
         await _supabase
             .from('dm_riders')
-            .upsert(rider.toJson(), onConflict: 'id');
+            .upsert(rider.toCloudJson(), onConflict: 'id');
       } catch (_) {}
     }
   }
@@ -102,6 +102,7 @@ class DeliveryService {
     final saved = withCommission.copyWith(id: id, localId: id);
 
     // 3. Auto-deduct from inventory
+    final shortId = id.length >= 8 ? id.substring(0, 8) : id;
     await local.insertInventoryTx(
       DmInventoryTx(
         id: '',
@@ -109,7 +110,7 @@ class DeliveryService {
         transactionDate: delivery.deliveryDate,
         transactionType: InventoryTxType.deduct,
         gallons: delivery.gallons,
-        notes: 'Auto: delivery ${id.substring(0, 8)}',
+        notes: 'Auto: delivery $shortId',
         deliveryId: id,
         createdAt: DateTime.now(),
       ),
@@ -125,7 +126,7 @@ class DeliveryService {
           riderName: delivery.riderName,
           deliveryId: id,
           creditType: CreditType.customer,
-          debtorName: 'Customer (Delivery ${id.substring(0, 8)})',
+          debtorName: 'Customer (Delivery $shortId)',
           amount: delivery.creditAmount,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),

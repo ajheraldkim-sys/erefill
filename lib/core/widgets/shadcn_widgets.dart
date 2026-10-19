@@ -2,6 +2,8 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
+import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 export 'package:shadcn_flutter/shadcn_flutter.dart' show LucideIcons;
 
 bool _hasShadcnTheme(BuildContext context) {
@@ -80,10 +82,10 @@ class ShadcnPrimaryButton extends StatelessWidget {
     if (!hasShadcn) {
       final mBtn = material.FilledButton(
         style: material.FilledButton.styleFrom(
-          backgroundColor: const material.Color(0xFF2563EB),
+          backgroundColor: AppUi.bluePrimary,
           foregroundColor: material.Colors.white,
           shape: material.RoundedRectangleBorder(
-            borderRadius: material.BorderRadius.circular(8),
+            borderRadius: material.BorderRadius.circular(AppUi.radiusControl),
           ),
           padding: const material.EdgeInsets.symmetric(horizontal: 16),
         ),
@@ -168,9 +170,9 @@ class ShadcnOutlineButton extends StatelessWidget {
     if (!hasShadcn) {
       final mBtn = material.OutlinedButton(
         style: material.OutlinedButton.styleFrom(
-          foregroundColor: const material.Color(0xFF2563EB),
-          side: const material.BorderSide(color: material.Color(0xFFE2E8F0)),
-          shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(8)),
+          foregroundColor: AppUi.brandOf(context),
+          side: const material.BorderSide(color: AppUi.borderLight),
+          shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(AppUi.radiusControl)),
           padding: const material.EdgeInsets.symmetric(horizontal: 16),
         ),
         onPressed: handlePress,
@@ -258,10 +260,10 @@ class ShadcnDestructiveButton extends StatelessWidget {
     if (!hasShadcn) {
       final mBtn = material.FilledButton(
         style: material.FilledButton.styleFrom(
-          backgroundColor: const material.Color(0xFFDC2626),
+          backgroundColor: AppColors.uiError,
           foregroundColor: material.Colors.white,
           shape: material.RoundedRectangleBorder(
-            borderRadius: material.BorderRadius.circular(8),
+            borderRadius: material.BorderRadius.circular(AppUi.radiusControl),
           ),
           padding: const material.EdgeInsets.symmetric(horizontal: 16),
         ),
@@ -424,15 +426,15 @@ class ShadcnBadge extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+            color: AppColors.uiSuccess.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppUi.radiusSm),
+            border: Border.all(color: AppColors.uiSuccess.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 12, color: const Color(0xFF059669)),
+                Icon(icon, size: 12, color: AppColors.uiSuccess),
                 const SizedBox(width: 4),
               ],
               Flexible(
@@ -442,8 +444,8 @@ class ShadcnBadge extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF059669),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.uiSuccess,
                   ),
                 ),
               ),
@@ -454,15 +456,15 @@ class ShadcnBadge extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+            color: AppColors.uiWarning.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppUi.radiusSm),
+            border: Border.all(color: AppColors.uiWarning.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 12, color: const Color(0xFFD97706)),
+                Icon(icon, size: 12, color: AppColors.uiWarning),
                 const SizedBox(width: 4),
               ],
               Flexible(
@@ -472,8 +474,8 @@ class ShadcnBadge extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFD97706),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.uiWarning,
                   ),
                 ),
               ),

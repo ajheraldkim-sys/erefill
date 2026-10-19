@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
 
+import 'package:erefill/core/constants.dart';
 /// Interactive, animated timeline representing the live stages of a refill order.
 class LiveOrderProgressTracker extends StatefulWidget {
   final String status;
@@ -90,9 +91,9 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF132029) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(
-          color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+          color: isDark ? AppColors.borderDark : AppUi.borderLight,
           width: 1.2,
         ),
         boxShadow: [
@@ -135,8 +136,8 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                         widget.stationName,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF1E293B),
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : AppUi.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -148,7 +149,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: statusStyle.subtleBackground,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                   border: Border.all(color: statusStyle.subtleBorder, width: 1),
                 ),
                 child: Row(
@@ -159,7 +160,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                     Text(
                       statusStyle.label,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: statusStyle.primaryColor,
                       ),
@@ -186,7 +187,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                        color: isDark ? AppUi.darkSurfaceRaised : AppUi.borderLight,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -226,7 +227,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                               ? AppColors.brandPrimary
                               : isCurrent
                                   ? statusStyle.primaryColor
-                                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+                                  : (isDark ? AppUi.darkSurfaceRaised : AppUi.borderLight),
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: isCurrent ? Colors.white : Colors.transparent,
@@ -248,7 +249,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                             size: 15,
                             color: (isPassed || isCurrent)
                                 ? Colors.white
-                                : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                                : (isDark ? AppUi.textMuted : const Color(0xFF94A3B8)),
                           ),
                         ),
                       );
@@ -268,13 +269,13 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                           Text(
                             step.title,
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                              fontSize: 11,
+                              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
                               color: isCurrent
                                   ? (isDark ? Colors.white : AppColors.brandPrimary)
                                   : isPassed
-                                      ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
-                                      : (isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+                                      ? (isDark ? AppUi.darkTextSecondary : AppUi.textMuted)
+                                      : (isDark ? AppUi.textSecondary : const Color(0xFF94A3B8)),
                             ),
                           ),
                         ],
@@ -293,7 +294,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1A2C38) : AppColors.brandSoft,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 border: Border.all(
                   color: AppColors.brandPrimary.withValues(alpha: 0.25),
                   width: 1,
@@ -317,14 +318,14 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                       children: [
                         const Text(
                           'Your Delivery Rider',
-                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 11, color: AppUi.textMuted, fontWeight: FontWeight.w600),
                         ),
                         Text(
                           widget.riderName!,
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : AppUi.textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -339,7 +340,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                       },
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.15),
-                        foregroundColor: AppColors.brandPrimary,
+                        foregroundColor: AppUi.brandOf(context),
                       ),
                       icon: const Icon(Icons.map_rounded, size: 18),
                       tooltip: 'Live Map',
@@ -352,7 +353,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                       },
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.15),
-                        foregroundColor: AppColors.brandPrimary,
+                        foregroundColor: AppUi.brandOf(context),
                       ),
                       icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
                       tooltip: 'Message',

@@ -6,6 +6,8 @@ import '../../../core/constants.dart';
 import '../../../core/services/station_data_cache.dart';
 import '../../../core/widgets/app_form_fields.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class ReviewModal extends StatefulWidget {
   final String orderId;
   final String stationId;
@@ -34,7 +36,7 @@ class ReviewModal extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (context) => ReviewModal(
         orderId: orderId,
@@ -72,7 +74,7 @@ class _ReviewModalState extends State<ReviewModal> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('You have already reviewed this order'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.uiWarning,
           ),
         );
         return;
@@ -107,7 +109,7 @@ class _ReviewModalState extends State<ReviewModal> {
           content: Text(
             'Thanks for rating ${widget.stationName} $_selectedRating stars!',
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.uiSuccess,
         ),
       );
 
@@ -116,8 +118,8 @@ class _ReviewModalState extends State<ReviewModal> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to submit review: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Failed to submit review: ${FriendlyErrors.message(e)}'),
+          backgroundColor: AppColors.uiError,
         ),
       );
     } finally {
@@ -175,9 +177,10 @@ class _ReviewModalState extends State<ReviewModal> {
                     starValue <= _selectedRating
                         ? Icons.star
                         : Icons.star_border,
-                    color: Colors.amber,
+                    color: AppColors.uiWarning,
                     size: 40,
                   ),
+                  tooltip: '$starValue star${starValue == 1 ? '' : 's'}',
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   constraints: const BoxConstraints(),
                 );
@@ -191,7 +194,7 @@ class _ReviewModalState extends State<ReviewModal> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Colors.amber.shade700,
+                color: AppColors.uiWarning,
               ),
             ),
           ),

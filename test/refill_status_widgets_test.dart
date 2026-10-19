@@ -192,4 +192,40 @@ void main() {
     expect(find.text('Empty trend'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  test('timeline maps every status synonym to a real stage', () {
+    int idx(String s) => RefillOrderStatusTimeline.statusIndex(s);
+    expect(idx('completed'), idx('delivered'));
+    expect(idx('confirmed'), idx('accepted'));
+    expect(idx('in_prep'), idx('preparing'));
+    expect(idx('dispatched'), idx('out_for_delivery'));
+    expect(idx('ready_for_delivery'), idx('ready_for_pickup'));
+    expect(idx('rider_assigned'), idx('assigned_to_rider'));
+    expect(idx('pending_sync'), idx('pending'));
+    for (final s in ['completed', 'confirmed', 'in_prep', 'dispatched']) {
+      expect(idx(s), greaterThanOrEqualTo(0), reason: s);
+    }
+    expect(idx('cancelled'), -1);
+    expect(idx('rejected'), -1);
+  });
+
+  testWidgets('rejected orders read as declined, not cancelled', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: RefillOrderStatusTimeline(status: 'rejected')),
+      ),
+    );
+    expect(find.text('Declined'), findsOneWidget);
+    expect(find.text('Cancelled'), findsNothing);
+  });
+
+  test('status synonyms share one canonical label', () {
+    expect(OrderStatusColors.getLabel('confirmed'), 'Accepted');
+    expect(OrderStatusColors.getLabel('completed'), 'Delivered');
+    expect(OrderStatusColors.getLabel('ready_for_delivery'), 'Ready for Pickup');
+    expect(
+      OrderStatusPresentation.fromStatus('completed').label,
+      OrderStatusStyle.resolve('completed').label,
+    );
+  });
 }

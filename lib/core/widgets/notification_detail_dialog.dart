@@ -61,7 +61,7 @@ Future<void> showNotificationDetailDialog(
       return Dialog(
         backgroundColor: AppUi.surfaceOf(dialogContext),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppUi.radiusPill),
         ),
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: ConstrainedBox(
@@ -81,7 +81,7 @@ Future<void> showNotificationDetailDialog(
                       height: 44,
                       decoration: BoxDecoration(
                         color: typeColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       ),
                       alignment: Alignment.center,
                       child: Icon(type.icon, color: typeColor, size: 22),
@@ -100,7 +100,7 @@ Future<void> showNotificationDetailDialog(
                                 ),
                                 decoration: BoxDecoration(
                                   color: typeColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
                                 ),
                                 child: Text(
                                   type.displayName,
@@ -124,13 +124,13 @@ Future<void> showNotificationDetailDialog(
                                   decoration: BoxDecoration(
                                     color: notification.priority.color
                                         .withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(AppUi.radiusSm),
                                   ),
                                   child: Text(
                                     notification.priority.value.toUpperCase(),
                                     style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w800,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
                                       color: notification.priority.color,
                                     ),
                                   ),
@@ -167,7 +167,7 @@ Future<void> showNotificationDetailDialog(
                   notification.title,
                   style: TextStyle(
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(dialogContext),
                     letterSpacing: -0.2,
                   ),
@@ -199,7 +199,7 @@ Future<void> showNotificationDetailDialog(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppUi.pageBgOf(dialogContext),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       border: Border.all(
                         color: AppUi.borderOf(dialogContext),
                       ),
@@ -243,7 +243,7 @@ Future<void> showNotificationDetailDialog(
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
                           ),
                         ),
                         child: const Text('Close'),
@@ -262,7 +262,7 @@ Future<void> showNotificationDetailDialog(
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                             ),
                           ),
                           child: const Text('View Order'),
@@ -285,7 +285,7 @@ Future<void> showNotificationDetailDialog(
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
                             ),
                           ),
                           child: const Text('Open Chat'),

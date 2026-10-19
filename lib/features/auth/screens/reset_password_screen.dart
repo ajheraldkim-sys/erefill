@@ -7,6 +7,7 @@ import '../../../core/utils/friendly_errors.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/widgets/brand/erefill_logo.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
 
@@ -37,7 +38,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter and confirm your new password.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
       return;
@@ -47,7 +48,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password must be at least 6 characters.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
       return;
@@ -57,7 +58,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Passwords do not match.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
       return;
@@ -81,7 +82,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               fallback: 'Could not update password. Please try again.',
             ),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
     } finally {
@@ -108,7 +109,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               _success ? 'Password updated!' : 'Set new password',
               style: TextStyle(
                 fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),

@@ -129,7 +129,7 @@ class SyncService {
       try {
         await _supabase
             .from('dm_riders')
-            .upsert(rider.toJson(), onConflict: 'id');
+            .upsert(rider.toCloudJson(), onConflict: 'id');
       } catch (e) {
         debugPrint('[SyncService] Push rider failed: $e');
         rethrow;
@@ -143,7 +143,7 @@ class SyncService {
       try {
         await _supabase
             .from('dm_deliveries')
-            .upsert(delivery.toJson(), onConflict: 'id');
+            .upsert(delivery.toCloudJson(), onConflict: 'id');
         await _local.markDeliverySynced(delivery.id);
       } catch (e) {
         debugPrint('[SyncService] Push delivery failed: $e');
@@ -158,7 +158,7 @@ class SyncService {
       try {
         await _supabase
             .from('dm_credits')
-            .upsert(credit.toJson(), onConflict: 'id');
+            .upsert(credit.toCloudJson(), onConflict: 'id');
         await _local.markCreditSynced(credit.id);
       } catch (e) {
         debugPrint('[SyncService] Push credit failed: $e');
@@ -173,7 +173,7 @@ class SyncService {
       try {
         await _supabase
             .from('dm_inventory')
-            .upsert(tx.toJson(), onConflict: 'id');
+            .upsert(tx.toCloudJson(), onConflict: 'id');
       } catch (e) {
         debugPrint('[SyncService] Push inventory failed: $e');
         // Non-blocking for local tx logs

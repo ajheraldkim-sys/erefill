@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/constants.dart';
 import '../../../core/db_tables.dart';
 import '../../../core/routing/app_navigation.dart';
@@ -25,6 +26,7 @@ import '../../chat/services/chat_service.dart';
 import '../../subscriptions/models/subscription_model.dart';
 import '../../subscriptions/services/subscription_service.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class StationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> station;
   const StationDetailsScreen({super.key, required this.station});
@@ -493,8 +495,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               right: 20,
             ),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              color: isDark ? AppUi.darkSurfaceRaised : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -521,11 +523,11 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.autorenew_rounded,
-                              color: AppUi.bluePrimary,
+                              color: AppUi.brandOf(context),
                               size: 22,
                             ),
                           ),
@@ -537,7 +539,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                 'Schedule Auto-Refill',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: AppUi.textPrimaryOf(ctx),
                                 ),
                               ),
@@ -600,7 +602,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             ),
                           ),
                           Text(
-                            '₱${selectedPrice.toStringAsFixed(0)} / bottle',
+                            '${formatPeso(selectedPrice, whole: true)} / bottle',
                             style: TextStyle(fontSize: 11, color: AppUi.textSecondaryOf(ctx)),
                           ),
                         ],
@@ -617,7 +619,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             '$selectedQty',
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: AppUi.textPrimaryOf(ctx),
                             ),
                           ),
@@ -644,7 +646,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     initialValue: selectedFrequency,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
                     ),
                     items: const [
                       DropdownMenuItem(value: 'every_3_days', child: Text('Every 3 Days')),
@@ -702,7 +704,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     decoration: InputDecoration(
                       hintText: 'Enter street, purok, or landmark',
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -710,8 +712,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppUi.blueSoft.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppUi.brandSoftOf(context).withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -725,11 +727,11 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           ),
                         ),
                         Text(
-                          '₱${estimatedPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
+                          formatPeso(estimatedPrice),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
                             fontSize: 16,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       ],
@@ -745,7 +747,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                         backgroundColor: AppUi.bluePrimary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         ),
                       ),
                       onPressed: () async {
@@ -780,14 +782,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                 content: Text(
                                   'Auto-Refill scheduled with $stationName! View under Orders > Routine.',
                                 ),
-                                backgroundColor: const Color(0xFF10B981),
+                                backgroundColor: AppColors.uiSuccess,
                               ),
                             );
                           }
                         } catch (err) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to schedule routine: $err')),
+                              SnackBar(content: Text('Failed to schedule routine: ${FriendlyErrors.message(err)}')),
                             );
                           }
                         }
@@ -867,10 +869,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         context: context,
         builder: (dialogCtx) => AlertDialog(
           backgroundColor: AppUi.surfaceOf(dialogCtx),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
           title: const Text(
             'Start new order?',
-            style: TextStyle(fontWeight: FontWeight.w800),
+            style: TextStyle(fontWeight: FontWeight.w700),
           ),
           content: Text(
             'Your cart already has items from ${cart.stationName ?? "another station"}. Adding from this station will replace them.',
@@ -884,7 +886,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppUi.bluePrimary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
               ),
               onPressed: () => Navigator.pop(dialogCtx, true),
               child: const Text('Start New Order'),
@@ -945,15 +947,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   }
 
   bool _isContainerOrAccessory(Map<String, dynamic> product) {
-    final cat = (product['category'] ?? '').toString().toLowerCase();
-    final name = (product['name'] ?? '').toString().toLowerCase();
-    return cat.contains('container') ||
-        cat.contains('accessory') ||
-        cat.contains('accessories') ||
-        name.contains('container') ||
-        name.contains('cap') ||
-        name.contains('bottle') ||
-        name.contains('dispenser');
+    return OrderProductHelpers.isContainerOrAccessory(product);
   }
 
   Future<void> _handleOrderNow({
@@ -1056,7 +1050,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             style: TextStyle(
               color: AppUi.textPrimaryOf(context),
               fontSize: 21,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               letterSpacing: -0.4,
               height: 1.2,
             ),
@@ -1064,9 +1058,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         ),
         if (isVerified) ...[
           const SizedBox(width: 8),
-          const Icon(
+          Icon(
             Icons.verified_rounded,
-            color: AppUi.bluePrimary,
+            color: AppUi.brandOf(context),
             size: 20,
           ),
         ],
@@ -1091,9 +1085,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
             decoration: BoxDecoration(
               color: isOpen
-                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                  : const Color(0xFFEF4444).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+                  ? AppColors.uiSuccess.withValues(alpha: 0.12)
+                  : AppColors.uiError.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1103,8 +1097,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   height: 6,
                   decoration: BoxDecoration(
                     color: isOpen
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFEF4444),
+                        ? AppColors.uiSuccess
+                        : AppColors.uiError,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1113,10 +1107,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   isOpen ? 'Open Now' : 'Closed',
                   style: TextStyle(
                     color: isOpen
-                        ? const Color(0xFF047857)
-                        : const Color(0xFFB91C1C),
+                        ? AppColors.uiSuccess
+                        : AppUi.errorFg,
                     fontWeight: FontWeight.w700,
-                    fontSize: 11.5,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -1132,7 +1126,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 const Icon(
                   Icons.star_rounded,
                   size: 15,
-                  color: Color(0xFFD97706),
+                  color: AppColors.uiWarning,
                 ),
                 const SizedBox(width: 3),
                 Text(
@@ -1160,15 +1154,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(6),
+                color: AppUi.warningBg,
+                borderRadius: BorderRadius.circular(AppUi.radiusSm),
               ),
               child: const Text(
                 'New Station',
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFFB45309),
+                  color: AppColors.uiWarning,
                 ),
               ),
             ),
@@ -1193,12 +1187,41 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
           ],
 
           // Delivery Fee
-          const Text(
+          Text(
             'Distance-based delivery',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('·', style: TextStyle(color: AppUi.textSecondaryOf(context))),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppUi.bluePrimary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppUi.radiusSm),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.verified_rounded,
+                  size: 12,
+                  color: AppUi.brandOf(context),
+                ),
+                SizedBox(width: 3),
+                Text(
+                  'Sanitary Permit Valid',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0369A1),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1215,7 +1238,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
           child: Icon(
             Icons.place_outlined,
             size: 16,
-            color: AppUi.bluePrimary,
+            color: AppUi.brandOf(context),
           ),
         ),
         const SizedBox(width: 6),
@@ -1277,20 +1300,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             HapticFeedback.lightImpact();
             onTap();
           },
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
               color: AppUi.surfaceOf(context),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
               border: Border.all(color: AppUi.borderOf(context)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1303,7 +1319,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child: Icon(icon, size: 18, color: AppUi.bluePrimary),
+                  child: Icon(icon, size: 18, color: AppUi.brandOf(context)),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -1327,7 +1343,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Row(
@@ -1364,13 +1380,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   Widget _buildBenefitRow(IconData icon, String label) {
     return Row(
       children: [
-        Icon(icon, size: 15, color: AppUi.bluePrimary),
+        Icon(icon, size: 15, color: AppUi.brandOf(context)),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppUi.textSecondaryOf(context),
             ),
@@ -1389,8 +1405,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppUi.blueSoft.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(16),
+        color: AppUi.brandSoftOf(context).withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(
           color: AppUi.blueBorder.withValues(alpha: 0.7),
           width: 1,
@@ -1403,7 +1419,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             height: 38,
             decoration: BoxDecoration(
               color: AppUi.bluePrimary,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),
             alignment: Alignment.center,
             child: Icon(
@@ -1420,8 +1436,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 Text(
                   hasActive ? 'Active Routine' : 'Automated Refill Routine',
                   style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                 ),
@@ -1431,7 +1447,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       ? '${_activeSubscription!.frequency.replaceAll('_', ' ')} · ${_activeSubscription!.quantity} bottles'
                       : 'Recurring water deliveries scheduled with $stationName.',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     color: AppUi.textSecondaryOf(context),
                     height: 1.25,
                   ),
@@ -1453,7 +1469,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
             ),
             child: Text(
@@ -1506,12 +1522,12 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: isDark
-            ? const Color(0xFF0D9488).withValues(alpha: 0.12)
+            ? AppColors.statusReady.withValues(alpha: 0.12)
             : const Color(0xFFF0FDFA),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(
           color: isDark
-              ? const Color(0xFF0D9488).withValues(alpha: 0.35)
+              ? AppColors.statusReady.withValues(alpha: 0.35)
               : const Color(0xFF99F6E4),
           width: 1,
         ),
@@ -1524,7 +1540,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             child: Icon(
               Icons.info_outline_rounded,
               size: 16,
-              color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+              color: isDark ? const Color(0xFF2DD4BF) : AppColors.statusReady,
             ),
           ),
           const SizedBox(width: 8),
@@ -1544,6 +1560,20 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     );
   }
 
+  /// 3 columns on phones (pinned product decision), more on wider screens.
+  SliverGridDelegate _productGridDelegate(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final columns = width >= AppBreakpoints.expanded
+        ? 5
+        : (width >= AppBreakpoints.compact ? 4 : 3);
+    return SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: columns,
+      crossAxisSpacing: AppUi.spacingSm,
+      mainAxisSpacing: AppUi.spacingSm,
+      childAspectRatio: 0.62,
+    );
+  }
+
   Widget _buildRefillProductsSection(BuildContext context) {
     final refillProducts = _products
         .where((p) => !_isContainerOrAccessory(Map<String, dynamic>.from(p)))
@@ -1559,10 +1589,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Available Water Refills',
+              'Water refills',
               style: TextStyle(
-                fontSize: 16.5,
-                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
                 letterSpacing: -0.3,
               ),
@@ -1580,37 +1610,51 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         ),
         const SizedBox(height: 12),
         _buildPreferenceNotice(),
+        const SizedBox(height: 10),
         if (_isLoadingPurified && _products.isEmpty)
-          Column(
-            children: List.generate(
-              2,
-              (index) => const Padding(
-                padding: EdgeInsets.only(bottom: 10),
-                child: Skeleton(height: 72, borderRadius: 16),
-              ),
-            ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 3,
+            gridDelegate: _productGridDelegate(context),
+            itemBuilder: (context, index) =>
+                const Skeleton(height: 160, borderRadius: 14),
           )
         else if (refillProducts.isNotEmpty)
-          ...refillProducts.map((p) {
-            final pMap = OrderProductHelpers.withDisplayDefaults(
-              Map<String, dynamic>.from(p),
-            );
-            final isSelected =
-                _selectedProduct?['id']?.toString() == pMap['id']?.toString();
-            return _buildProductCard(
-              pMap,
-              isSelected: isSelected,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _selectedProduct = pMap);
-              },
-            );
-          })
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: refillProducts.length,
+            gridDelegate: _productGridDelegate(context),
+            itemBuilder: (context, index) {
+              final pMap = OrderProductHelpers.withDisplayDefaults(
+                Map<String, dynamic>.from(refillProducts[index]),
+              );
+              final isSelected =
+                  _selectedProduct?['id']?.toString() == pMap['id']?.toString();
+              return _buildProductGridCard(
+                pMap,
+                isSelected: isSelected,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedProduct = pMap);
+                },
+              );
+            },
+          )
         else
-          _buildProductCard(
-            _displayProduct,
-            isSelected: true,
-            onTap: () {},
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 1,
+            gridDelegate: _productGridDelegate(context),
+            itemBuilder: (context, index) {
+              return _buildProductGridCard(
+                _displayProduct,
+                isSelected: true,
+                onTap: () {},
+              );
+            },
           ),
 
         if (accessoryProducts.isNotEmpty) ...[
@@ -1619,10 +1663,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Containers & Accessories',
+                'Containers & accessories',
                 style: TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                   letterSpacing: -0.3,
                 ),
@@ -1646,38 +1690,47 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          ...accessoryProducts.map((p) {
-            final pMap = OrderProductHelpers.withDisplayDefaults(
-              Map<String, dynamic>.from(p),
-            );
-            final isSelected =
-                _selectedProduct?['id']?.toString() == pMap['id']?.toString();
-            return _buildProductCard(
-              pMap,
-              isSelected: isSelected,
-              isAccessory: true,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _selectedProduct = pMap);
-              },
-            );
-          }),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: accessoryProducts.length,
+            gridDelegate: _productGridDelegate(context),
+            itemBuilder: (context, index) {
+              final pMap = OrderProductHelpers.withDisplayDefaults(
+                Map<String, dynamic>.from(accessoryProducts[index]),
+              );
+              final isSelected =
+                  _selectedProduct?['id']?.toString() == pMap['id']?.toString();
+              return _buildProductGridCard(
+                pMap,
+                isSelected: isSelected,
+                isAccessory: true,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _selectedProduct = pMap);
+                },
+              );
+            },
+          ),
         ],
       ],
     );
   }
 
-  Widget _buildProductCard(
+  Widget _buildProductGridCard(
     Map<String, dynamic> product, {
     required bool isSelected,
     required VoidCallback onTap,
     bool isAccessory = false,
   }) {
-    final category = product['category']?.toString() ?? product['name']?.toString() ?? '';
+    final category = OrderProductHelpers.formatCategory(
+      product['category']?.toString(),
+      name: product['name']?.toString(),
+    );
     final waterType = WaterTypes.byName(category);
     final price = (product['price'] as num?)?.toDouble();
-    final containerSize = product['container_size']?.toString() ?? (isAccessory ? 'Piece' : '5-Gallon');
-    final prepMinutes = (product['preparation_minutes'] as num?)?.toInt() ?? 15;
+    final containerSize = product['container_size']?.toString() ??
+        (isAccessory ? 'Piece' : '5-Gallon');
     final isAvailable = product['is_available'] != false;
     final customerPref = _getCustomerWaterPreference();
     final isCustomerPreferred = !isAccessory &&
@@ -1691,304 +1744,243 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     final pId = product['id']?.toString() ?? '';
     final isThisStation = cart.stationId == targetStationId;
     final inCartQty = isThisStation ? (cart.items[pId]?.quantity ?? 0) : 0;
+    final productName = product['name']?.toString() ?? 'item';
 
     Color badgeBg;
     Color iconColor;
     IconData cardIcon;
     if (isAccessory) {
-      badgeBg = const Color(0xFFFFFBEB);
-      iconColor = const Color(0xFFD97706);
+      badgeBg = AppUi.warningBg;
+      iconColor = AppColors.uiWarning;
       cardIcon = Icons.inventory_2_outlined;
     } else if (category.toLowerCase().contains('alkaline')) {
-      badgeBg = const Color(0xFFF3E8FF);
-      iconColor = const Color(0xFF8B5CF6);
+      badgeBg = AppColors.statusPreparing.withValues(alpha: 0.1);
+      iconColor = AppColors.statusPreparing;
       cardIcon = Icons.water_drop_rounded;
     } else if (category.toLowerCase().contains('mineral')) {
-      badgeBg = const Color(0xFFE6FFFA);
-      iconColor = const Color(0xFF0D9488);
+      badgeBg = AppColors.statusReady.withValues(alpha: 0.1);
+      iconColor = AppColors.statusReady;
       cardIcon = Icons.water_drop_rounded;
     } else {
-      badgeBg = AppUi.blueSoft;
-      iconColor = AppUi.bluePrimary;
+      badgeBg = AppUi.brandSoftOf(context);
+      iconColor = AppUi.brandOf(context);
       cardIcon = Icons.water_drop_rounded;
     }
 
     return Opacity(
-      opacity: isAvailable ? 1.0 : 0.5,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: isAvailable ? onTap : null,
-            borderRadius: BorderRadius.circular(16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+      opacity: isAvailable ? 1.0 : 0.7,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isAvailable ? onTap : null,
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
+          child: AnimatedContainer(
+            duration: AppUi.motion(context, AppUi.motionFast),
+            padding: const EdgeInsets.all(AppUi.spacingSm),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppUi.bluePrimary.withValues(alpha: 0.05)
+                  : (inCartQty > 0
+                      ? AppUi.brandSoftOf(context).withValues(alpha: 0.25)
+                      : AppUi.surfaceOf(context)),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+              border: Border.all(
                 color: isSelected
-                    ? AppUi.bluePrimary.withValues(alpha: 0.04)
-                    : AppUi.surfaceOf(context),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? AppUi.bluePrimary : AppUi.borderOf(context),
-                  width: isSelected ? 1.4 : 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isSelected
-                        ? AppUi.bluePrimary.withValues(alpha: 0.08)
-                        : Colors.black.withValues(alpha: 0.02),
-                    blurRadius: isSelected ? 8 : 2,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                    ? AppUi.bluePrimary
+                    : (inCartQty > 0
+                        ? AppUi.bluePrimary.withValues(alpha: 0.4)
+                        : AppUi.borderOf(context)),
+                width: isSelected ? 1.5 : 1.0,
               ),
-              child: Row(
-                children: [
-                  // Product icon container
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top Icon & Badge
+                Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        cardIcon,
+                        color: iconColor,
+                        size: 20,
+                      ),
                     ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      cardIcon,
-                      color: iconColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Name, container, prep
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                product['name']?.toString() ?? waterType.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14.5,
-                                  color: isSelected
-                                      ? AppUi.bluePrimary
-                                      : AppUi.textPrimaryOf(context),
-                                ),
-                              ),
-                            ),
-                            if (isCustomerPreferred) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: const Color(0xFF0D9488).withValues(alpha: 0.3),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.star_rounded,
-                                      size: 11,
-                                      color: Color(0xFF0D9488),
-                                    ),
-                                    SizedBox(width: 2.5),
-                                    Text(
-                                      'Your pick',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF0D9488),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            if (isSelected) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: AppUi.bluePrimary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check,
-                                  size: 10,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1.5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppUi.surfaceRaisedOf(context),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                containerSize,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppUi.textSecondaryOf(context),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                isAccessory
-                                    ? ((product['description']?.toString().isNotEmpty ?? false)
-                                        ? product['description'].toString()
-                                        : 'Standard item')
-                                    : '• ~$prepMinutes min prep',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppUi.textSecondaryOf(context),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  // Price display & In-line Cart Controls
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (price != null) ...[
-                        Text(
-                          '₱${price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
+                    if (isSelected)
+                      Positioned(
+                        top: -3,
+                        right: -5,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
                             color: AppUi.bluePrimary,
-                            letterSpacing: -0.4,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            size: 11,
+                            color: Colors.white,
                           ),
                         ),
-                        Text(
-                          isAccessory ? '/ piece' : '/ refill',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: AppUi.textSecondaryOf(context),
+                      ),
+                    if (isCustomerPreferred && !isSelected)
+                      Positioned(
+                        top: -3,
+                        right: -5,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: AppColors.statusReady,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.star_rounded,
+                            size: 11,
+                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                      ],
-                      if (inCartQty > 0)
-                        Container(
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: AppUi.blueSoft,
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(
-                              color: AppUi.bluePrimary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              InkWell(
-                                onTap: () => _removeItemFromCart(pId),
-                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(15)),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                  child: Icon(Icons.remove_rounded, size: 14, color: AppUi.bluePrimary),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 3),
-                                child: Text(
-                                  '$inCartQty',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppUi.bluePrimary,
-                                  ),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () => _addItemToCart(product, qty: 1),
-                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(15)),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                  child: Icon(Icons.add_rounded, size: 14, color: AppUi.bluePrimary),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        InkWell(
-                          onTap: isAvailable ? () => _addItemToCart(product, qty: 1) : null,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isAvailable
-                                  ? AppUi.bluePrimary.withValues(alpha: 0.1)
-                                  : AppUi.borderOf(context),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.add_shopping_cart_rounded,
-                                  size: 13,
-                                  color: isAvailable ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Add',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: isAvailable ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+
+                // Name
+                Text(
+                  product['name']?.toString() ?? waterType.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    height: 1.15,
+                    color: isSelected
+                        ? AppUi.brandOf(context)
+                        : AppUi.textPrimaryOf(context),
                   ),
-                ],
-              ),
+                ),
+
+                // Container Size badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppUi.surfaceRaisedOf(context),
+                    borderRadius: BorderRadius.circular(AppUi.radiusXs),
+                  ),
+                  child: Text(
+                    containerSize,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                  ),
+                ),
+
+                // Price
+                if (price != null)
+                  Text(
+                    formatPeso(price),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: AppUi.textPrimaryOf(context),
+                    ),
+                  ),
+
+                const SizedBox(height: 2),
+
+                // In-cart stepper or Add button (40 dp targets)
+                if (!isAvailable)
+                  Container(
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppUi.surfaceRaisedOf(context),
+                      borderRadius: AppUi.controlRadius,
+                    ),
+                    child: Text(
+                      'Unavailable',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                  )
+                else if (inCartQty > 0)
+                  Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppUi.brandSoftOf(context),
+                      borderRadius: AppUi.controlRadius,
+                      border: Border.all(
+                        color: AppUi.brandOf(context).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _GridStepButton(
+                            icon: Icons.remove_rounded,
+                            tooltip: 'Remove one $productName',
+                            onTap: () => _removeItemFromCart(pId),
+                          ),
+                        ),
+                        Semantics(
+                          label: 'In cart',
+                          value: '$inCartQty',
+                          child: Text(
+                            '$inCartQty',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppUi.onBrandSoftOf(context),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: _GridStepButton(
+                            icon: Icons.add_rounded,
+                            tooltip: 'Add one $productName',
+                            onTap: () => _addItemToCart(product, qty: 1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 40,
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => _addItemToCart(product, qty: 1),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppUi.brandSoftOf(context),
+                        foregroundColor: AppUi.onBrandSoftOf(context),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: const Size(0, 40),
+                        textStyle: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Add'),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -2011,7 +2003,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               'Customer Ratings & Reviews',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
                 letterSpacing: -0.3,
               ),
@@ -2053,7 +2045,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
 
   Widget _buildReviewCard(BuildContext context, dynamic review) {
     final rMap = review is Map ? review : <String, dynamic>{};
-    final rating = (rMap['rating'] as num?)?.toInt() ?? 5;
+    final rating = (rMap['rating'] as num?)?.toInt() ?? 0;
     final comment = rMap['comment']?.toString().trim();
     final createdAtRaw = rMap['created_at']?.toString();
     final profile = rMap['profiles'] is Map ? rMap['profiles'] as Map : null;
@@ -2087,7 +2079,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.borderOf(context).withValues(alpha: 0.8)),
       ),
       child: Column(
@@ -2114,10 +2106,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       )
                     : Text(
                         initial,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: AppUi.bluePrimary,
+                          fontWeight: FontWeight.w700,
+                          color: AppUi.brandOf(context),
                         ),
                       ),
               ),
@@ -2146,7 +2138,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                   ? Icons.star_rounded
                                   : Icons.star_outline_rounded,
                               size: 13,
-                              color: const Color(0xFFFFC107),
+                              color: AppColors.uiWarning,
                             );
                           }),
                         ),
@@ -2169,8 +2161,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(6),
+                  color: AppUi.successBg,
+                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2178,15 +2170,15 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     Icon(
                       Icons.check_circle_rounded,
                       size: 11,
-                      color: Color(0xFF059669),
+                      color: AppColors.uiSuccess,
                     ),
                     SizedBox(width: 3),
                     Text(
                       'Verified',
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF059669),
+                        color: AppColors.uiSuccess,
                       ),
                     ),
                   ],
@@ -2221,7 +2213,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         decoration: BoxDecoration(
           color: AppUi.surfaceOf(context),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
           border: Border.all(color: AppUi.borderOf(context)),
         ),
         child: Column(
@@ -2231,12 +2223,12 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               width: 44,
               height: 44,
               decoration: const BoxDecoration(
-                color: Color(0xFFFEF3C7),
+                color: AppUi.warningBg,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.star_outline_rounded,
-                color: Color(0xFFD97706),
+                color: AppColors.uiWarning,
                 size: 24,
               ),
             ),
@@ -2244,8 +2236,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             Text(
               'No reviews yet',
               style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),
@@ -2274,7 +2266,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Row(
@@ -2291,7 +2283,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     rating.toStringAsFixed(1),
                     style: TextStyle(
                       fontSize: 30,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -1,
                       height: 1,
                       color: AppUi.textPrimaryOf(context),
@@ -2317,7 +2309,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       : remaining >= 0.25
                           ? Icons.star_half_rounded
                           : Icons.star_outline_rounded;
-                  return Icon(icon, color: const Color(0xFFFFC107), size: 16);
+                  return Icon(icon, color: AppColors.uiWarning, size: 16);
                 }),
               ),
               const SizedBox(height: 6),
@@ -2325,7 +2317,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 '$reviewCount verified review${reviewCount == 1 ? '' : 's'}',
                 style: TextStyle(
                   color: AppUi.textSecondaryOf(context),
-                  fontSize: 11.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -2345,19 +2337,19 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             '$stars',
                             style: TextStyle(
                               color: AppUi.textSecondaryOf(context),
-                              fontSize: 10.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(99),
+                              borderRadius: BorderRadius.circular(AppUi.radiusFull),
                               child: LinearProgressIndicator(
                                 value: _ratingCounts[stars - 1] / maxRatingCount,
                                 minHeight: 5,
                                 backgroundColor: AppUi.borderOf(context),
-                                color: const Color(0xFFFFC107),
+                                color: AppColors.uiWarning,
                               ),
                             ),
                           ),
@@ -2452,13 +2444,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
                     shape: BoxShape.circle,
                     border: Border.all(color: AppUi.borderOf(context)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Icon(
                     Icons.arrow_back_rounded,
@@ -2486,18 +2471,11 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
                               shape: BoxShape.circle,
                               border: Border.all(color: AppUi.borderOf(context)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
                             ),
                             child: Icon(
                               Icons.shopping_cart_outlined,
                               size: 19,
-                              color: hasItems ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
+                              color: hasItems ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
                             ),
                           ),
                         ),
@@ -2508,7 +2486,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
-                                color: Color(0xFFEF4444),
+                                color: AppColors.uiError,
                                 shape: BoxShape.circle,
                               ),
                               constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
@@ -2517,8 +2495,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                 '${cart.totalItems}',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -2539,13 +2517,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       color: AppUi.surfaceOf(context).withValues(alpha: 0.9),
                       shape: BoxShape.circle,
                       border: Border.all(color: AppUi.borderOf(context)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Icon(
                       _isFav
@@ -2553,37 +2524,16 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           : Icons.favorite_border_rounded,
                       size: 19,
                       color: _isFav
-                          ? Colors.redAccent
+                          ? AppColors.uiError
                           : AppUi.textPrimaryOf(context),
                     ),
                   ),
                 ),
               ),
             ],
-            flexibleSpace: LayoutBuilder(
-              builder: (ctx, constraints) {
-                final topPadding = MediaQuery.of(ctx).padding.top;
-                final isCollapsed = constraints.biggest.height <=
-                    (topPadding + kToolbarHeight + 10);
-
-                return FlexibleSpaceBar(
-                  centerTitle: true,
-                  title: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 180),
-                    opacity: isCollapsed ? 1.0 : 0.0,
-                    child: Text(
-                      stationName,
-                      style: TextStyle(
-                        color: AppUi.textPrimaryOf(context),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  background: Stack(
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
+              background: Stack(
                     fit: StackFit.expand,
                     children: [
                       Container(color: Colors.white),
@@ -2619,10 +2569,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       ),
                     ],
                   ),
-                );
-              },
-            ),
-          ),
+                ),
+              ),
 
           // ── Main Content Body ────────────────────────────────────────────
           SliverToBoxAdapter(
@@ -2712,7 +2660,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: AppUi.bluePrimary,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         boxShadow: [
                           BoxShadow(
                             color: AppUi.bluePrimary.withValues(alpha: 0.25),
@@ -2731,17 +2679,17 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '${cart.totalItems} ${cart.totalItems == 1 ? "item" : "items"} in cart · ₱${cart.totalAmount.toStringAsFixed(0)}',
+                              '${cart.totalItems} ${cart.totalItems == 1 ? "item" : "items"} in cart · ${formatPeso(cart.totalAmount, whole: true)}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 13,
                               ),
                             ),
                           ),
                           InkWell(
                             onTap: () => context.openCart(_stationData),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -2749,16 +2697,16 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     'View Cart',
                                     style: TextStyle(
-                                      color: AppUi.bluePrimary,
-                                      fontWeight: FontWeight.w800,
+                                      color: AppUi.brandOf(context),
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -2766,7 +2714,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                   Icon(
                                     Icons.chevron_right_rounded,
                                     size: 14,
-                                    color: AppUi.bluePrimary,
+                                    color: AppUi.brandOf(context),
                                   ),
                                 ],
                               ),
@@ -2784,7 +2732,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           height: 48,
                           decoration: BoxDecoration(
                             color: AppUi.pageBgOf(context),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(AppUi.radiusPill),
                             border: Border.all(color: AppUi.borderOf(context)),
                           ),
                           child: Row(
@@ -2814,7 +2762,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                     style: TextStyle(
                                       color: AppUi.textPrimaryOf(context),
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
@@ -2852,7 +2800,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                     : AppUi.textMuted,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusPill),
                                 ),
                                 elevation: 0,
                               ),
@@ -2871,14 +2819,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                         Text(
                                           canOrder
                                               ? (hasItemsInCart
-                                                  ? 'Add to Cart · ₱${subtotal.toStringAsFixed(0)}'
-                                                  : 'Order ($_quantity) · ₱${subtotal.toStringAsFixed(0)}')
+                                                  ? 'Add to Cart · ${formatPeso(subtotal, whole: true)}'
+                                                  : 'Order ($_quantity) · ${formatPeso(subtotal, whole: true)}')
                                               : (isOpen
                                                   ? 'Station Busy'
                                                   : 'Station Closed'),
                                           style: const TextStyle(
                                             fontSize: 15,
-                                            fontWeight: FontWeight.w800,
+                                            fontWeight: FontWeight.w700,
                                             letterSpacing: -0.2,
                                           ),
                                         ),
@@ -2902,6 +2850,36 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _GridStepButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _GridStepButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        borderRadius: AppUi.controlRadius,
+        child: SizedBox(
+          height: 40,
+          child: Icon(icon, size: 18, color: AppUi.onBrandSoftOf(context)),
+        ),
       ),
     );
   }
@@ -2944,10 +2922,10 @@ class _QuantityInputDialogState extends State<_QuantityInputDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppUi.surfaceOf(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
       title: const Text(
         'Enter quantity',
-        style: TextStyle(fontWeight: FontWeight.w800),
+        style: TextStyle(fontWeight: FontWeight.w700),
       ),
       content: TextField(
         controller: _controller,
@@ -2972,7 +2950,7 @@ class _QuantityInputDialogState extends State<_QuantityInputDialog> {
           style: FilledButton.styleFrom(
             backgroundColor: AppUi.bluePrimary,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
           ),
           child: const Text('Apply'),
         ),

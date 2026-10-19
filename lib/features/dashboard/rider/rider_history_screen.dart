@@ -10,6 +10,7 @@ import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/services/receipt_service.dart';
 import 'services/order_cache_service.dart';
 
+import 'package:erefill/core/utils/money.dart';
 double _safeDouble(dynamic value, {double fallback = 0}) {
   if (value == null) return fallback;
   if (value is num) return value.toDouble();
@@ -158,12 +159,12 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                         AppUi.spacingMd,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppUi.blueSoft,
+                                        color: AppUi.brandSoftOf(context),
                                         borderRadius: AppUi.cardRadius,
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.water_drop_rounded,
-                                        color: AppUi.bluePrimary,
+                                        color: AppUi.brandOf(context),
                                         size: 22,
                                       ),
                                     ),
@@ -176,7 +177,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                           Text(
                                             customerName,
                                             style: TextStyle(
-                                              fontWeight: FontWeight.w900,
+                                              fontWeight: FontWeight.w700,
                                               fontSize: 16,
                                               color: AppUi.textPrimaryOf(context),
                                             ),
@@ -186,7 +187,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                             style: const TextStyle(
                                               color: AppUi.textMuted,
                                               fontSize: 11,
-                                              fontWeight: FontWeight.w800,
+                                              fontWeight: FontWeight.w700,
                                               letterSpacing: 0.5,
                                             ),
                                           ),
@@ -214,16 +215,16 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                               'Earnings',
                                               style: TextStyle(
                                                 color: AppUi.textMuted,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w900,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
                                                 letterSpacing: 0,
                                               ),
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              '₱${_safeDouble(order['delivery_fee']).toStringAsFixed(2)}',
+                                              formatPeso(_safeDouble(order['delivery_fee'])),
                                               style: TextStyle(
-                                                fontWeight: FontWeight.w900,
+                                                fontWeight: FontWeight.w700,
                                                 fontSize: 15,
                                                 color: AppUi.textPrimaryOf(context),
                                               ),
@@ -245,18 +246,18 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                             'Total',
                                             style: TextStyle(
                                               color: AppUi.textMuted,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w900,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
                                               letterSpacing: 1,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
                                             '₱$total',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
                                               fontSize: 15,
-                                              color: AppUi.bluePrimary,
+                                              color: AppUi.brandOf(context),
                                             ),
                                           ),
                                         ],
@@ -353,7 +354,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                               const Text(
                                 'DELIVERY COMPLETE!',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 18,
                                   color: AppColors.statusCompleted,
                                   letterSpacing: 0.5,
@@ -365,7 +366,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                 style: const TextStyle(
                                   color: AppColors.statusCompleted,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 1.5,
                                 ),
                               ),
@@ -426,7 +427,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                             return _summaryRow(
                               Icons.water_drop_rounded,
                               '${quantity}x $name',
-                              '₱${subtotal.toStringAsFixed(2)}',
+                              formatPeso(subtotal),
                             );
                           })),
                         ]),
@@ -443,15 +444,15 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                               const Text(
                                 'Total collected',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 14,
                                   color: Colors.white70,
                                 ),
                               ),
                               Text(
-                                '₱${_safeDouble(order['total_amount']).toStringAsFixed(2)}',
+                                formatPeso(_safeDouble(order['total_amount'])),
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 22,
                                   color: Colors.white,
                                 ),
@@ -488,7 +489,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                         label: const Text(
                           'Print Receipt (Standard or Thermal)',
                           style: TextStyle(
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             fontSize: 15,
                             letterSpacing: 0.5,
                           ),
@@ -524,14 +525,14 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                               label: const Text(
                                 'Share PDF',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: AppUi.bluePrimary,
-                                side: const BorderSide(
-                                  color: AppUi.bluePrimary,
+                                foregroundColor: AppUi.brandOf(context),
+                                side: BorderSide(
+                                  color: AppUi.brandOf(context),
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: AppUi.pillRadius,
@@ -589,14 +590,14 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                               label: const Text(
                                 'Copy text',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF64748B),
+                                foregroundColor: AppUi.textMuted,
                                 side: const BorderSide(
-                                  color: Color(0xFFCBD5E1),
+                                  color: AppUi.borderStrongLight,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: AppUi.pillRadius,
@@ -624,7 +625,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
         Text(
           title,
           style: const TextStyle(
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             fontSize: 11,
             color: AppUi.textSecondary,
             letterSpacing: 1.5,
@@ -667,7 +668,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
               style: TextStyle(
                 color: AppUi.textPrimaryOf(context),
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -684,7 +685,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
     showModalBottomSheet<void>(
       context: sheetContext,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -697,7 +698,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
               children: [
                 const Text(
                   'Receipt Printing Options',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -707,9 +708,9 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
             ),
             const Divider(height: 12),
             ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: Color(0xFFEFF6FF),
-                child: Icon(Icons.receipt_long_rounded, color: AppUi.bluePrimary),
+                child: Icon(Icons.receipt_long_rounded, color: AppUi.brandOf(context)),
               ),
               title: const Text('Official Invoice (Standard / A4)',
                   style: TextStyle(fontWeight: FontWeight.w700)),

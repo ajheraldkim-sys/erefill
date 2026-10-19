@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 /// Animated favorite heart button with scale punch and smooth color fill.
 class AnimatedFavoriteButton extends StatefulWidget {
   final bool isFavorite;
@@ -14,7 +15,7 @@ class AnimatedFavoriteButton extends StatefulWidget {
     required this.isFavorite,
     this.onToggle,
     this.size = 22,
-    this.activeColor = const Color(0xFFEF4444),
+    this.activeColor = AppColors.uiError,
     this.inactiveColor = const Color(0xFF94A3B8),
   });
 

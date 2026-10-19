@@ -22,7 +22,7 @@ void showNotificationPreviewSheet(
       builder: (context, scrollController) => Container(
         decoration: BoxDecoration(
           color: AppUi.surfaceOf(context),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
         ),
         child: SafeArea(
           top: false,
@@ -38,7 +38,7 @@ void showNotificationPreviewSheet(
                         'Notifications',
                         style: TextStyle(
                           fontSize: 19,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -124,7 +124,7 @@ class _NotificationSheetHandle extends StatelessWidget {
       margin: const EdgeInsets.only(top: 10, bottom: 8),
       decoration: BoxDecoration(
         color: AppUi.textMuted.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
       ),
     );
   }
@@ -178,9 +178,9 @@ class _NotificationPreviewTile extends StatelessWidget {
       color: notification.isRead
           ? AppUi.pageBgOf(context)
           : color.withValues(alpha: 0.07),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppUi.radiusSheet),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -192,7 +192,7 @@ class _NotificationPreviewTile extends StatelessWidget {
                 height: 38,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
                 child: Icon(notification.type.icon, color: color, size: 19),
               ),
@@ -209,7 +209,7 @@ class _NotificationPreviewTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               fontSize: 13,
                             ),
                           ),
@@ -240,7 +240,7 @@ class _NotificationPreviewTile extends StatelessWidget {
                       notification.formattedTime,
                       style: const TextStyle(
                         color: AppUi.textMuted,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

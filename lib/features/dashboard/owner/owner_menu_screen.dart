@@ -1,3 +1,4 @@
+import 'package:erefill/core/utils/money.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +28,9 @@ import 'package:go_router/go_router.dart';
 import 'package:erefill/core/routing/app_routes.dart';
 import 'service_catalog_screen.dart';
 import 'services/station_setup_service.dart';
+import 'package:erefill/core/localization/app_strings.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
 
@@ -89,7 +92,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
   // Payment methods
   List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
-  double _systemDeliveryRate = 10.0;
+  double? _systemDeliveryRate;
 
   final Map<String, List<String>> _municipalityData =
       AppConstants.municipalityData;
@@ -115,7 +118,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     messenger?.showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : null,
+        backgroundColor: isError ? AppColors.uiError : null,
       ),
     );
   }
@@ -482,7 +485,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       double.tryParse(_deliveryFeeController.text.trim()) ?? 25.0;
 
   String get _pricingSummary =>
-      '₱${_currentPricePerGallon.toStringAsFixed(2)}/gal · ₱${_currentBaseFee.toStringAsFixed(2)} delivery';
+      '${formatPeso(_currentPricePerGallon)}/gal · ${formatPeso(_currentBaseFee)} delivery';
 
   String get _paymentMethodsSummary {
     if (_enabledPaymentMethods.isEmpty) return 'None enabled';
@@ -615,7 +618,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           'Station details',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -738,12 +741,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                   children: [AppMapTiles.layer(context: context)],
                 ),
               ),
-              const Center(
+              Center(
                 child: Padding(
                   padding: EdgeInsets.only(bottom: 35),
                   child: Icon(
                     Icons.location_on_rounded,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                     size: 44,
                     shadows: [
                       Shadow(
@@ -764,7 +767,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                     setModalState(() {});
                   },
                   backgroundColor: AppUi.surfaceOf(context),
-                  foregroundColor: AppUi.bluePrimary,
+                  foregroundColor: AppUi.brandOf(context),
                   child: const Icon(Icons.my_location_rounded),
                 ),
               ),
@@ -892,7 +895,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           'About owner',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -1235,7 +1238,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           'Operating schedule',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -1279,12 +1282,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                     setModalState(() {});
                                   }
                                 },
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AppUi.chipBgOf(context),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                     border: Border.all(color: AppUi.borderOf(context)),
                                   ),
                                   child: Column(
@@ -1301,14 +1304,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                       const SizedBox(height: 6),
                                       Row(
                                         children: [
-                                          const Icon(Icons.schedule_rounded,
-                                              size: 18, color: AppUi.bluePrimary),
+                                          Icon(Icons.schedule_rounded,
+                                              size: 18, color: AppUi.brandOf(context)),
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatTime12Hr(_openingTime),
                                             style: TextStyle(
                                               fontSize: 16,
-                                              fontWeight: FontWeight.w800,
+                                              fontWeight: FontWeight.w700,
                                               color: AppUi.textPrimaryOf(context),
                                             ),
                                           ),
@@ -1334,12 +1337,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                     setModalState(() {});
                                   }
                                 },
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AppUi.chipBgOf(context),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                     border: Border.all(color: AppUi.borderOf(context)),
                                   ),
                                   child: Column(
@@ -1356,14 +1359,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                       const SizedBox(height: 6),
                                       Row(
                                         children: [
-                                          const Icon(Icons.schedule_rounded,
-                                              size: 18, color: AppUi.bluePrimary),
+                                          Icon(Icons.schedule_rounded,
+                                              size: 18, color: AppUi.brandOf(context)),
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatTime12Hr(_closingTime),
                                             style: TextStyle(
                                               fontSize: 16,
-                                              fontWeight: FontWeight.w800,
+                                              fontWeight: FontWeight.w700,
                                               color: AppUi.textPrimaryOf(context),
                                             ),
                                           ),
@@ -1420,10 +1423,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                               labelStyle: TextStyle(
                                 fontSize: 13,
                                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected ? AppUi.bluePrimary : AppUi.textPrimaryOf(context),
+                                color: isSelected ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppUi.bluePrimary
@@ -1453,16 +1456,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppUi.blueSoft,
-                            borderRadius: BorderRadius.circular(12),
+                            color: AppUi.brandSoftOf(context),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
                             border: Border.all(
                               color: AppUi.bluePrimary.withValues(alpha: 0.25),
                             ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.info_outline_rounded,
-                                  color: AppUi.bluePrimary, size: 20),
+                              Icon(Icons.info_outline_rounded,
+                                  color: AppUi.brandOf(context), size: 20),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -1542,7 +1545,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           'Pricing & delivery rules',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -1598,8 +1601,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppUi.blueSoft,
-            borderRadius: BorderRadius.circular(12),
+            color: AppUi.brandSoftOf(context),
+            borderRadius: BorderRadius.circular(AppUi.radiusCard),
             border: Border.all(
               color: AppUi.bluePrimary.withValues(alpha: 0.25),
             ),
@@ -1607,9 +1610,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.verified_outlined,
-                color: AppUi.bluePrimary,
+                color: AppUi.brandOf(context),
                 size: 20,
               ),
               const SizedBox(width: 10),
@@ -1634,13 +1637,13 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(AppUi.radiusSm),
                           ),
                           child: const Text(
                             'Centralized',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1649,7 +1652,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Active delivery rate is ₱${_systemDeliveryRate.toStringAsFixed(2)}/km (Admin-Controlled). Delivery fees are calculated automatically by the system based on customer distance.',
+                      _systemDeliveryRate == null ? "Delivery fees are set by the eRefill admin and calculated automatically from each customer's distance." : "Delivery rate: ${formatPeso(_systemDeliveryRate)}/km, set by the eRefill admin. Fees are calculated automatically from each customer's distance.",
                       style: const TextStyle(
                         fontSize: 12,
                         height: 1.35,
@@ -1776,7 +1779,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           'Accepted payment methods',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -1876,12 +1879,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       color: isEnabled
                           ? AppUi.bluePrimary.withValues(alpha: 0.15)
                           : AppUi.borderOf(sheetContext).withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                     child: Icon(
                       opt.$3,
                       color: isEnabled
-                          ? AppUi.bluePrimary
+                          ? AppUi.brandOf(context)
                           : AppUi.textSecondaryOf(sheetContext),
                       size: 20,
                     ),
@@ -2008,11 +2011,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.account_balance_wallet_rounded,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -2024,7 +2027,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 'Payout Destination',
                                 style: TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                   color: AppUi.textPrimaryOf(ctx),
                                 ),
                               ),
@@ -2062,7 +2065,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             Text(
                               'No payout account added yet',
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: AppUi.textPrimaryOf(ctx),
                               ),
                             ),
@@ -2094,12 +2097,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 acc.type == 'gcash'
                                     ? Icons.phone_android_rounded
                                     : Icons.account_balance_rounded,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                               ),
                               title: Text(
                                 acc.label,
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: AppUi.textPrimaryOf(ctx),
                                 ),
                               ),
@@ -2120,14 +2123,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                         color: AppUi.bluePrimary.withValues(
                                           alpha: 0.12,
                                         ),
-                                        borderRadius: BorderRadius.circular(6),
+                                        borderRadius: BorderRadius.circular(AppUi.radiusSm),
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         'PRIMARY',
                                         style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          color: AppUi.bluePrimary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppUi.brandOf(context),
                                         ),
                                       ),
                                     )
@@ -2144,7 +2147,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         icon: const Icon(Icons.add_rounded, size: 20),
                         label: const Text(
                           'Add Payout Account',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                          style: TextStyle(fontWeight: FontWeight.w700),
                         ),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppUi.bluePrimary,
@@ -2189,7 +2192,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           title: Text(
             'Add Payout Account',
             style: TextStyle(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppUi.textPrimaryOf(dialogCtx),
             ),
           ),
@@ -2473,11 +2476,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 : _stationLocationSummary,
                             badgeText: _setupStatus.profileSection.badgeText,
                             badgeColor: _setupStatus.profileSection.isComplete
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFEF4444),
+                                ? AppColors.uiSuccess
+                                : AppColors.uiError,
                             badgeBgColor: _setupStatus.profileSection.isComplete
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF2F2),
+                                ? AppUi.successBg
+                                : AppUi.errorBg,
                             onTap: _openStationDetailsSheet,
                           ),
                           AccountNavTile(
@@ -2486,11 +2489,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             subtitle: _operatingScheduleSummary,
                             badgeText: _setupStatus.scheduleSection.badgeText,
                             badgeColor: _setupStatus.scheduleSection.isComplete
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFEF4444),
+                                ? AppColors.uiSuccess
+                                : AppColors.uiError,
                             badgeBgColor: _setupStatus.scheduleSection.isComplete
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF2F2),
+                                ? AppUi.successBg
+                                : AppUi.errorBg,
                             onTap: _openOperatingScheduleSheet,
                           ),
                           AccountNavTile(
@@ -2513,11 +2516,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             subtitle: _pricingSummary,
                             badgeText: _setupStatus.deliverySection.badgeText,
                             badgeColor: _setupStatus.deliverySection.isComplete
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFEF4444),
+                                ? AppColors.uiSuccess
+                                : AppColors.uiError,
                             badgeBgColor: _setupStatus.deliverySection.isComplete
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF2F2),
+                                ? AppUi.successBg
+                                : AppUi.errorBg,
                             onTap: _openPricingDeliverySheet,
                           ),
                           AccountNavTile(
@@ -2526,11 +2529,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             subtitle: _paymentMethodsSummary,
                             badgeText: _setupStatus.paymentsSection.badgeText,
                             badgeColor: _setupStatus.paymentsSection.isComplete
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFEF4444),
+                                ? AppColors.uiSuccess
+                                : AppColors.uiError,
                             badgeBgColor: _setupStatus.paymentsSection.isComplete
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF2F2),
+                                ? AppUi.successBg
+                                : AppUi.errorBg,
                             onTap: _openPaymentMethodsSheet,
                           ),
                           AccountNavTile(
@@ -2553,11 +2556,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 'Refill sizes, alkalines, and containers',
                             badgeText: _setupStatus.productsSection.badgeText,
                             badgeColor: _setupStatus.productsSection.isComplete
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFF59E0B),
+                                ? AppColors.uiSuccess
+                                : AppColors.uiWarning,
                             badgeBgColor: _setupStatus.productsSection.isComplete
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFFFBEB),
+                                ? AppUi.successBg
+                                : AppUi.warningBg,
                             onTap: _openWaterProductsCatalogPopup,
                           ),
                               AccountNavTile(
@@ -2598,6 +2601,75 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                     .read<ThemeProvider>()
                                     .setDarkMode(v),
                               ),
+                              AccountToggleTile(
+                                icon: Icons.wb_sunny_outlined,
+                                title: 'Outdoor high-contrast theme',
+                                value: context.select<ThemeProvider, bool>(
+                                  (t) => t.isOutdoorMode,
+                                ),
+                                onChanged: (v) => context
+                                    .read<ThemeProvider>()
+                                    .setOutdoorMode(v),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Language / Wika / Pinulongan',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Station & order management language',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppUi.textSecondaryOf(context),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Consumer<AppLanguageProvider>(
+                                      builder: (context, langProvider, _) {
+                                        return Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: AppLanguage.values.map((lang) {
+                                            final isSelected =
+                                                langProvider.language == lang;
+                                            return ChoiceChip(
+                                              label: Text(
+                                                '${lang.label} (${lang.subtitle})',
+                                              ),
+                                              selected: isSelected,
+                                              onSelected: (_) =>
+                                                  langProvider.setLanguage(lang),
+                                              selectedColor: AppUi.bluePrimary
+                                                  .withValues(alpha: 0.15),
+                                              labelStyle: TextStyle(
+                                                fontWeight: isSelected
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500,
+                                                color: isSelected
+                                                    ? AppUi.brandOf(context)
+                                                    : AppUi.textPrimaryOf(
+                                                        context,
+                                                      ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
 
@@ -2620,18 +2692,18 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                               ),
                               AccountNavTile(
                                 icon: Icons.logout_rounded,
-                                iconColor: const Color(0xFFEF4444),
+                                iconColor: AppColors.uiError,
                                 title: 'Sign out',
-                                titleColor: const Color(0xFFEF4444),
+                                titleColor: AppColors.uiError,
                                 subtitle:
                                     'Log out of your account on this device',
                                 onTap: _logout,
                               ),
                               AccountNavTile(
                                 icon: Icons.delete_outline_rounded,
-                                iconColor: const Color(0xFFDC2626),
+                                iconColor: AppColors.uiError,
                                 title: 'Delete account',
-                                titleColor: const Color(0xFFDC2626),
+                                titleColor: AppColors.uiError,
                                 subtitle:
                                     'Permanently remove your account and data',
                                 onTap: () =>
@@ -2686,7 +2758,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                   children: [
                     const Icon(
                       Icons.warning_amber_rounded,
-                      color: Color(0xFFEF4444),
+                      color: AppColors.uiError,
                       size: 48,
                     ),
                     const SizedBox(height: 16),
@@ -2694,7 +2766,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       'Delete account',
                       style: TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -2742,14 +2814,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                   setSheetState(() => isDeleting = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deletion failed: $e'),
-                                      backgroundColor: Colors.red,
+                                      content: Text('Deletion failed: ${FriendlyErrors.message(e)}'),
+                                      backgroundColor: AppColors.uiError,
                                     ),
                                   );
                                 }
                               },
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
+                          backgroundColor: AppColors.uiError,
                         ),
                         child: isDeleting
                             ? const CircularProgressIndicator(
@@ -2757,7 +2829,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                               )
                             : const Text(
                                 'Delete everything',
-                                style: TextStyle(fontWeight: FontWeight.w800),
+                                style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
                     ),
@@ -2844,9 +2916,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                   color: Colors.white,
                                   size: 16,
                                 ),
+                                tooltip: 'Change cover photo',
                                 onPressed: _pickAndUploadCoverPhoto,
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
+                                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                               ),
                       ),
                     ),
@@ -2886,9 +2959,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                   color: AppUi.bluePrimary.withValues(
                                     alpha: 0.1,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.person,
-                                    color: AppUi.bluePrimary,
+                                    color: AppUi.brandOf(context),
                                     size: 32,
                                   ),
                                 ),
@@ -2937,7 +3010,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         : 'Water Station',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                       letterSpacing: -0.3,
                     ),

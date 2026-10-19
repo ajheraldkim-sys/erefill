@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../water_types.dart';
 import 'order_card.dart';
 
+import 'package:erefill/core/utils/money.dart';
 export '../theme/app_colors.dart';
 export 'order_card.dart';
 
@@ -19,84 +20,14 @@ class OrderStatusPresentation {
     required this.icon,
   });
 
+  /// Delegates to [OrderStatusColors] so labels, colors and icons are
+  /// identical in every role.
   static OrderStatusPresentation fromStatus(String? status) {
-    final normalized = (status ?? 'pending').toLowerCase().trim();
-    switch (normalized) {
-      case 'pending_sync':
-        return const OrderStatusPresentation(
-          label: 'Queued Offline',
-          color: AppColors.statusPending,
-          icon: Icons.cloud_upload_outlined,
-        );
-      case 'pending':
-        return const OrderStatusPresentation(
-          label: 'Pending',
-          color: AppColors.statusPending,
-          icon: Icons.schedule_rounded,
-        );
-      case 'accepted':
-      case 'confirmed':
-        return const OrderStatusPresentation(
-          label: 'Accepted',
-          color: AppColors.statusConfirmed,
-          icon: Icons.thumb_up_alt_outlined,
-        );
-      case 'preparing':
-      case 'in_prep':
-        return const OrderStatusPresentation(
-          label: 'Preparing',
-          color: AppColors.statusPreparing,
-          icon: Icons.water_drop_rounded,
-        );
-      case 'ready':
-      case 'ready_for_pickup':
-        return const OrderStatusPresentation(
-          label: 'Ready for Pickup',
-          color: AppColors.statusReady,
-          icon: Icons.inventory_2_outlined,
-        );
-      case 'rider_assigned':
-      case 'assigned_to_rider':
-        return const OrderStatusPresentation(
-          label: 'Assigned to Rider',
-          color: AppColors.statusOutForDelivery,
-          icon: Icons.person_pin_circle_outlined,
-        );
-      case 'delivering':
-      case 'out_for_delivery':
-      case 'dispatched':
-        return const OrderStatusPresentation(
-          label: 'Out for Delivery',
-          color: AppColors.statusOutForDelivery,
-          icon: Icons.delivery_dining_rounded,
-        );
-      case 'delivered':
-      case 'completed':
-        return const OrderStatusPresentation(
-          label: 'Delivered',
-          color: AppColors.statusCompleted,
-          icon: Icons.check_circle_rounded,
-        );
-      case 'cancelled':
-      case 'canceled':
-        return const OrderStatusPresentation(
-          label: 'Cancelled',
-          color: AppColors.statusCancelled,
-          icon: Icons.cancel_rounded,
-        );
-      case 'rejected':
-        return const OrderStatusPresentation(
-          label: 'Rejected',
-          color: AppColors.statusRejected,
-          icon: Icons.block_rounded,
-        );
-      default:
-        return const OrderStatusPresentation(
-          label: 'Processing',
-          color: AppColors.statusNeutral,
-          icon: Icons.help_outline_rounded,
-        );
-    }
+    return OrderStatusPresentation(
+      label: OrderStatusColors.getLabel(status),
+      color: OrderStatusColors.getColor(status),
+      icon: OrderStatusColors.getIcon(status),
+    );
   }
 }
 
@@ -133,17 +64,17 @@ class AvailabilityPresentation {
       case 'open':
         return const AvailabilityPresentation(
           label: 'Open',
-          color: Color(0xFF10B981),
+          color: AppColors.uiSuccess,
         );
       case 'busy':
         return const AvailabilityPresentation(
           label: 'Busy',
-          color: Color(0xFFF59E0B),
+          color: AppColors.uiWarning,
         );
       case 'maintenance':
         return const AvailabilityPresentation(
           label: 'Maintenance',
-          color: Color(0xFFEF4444),
+          color: AppColors.uiError,
         );
       default:
         return const AvailabilityPresentation(
@@ -167,29 +98,36 @@ class AvailabilityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AvailabilityPresentation.fromAvailability(availability);
-    final stateColor = state.label == 'Closed'
-        ? AppUi.textSecondaryOf(context)
-        : state.color;
+    final key = state.label.toLowerCase();
+    final (tone, iconData) = switch (key) {
+      'open' => (StatusTone.success, Icons.check_circle_rounded),
+      'busy' => (StatusTone.warning, Icons.access_time_filled_rounded),
+      'maintenance' => (StatusTone.danger, Icons.build_circle_rounded),
+      _ => (StatusTone.neutral, Icons.remove_circle_outline_rounded),
+    };
+    final style = StatusToneStyle.of(tone, isDark: AppUi.isDark(context));
+
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 7 : 10,
-        vertical: compact ? 3 : 5,
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 2 : 4,
       ),
       decoration: BoxDecoration(
-        color: stateColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
+        color: style.background,
+        borderRadius: AppUi.fullRadius,
+        border: Border.all(color: style.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.circle, size: compact ? 6 : 7, color: stateColor),
-          const SizedBox(width: 5),
+          Icon(iconData, size: compact ? 12 : 14, color: style.foreground),
+          const SizedBox(width: 4),
           Text(
             state.label,
             style: TextStyle(
-              fontSize: compact ? 9 : 11,
-              color: stateColor,
-              fontWeight: FontWeight.w800,
+              fontSize: compact ? 11 : 12,
+              color: style.foreground,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -225,7 +163,7 @@ class DashboardMetricCard extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
@@ -236,7 +174,7 @@ class DashboardMetricCard extends StatelessWidget {
                 value,
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -245,7 +183,7 @@ class DashboardMetricCard extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textSecondaryOf(context),
                 ),
               ),
@@ -288,10 +226,8 @@ class WaterTypeCard extends StatelessWidget {
       margin: compact ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: selected ? AppUi.blueSoft : AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(
-          compact ? AppUi.radiusCard : AppUi.radiusPill,
-        ),
+        color: selected ? AppUi.brandSoftOf(context) : AppUi.surfaceOf(context),
+        borderRadius: AppUi.cardRadius,
         border: Border.all(
           color: selected ? AppUi.bluePrimary : AppUi.borderOf(context),
           width: selected ? 2 : 1,
@@ -306,7 +242,7 @@ class WaterTypeCard extends StatelessWidget {
 
     return InkWell(
       onTap: available ? onTap : null,
-      borderRadius: compact ? AppUi.cardRadius : AppUi.pillRadius,
+      borderRadius: AppUi.cardRadius,
       child: content,
     );
   }
@@ -321,7 +257,7 @@ class WaterTypeCard extends StatelessWidget {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: type.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
               child: Icon(type.icon, size: 16, color: type.color),
             ),
@@ -330,7 +266,7 @@ class WaterTypeCard extends StatelessWidget {
               child: Text(
                 type.shortName,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 13,
                   color: AppUi.textPrimary,
                 ),
@@ -357,7 +293,7 @@ class WaterTypeCard extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             height: 1.25,
             color: AppUi.textSecondary,
           ),
@@ -377,7 +313,7 @@ class WaterTypeCard extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: type.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
               ),
               child: Icon(type.icon, color: type.color, size: 24),
             ),
@@ -392,7 +328,7 @@ class WaterTypeCard extends StatelessWidget {
                         child: Text(
                           type.name,
                           style: TextStyle(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontSize: 16,
                             color: selected
                                 ? AppUi.bluePrimary
@@ -418,10 +354,10 @@ class WaterTypeCard extends StatelessWidget {
             if (price != null) ...[
               const SizedBox(width: 8),
               Text(
-                '₱${price!.toStringAsFixed(0)}',
-                style: const TextStyle(
+                formatPeso(price!, whole: true),
+                style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.bluePrimary,
                 ),
               ),
@@ -447,7 +383,7 @@ class WaterTypeCard extends StatelessWidget {
                 (b) => Text(
                   '✓ $b',
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textSecondary,
                   ),
@@ -458,7 +394,10 @@ class WaterTypeCard extends StatelessWidget {
         if (containerSize != null || preparationMinutes != null) ...[
           const SizedBox(height: 8),
           Text(
-            '${containerSize ?? '5 gallon'} · Ready in ~${preparationMinutes ?? 15} min',
+            [
+              ?containerSize,
+              if (preparationMinutes != null) 'Ready in ~$preparationMinutes min',
+            ].join(' · '),
             style: const TextStyle(
               fontSize: 11,
               color: AppUi.textMuted,
@@ -488,8 +427,8 @@ class _TypeBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
           color: color,
         ),
       ),
@@ -548,12 +487,17 @@ class RefillOrderStatusTimeline extends StatelessWidget {
   ];
 
   static int statusIndex(String status) {
-    final normalized = switch (status) {
-      'pending_sync' => 'pending',
-      'ready' => 'ready_for_pickup',
-      'rider_assigned' => 'assigned_to_rider',
-      'delivering' => 'out_for_delivery',
-      _ => status,
+    final raw = status.trim().toLowerCase().replaceAll('-', '_');
+    // Keep the rider-assigned step distinct; everything else uses the
+    // canonical normalizer so synonyms (completed, confirmed, in_prep,
+    // dispatched, …) never fall through to "Cancelled".
+    final normalized = switch (raw) {
+      'assigned_to_rider' || 'rider_assigned' => 'assigned_to_rider',
+      _ => OrderStatusColors.normalize(raw) == 'pending_sync'
+          ? 'pending'
+          : (OrderStatusColors.normalize(raw) == 'ready'
+                ? 'ready_for_pickup'
+                : OrderStatusColors.normalize(raw)),
     };
     return _stages.indexWhere((stage) => stage.status == normalized);
   }
@@ -570,14 +514,22 @@ class RefillOrderStatusTimeline extends StatelessWidget {
         : currentIndex < 6
         ? 2
         : 3;
-    final stage = currentIndex < 0
+    final isRejected = OrderStatusColors.normalize(status) == 'rejected';
+    final stage = currentIndex >= 0
+        ? _stages[currentIndex]
+        : isRejected
         ? const _TimelineStage(
+            status: 'rejected',
+            title: 'Declined',
+            subtitle: 'The station could not take this order.',
+            icon: Icons.block_rounded,
+          )
+        : const _TimelineStage(
             status: 'cancelled',
             title: 'Cancelled',
             subtitle: 'This order has been cancelled.',
             icon: Icons.cancel_outlined,
-          )
-        : _stages[currentIndex];
+          );
     final milestones = [
       (label: 'Order', icon: Icons.receipt_long_rounded),
       (label: 'Preparing', icon: Icons.water_drop_rounded),
@@ -592,7 +544,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(color: AppUi.dividerOf(context)),
       ),
       child: LayoutBuilder(
@@ -608,7 +560,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                     height: 38,
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     ),
                     child: Icon(stage.icon, color: statusColor, size: 20),
                   ),
@@ -622,7 +574,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                           style: TextStyle(
                             color: AppUi.textPrimaryOf(context),
                             fontSize: 15,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
@@ -644,7 +596,10 @@ class RefillOrderStatusTimeline extends StatelessWidget {
               Row(
                 children: [
                   for (var i = 0; i < milestones.length; i++) ...[
+                    // Labels get 3x the width of the connectors so
+                    // "Preparing" / "On the way" never truncate on phones.
                     Expanded(
+                      flex: 3,
                       child: _ProgressMilestone(
                         label: milestones[i].label,
                         icon: milestones[i].icon,
@@ -655,6 +610,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                     ),
                     if (i < milestones.length - 1)
                       Expanded(
+                        flex: 1,
                         child: Container(
                           height: 3,
                           margin: const EdgeInsets.only(bottom: 20),
@@ -662,7 +618,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                             color: i < progressIndex
                                 ? statusColor
                                 : AppUi.dividerOf(context),
-                            borderRadius: BorderRadius.circular(99),
+                            borderRadius: BorderRadius.circular(AppUi.radiusFull),
                           ),
                         ),
                       ),
@@ -725,15 +681,13 @@ class _ProgressMilestone extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: isCurrent
-                ? statusColor
-                : AppUi.textSecondaryOf(context),
-            fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-            fontSize: 9,
+            color: isCurrent ? statusColor : AppUi.textSecondaryOf(context),
+            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+            fontSize: 11,
           ),
         ),
       ],

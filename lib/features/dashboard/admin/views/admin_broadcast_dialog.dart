@@ -4,6 +4,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/app_haptics.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 Future<bool?> showAdminBroadcastDialog(BuildContext context) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -127,7 +128,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
       AppHaptics.error();
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Broadcast failed: $e'), backgroundColor: AppUi.error),
+        SnackBar(content: Text('Broadcast failed: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
       );
     }
   }
@@ -143,7 +144,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
       ),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -166,12 +167,12 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppUi.blueSoft,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppUi.brandSoftOf(context),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.campaign_rounded,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                     size: 24,
                   ),
                 ),
@@ -184,7 +185,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                         'Broadcast Push Alert',
                         style: TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textPrimaryOf(context),
                         ),
                       ),
@@ -230,7 +231,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                 decoration: InputDecoration(
                   labelText: 'User ID or Email',
                   hintText: 'Enter user profile ID…',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
                   isDense: true,
                 ),
               ),
@@ -241,7 +242,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
               decoration: InputDecoration(
                 labelText: 'Alert Headline / Title',
                 hintText: 'e.g., Scheduled Maintenance Notice',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
                 isDense: true,
               ),
             ),
@@ -251,7 +252,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
               decoration: InputDecoration(
                 labelText: 'Message Body',
                 hintText: 'Type your message text here…',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppUi.radiusControl)),
               ),
               maxLines: 3,
             ),
@@ -267,11 +268,11 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _priorityChip('Normal', 'normal', Colors.blue),
+                _priorityChip('Normal', 'normal', AppUi.bluePrimary),
                 const SizedBox(width: 6),
-                _priorityChip('High', 'high', Colors.amber),
+                _priorityChip('High', 'high', AppColors.uiWarning),
                 const SizedBox(width: 6),
-                _priorityChip('Urgent', 'urgent', Colors.red),
+                _priorityChip('Urgent', 'urgent', AppColors.uiError),
               ],
             ),
             const SizedBox(height: 24),
@@ -283,7 +284,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppUi.bluePrimary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusCard)),
                 ),
                 icon: _sending
                     ? const SizedBox(
@@ -294,7 +295,7 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
                     : const Icon(Icons.send_rounded, size: 20),
                 label: Text(
                   _sending ? 'Broadcasting...' : 'Broadcast Alert Now',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),
             ),
@@ -313,11 +314,11 @@ class _AdminBroadcastSheetState extends State<_AdminBroadcastSheet> {
         AppHaptics.selection();
         setState(() => _targetAudience = value);
       },
-      selectedColor: AppUi.blueSoft,
+      selectedColor: AppUi.brandSoftOf(context),
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: selected ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
+        color: selected ? AppUi.brandOf(context) : AppUi.textSecondaryOf(context),
       ),
     );
   }

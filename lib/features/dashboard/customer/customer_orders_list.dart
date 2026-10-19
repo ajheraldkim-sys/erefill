@@ -195,8 +195,9 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
         _reviewedOrderRatings.clear();
         for (final r in (reviewRows as List? ?? const [])) {
           if (r is Map && r['order_id'] != null) {
+            // 0 = reviewed without a star value; never assume 5 stars.
             _reviewedOrderRatings[r['order_id'].toString()] =
-                (r['rating'] as num?)?.toInt() ?? 5;
+                (r['rating'] as num?)?.toInt() ?? 0;
           }
         }
       } catch (reviewErr) {
@@ -466,8 +467,8 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
             ? Colors.white.withValues(alpha: 0.08)
-            : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(99),
+            : AppUi.lightSurfaceRaised,
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
         border: Border.all(color: AppUi.borderOf(context), width: 0.8),
       ),
       child: Row(
@@ -489,9 +490,9 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
     return Expanded(
       child: Material(
         color: selected
-            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+            ? (isDark ? AppUi.darkSurfaceRaised : Colors.white)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
         elevation: selected ? 1 : 0,
         shadowColor: Colors.black.withValues(alpha: 0.1),
         child: InkWell(
@@ -499,7 +500,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
             HapticFeedback.selectionClick();
             setState(() => _activeSegment = index);
           },
-          borderRadius: BorderRadius.circular(99),
+          borderRadius: BorderRadius.circular(AppUi.radiusFull),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
             child: Row(
@@ -509,9 +510,9 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                   label,
                   style: TextStyle(
                     color: selected
-                        ? AppUi.bluePrimary
+                        ? AppUi.brandOf(context)
                         : (isDark ? Colors.white70 : AppUi.textSecondary),
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),
@@ -524,20 +525,20 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                     ),
                     decoration: BoxDecoration(
                       color: selected
-                          ? AppUi.blueSoft
+                          ? AppUi.brandSoftOf(context)
                           : (isDark
                                 ? Colors.white.withValues(alpha: 0.12)
                                 : Colors.black.withValues(alpha: 0.06)),
-                      borderRadius: BorderRadius.circular(99),
+                      borderRadius: BorderRadius.circular(AppUi.radiusFull),
                     ),
                     child: Text(
                       '$count',
                       style: TextStyle(
                         color: selected
-                            ? AppUi.bluePrimary
+                            ? AppUi.brandOf(context)
                             : (isDark ? Colors.white70 : AppUi.textSecondary),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -577,7 +578,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
               ),
               child: Row(
@@ -586,14 +587,14 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                   const Icon(
                     Icons.star_rounded,
                     size: 16,
-                    color: Colors.amberAccent,
+                    color: Colors.white,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Rated $reviewedRating★',
+                    reviewedRating > 0 ? 'Rated $reviewedRating/5' : 'Reviewed',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
                   ),
@@ -615,7 +616,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                 ),
               ),
@@ -640,16 +641,16 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                 icon: const Icon(
                   Icons.star_rounded,
                   size: 16,
-                  color: Colors.amber,
+                  color: AppColors.uiWarning,
                 ),
                 label: const Text('Rate refill'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF1E293B),
+                  foregroundColor: AppUi.textPrimary,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                 ),
               ),
@@ -669,7 +670,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                 ),
               ),
@@ -689,11 +690,11 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
           label: const Text('Reorder refill'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
-            foregroundColor: AppUi.bluePrimary,
+            foregroundColor: AppUi.brandOf(context),
             elevation: 0,
             padding: const EdgeInsets.symmetric(vertical: 8),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),
           ),
         ),
@@ -716,20 +717,18 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
       message: isActive
           ? 'When you order water from a station, your active deliveries will show up here.'
           : 'Completed and cancelled orders will appear here after your first delivery.',
-      actionLabel: isActive ? 'Find a station' : null,
-      onAction: isActive
-          ? (widget.onNavigateToStations ??
-                () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Open the Stations tab to browse water refilling stations.',
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                })
-          : null,
+      actionLabel: 'Find a station',
+      onAction: widget.onNavigateToStations ??
+          () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Open the Stations tab to browse water refilling stations.',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
     );
   }
 }

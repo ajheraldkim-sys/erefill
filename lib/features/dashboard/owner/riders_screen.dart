@@ -47,10 +47,10 @@ class _RidersScreenState extends State<RidersScreen>
               indicator: const UnderlineTabIndicator(
                 borderSide: BorderSide(width: 3, color: AppUi.bluePrimary),
               ),
-              labelColor: AppUi.bluePrimary,
+              labelColor: AppUi.brandOf(context),
               unselectedLabelColor: AppUi.textMuted,
               labelStyle: const TextStyle(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
               unselectedLabelStyle: const TextStyle(

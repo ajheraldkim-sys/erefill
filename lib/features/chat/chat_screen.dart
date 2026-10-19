@@ -18,6 +18,8 @@ import 'utils/chat_identity_resolver.dart';
 import 'widgets/delivery_receipt_message.dart';
 import '../../core/services/notification_service.dart';
 
+import 'package:erefill/core/widgets/app_ui_kit.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 /// Enhanced ChatScreen with room-based architecture
 /// Supports all roles: Customer, Rider, Owner
 class ChatScreen extends StatefulWidget {
@@ -205,7 +207,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to send: ${FriendlyErrors.message(e)}')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -217,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -238,22 +240,22 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
                   'Send Photo',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
               ),
               ListTile(
-                leading: const CircleAvatar(
+                leading: CircleAvatar(
                   backgroundColor: AppColors.brandSoft,
-                  child: Icon(Icons.camera_alt_rounded, color: AppColors.brandPrimary),
+                  child: Icon(Icons.camera_alt_rounded, color: AppUi.brandOf(context)),
                 ),
                 title: const Text('Take a Photo', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Use camera to capture image'),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
-                leading: const CircleAvatar(
+                leading: CircleAvatar(
                   backgroundColor: AppColors.brandPale,
-                  child: Icon(Icons.photo_library_rounded, color: AppColors.brandPrimary),
+                  child: Icon(Icons.photo_library_rounded, color: AppUi.brandOf(context)),
                 ),
                 title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: const Text('Select an existing photo'),
@@ -289,7 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Image upload failed: $e')));
+      ).showSnackBar(SnackBar(content: Text('Image upload failed: ${FriendlyErrors.message(e)}')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -377,12 +379,12 @@ class _ChatScreenState extends State<ChatScreen> {
               _messageController.text = text;
               _send();
             },
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AppUi.radiusFull),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isCustom ? AppUi.blueSoft : AppUi.surfaceOf(context),
-          borderRadius: BorderRadius.circular(999),
+          color: isCustom ? AppUi.brandSoftOf(context) : AppUi.surfaceOf(context),
+          borderRadius: BorderRadius.circular(AppUi.radiusFull),
           border: Border.all(
             color: isCustom ? AppUi.blueBorder : AppUi.borderOf(context),
           ),
@@ -390,7 +392,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Text(
           text,
           style: TextStyle(
-            color: isCustom ? AppUi.bluePrimary : const Color(0xFF334155),
+            color: isCustom ? AppUi.brandOf(context) : const Color(0xFF334155),
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -535,9 +537,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (_room?['room_type'] == 'order_delivery' &&
                           _assignedRiderId != null)
                         IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.location_on_rounded,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                           onPressed: _openMap,
                         ),
@@ -700,7 +702,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildActionButton(IconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: _sending ? null : onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppUi.radiusCard),
       child: Container(
         width: 44,
         height: 44,
@@ -717,7 +719,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildSendButton() {
     return InkWell(
       onTap: _send,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppUi.radiusCard),
       child: Container(
         width: 44,
         height: 44,
@@ -748,7 +750,20 @@ class _ChatScreenState extends State<ChatScreen> {
           return const SkeletonList(itemCount: 5);
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return AppErrorState(
+            title: 'Messages could not load',
+            message: FriendlyErrors.message(
+              snapshot.error!,
+              fallback: 'Check your connection and try again.',
+            ),
+            onRetry: widget.roomId == null
+                ? null
+                : () => setState(() {
+                    _messagesStream = _chatService
+                        .getMessagesForRoom(widget.roomId!)
+                        .asBroadcastStream();
+                  }),
+          );
         }
 
         _allMessages = snapshot.data ?? [];
@@ -818,15 +833,15 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: AppUi.surfaceRaisedOf(context),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           border: Border.all(color: AppUi.borderOf(context)),
         ),
         child: Text(
           msg.content,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 11,
             color: AppUi.textSecondaryOf(context),
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             letterSpacing: 0.5,
           ),
         ),
@@ -911,8 +926,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? AppUi.bluePrimary
                       : AppUi.surfaceOf(context),
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
+                    topLeft: const Radius.circular(AppUi.radiusSheet),
+                    topRight: const Radius.circular(AppUi.radiusSheet),
                     bottomLeft: Radius.circular(isMine ? 16 : 4),
                     bottomRight: Radius.circular(isMine ? 4 : 16),
                   ),
@@ -961,7 +976,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             child: GestureDetector(
                               onTap: () => _showFullScreenImage(context, imageUrl!, heroTag),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 child: Hero(
                                   tag: heroTag,
                                   child: Image.network(
@@ -1029,9 +1044,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   _formatTime(msg.createdAt),
                   style: const TextStyle(
-                    fontSize: 9,
+                    fontSize: 11,
                     color: AppUi.textMuted,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 if (isMine) ...[
@@ -1039,7 +1054,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Icon(
                     msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
                     size: 12,
-                    color: msg.isRead ? AppUi.bluePrimary : AppUi.textMuted,
+                    color: msg.isRead ? AppUi.brandOf(context) : AppUi.textMuted,
                   ),
                 ],
               ],
@@ -1088,9 +1103,9 @@ class _ChatScreenState extends State<ChatScreen> {
               color: AppUi.surfaceOf(context),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.delivery_dining_rounded,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               size: 20,
             ),
           ),
@@ -1102,7 +1117,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   _formatStatus(status),
                   style: TextStyle(
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
                     color: AppUi.textPrimaryOf(context),
                   ),
@@ -1124,14 +1139,14 @@ class _ChatScreenState extends State<ChatScreen> {
               icon: const Icon(Icons.map_rounded, size: 16),
               label: const Text(
                 'TRACK',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
               ),
               style: TextButton.styleFrom(
-                foregroundColor: AppUi.bluePrimary,
+                foregroundColor: AppUi.brandOf(context),
                 backgroundColor: AppUi.surfaceOf(context),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
               ),
             ),
@@ -1206,7 +1221,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: AppColors.uiError)),
           ),
         ],
       ),
@@ -1247,7 +1262,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Archive', style: TextStyle(color: Colors.red)),
+            child: const Text('Archive', style: TextStyle(color: AppColors.uiError)),
           ),
         ],
       ),
@@ -1283,7 +1298,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+            child: const Text('Clear', style: TextStyle(color: AppColors.uiError)),
           ),
         ],
       ),

@@ -134,7 +134,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                       'Update Required',
                       style: TextStyle(
                         fontSize: 24,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: -0.5,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -158,7 +158,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: AppUi.surfaceOf(context),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                         border: Border.all(color: AppUi.borderOf(context)),
                       ),
                       child: Row(
@@ -170,8 +170,8 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                                 Text(
                                   'CURRENT VERSION',
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: 0.6,
                                     color: AppUi.textSecondaryOf(context),
                                   ),
@@ -201,8 +201,8 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                                 Text(
                                   'REQUIRED VERSION',
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: 0.6,
                                     color: AppUi.textSecondaryOf(context),
                                   ),
@@ -233,7 +233,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                           color: isDark
                               ? Colors.white.withValues(alpha: 0.04)
                               : Colors.black.withValues(alpha: 0.02),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                           border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Column(
@@ -248,7 +248,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                                   'What\'s New in v${policy.latestVersion}',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: 0.5,
                                     color: AppUi.textPrimaryOf(context),
                                   ),
@@ -277,7 +277,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: AppUi.surfaceOf(context),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                           border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Column(
@@ -297,7 +297,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                                   '${(_progress!.progressPercent * 100).toInt()}%',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     color: primaryColor,
                                   ),
                                 ),
@@ -305,7 +305,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                             ),
                             const SizedBox(height: 10),
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               child: LinearProgressIndicator(
                                 value: _progress!.progressPercent > 0
                                     ? _progress!.progressPercent
@@ -337,7 +337,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: AppUi.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppUi.radiusCard),
                           border: Border.all(color: AppUi.error.withValues(alpha: 0.3)),
                         ),
                         child: Row(
@@ -371,7 +371,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
                           ),
                         ),
                         onPressed: _isDownloading ? null : _startUpdate,
@@ -389,7 +389,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                           _isDownloading ? 'Preparing Installation...' : 'Update Now',
                           style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),

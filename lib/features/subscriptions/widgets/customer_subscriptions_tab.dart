@@ -7,6 +7,9 @@ import 'package:provider/provider.dart';
 import '../models/subscription_model.dart';
 import '../services/subscription_service.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class CustomerSubscriptionsTab extends StatefulWidget {
   final VoidCallback? onBrowseStations;
   const CustomerSubscriptionsTab({super.key, this.onBrowseStations});
@@ -63,7 +66,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
               content: Text(
                 'Created ${generated.length} auto-refill order(s) successfully!',
               ),
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: AppColors.uiSuccess,
             ),
           );
         } else {
@@ -80,7 +83,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to process subscriptions: $e')),
+          SnackBar(content: Text('Failed to process subscriptions: ${FriendlyErrors.message(e)}')),
         );
       }
     } finally {
@@ -104,15 +107,8 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppUi.bluePrimary,
-                  AppUi.bluePrimary.withValues(alpha: 0.8),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
+              color: AppUi.bluePrimary,
+              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
               boxShadow: [
                 BoxShadow(
                   color: AppUi.bluePrimary.withValues(alpha: 0.25),
@@ -145,7 +141,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -178,7 +174,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
                 textStyle: const TextStyle(
                   fontSize: 14,
@@ -192,15 +188,15 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFF59E0B)),
+                color: AppUi.warningBg,
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                border: Border.all(color: AppColors.uiWarning),
               ),
               child: Row(
                 children: [
                   const Icon(
                     Icons.alarm_on_rounded,
-                    color: Color(0xFFD97706),
+                    color: AppColors.uiWarning,
                     size: 26,
                   ),
                   const SizedBox(width: 12),
@@ -211,8 +207,8 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                         Text(
                           'Refill Routine Due Today!',
                           style: TextStyle(
-                            color: Color(0xFF92400E),
-                            fontWeight: FontWeight.w800,
+                            color: AppUi.warningFg,
+                            fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
                         ),
@@ -220,7 +216,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                         Text(
                           'Tap below to immediately trigger your scheduled orders.',
                           style: TextStyle(
-                            color: Color(0xFFB45309),
+                            color: AppColors.uiWarning,
                             fontSize: 11,
                           ),
                         ),
@@ -231,7 +227,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                   ElevatedButton(
                     onPressed: _isProcessingDue ? null : _processDueNow,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD97706),
+                      backgroundColor: AppColors.uiWarning,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       minimumSize: Size.zero,
@@ -263,7 +259,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
               padding: const EdgeInsets.all(36),
               decoration: BoxDecoration(
                 color: AppUi.surfaceOf(context),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                 border: Border.all(color: AppUi.borderOf(context)),
               ),
               child: Center(
@@ -279,7 +275,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                       'No scheduled refills yet',
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -309,7 +305,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(
           color: sub.isActive
               ? AppUi.bluePrimary.withValues(alpha: 0.3)
@@ -331,16 +327,16 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                       sub.stationName,
                       style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${sub.quantity}x ${sub.waterType} · ₱${sub.estimatedPrice.toStringAsFixed(2)}',
+                      '${sub.quantity}x ${sub.waterType} · ${formatPeso(sub.estimatedPrice)}',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                     ),
                   ],
@@ -398,9 +394,9 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: sub.isActive
-                  ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                  ? AppColors.uiSuccess.withValues(alpha: 0.1)
                   : Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),
             child: Row(
               children: [
@@ -409,7 +405,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                       ? Icons.check_circle_outline_rounded
                       : Icons.pause_circle_outline_rounded,
                   size: 14,
-                  color: sub.isActive ? const Color(0xFF10B981) : Colors.grey,
+                  color: sub.isActive ? AppColors.uiSuccess : Colors.grey,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -420,7 +416,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: sub.isActive
-                        ? const Color(0xFF10B981)
+                        ? AppColors.uiSuccess
                         : Colors.grey.shade600,
                   ),
                 ),
@@ -442,7 +438,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFEF4444),
+                              backgroundColor: AppColors.uiError,
                               foregroundColor: Colors.white,
                             ),
                             onPressed: () => Navigator.pop(ctx, true),
@@ -466,7 +462,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                       'Cancel',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFEF4444),
+                        color: AppColors.uiError,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -497,14 +493,14 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
       builder: (dlgCtx) => StatefulBuilder(
         builder: (context, setDlgState) => AlertDialog(
           backgroundColor: AppUi.surfaceOf(context),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
+          title: Row(
             children: [
-              Icon(Icons.autorenew_rounded, color: AppUi.bluePrimary),
+              Icon(Icons.autorenew_rounded, color: AppUi.brandOf(context)),
               SizedBox(width: 8),
               Text(
                 'Schedule Auto-Refill',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
               ),
             ],
           ),
@@ -550,7 +546,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                   initialValue: selectedWaterType,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -594,7 +590,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                   initialValue: selectedFrequency,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -639,7 +635,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                   initialValue: selectedTimeSlot,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -673,7 +669,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                     labelText: 'Delivery Address',
                     hintText: 'Barangay, Municipality, Landmark',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     ),
                   ),
                 ),
@@ -683,26 +679,26 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppUi.blueSoft,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppUi.brandSoftOf(context),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Estimated Per Delivery:',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: AppUi.bluePrimary,
+                          color: AppUi.brandOf(context),
                         ),
                       ),
                       Text(
-                        '₱${(quantity * pricePerGallon + 20).toStringAsFixed(2)}',
-                        style: const TextStyle(
+                        formatPeso((quantity * pricePerGallon + 20)),
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: AppUi.bluePrimary,
+                          fontWeight: FontWeight.w700,
+                          color: AppUi.brandOf(context),
                         ),
                       ),
                     ],
@@ -751,14 +747,14 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                         content: Text(
                           'Auto-Refill scheduled! Your refills will now arrive on routine.',
                         ),
-                        backgroundColor: Color(0xFF10B981),
+                        backgroundColor: AppColors.uiSuccess,
                       ),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     messenger.showSnackBar(
-                      SnackBar(content: Text('Failed to schedule: $e')),
+                      SnackBar(content: Text('Failed to schedule: ${FriendlyErrors.message(e)}')),
                     );
                   }
                 }

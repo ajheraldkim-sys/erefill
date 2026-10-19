@@ -2,6 +2,8 @@ import 'package:erefill_admin/services/admin_api_service.dart';
 import 'package:erefill_admin/features/onboarding/create_dialogs.dart';
 import 'package:erefill_admin/utils/csv_export.dart';
 import 'package:erefill_admin/widgets/admin_ui.dart';
+import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,7 +56,7 @@ void main() {
       expect(formatPeso(0), '₱0.00');
       expect(formatPeso(50), '₱50.00');
       expect(formatPeso(25.5), '₱25.50');
-      expect(formatPeso(1234.567), '₱1234.57');
+      expect(formatPeso(1234.567), '₱1,234.57');
     });
 
     testWidgets('dark mode uses readable semantic colors and map tiles', (
@@ -81,9 +83,12 @@ void main() {
         ),
       );
 
-      expect(mutedText, const Color(0xFFB8C9CE));
-      expect(errorText, const Color(0xFFFF7B83));
-      expect(pendingStatus, const Color(0xFFFBBF24));
+      expect(mutedText, AppUi.darkTextSecondary);
+      expect(errorText, AppUi.errorFgDark);
+      expect(
+        pendingStatus,
+        OrderStatusStyle.resolve('pending', isDark: true).badgeForeground,
+      );
       expect(darkMapUsesDarkTileBuilder, isFalse);
     });
 

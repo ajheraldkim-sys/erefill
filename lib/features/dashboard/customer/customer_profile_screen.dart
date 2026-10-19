@@ -20,7 +20,10 @@ import '../../account/saved_addresses_screen.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../auth/widgets/gmail_binding_card.dart';
 import '../../settings/account_security_screen.dart';
+import 'widgets/customer_credit_sheet.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
 
@@ -377,7 +380,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         'About you',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textPrimaryOf(context),
                         ),
                       ),
@@ -652,7 +655,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               'Preferred water type',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(ctx),
               ),
             ),
@@ -683,17 +686,17 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                     leading: Icon(
                       Icons.water_drop_rounded,
                       color: isSelected
-                          ? AppUi.bluePrimary
+                          ? AppUi.brandOf(context)
                           : AppUi.textSecondaryOf(ctx),
                     ),
                     title: Text(
                       type.name,
                       style: TextStyle(
                         fontWeight: isSelected
-                            ? FontWeight.w800
+                            ? FontWeight.w700
                             : FontWeight.w600,
                         color: isSelected
-                            ? AppUi.bluePrimary
+                            ? AppUi.brandOf(context)
                             : AppUi.textPrimaryOf(ctx),
                       ),
                     ),
@@ -705,9 +708,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       ),
                     ),
                     trailing: isSelected
-                        ? const Icon(
+                        ? Icon(
                             Icons.check_circle_rounded,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           )
                         : null,
                     onTap: () async {
@@ -776,11 +779,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: AppUi.bluePrimary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.support_agent_rounded,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -791,7 +794,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       'Help & Customer Support',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(ctx),
                       ),
                     ),
@@ -811,7 +814,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               'CONTACT INFORMATION',
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: AppUi.textSecondaryOf(ctx),
               ),
@@ -824,10 +827,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.phone_in_talk_rounded,
                         size: 20,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -844,7 +847,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             Text(
                               '+63 912 345 6789',
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: AppUi.textPrimaryOf(ctx),
                               ),
                             ),
@@ -863,10 +866,10 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   Divider(height: 20, color: AppUi.dividerOf(ctx)),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.email_outlined,
                         size: 20,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -883,7 +886,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             Text(
                               'support@erefill.com',
                               style: TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: AppUi.textPrimaryOf(ctx),
                               ),
                             ),
@@ -900,7 +903,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               'QUICK FAQS',
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: AppUi.textSecondaryOf(ctx),
               ),
@@ -1026,7 +1029,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   children: [
                     const Icon(
                       Icons.warning_amber_rounded,
-                      color: Color(0xFFEF4444),
+                      color: AppColors.uiError,
                       size: 48,
                     ),
                     const SizedBox(height: 16),
@@ -1034,7 +1037,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       'Delete account',
                       style: TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -1082,14 +1085,14 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                   setSheetState(() => isDeleting = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Deletion failed: $e'),
-                                      backgroundColor: Colors.red,
+                                      content: Text('Deletion failed: ${FriendlyErrors.message(e)}'),
+                                      backgroundColor: AppColors.uiError,
                                     ),
                                   );
                                 }
                               },
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF4444),
+                          backgroundColor: AppColors.uiError,
                         ),
                         child: isDeleting
                             ? const CircularProgressIndicator(
@@ -1097,7 +1100,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                               )
                             : const Text(
                                 'Delete everything',
-                                style: TextStyle(fontWeight: FontWeight.w800),
+                                style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                       ),
                     ),
@@ -1202,6 +1205,24 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             ),
                           ],
                         ),
+                        const AccountSectionLabel('Credits & Balance'),
+                        AccountGroup(
+                          children: [
+                            AccountNavTile(
+                              icon: Icons.receipt_long_rounded,
+                              title: 'Store Credits & Utang Ledger',
+                              subtitle:
+                                  'View your outstanding refilling credit and payment records',
+                              onTap: () {
+                                CustomerCreditSheet.show(
+                                  context,
+                                  customerName: _composedFullName,
+                                  customerId: supabase.auth.currentUser?.id,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                         const AccountSectionLabel('Preferences'),
                         AccountGroup(
                           children: [
@@ -1264,7 +1285,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                         decoration: BoxDecoration(
                                           color: AppUi.pageBgOf(ctx),
                                           borderRadius: const BorderRadius.vertical(
-                                            top: Radius.circular(24),
+                                            top: Radius.circular(AppUi.radiusPill),
                                           ),
                                         ),
                                         child: Column(
@@ -1316,18 +1337,18 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                           children: [
                             AccountNavTile(
                               icon: Icons.logout_rounded,
-                              iconColor: const Color(0xFFEF4444),
+                              iconColor: AppColors.uiError,
                               title: 'Sign out',
-                              titleColor: const Color(0xFFEF4444),
+                              titleColor: AppColors.uiError,
                               subtitle:
                                   'Log out of your account on this device',
                               onTap: () => _showLogoutConfirmation(context),
                             ),
                             AccountNavTile(
                               icon: Icons.delete_outline_rounded,
-                              iconColor: const Color(0xFFDC2626),
+                              iconColor: AppColors.uiError,
                               title: 'Delete account',
-                              titleColor: const Color(0xFFDC2626),
+                              titleColor: AppColors.uiError,
                               subtitle:
                                   'Permanently remove your account and data',
                               onTap: () => _showDeleteAccountDialog(context),

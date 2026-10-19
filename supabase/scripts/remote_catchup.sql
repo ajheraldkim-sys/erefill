@@ -1567,3 +1567,28 @@ FROM (
   GROUP BY station_id
 ) sub
 WHERE p.id = sub.station_id;
+
+-- Customer Credit Ledger Access (20261017)
+CREATE OR REPLACE FUNCTION public.get_customer_credits()
+RETURNS SETOF public.dm_credits
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT * FROM public.dm_credits
+  WHERE debtor_name ILIKE (SELECT full_name FROM public.profiles WHERE id = auth.uid())
+     OR debtor_name ILIKE (SELECT coalesce(first_name, '') || ' ' || coalesce(last_name, '') FROM public.profiles WHERE id = auth.uid())
+  ORDER BY created_at DESC;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_customer_credits() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_customer_credits() TO service_role;
+
+-- Offline & Manual Delivery Ledger schema alignment (20261017)
+ALTER TABLE IF EXISTS public.dm_deliveries
+  ADD COLUMN IF NOT EXISTS rider_name text;
+
+ALTER TABLE IF EXISTS public.dm_credits
+  ADD COLUMN IF NOT EXISTS rider_name text;
+
+

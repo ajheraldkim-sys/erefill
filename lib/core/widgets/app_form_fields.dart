@@ -85,8 +85,8 @@ class AppFormDecoration {
         fontWeight: FontWeight.w500,
         letterSpacing: 0,
       ),
-      floatingLabelStyle: const TextStyle(
-        color: AppUi.bluePrimary,
+      floatingLabelStyle: TextStyle(
+        color: AppUi.brandOf(context),
         fontSize: 13,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
@@ -407,7 +407,7 @@ class AppFormSectionHeader extends StatelessWidget {
             title.toUpperCase(),
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppUi.textSecondaryOf(context),
               letterSpacing: 0.6,
             ),
@@ -493,7 +493,7 @@ class AppFormSubmitButton extends StatelessWidget {
                     effectiveLabel,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: fg,
                     ),
                   ),

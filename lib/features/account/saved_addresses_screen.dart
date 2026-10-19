@@ -15,6 +15,7 @@ import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/app_form_fields.dart';
 import '../../core/utils/profile_query_helpers.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 /// Launch context for saved-addresses route (`extra` map).
 class SavedAddressLaunchContext {
   final String address;
@@ -317,7 +318,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       debugPrint('Error setting default address: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update default address: $e')),
+          SnackBar(content: Text('Could not update default address: ${FriendlyErrors.message(e)}')),
         );
       }
       await _loadAddresses();
@@ -395,7 +396,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       debugPrint('Error deleting address: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not delete address: $e')),
+          SnackBar(content: Text('Could not delete address: ${FriendlyErrors.message(e)}')),
         );
       }
     }
@@ -609,15 +610,15 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             ),
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(sheetContext).size.height * 0.92,
-              ),
-              decoration: BoxDecoration(
-                color: AppUi.surfaceOf(context),
-                borderRadius: AppUi.radiusSheetTop,
-              ),
-              child: Column(
+            child: Material(
+              color: AppUi.surfaceOf(context),
+              borderRadius: AppUi.radiusSheetTop,
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.92,
+                ),
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const SizedBox(height: 10),
@@ -638,7 +639,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           isEditing ? 'Edit address' : 'Add delivery address',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -676,7 +677,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                 labelStyle: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: isSelected
-                                      ? AppUi.bluePrimary
+                                      ? AppUi.brandOf(context)
                                       : AppUi.textPrimaryOf(context),
                                 ),
                                 onSelected: (_) {
@@ -809,12 +810,12 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                       AppMapTiles.layer(context: context)
                                     ],
                                   ),
-                                  const Center(
+                                  Center(
                                     child: Padding(
                                       padding: EdgeInsets.only(bottom: 28),
                                       child: Icon(
                                         Icons.location_on_rounded,
-                                        color: AppUi.bluePrimary,
+                                        color: AppUi.brandOf(context),
                                         size: 38,
                                         shadows: [
                                           Shadow(
@@ -856,7 +857,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                               }
                                             },
                                       backgroundColor: AppUi.surfaceOf(context),
-                                      foregroundColor: AppUi.bluePrimary,
+                                      foregroundColor: AppUi.brandOf(context),
                                       child: isLocating
                                           ? const SizedBox(
                                               width: 16,
@@ -930,8 +931,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                 ],
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
       ),
     );
   }
@@ -946,9 +948,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         actions: [
           IconButton(
             onPressed: () => _showAddressForm(),
-            icon: const Icon(
+            icon: Icon(
               Icons.add_location_alt_outlined,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
             ),
             tooltip: 'Add new address',
           ),
@@ -973,7 +975,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           'No saved addresses yet',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
@@ -1017,9 +1019,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: AppUi.bluePrimary,
+                            foregroundColor: AppUi.brandOf(context),
                             side: BorderSide(
-                              color: AppUi.bluePrimary
+                              color: AppUi.brandOf(context)
                                   .withValues(alpha: 0.35),
                             ),
                             shape: RoundedRectangleBorder(
@@ -1082,7 +1084,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                           : Icons
                                               .radio_button_unchecked_rounded,
                                       color: isDefault
-                                          ? AppUi.bluePrimary
+                                          ? AppUi.brandOf(context)
                                           : AppUi.textMuted,
                                       size: 22,
                                     ),
@@ -1091,7 +1093,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                       label,
                                       style: TextStyle(
                                         fontSize: 16,
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w700,
                                         color: AppUi.textPrimaryOf(context),
                                       ),
                                     ),
@@ -1106,14 +1108,14 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                           color: AppUi.bluePrimary
                                               .withValues(alpha: 0.12),
                                           borderRadius:
-                                              BorderRadius.circular(6),
+                                              BorderRadius.circular(AppUi.radiusSm),
                                         ),
-                                        child: const Text(
+                                        child: Text(
                                           'DEFAULT',
                                           style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w900,
-                                            color: AppUi.bluePrimary,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppUi.brandOf(context),
                                             letterSpacing: 0.5,
                                           ),
                                         ),
@@ -1208,7 +1210,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: AppUi.bluePrimary,
+                                            color: AppUi.brandOf(context),
                                           ),
                                         ),
                                       ],

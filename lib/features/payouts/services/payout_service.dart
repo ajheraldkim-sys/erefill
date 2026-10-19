@@ -92,7 +92,11 @@ class PayoutService {
 
     // Try remote insert
     try {
-      await _supabase.from('rider_payout_requests').insert(req.toJson());
+      final payload = Map<String, dynamic>.from(req.toJson());
+      if (payload['owner_id'] == null || payload['owner_id'].toString().trim().isEmpty) {
+        payload.remove('owner_id');
+      }
+      await _supabase.from('rider_payout_requests').insert(payload);
     } catch (e) {
       debugPrint('Saved payout request locally. Supabase insert deferred/fallback: $e');
     }
@@ -183,4 +187,81 @@ class PayoutService {
       debugPrint('Supabase updatePayoutStatus deferred/fallback: $e');
     }
   }
+
+  /// Get Owner Digital Wallet Summary (digital sales, rider payout obligations, available balance)
+  Future<OwnerWalletSummary> getOwnerWalletSummary(String ownerId) async {
+    final cacheKey = 'owner_wallet_summary_$ownerId';
+    final cached = await _cache.get<Map<String, dynamic>>(cacheKey);
+    OwnerWalletSummary summary = cached != null
+        ? OwnerWalletSummary.fromJson(cached)
+        : OwnerWalletSummary.empty();
+
+    try {
+      // 1. Fetch digital orders for this station owner
+      final ordersRes = await _supabase
+          .from('orders')
+          .select('id, total_amount, payment_method, payment_status, status, created_at, customer_address')
+          .eq('owner_id', ownerId)
+          .neq('payment_method', 'cod')
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      double digitalEarnings = 0.0;
+      int digitalCount = 0;
+      final recentTxs = <Map<String, dynamic>>[];
+
+      for (final o in ordersRes) {
+        final amt = (o['total_amount'] as num?)?.toDouble() ?? 0.0;
+        final pStatus = o['payment_status']?.toString().toLowerCase();
+        final oStatus = o['status']?.toString().toLowerCase();
+        final isDeliveredOrPaid = pStatus == 'paid' || oStatus == 'delivered' || oStatus == 'completed';
+
+        if (isDeliveredOrPaid) {
+          digitalEarnings += amt;
+          digitalCount++;
+        }
+        recentTxs.add({
+          'id': o['id'],
+          'amount': amt,
+          'payment_method': o['payment_method'],
+          'status': o['status'],
+          'payment_status': o['payment_status'],
+          'created_at': o['created_at'],
+        });
+      }
+
+      // 2. Fetch rider payout requests
+      final payoutRequests = await getOwnerPayoutRequests(ownerId);
+      double pendingRider = 0.0;
+      double completedRider = 0.0;
+
+      for (final req in payoutRequests) {
+        if (req.status == 'pending') {
+          pendingRider += req.amount;
+        } else if (req.status == 'disbursed') {
+          completedRider += req.amount;
+        }
+      }
+
+      final available = (digitalEarnings - completedRider - pendingRider).clamp(0.0, double.infinity);
+
+      summary = OwnerWalletSummary(
+        totalDigitalEarnings: digitalEarnings,
+        pendingRiderDisbursements: pendingRider,
+        completedRiderDisbursements: completedRider,
+        availableBalance: available,
+        totalDigitalOrders: digitalCount,
+        recentTransactions: recentTxs,
+      );
+
+      await _cache.set(cacheKey, summary.toJson());
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('PayoutService getOwnerWalletSummary fallback: $e');
+      }
+    }
+
+    return summary;
+  }
 }
+

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/connectivity_provider.dart';
 
+import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/theme/app_colors.dart';
 /// App-wide offline banner widget that automatically informs users when
 /// their device loses internet connection and shows pending sync items.
 class OfflineBanner extends StatelessWidget {
@@ -31,21 +33,21 @@ class OfflineBanner extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              color: AppColors.uiWarning.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+              border: Border.all(color: AppColors.uiWarning.withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.cloud_off_rounded, size: 13, color: Color(0xFFD97706)),
+                const Icon(Icons.cloud_off_rounded, size: 13, color: AppColors.uiWarning),
                 const SizedBox(width: 5),
                 Text(
                   message,
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFD97706),
+                    color: AppColors.uiWarning,
                   ),
                 ),
               ],
@@ -54,7 +56,7 @@ class OfflineBanner extends StatelessWidget {
         }
 
         return Material(
-          color: const Color(0xFFD97706),
+          color: AppColors.uiWarning,
           elevation: 2,
           child: SafeArea(
             bottom: false,

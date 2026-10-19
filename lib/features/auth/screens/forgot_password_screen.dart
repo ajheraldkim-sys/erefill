@@ -4,6 +4,7 @@ import '../../../core/constants.dart';
 import '../../../core/utils/friendly_errors.dart';
 import '../../../core/widgets/app_form_fields.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -41,7 +42,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               fallback: 'Could not send reset instructions. Please try again.',
             ),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
     } finally {
@@ -66,7 +67,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               _sent ? 'Check your email' : 'Forgot password?',
               style: TextStyle(
                 fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),

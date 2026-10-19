@@ -11,6 +11,7 @@ import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'services/station_setup_service.dart';
 
+import 'package:erefill/core/utils/money.dart';
 class ServiceCatalogScreen extends StatefulWidget {
   final bool isPopup;
 
@@ -121,7 +122,9 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isActive ? 'Product marked unavailable' : 'Product marked available',
+              isActive
+                  ? 'Product marked unavailable'
+                  : 'Product marked available',
             ),
           ),
         );
@@ -130,7 +133,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}')));
       }
     }
   }
@@ -152,9 +155,9 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not seed products: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not seed products: ${FriendlyErrors.message(e)}')));
       }
     } finally {
       if (mounted) setState(() => _isSeeding = false);
@@ -240,30 +243,32 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                       : Container(
                           padding: const EdgeInsets.all(AppUi.spacingXs),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF3E8FF),
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppUi.lightSurfaceRaised,
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: const Icon(
                             Icons.auto_awesome_rounded,
-                            color: Color(0xFF8B5CF6),
+                            color: AppColors.statusPreparing,
                             size: 20,
                           ),
                         ),
                 ),
               IconButton(
                 onPressed: _showAddDialog,
-                tooltip: _selectedTabIndex == 0 ? 'Set refill price' : 'Add product',
+                tooltip: _selectedTabIndex == 0
+                    ? 'Set refill price'
+                    : 'Add product',
                 icon: Container(
                   padding: const EdgeInsets.all(AppUi.spacingXs),
                   decoration: BoxDecoration(
                     color: Theme.of(context).brightness == Brightness.dark
                         ? Colors.white.withValues(alpha: 0.12)
-                        : AppUi.blueSoft,
-                    borderRadius: BorderRadius.circular(10),
+                        : AppUi.brandSoftOf(context),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.add,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                     size: 20,
                   ),
                 ),
@@ -277,7 +282,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: AppUi.surfaceOf(context),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                     border: Border.all(color: AppUi.borderOf(context)),
                   ),
                   child: Row(
@@ -308,9 +313,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                     hintText: _selectedTabIndex == 0
                         ? 'Search refill pricing or notes'
                         : 'Search containers, caps, or prices',
-                    hintStyle: TextStyle(
-                      color: AppUi.textSecondaryOf(context),
-                    ),
+                    hintStyle: TextStyle(color: AppUi.textSecondaryOf(context)),
                     prefixIcon: Icon(
                       Icons.search,
                       color: AppUi.textSecondaryOf(context),
@@ -327,7 +330,10 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: AppUi.pillRadius,
-                      borderSide: const BorderSide(color: AppUi.bluePrimary, width: 2),
+                      borderSide: const BorderSide(
+                        color: AppUi.bluePrimary,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -338,19 +344,19 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
             child: _isLoading
                 ? const AxoLoader(message: 'Loading product catalog...')
                 : filtered.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        padding: AppUi.pagePadding,
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final service = filtered[index];
-                          if (_selectedTabIndex == 0) {
-                            return _buildRefillCard(service);
-                          } else {
-                            return _buildAccessoryCard(service);
-                          }
-                        },
-                      ),
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: AppUi.pagePadding,
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final service = filtered[index];
+                      if (_selectedTabIndex == 0) {
+                        return _buildRefillCard(service);
+                      } else {
+                        return _buildAccessoryCard(service);
+                      }
+                    },
+                  ),
           ),
         ],
       ),
@@ -365,13 +371,13 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
     final isSelected = _selectedTabIndex == index;
     return InkWell(
       onTap: () => setState(() => _selectedTabIndex = index),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppUi.radiusControl),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppUi.bluePrimary : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppUi.radiusControl),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -388,8 +394,10 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? Colors.white : AppUi.textSecondaryOf(context),
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected
+                      ? Colors.white
+                      : AppUi.textSecondaryOf(context),
                 ),
               ),
             ),
@@ -405,7 +413,8 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
         pose: AxoPose.thinking,
         compact: true,
         title: 'No refill price configured',
-        message: 'Set your ${_ownerWaterType.name.toLowerCase()} refill price so customers can order refills.',
+        message:
+            'Set your ${_ownerWaterType.name.toLowerCase()} refill price so customers can order refills.',
         actionLabel: 'Set Refill Price',
         onAction: _showAddDialog,
       );
@@ -420,12 +429,12 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3E8FF),
-                  borderRadius: BorderRadius.circular(20),
+                  color: AppUi.lightSurfaceRaised,
+                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                 ),
                 child: const Icon(
                   Icons.inventory_2_outlined,
-                  color: Color(0xFF8B5CF6),
+                  color: AppColors.statusPreparing,
                   size: 32,
                 ),
               ),
@@ -434,7 +443,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                 'No containers or accessories yet',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -457,7 +466,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                   FilledButton.icon(
                     onPressed: _isSeeding ? null : _seedStandardProducts,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B5CF6),
+                      backgroundColor: AppColors.statusPreparing,
                       foregroundColor: Colors.white,
                     ),
                     icon: const Icon(Icons.auto_awesome_rounded, size: 18),
@@ -484,7 +493,8 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
       service['category']?.toString() ?? service['name']?.toString(),
     );
     final containerSize = service['container_size']?.toString() ?? '5 gallon';
-    final preparationMinutes = (service['preparation_minutes'] as num?)?.toInt() ?? 15;
+    final preparationMinutes =
+        (service['preparation_minutes'] as num?)?.toInt() ?? 15;
 
     return Stack(
       children: [
@@ -492,7 +502,8 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
           padding: const EdgeInsets.only(right: 44, bottom: 12),
           child: WaterTypeCard(
             type: waterType,
-            description: service['description']?.toString() ?? waterType.description,
+            description:
+                service['description']?.toString() ?? waterType.description,
             price: price,
             containerSize: containerSize,
             preparationMinutes: preparationMinutes,
@@ -513,7 +524,10 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
     final isActive = item['is_available'] ?? true;
     final price = (item['price'] as num?)?.toDouble() ?? 0;
     final name = item['name']?.toString() ?? 'Accessory';
-    final category = item['category']?.toString() ?? 'Accessories';
+    final category = OrderProductHelpers.formatCategory(
+      item['category']?.toString(),
+      name: name,
+    );
     final containerSize = item['container_size']?.toString() ?? 'Piece';
     final stockLevel = (item['stock_level'] as num?)?.toInt() ?? 100;
     final description = item['description']?.toString() ?? '';
@@ -522,16 +536,18 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
         border: Border.all(
-          color: isActive ? AppUi.borderOf(context) : AppUi.borderOf(context).withValues(alpha: 0.5),
+          color: isActive
+              ? AppUi.borderOf(context)
+              : AppUi.borderOf(context).withValues(alpha: 0.5),
         ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showEditServiceDialog(item),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppUi.radiusSheet),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -542,12 +558,12 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3E8FF),
-                    borderRadius: BorderRadius.circular(14),
+                    color: AppUi.lightSurfaceRaised,
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   ),
                   child: const Icon(
                     Icons.inventory_2_outlined,
-                    color: Color(0xFF8B5CF6),
+                    color: AppColors.statusPreparing,
                     size: 24,
                   ),
                 ),
@@ -565,7 +581,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                               name,
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: isActive
                                     ? AppUi.textPrimaryOf(context)
                                     : AppUi.textMuted,
@@ -578,10 +594,13 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppUi.chipBgOf(context),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(AppUi.radiusSm),
                             ),
                             child: Text(
                               category,
@@ -594,12 +613,15 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: stockLevel > 10
-                                  ? const Color(0xFFECFDF5)
-                                  : const Color(0xFFFEF2F2),
-                              borderRadius: BorderRadius.circular(6),
+                                  ? AppUi.successBg
+                                  : AppUi.errorBg,
+                              borderRadius: BorderRadius.circular(AppUi.radiusSm),
                             ),
                             child: Text(
                               '$stockLevel in stock ($containerSize)',
@@ -607,8 +629,8 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: stockLevel > 10
-                                    ? const Color(0xFF047857)
-                                    : const Color(0xFFB91C1C),
+                                    ? AppColors.uiSuccess
+                                    : AppUi.errorFg,
                               ),
                             ),
                           ),
@@ -621,7 +643,7 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 12,
                             color: AppUi.textSecondaryOf(context),
                           ),
                         ),
@@ -635,11 +657,11 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '₱${price.toStringAsFixed(2)}',
+                      formatPeso(price),
                       style: TextStyle(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 16,
-                        color: isActive ? AppUi.bluePrimary : AppUi.textMuted,
+                        color: isActive ? AppUi.brandOf(context) : AppUi.textMuted,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -790,7 +812,7 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
                       'Add Refill Pricing',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -813,17 +835,17 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppUi.blueSoft,
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppUi.brandSoftOf(context),
+                          borderRadius: BorderRadius.circular(AppUi.radiusCard),
                           border: Border.all(
                             color: AppUi.bluePrimary.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.water_drop_rounded,
-                              color: AppUi.bluePrimary,
+                              color: AppUi.brandOf(context),
                               size: 24,
                             ),
                             const SizedBox(width: 10),
@@ -871,7 +893,9 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
                               compact: true,
                               validator: (v) {
                                 final p = double.tryParse(v ?? '');
-                                return (p == null || p <= 0) ? 'Enter valid price' : null;
+                                return (p == null || p <= 0)
+                                    ? 'Enter valid price'
+                                    : null;
                               },
                             ),
                           ),
@@ -897,11 +921,14 @@ class _AddServiceDialogState extends State<AddServiceDialog> {
                         compact: true,
                       ),
                       const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text('Available for ordering'),
-                        value: _isActive,
-                        activeThumbColor: AppUi.bluePrimary,
-                        onChanged: (v) => setState(() => _isActive = v),
+                      Material(
+                        type: MaterialType.transparency,
+                        child: SwitchListTile(
+                          title: const Text('Available for ordering'),
+                          value: _isActive,
+                          activeThumbColor: AppUi.bluePrimary,
+                          onChanged: (v) => setState(() => _isActive = v),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       AppFormSubmitButton(
@@ -1038,7 +1065,7 @@ class _EditServiceDialogState extends State<EditServiceDialog> {
                       'Update Refill Pricing',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -1077,7 +1104,9 @@ class _EditServiceDialogState extends State<EditServiceDialog> {
                               compact: true,
                               validator: (v) {
                                 final p = double.tryParse(v ?? '');
-                                return (p == null || p <= 0) ? 'Enter valid price' : null;
+                                return (p == null || p <= 0)
+                                    ? 'Enter valid price'
+                                    : null;
                               },
                             ),
                           ),
@@ -1101,11 +1130,14 @@ class _EditServiceDialogState extends State<EditServiceDialog> {
                         compact: true,
                       ),
                       const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text('Available for ordering'),
-                        value: _isActive,
-                        activeThumbColor: AppUi.bluePrimary,
-                        onChanged: (v) => setState(() => _isActive = v),
+                      Material(
+                        type: MaterialType.transparency,
+                        child: SwitchListTile(
+                          title: const Text('Available for ordering'),
+                          value: _isActive,
+                          activeThumbColor: AppUi.bluePrimary,
+                          onChanged: (v) => setState(() => _isActive = v),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       AppFormSubmitButton(
@@ -1151,11 +1183,11 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
   final _priceController = TextEditingController();
   final _containerController = TextEditingController(text: '5 Gallon');
   final _stockController = TextEditingController(text: '50');
-  String _category = 'Accessories';
+  String _category = 'Containers';
   bool _isActive = true;
   bool _isLoading = false;
 
-  final List<String> _categoryOptions = ['Accessories', 'Products', 'Refill'];
+  final List<String> _categoryOptions = ['Containers', 'Accessories'];
 
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
@@ -1185,9 +1217,9 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FriendlyErrors.message(e))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(FriendlyErrors.message(e))));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -1229,7 +1261,7 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                       'Add Container or Accessory',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -1255,7 +1287,9 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                         hint: 'e.g. Empty 5 Gallon Round Water Container',
                         icon: Icons.inventory_2_outlined,
                         compact: true,
-                        validator: (v) => v?.trim().isEmpty == true ? 'Product name required' : null,
+                        validator: (v) => v?.trim().isEmpty == true
+                            ? 'Product name required'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -1263,9 +1297,21 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _category,
-                              decoration: AppUi.fieldDecorationOf(context, 'Category'),
-                              items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                              onChanged: (v) => setState(() => _category = v ?? 'Accessories'),
+                              decoration: AppUi.fieldDecorationOf(
+                                context,
+                                'Category',
+                              ),
+                              items: _categoryOptions
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(c),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(
+                                () => _category = v ?? 'Accessories',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1292,7 +1338,9 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                               compact: true,
                               validator: (v) {
                                 final p = double.tryParse(v ?? '');
-                                return (p == null || p <= 0) ? 'Price must be > 0' : null;
+                                return (p == null || p <= 0)
+                                    ? 'Price must be > 0'
+                                    : null;
                               },
                             ),
                           ),
@@ -1306,7 +1354,9 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                               compact: true,
                               validator: (v) {
                                 final s = int.tryParse(v ?? '');
-                                return (s == null || s < 0) ? 'Enter valid stock' : null;
+                                return (s == null || s < 0)
+                                    ? 'Enter valid stock'
+                                    : null;
                               },
                             ),
                           ),
@@ -1316,17 +1366,21 @@ class _AddCustomProductDialogState extends State<AddCustomProductDialog> {
                       AppFormField(
                         controller: _descriptionController,
                         label: 'Description',
-                        hint: 'e.g. Empty reusable 5-gallon container for refills',
+                        hint:
+                            'e.g. Empty reusable 5-gallon container for refills',
                         icon: Icons.description_outlined,
                         maxLines: 2,
                         compact: true,
                       ),
                       const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text('Available for customers to order'),
-                        value: _isActive,
-                        activeThumbColor: AppUi.bluePrimary,
-                        onChanged: (v) => setState(() => _isActive = v),
+                      Material(
+                        type: MaterialType.transparency,
+                        child: SwitchListTile(
+                          title: const Text('Available for customers to order'),
+                          value: _isActive,
+                          activeThumbColor: AppUi.bluePrimary,
+                          onChanged: (v) => setState(() => _isActive = v),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       AppFormSubmitButton(
@@ -1363,7 +1417,8 @@ class EditCustomProductDialog extends StatefulWidget {
   const EditCustomProductDialog({super.key, required this.product});
 
   @override
-  State<EditCustomProductDialog> createState() => _EditCustomProductDialogState();
+  State<EditCustomProductDialog> createState() =>
+      _EditCustomProductDialogState();
 }
 
 class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
@@ -1377,22 +1432,36 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
   bool _isActive = true;
   bool _isLoading = false;
 
-  final List<String> _categoryOptions = ['Accessories', 'Products', 'Refill'];
+  final List<String> _categoryOptions = ['Containers', 'Accessories'];
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.product['name']?.toString() ?? '');
-    _descriptionController = TextEditingController(text: widget.product['description']?.toString() ?? '');
-    _priceController = TextEditingController(
-      text: widget.product['price'] != null ? (widget.product['price'] as num).toStringAsFixed(2) : '',
+    _nameController = TextEditingController(
+      text: widget.product['name']?.toString() ?? '',
     );
-    _containerController = TextEditingController(text: widget.product['container_size']?.toString() ?? 'Piece');
+    _descriptionController = TextEditingController(
+      text: widget.product['description']?.toString() ?? '',
+    );
+    _priceController = TextEditingController(
+      text: widget.product['price'] != null
+          ? (widget.product['price'] as num).toStringAsFixed(2)
+          : '',
+    );
+    _containerController = TextEditingController(
+      text: widget.product['container_size']?.toString() ?? 'Piece',
+    );
     _stockController = TextEditingController(
       text: (widget.product['stock_level'] ?? 50).toString(),
     );
     final rawCat = widget.product['category']?.toString() ?? 'Accessories';
-    _category = _categoryOptions.contains(rawCat) ? rawCat : 'Accessories';
+    final normalizedCat = OrderProductHelpers.formatCategory(
+      rawCat,
+      name: widget.product['name']?.toString(),
+    );
+    _category = _categoryOptions.contains(normalizedCat)
+        ? normalizedCat
+        : 'Accessories';
     _isActive = widget.product['is_available'] ?? true;
   }
 
@@ -1421,9 +1490,9 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(FriendlyErrors.message(e))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(FriendlyErrors.message(e))));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -1465,7 +1534,7 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
                       'Edit Product',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -1490,7 +1559,8 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
                         label: 'Product Name',
                         icon: Icons.inventory_2_outlined,
                         compact: true,
-                        validator: (v) => v?.trim().isEmpty == true ? 'Required' : null,
+                        validator: (v) =>
+                            v?.trim().isEmpty == true ? 'Required' : null,
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -1498,9 +1568,21 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _category,
-                              decoration: AppUi.fieldDecorationOf(context, 'Category'),
-                              items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                              onChanged: (v) => setState(() => _category = v ?? 'Accessories'),
+                              decoration: AppUi.fieldDecorationOf(
+                                context,
+                                'Category',
+                              ),
+                              items: _categoryOptions
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(c),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setState(
+                                () => _category = v ?? 'Accessories',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1526,7 +1608,9 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
                               compact: true,
                               validator: (v) {
                                 final p = double.tryParse(v ?? '');
-                                return (p == null || p <= 0) ? 'Enter valid price' : null;
+                                return (p == null || p <= 0)
+                                    ? 'Enter valid price'
+                                    : null;
                               },
                             ),
                           ),
@@ -1551,11 +1635,14 @@ class _EditCustomProductDialogState extends State<EditCustomProductDialog> {
                         compact: true,
                       ),
                       const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text('Available for ordering'),
-                        value: _isActive,
-                        activeThumbColor: AppUi.bluePrimary,
-                        onChanged: (v) => setState(() => _isActive = v),
+                      Material(
+                        type: MaterialType.transparency,
+                        child: SwitchListTile(
+                          title: const Text('Available for ordering'),
+                          value: _isActive,
+                          activeThumbColor: AppUi.bluePrimary,
+                          onChanged: (v) => setState(() => _isActive = v),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       AppFormSubmitButton(

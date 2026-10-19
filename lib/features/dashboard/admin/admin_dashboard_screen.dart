@@ -17,6 +17,8 @@ import 'package:erefill/features/dashboard/admin/views/admin_payment_failures_vi
 import 'package:erefill/features/dashboard/admin/views/admin_create_dialogs.dart';
 import 'package:erefill/features/dashboard/admin/views/admin_releases_view.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/widgets/app_ui_kit.dart';
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -117,7 +119,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               title: 'Station Activity',
               description: 'Station "$name" status: $status.',
               icon: Icons.storefront_rounded,
-              color: const Color(0xFF087E8B),
+              color: AppColors.brandSecondary,
             );
           },
         )
@@ -469,7 +471,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not approve station: $e'),
+            content: Text('Could not approve station: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -554,7 +556,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating station status: $e'),
+            content: Text('Error updating station status: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -591,7 +593,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   labelText: 'Suspension Reason',
                   hintText: 'e.g. Terms violation, fraudulent activity',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   ),
                 ),
                 onChanged: (val) => reason = val,
@@ -660,7 +662,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating user state: $e'),
+            content: Text('Error updating user state: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -749,7 +751,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update role: $e'),
+          content: Text('Failed to update role: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
         ),
       );
@@ -805,7 +807,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to send reset link: $e'),
+          content: Text('Failed to send reset link: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
         ),
       );
@@ -908,7 +910,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to assign rider: $e'),
+          content: Text('Failed to assign rider: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
         ),
       );
@@ -921,7 +923,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       builder: (ctx) => AlertDialog(
         title: const Text('Mark Order as Delivered?'),
         content: Text(
-          'Force update status of Order #${orderId.substring(0, 8)} to DELIVERED?',
+          'Force update status of Order #${orderId.length >= 8 ? orderId.substring(0, 8) : orderId} to DELIVERED?',
         ),
         actions: [
           TextButton(
@@ -965,7 +967,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update status: $e'),
+          content: Text('Failed to update status: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
         ),
       );
@@ -1041,7 +1043,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to reject station: $e'),
+          content: Text('Failed to reject station: ${FriendlyErrors.message(e)}'),
           backgroundColor: AppUi.error,
         ),
       );
@@ -1171,7 +1173,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(20),
@@ -1181,12 +1183,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.download_rounded, color: AppUi.bluePrimary),
+                Icon(Icons.download_rounded, color: AppUi.brandOf(context)),
                 const SizedBox(width: 8),
                 Text(
                   'Export Marketplace Reports (CSV)',
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 16,
                     color: AppUi.textPrimaryOf(context),
                   ),
@@ -1195,9 +1197,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.receipt_long_rounded,
-                color: AppUi.bluePrimary,
+                color: AppUi.brandOf(context),
               ),
               title: const Text(
                 'Export Orders CSV',
@@ -1214,7 +1216,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ListTile(
               leading: const Icon(
                 Icons.storefront_rounded,
-                color: Color(0xFF087E8B),
+                color: AppColors.brandSecondary,
               ),
               title: const Text(
                 'Export Water Stations CSV',
@@ -1328,7 +1330,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not save platform fees: $e'),
+            content: Text('Could not save platform fees: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -1386,7 +1388,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save delivery fee settings: $e'),
+            content: Text('Failed to save delivery fee settings: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -1440,7 +1442,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not update maintenance mode: $e'),
+            content: Text('Could not update maintenance mode: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -1504,7 +1506,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not cancel order: $e'),
+            content: Text('Could not cancel order: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -1540,7 +1542,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       isScrollControlled: true,
       backgroundColor: AppUi.surfaceOf(context),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (ctx) {
         return DraggableScrollableSheet(
@@ -1572,7 +1574,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         'Order #$shortId',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textPrimaryOf(context),
                         ),
                         maxLines: 1,
@@ -1714,7 +1716,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       'Total Amount',
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -1722,8 +1724,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       currencyFormat.format(amt),
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppUi.bluePrimary,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.brandOf(context),
                       ),
                     ),
                   ],
@@ -1737,7 +1739,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             ),
                           ),
                           icon: const Icon(Icons.phone_rounded, size: 16),
@@ -1757,7 +1759,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                         ),
                         icon: const Icon(Icons.two_wheeler_rounded, size: 16),
@@ -1782,7 +1784,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         ),
                       ),
                       icon: const Icon(
@@ -1806,7 +1808,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         ),
                       ),
                       onPressed: () {
@@ -1833,7 +1835,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       isScrollControlled: true,
       backgroundColor: AppUi.surfaceOf(context),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
@@ -1865,12 +1867,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppUi.blueSoft,
-                              borderRadius: BorderRadius.circular(10),
+                              color: AppUi.brandSoftOf(context),
+                              borderRadius: BorderRadius.circular(AppUi.radiusControl),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.notifications_active_rounded,
-                              color: AppUi.bluePrimary,
+                              color: AppUi.brandOf(context),
                               size: 20,
                             ),
                           ),
@@ -1883,7 +1885,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                   'Real-Time Notifications',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     color: AppUi.textPrimaryOf(context),
                                   ),
                                 ),
@@ -2064,12 +2066,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppUi.blueSoft,
-                borderRadius: BorderRadius.circular(10),
+                color: AppUi.brandSoftOf(context),
+                borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.admin_panel_settings_rounded,
-                color: AppUi.bluePrimary,
+                color: AppUi.brandOf(context),
                 size: 20,
               ),
             ),
@@ -2082,7 +2084,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     'eRefill Admin',
                     style: TextStyle(
                       fontSize: 17,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
@@ -2123,7 +2125,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               isLabelVisible: _unreadNotifications > 0,
               label: Text(
                 _unreadNotifications > 99 ? '99+' : '$_unreadNotifications',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
               child: const Icon(Icons.notifications_rounded),
             ),
@@ -2146,7 +2148,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           controller: _tabController,
           isScrollable: true,
           labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-          labelColor: AppUi.bluePrimary,
+          labelColor: AppUi.brandOf(context),
           unselectedLabelColor: AppUi.textMuted,
           indicatorColor: AppUi.bluePrimary,
           indicatorWeight: 3,
@@ -2183,8 +2185,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppUi.bluePrimary),
+            ? Center(
+                child: CircularProgressIndicator(color: AppUi.brandOf(context)),
               )
             : _error != null
             ? Center(
@@ -2349,7 +2351,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           '$pendingCount Water Station${pendingCount > 1 ? "s" : ""} Pending Review',
                           style: const TextStyle(
                             color: AppColors.statusPending,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontSize: 15,
                           ),
                         ),
@@ -2409,7 +2411,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     : '—',
                 subtitle: 'Latest ${_orders.length} shown below',
                 icon: Icons.receipt_long_rounded,
-                color: const Color(0xFF6366F1),
+                color: AppColors.statusOutForDelivery,
               ),
               _buildKpiCard(
                 context,
@@ -2559,7 +2561,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 key: ValueKey(value),
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                 ),
               ),
@@ -2596,12 +2598,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppUi.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.bolt_rounded,
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 18,
                 ),
               ),
@@ -2609,7 +2611,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Text(
                 'Quick Operations Hub',
                 style: TextStyle(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 15,
                   color: AppUi.textPrimaryOf(context),
                 ),
@@ -2632,7 +2634,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               _buildOpAction(
                 icon: Icons.two_wheeler_rounded,
                 label: 'Fleet Map',
-                color: const Color(0xFF087E8B),
+                color: AppColors.brandSecondary,
                 onTap: () {
                   AppHaptics.light();
                   Navigator.push(
@@ -2644,7 +2646,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               _buildOpAction(
                 icon: Icons.gavel_rounded,
                 label: 'Disputes',
-                color: const Color(0xFFF59E0B),
+                color: AppColors.uiWarning,
                 onTap: () {
                   AppHaptics.light();
                   Navigator.push(
@@ -2667,7 +2669,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               _buildOpAction(
                 icon: Icons.add_business_rounded,
                 label: 'Add Station',
-                color: const Color(0xFF10B981),
+                color: AppColors.uiSuccess,
                 onTap: () async {
                   AppHaptics.light();
                   final created = await showCreateStationSheet(context);
@@ -2677,7 +2679,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               _buildOpAction(
                 icon: Icons.person_add_rounded,
                 label: 'Add User',
-                color: const Color(0xFF8B5CF6),
+                color: AppColors.statusPreparing,
                 onTap: () async {
                   AppHaptics.light();
                   final created = await showCreateUserSheet(context);
@@ -2687,7 +2689,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               _buildOpAction(
                 icon: Icons.shield_rounded,
                 label: 'Audit Log',
-                color: const Color(0xFF64748B),
+                color: AppUi.textMuted,
                 onTap: () {
                   AppHaptics.light();
                   Navigator.push(
@@ -2735,13 +2737,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     required VoidCallback onTap,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppUi.radiusCard),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
           border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
@@ -2753,7 +2755,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
@@ -2805,7 +2807,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         ),
                       ),
                       icon: const Icon(Icons.add_business_rounded, size: 18),
@@ -2831,7 +2833,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         vertical: 10,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     icon: const Icon(Icons.download_rounded, size: 18),
@@ -2853,7 +2855,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   isDense: true,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     borderSide: BorderSide(color: AppUi.borderOf(context)),
                   ),
                   filled: true,
@@ -2935,63 +2937,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 child: Text(
                                   s['name'] ?? 'Unnamed Station',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 15,
                                     color: AppUi.textPrimaryOf(context),
                                   ),
                                 ),
                               ),
                               if (isPending)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.uiWarningBg,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'Needs Review',
-                                    style: TextStyle(
-                                      color: AppColors.uiWarning,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                const AppStatusPill(
+                                  label: 'Needs review',
+                                  tone: StatusTone.warning,
                                 )
                               else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSuspended
-                                        ? AppColors.uiErrorBg
-                                        : (isOpen
-                                              ? AppColors.brandSoft
-                                              : AppUi.borderOf(
-                                                  context,
-                                                ).withValues(alpha: 0.3)),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    isSuspended
-                                        ? 'Suspended'
-                                        : (isOpen ? 'Open' : 'Closed'),
-                                    style: TextStyle(
-                                      color: isSuspended
-                                          ? AppColors.statusCancelled
-                                          : (isOpen
-                                                ? AppColors.brandPrimary
-                                                : AppUi.textSecondaryOf(
-                                                    context,
-                                                  )),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                AppStatusPill(
+                                  label: isSuspended
+                                      ? 'Suspended'
+                                      : (isOpen ? 'Open' : 'Closed'),
+                                  tone: isSuspended
+                                      ? StatusTone.danger
+                                      : (isOpen
+                                            ? StatusTone.success
+                                            : StatusTone.neutral),
                                 ),
                             ],
                           ),
@@ -3018,7 +2984,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               if (s['rating'] != null) ...[
                                 const Icon(
                                   Icons.star_rounded,
-                                  color: Color(0xFFF59E0B),
+                                  color: AppColors.uiWarning,
                                   size: 14,
                                 ),
                                 const SizedBox(width: 2),
@@ -3162,7 +3128,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         vertical: 8,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     icon: const Icon(Icons.download_rounded, size: 18),
@@ -3184,7 +3150,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   isDense: true,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     borderSide: BorderSide(color: AppUi.borderOf(context)),
                   ),
                   filled: true,
@@ -3287,7 +3253,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                         child: Text(
                                           'Order #$shortId',
                                           style: TextStyle(
-                                            fontWeight: FontWeight.w800,
+                                            fontWeight: FontWeight.w700,
                                             fontSize: 14,
                                             color: AppUi.textPrimaryOf(context),
                                           ),
@@ -3340,7 +3306,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 Text(
                                   currencyFormat.format(amt),
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 14,
                                     color: AppUi.textPrimaryOf(context),
                                   ),
@@ -3447,7 +3413,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
                         ),
                       ),
                       icon: const Icon(Icons.person_add_rounded, size: 18),
@@ -3473,7 +3439,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         vertical: 10,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     icon: const Icon(Icons.download_rounded, size: 18),
@@ -3495,7 +3461,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   isDense: true,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppUi.radiusControl),
                     borderSide: BorderSide(color: AppUi.borderOf(context)),
                   ),
                   filled: true,
@@ -3565,14 +3531,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         children: [
                           CircleAvatar(
                             radius: 20,
-                            backgroundColor: AppUi.blueSoft,
+                            backgroundColor: AppUi.brandSoftOf(context),
                             child: Text(
                               (u['full_name']?.toString() ?? "U")
                                   .substring(0, 1)
                                   .toUpperCase(),
-                              style: const TextStyle(
-                                color: AppUi.bluePrimary,
-                                fontWeight: FontWeight.w800,
+                              style: TextStyle(
+                                color: AppUi.brandOf(context),
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -3587,7 +3553,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                       child: Text(
                                         u['full_name'] ?? 'Unnamed',
                                         style: TextStyle(
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w700,
                                           fontSize: 14,
                                           color: AppUi.textPrimaryOf(context),
                                         ),
@@ -3602,15 +3568,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppUi.blueSoft,
-                                        borderRadius: BorderRadius.circular(4),
+                                        color: AppUi.brandSoftOf(context),
+                                        borderRadius: BorderRadius.circular(AppUi.radiusXs),
                                       ),
                                       child: Text(
                                         role,
-                                        style: const TextStyle(
-                                          color: AppUi.bluePrimary,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
+                                        style: TextStyle(
+                                          color: AppUi.brandOf(context),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ),
@@ -3631,7 +3597,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     'Suspended: ${u['suspended_reason'] ?? "Admin action"}',
                                     style: const TextStyle(
                                       color: AppUi.error,
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -3650,14 +3616,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                               }
                             },
                             itemBuilder: (ctx) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'role',
                                 child: Row(
                                   children: [
                                     Icon(
                                       Icons.badge_rounded,
                                       size: 18,
-                                      color: AppUi.bluePrimary,
+                                      color: AppUi.brandOf(context),
                                     ),
                                     SizedBox(width: 8),
                                     Text('Change Role'),
@@ -3671,7 +3637,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                     Icon(
                                       Icons.lock_reset_rounded,
                                       size: 18,
-                                      color: Color(0xFFF59E0B),
+                                      color: AppColors.uiWarning,
                                     ),
                                     SizedBox(width: 8),
                                     Text('Reset Password'),
@@ -3728,15 +3694,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.receipt_long_rounded,
-                    color: AppUi.bluePrimary,
+                    color: AppUi.brandOf(context),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'App Service Fee',
                     style: TextStyle(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
                       color: AppUi.textPrimaryOf(context),
                     ),
@@ -3761,9 +3727,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   ),
                   Text(
                     '${_platformFeePercent.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
                     ),
                   ),
                 ],
@@ -3787,9 +3753,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   ),
                   Text(
                     currencyFormat.format(_platformFeeFixed),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
                     ),
                   ),
                 ],
@@ -3807,8 +3773,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 margin: const EdgeInsets.symmetric(vertical: 10),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppUi.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   border: Border.all(
                     color: AppUi.bluePrimary.withValues(alpha: 0.2),
                   ),
@@ -3816,12 +3782,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(
                           Icons.lightbulb_outline_rounded,
                           size: 16,
-                          color: AppUi.bluePrimary,
+                          color: AppUi.brandOf(context),
                         ),
                         SizedBox(width: 6),
                         Text(
@@ -3829,7 +3795,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       ],
@@ -3848,8 +3814,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           'On a sample ₱100 refill + ₱25 delivery order:\n'
                           '• Refill subtotal: ₱100.00\n'
                           '• Delivery fee: ₱25.00\n'
-                          '• Service fee: ₱${sampleFee.toStringAsFixed(2)}\n'
-                          '• Total to Pay: ₱${sampleTotal.toStringAsFixed(2)}',
+                          '• Service fee: ${formatPeso(sampleFee)}\n'
+                          '• Total to Pay: ${formatPeso(sampleTotal)}',
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.4,
@@ -3879,14 +3845,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
         ),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppUi.surfaceOf(context),
+        Material(
+          color: AppUi.surfaceOf(context),
+          shape: RoundedRectangleBorder(
             borderRadius: AppUi.radiusLg,
-            border: Border.all(color: AppUi.borderOf(context)),
+            side: BorderSide(color: AppUi.borderOf(context)),
           ),
-          child: Column(
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -3894,15 +3862,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.local_shipping_outlined,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Centralized Delivery Fee',
                         style: TextStyle(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           fontSize: 16,
                           color: AppUi.textPrimaryOf(context),
                         ),
@@ -3914,14 +3882,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(AppUi.radiusSm),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Admin Only',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppUi.bluePrimary,
+                        color: AppUi.brandOf(context),
                       ),
                     ),
                   ),
@@ -3936,24 +3904,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
               ),
               const SizedBox(height: 14),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Enable Distance-Based Delivery Fee',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-                ),
-                subtitle: Text(
-                  _deliveryFeeEnabled
-                      ? 'Active. Orders calculate delivery fee per kilometer.'
-                      : 'Disabled. Free delivery applied system-wide (₱0.00).',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: AppUi.textSecondaryOf(context),
+              Material(
+                color: Colors.transparent,
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Enable Distance-Based Delivery Fee',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
+                  subtitle: Text(
+                    _deliveryFeeEnabled
+                        ? 'Active. Orders calculate delivery fee per kilometer.'
+                        : 'Disabled. Free delivery applied system-wide (₱0.00).',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                  ),
+                  value: _deliveryFeeEnabled,
+                  activeThumbColor: AppUi.bluePrimary,
+                  onChanged: (val) => setState(() => _deliveryFeeEnabled = val),
                 ),
-                value: _deliveryFeeEnabled,
-                activeThumbColor: AppUi.bluePrimary,
-                onChanged: (val) => setState(() => _deliveryFeeEnabled = val),
               ),
               const Divider(height: 20),
               Row(
@@ -3962,14 +3934,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   const Text(
                     'Rate per Kilometer:',
                     style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   Text(
                     '₱${_deliveryRatePerKm.toStringAsFixed(1)}/km',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
-                      fontSize: 14.5,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
+                      fontSize: 15,
                     ),
                   ),
                 ],
@@ -3997,7 +3969,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       fontSize: 11,
                       fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
                       color: isSel
-                          ? AppUi.bluePrimary
+                          ? AppUi.brandOf(context)
                           : AppUi.textPrimaryOf(context),
                     ),
                   );
@@ -4010,16 +3982,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   const Text(
                     'Minimum Delivery Fee:',
                     style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   Text(
                     _deliveryMinFee > 0
-                        ? '₱${_deliveryMinFee.toStringAsFixed(0)}'
+                        ? formatPeso(_deliveryMinFee, whole: true)
                         : '₱0 (None)',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
-                      fontSize: 14.5,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
+                      fontSize: 15,
                     ),
                   ),
                 ],
@@ -4030,7 +4002,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 max: 50.0,
                 divisions: 50,
                 activeColor: AppUi.bluePrimary,
-                label: '₱${_deliveryMinFee.toStringAsFixed(0)}',
+                label: formatPeso(_deliveryMinFee, whole: true),
                 onChanged: (v) => setState(() => _deliveryMinFee = v),
               ),
               const SizedBox(height: 12),
@@ -4040,14 +4012,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   const Text(
                     'Minimum Billable Distance:',
                     style:
-                        TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                        TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   Text(
                     '${_deliveryMinDistance.toStringAsFixed(1)} km',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppUi.bluePrimary,
-                      fontSize: 14.5,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
+                      fontSize: 15,
                     ),
                   ),
                 ],
@@ -4064,7 +4036,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               const SizedBox(height: 12),
               const Text(
                 'Distance Rounding Rule:',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -4095,8 +4067,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppUi.blueSoft,
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppUi.brandSoftOf(context),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                   border: Border.all(
                     color: AppUi.bluePrimary.withValues(alpha: 0.2),
                   ),
@@ -4109,18 +4081,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       children: [
                         Text(
                           'Test Distance: ${_simulatedDeliveryDistance.toStringAsFixed(1)} km',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                         Text(
-                          'Fee: ₱${_calculateSimulatedFee(_simulatedDeliveryDistance).toStringAsFixed(2)}',
-                          style: const TextStyle(
+                          'Fee: ${formatPeso(_calculateSimulatedFee(_simulatedDeliveryDistance))}',
+                          style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppUi.bluePrimary,
+                            fontWeight: FontWeight.w700,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       ],
@@ -4136,13 +4108,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     ),
                     Text(
                       'Sample calculations at ₱${_deliveryRatePerKm.toStringAsFixed(1)}/km:\n'
-                      '• 1.0 km → ₱${_calculateSimulatedFee(1.0).toStringAsFixed(2)}\n'
-                      '• 2.0 km → ₱${_calculateSimulatedFee(2.0).toStringAsFixed(2)}\n'
-                      '• 3.5 km → ₱${_calculateSimulatedFee(3.5).toStringAsFixed(2)}\n'
-                      '• 5.0 km → ₱${_calculateSimulatedFee(5.0).toStringAsFixed(2)}\n'
-                      '• 10.0 km → ₱${_calculateSimulatedFee(10.0).toStringAsFixed(2)}',
+                      '• 1.0 km → ${formatPeso(_calculateSimulatedFee(1.0))}\n'
+                      '• 2.0 km → ${formatPeso(_calculateSimulatedFee(2.0))}\n'
+                      '• 3.5 km → ${formatPeso(_calculateSimulatedFee(3.5))}\n'
+                      '• 5.0 km → ${formatPeso(_calculateSimulatedFee(5.0))}\n'
+                      '• 10.0 km → ${formatPeso(_calculateSimulatedFee(10.0))}',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 12,
                         height: 1.4,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -4185,6 +4157,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ],
           ),
         ),
+      ),
         const SizedBox(height: 16),
         Material(
           color: AppUi.surfaceOf(context),
@@ -4199,15 +4172,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.build_circle_rounded,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'System Guard & Maintenance',
                       style: TextStyle(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 16,
                         color: AppUi.textPrimaryOf(context),
                       ),
@@ -4246,7 +4219,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       children: [
         _buildOpToolTile(
           icon: Icons.system_update_alt_rounded,
-          iconColor: const Color(0xFF6366F1),
+          iconColor: AppColors.statusOutForDelivery,
           title: 'App Releases & Version Enforcement',
           subtitle:
               'Manage production releases, enforce mandatory updates, configure checksums, and audit releases.',
@@ -4262,7 +4235,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         const SizedBox(height: 12),
         _buildOpToolTile(
           icon: Icons.two_wheeler_rounded,
-          iconColor: const Color(0xFF087E8B),
+          iconColor: AppColors.brandSecondary,
           title: 'Live Fleet Dispatch Map',
           subtitle:
               'Real-time rider GPS tracking, active deliveries, and direct dispatch.',
@@ -4278,7 +4251,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         const SizedBox(height: 12),
         _buildOpToolTile(
           icon: Icons.gavel_rounded,
-          iconColor: const Color(0xFFF59E0B),
+          iconColor: AppColors.uiWarning,
           title: 'Customer Disputes & Moderation',
           subtitle:
               'Resolve order disputes, review customer feedback, and moderate ratings.',
@@ -4307,7 +4280,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         const SizedBox(height: 12),
         _buildOpToolTile(
           icon: Icons.shield_rounded,
-          iconColor: const Color(0xFF64748B),
+          iconColor: AppUi.textMuted,
           title: 'System Audit Trail',
           subtitle:
               'Immutable record of administrative actions, compliance updates, and security events.',
@@ -4341,7 +4314,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         const SizedBox(height: 12),
         _buildOpToolTile(
           icon: Icons.file_download_rounded,
-          iconColor: const Color(0xFF10B981),
+          iconColor: AppColors.uiSuccess,
           title: 'Export Marketplace Data (CSV)',
           subtitle:
               'Generate and copy full CSV data sheets for orders, users, and water stations.',
@@ -4379,7 +4352,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 border: Border.all(color: iconColor.withValues(alpha: 0.2)),
               ),
               child: Icon(icon, color: iconColor, size: 24),
@@ -4396,7 +4369,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           title,
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textPrimaryOf(context),
                           ),
                           maxLines: 1,
@@ -4411,13 +4384,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                         ),
                         decoration: BoxDecoration(
                           color: iconColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(AppUi.radiusSm),
                         ),
                         child: Text(
                           badge,
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             color: iconColor,
                           ),
                         ),
@@ -4455,14 +4428,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      selectedColor: AppUi.blueSoft,
+      selectedColor: AppUi.brandSoftOf(context),
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: selected ? AppUi.bluePrimary : AppUi.textSecondaryOf(context),
+        color: selected ? AppUi.brandOf(context) : AppUi.textSecondaryOf(context),
       ),
       side: BorderSide(
-        color: selected ? AppUi.bluePrimary : AppUi.borderOf(context),
+        color: selected ? AppUi.brandOf(context) : AppUi.borderOf(context),
       ),
       onSelected: (_) => onSelected(value),
     );

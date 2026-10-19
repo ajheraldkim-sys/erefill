@@ -56,6 +56,23 @@ class DmRider {
     'commission_per_gallon': commissionPerGallon,
   };
 
+  /// Serializes model for Supabase cloud upsert, sanitizing linked_user_id
+  Map<String, dynamic> toCloudJson() {
+    final cleanUserId =
+        (linkedUserId != null && linkedUserId!.trim().isNotEmpty)
+            ? linkedUserId!.trim()
+            : null;
+    return {
+      'id': id,
+      'owner_id': ownerId,
+      'linked_user_id': cleanUserId,
+      'full_name': fullName,
+      'phone': phone,
+      'email': email,
+      'commission_per_gallon': commissionPerGallon,
+    };
+  }
+
   DmRider copyWith({
     String? id,
     String? ownerId,

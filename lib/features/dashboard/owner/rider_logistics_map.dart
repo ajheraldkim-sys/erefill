@@ -7,6 +7,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:erefill/core/services/road_routing_service.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class RiderLogisticsMap extends StatefulWidget {
   final String ownerId;
   const RiderLogisticsMap({super.key, required this.ownerId});
@@ -125,7 +126,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
               Polyline(
                 points: _routePoints,
                 strokeWidth: 4.0,
-                color: const Color(0xFF6366F1),
+                color: AppColors.statusOutForDelivery,
               ),
             ],
           ),
@@ -183,7 +184,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6366F1),
+                          color: AppColors.statusOutForDelivery,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2.5),
                           boxShadow: [
@@ -222,13 +223,6 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
             color: AppUi.surfaceOf(context),
             borderRadius: AppUi.cardRadius,
             border: Border.all(color: AppUi.borderOf(context)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -237,7 +231,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF10B981),
+                  color: AppColors.uiSuccess,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -246,7 +240,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                 '$riderCount RIDERS ONLINE',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                   letterSpacing: 0.8,
                 ),
@@ -291,13 +285,6 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                   color: AppUi.surfaceOf(context),
                   borderRadius: AppUi.pillRadius,
                   border: Border.all(color: AppUi.borderOf(context)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Row(
                   children: [
@@ -313,9 +300,9 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                       child: Center(
                         child: Text(
                           name.isNotEmpty ? name[0].toUpperCase() : 'R',
-                          style: const TextStyle(
-                            color: AppUi.bluePrimary,
-                            fontWeight: FontWeight.w900,
+                          style: TextStyle(
+                            color: AppUi.brandOf(context),
+                            fontWeight: FontWeight.w700,
                             fontSize: 18,
                           ),
                         ),
@@ -330,7 +317,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                           Text(
                             name,
                             style: TextStyle(
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               fontSize: 14,
                               color: AppUi.textPrimaryOf(context),
                             ),
@@ -344,7 +331,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                                 Icons.circle,
                                 size: 8,
                                 color: (rider['is_online'] == true)
-                                    ? const Color(0xFF10B981)
+                                    ? AppColors.uiSuccess
                                     : AppUi.textDisabled,
                               ),
                               const SizedBox(width: 4),
@@ -354,10 +341,10 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                                     : 'Standby / Offline',
                                 style: TextStyle(
                                   color: (rider['is_online'] == true)
-                                      ? const Color(0xFF10B981)
+                                      ? AppColors.uiSuccess
                                       : AppUi.textSecondaryOf(context),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
                                 ),
                               ),

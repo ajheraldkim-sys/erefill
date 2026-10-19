@@ -1,3 +1,4 @@
+import 'package:erefill/core/utils/money.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -37,7 +38,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     ('card', 'Credit / debit card'),
   ];
   List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
-  double _systemDeliveryRate = 10.0;
+  double? _systemDeliveryRate;
 
   @override
   void initState() {
@@ -313,8 +314,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppUi.blueSoft,
-                                borderRadius: BorderRadius.circular(12),
+                                color: AppUi.brandSoftOf(context),
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
                                 border: Border.all(
                                   color: AppUi.bluePrimary.withValues(alpha: 0.25),
                                 ),
@@ -322,9 +323,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.verified_outlined,
-                                    color: AppUi.bluePrimary,
+                                    color: AppUi.brandOf(context),
                                     size: 20,
                                   ),
                                   const SizedBox(width: 10),
@@ -351,13 +352,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                               decoration: BoxDecoration(
                                                 color: AppUi.bluePrimary,
                                                 borderRadius:
-                                                    BorderRadius.circular(6),
+                                                    BorderRadius.circular(AppUi.radiusSm),
                                               ),
                                               child: const Text(
                                                 'Centralized',
                                                 style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 10,
+                                                  fontSize: 11,
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
@@ -366,7 +367,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Active delivery rate is ₱${_systemDeliveryRate.toStringAsFixed(2)}/km configured centrally by the Administrator. Station owners cannot modify delivery rates.',
+                                          _systemDeliveryRate == null ? 'Delivery rates are set centrally by the eRefill admin.' : 'Delivery rate: ${formatPeso(_systemDeliveryRate)}/km, set centrally by the eRefill admin. Station owners cannot change it.',
                                           style: const TextStyle(
                                             fontSize: 12,
                                             height: 1.35,

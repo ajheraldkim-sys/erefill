@@ -7,6 +7,7 @@ import 'package:erefill/core/widgets/app_header.dart';
 import 'package:erefill/widgets/app_widgets.dart';
 import 'rider_management_screen.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class RiderPerformanceScreen extends StatefulWidget {
   final String riderId;
   final String riderName;
@@ -178,7 +179,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined, size: 20),
-            color: AppUi.bluePrimary,
+            color: AppUi.brandOf(context),
             tooltip: 'Edit Rider Information',
             onPressed: () async {
               HapticFeedback.lightImpact();
@@ -240,8 +241,8 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                           : Icons.block_outlined,
                       size: 18,
                       color: isSuspended
-                          ? const Color(0xFF10B981)
-                          : Colors.orange,
+                          ? AppColors.uiSuccess
+                          : AppColors.uiWarning,
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -257,13 +258,13 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                     Icon(
                       Icons.person_remove_outlined,
                       size: 18,
-                      color: Color(0xFFEF4444),
+                      color: AppColors.uiError,
                     ),
                     SizedBox(width: 10),
                     Text(
                       'Unlink from Station',
                       style: TextStyle(
-                        color: Color(0xFFEF4444),
+                        color: AppColors.uiError,
                       ),
                     ),
                   ],
@@ -304,9 +305,9 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                 color: AppUi.bluePrimary.withValues(alpha: 0.1),
                                 borderRadius: AppUi.cardRadius,
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.two_wheeler_rounded,
-                                color: AppUi.bluePrimary,
+                                color: AppUi.brandOf(context),
                                 size: 28,
                               ),
                             ),
@@ -318,7 +319,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                   Text(
                                     displayName,
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w700,
                                       fontSize: 18,
                                       color: AppUi.textPrimaryOf(context),
                                     ),
@@ -342,19 +343,19 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: (isSuspended
-                                        ? const Color(0xFFEF4444)
-                                        : const Color(0xFF10B981))
+                                        ? AppColors.uiError
+                                        : AppColors.uiSuccess)
                                     .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
                               ),
                               child: Text(
                                 isSuspended ? 'SUSPENDED' : (isOnline ? 'ONLINE' : 'ACTIVE'),
                                 style: TextStyle(
                                   color: isSuspended
-                                      ? const Color(0xFFEF4444)
-                                      : const Color(0xFF10B981),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
+                                      ? AppColors.uiError
+                                      : AppColors.uiSuccess,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -393,8 +394,8 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                           'Rider performance score',
                           style: TextStyle(
                             color: AppUi.textSecondaryOf(context),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: 0,
                           ),
                         ),
@@ -404,7 +405,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                           children: [
                             const Icon(
                               Icons.star_rounded,
-                              color: Color(0xFFF59E0B),
+                              color: AppColors.uiWarning,
                               size: 38,
                             ),
                             const SizedBox(width: 8),
@@ -413,7 +414,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                               style: TextStyle(
                                 color: AppUi.textPrimaryOf(context),
                                 fontSize: 44,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: 0,
                               ),
                             ),
@@ -437,7 +438,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                             color: const Color(
                               0xFF10B981,
                             ).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppUi.radiusCard),
                           ),
                           child: Text(
                             totalDeliveries == 0
@@ -445,9 +446,9 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                 : '${(onTimeRate * 100).toInt()}% '
                                       'ON-TIME DELIVERY',
                             style: const TextStyle(
-                              color: Color(0xFF10B981),
+                              color: AppColors.uiSuccess,
                               fontSize: 11,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -477,7 +478,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                           'Monthly',
                           '${_performance['monthlyDeliveries'] ?? 0}',
                           Icons.calendar_today_rounded,
-                          const Color(0xFF6366F1),
+                          AppColors.statusOutForDelivery,
                         ),
                       ),
                     ],
@@ -494,7 +495,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                 0,
                           ),
                           Icons.wallet_rounded,
-                          const Color(0xFF10B981),
+                          AppColors.uiSuccess,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -507,7 +508,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                 0,
                           ),
                           Icons.local_shipping_rounded,
-                          const Color(0xFFF59E0B),
+                          AppColors.uiWarning,
                         ),
                       ),
                     ],
@@ -536,7 +537,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
       title,
       style: TextStyle(
         fontSize: 12,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         color: AppUi.textPrimaryOf(context),
         letterSpacing: 0,
       ),
@@ -578,12 +579,12 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.uiSuccess.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppUi.radiusCard),
             ),
             child: const Icon(
               Icons.check_circle_rounded,
-              color: Color(0xFF10B981),
+              color: AppColors.uiSuccess,
               size: 24,
             ),
           ),
@@ -595,7 +596,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                 Text(
                   customerName,
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 15,
                     color: AppUi.textPrimaryOf(context),
                   ),
@@ -614,7 +615,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
           Text(
             _formatCurrency(amount),
             style: TextStyle(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               fontSize: 16,
               color: AppUi.textPrimaryOf(context),
             ),
@@ -644,7 +645,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   color: AppUi.textSecondaryOf(context),
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0,
                 ),
               ),
@@ -655,7 +656,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
             value,
             style: TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppUi.textPrimaryOf(context),
               letterSpacing: 0,
             ),
@@ -678,7 +679,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
   Widget _detailRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: AppUi.bluePrimary),
+        Icon(icon, size: 16, color: AppUi.brandOf(context)),
         const SizedBox(width: 8),
         Text(
           '$label: ',
@@ -694,7 +695,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
             style: TextStyle(
               fontSize: 13,
               color: AppUi.textPrimaryOf(context),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
             overflow: TextOverflow.ellipsis,
           ),

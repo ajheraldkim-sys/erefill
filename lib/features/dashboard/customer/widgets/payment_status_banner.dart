@@ -3,6 +3,7 @@ import 'package:erefill/core/constants.dart';
 
 import '../checkout_rules.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class PaymentStatusBanner extends StatelessWidget {
   final Map<String, dynamic> order;
   final VoidCallback? onRetry;
@@ -45,10 +46,10 @@ class PaymentStatusBanner extends StatelessWidget {
     }.contains(paymentStatus.toLowerCase());
 
     final color = isPaid
-        ? const Color(0xFF10B981)
+        ? AppColors.uiSuccess
         : isFailed
-        ? Colors.redAccent
-        : const Color(0xFFF59E0B);
+        ? AppColors.uiError
+        : AppColors.uiWarning;
     final title = isPaid
         ? 'Payment confirmed'
         : isFailed
@@ -86,7 +87,7 @@ class PaymentStatusBanner extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: color,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
                 ),
@@ -96,9 +97,9 @@ class PaymentStatusBanner extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF475569),
+                    color: AppUi.textSecondary,
                     fontWeight: FontWeight.w600,
-                    fontSize: 10,
+                    fontSize: 11,
                   ),
                 ),
               ],

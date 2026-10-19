@@ -20,6 +20,7 @@ import '../../../core/services/payment_launch_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/services/offline_order_sync_service.dart';
 
+import 'package:erefill/core/utils/money.dart';
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? order;
   final String? orderId;
@@ -421,7 +422,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.uiSuccess,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -627,7 +628,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: AppColors.uiError,
         ),
       );
     } finally {
@@ -669,7 +670,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             SizedBox(width: 8),
             Text(
               'Cancel Order?',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
             ),
           ],
         ),
@@ -724,7 +725,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not cancel order: $e'),
+            content: Text('Could not cancel order: ${FriendlyErrors.message(e)}'),
             backgroundColor: AppUi.error,
           ),
         );
@@ -773,24 +774,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       backgroundColor: AppUi.pageBgOf(context),
       appBar: ERefillHeader(
         type: ERefillHeaderType.orderDetail,
-        title: 'Order #${order['id'].toString().substring(0, 8).toUpperCase()}',
+        title:
+            'Order #${((order['id']?.toString() ?? '').length >= 8 ? (order['id']!.toString().substring(0, 8)) : (order['id']?.toString() ?? '')).toUpperCase()}',
         subtitle: 'Track your water refill delivery',
         statusBadge: OrderStatusBadge(status: status),
         actions: [
           IconButton(
             onPressed: () => _contactStation(),
-            icon: const Icon(
+            icon: Icon(
               Icons.chat_bubble_outline_rounded,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               size: 22,
             ),
             tooltip: 'Chat with station',
           ),
           IconButton(
             onPressed: () => _showOrderDetails(order),
-            icon: const Icon(
+            icon: Icon(
               Icons.receipt_long_rounded,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               size: 22,
             ),
             tooltip: 'Order details',
@@ -813,7 +815,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 ),
                 decoration: BoxDecoration(
                   color: AppUi.warningBg,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                   border: Border.all(
                     color: AppUi.warningFg.withValues(alpha: 0.25),
                   ),
@@ -845,98 +847,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
               ),
               const SizedBox(height: 10),
             ],
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppUi.surfaceRaisedOf(context)
-                    : AppUi.surfaceOf(context),
-                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                border: Border.all(color: AppUi.borderOf(context)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark
-                          ? AppUi.bluePrimary.withValues(alpha: 0.18)
-                          : AppUi.blueSoft,
-                    ),
-                    child: Center(
-                      child: ClipOval(
-                        child: status == 'delivered'
-                            ? const RefillLottie.success(width: 44, height: 44)
-                            : (status == 'delivering' ||
-                                  status == 'assigned_to_rider' ||
-                                  status == 'out_for_delivery')
-                            ? const RefillLottie.rider(width: 48, height: 48)
-                            : (status == 'preparing' ||
-                                  status == 'ready_for_pickup')
-                            ? const RefillLottie.waterDrop(
-                                width: 40,
-                                height: 40,
-                              )
-                            : const Icon(
-                                Icons.local_shipping_rounded,
-                                color: AppUi.bluePrimary,
-                                size: 24,
-                              ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          OrderStatusPresentation.fromStatus(status).label,
-                          style: TextStyle(
-                            color: AppUi.textPrimaryOf(context),
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          stationName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppUi.textSecondaryOf(context),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '₱${totalAmount.toStringAsFixed(0)} · ${_formatDate(createdAt)}',
-                          style: TextStyle(
-                            color: AppUi.textSecondaryOf(context),
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // 1. Simple Stepper at the top with large ETA
+            _buildTrackingHeaderWithEta(status, order),
+            const SizedBox(height: 10),
+
+            // 2. Map underneath stepper
+            if (status != 'delivered' && status != 'cancelled') ...[
+              _buildMapPreview(status, order),
+              const SizedBox(height: 10),
+            ],
+
+            // 3. One-tap rider contact buttons (Call, Chat, Track)
+            if (status == 'assigned_to_rider' ||
+                status == 'rider_assigned' ||
+                status == 'out_for_delivery' ||
+                status == 'delivering') ...[
+              _buildRiderContact(order),
+              const SizedBox(height: 10),
+            ],
+
+            // 4. Delivery completed summary card
+            if (status == 'delivered') ...[
+              _buildDeliveryCompleteCompact(),
+              const SizedBox(height: 10),
+            ],
+
+            // 5. Offline sync & payment notices
             if (order['is_offline_queued'] == true ||
                 status == 'pending_sync') ...[
-              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -980,9 +918,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
             ],
             if (status == 'cancelled') ...[
-              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -1016,28 +954,95 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: 10),
             ],
             if (_isOnlinePayment(order)) ...[
-              const SizedBox(height: 8),
               PaymentStatusBanner(
                 order: order,
                 isLoading: _isRetryingPayment,
                 onRetry: _isRetryingPayment ? null : () => _retryPayment(order),
               ),
+              const SizedBox(height: 10),
             ],
+
+            // 6. Station & Delivery info
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppUi.surfaceRaisedOf(context)
+                    : AppUi.surfaceOf(context),
+                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                border: Border.all(color: AppUi.borderOf(context)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark
+                          ? AppUi.bluePrimary.withValues(alpha: 0.18)
+                          : AppUi.brandSoftOf(context),
+                    ),
+                    child: Center(
+                      child: ClipOval(
+                        child: status == 'delivered'
+                            ? const RefillLottie.success(width: 44, height: 44)
+                            : (status == 'delivering' ||
+                                  status == 'assigned_to_rider' ||
+                                  status == 'out_for_delivery')
+                            ? const RefillLottie.rider(width: 48, height: 48)
+                            : (status == 'preparing' ||
+                                  status == 'ready_for_pickup')
+                            ? const RefillLottie.waterDrop(
+                                width: 40,
+                                height: 40,
+                              )
+                            : Icon(
+                                Icons.storefront_rounded,
+                                color: AppUi.brandOf(context),
+                                size: 24,
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          stationName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppUi.textPrimaryOf(context),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${formatPeso(totalAmount, whole: true)} · ${_formatDate(createdAt)}',
+                          style: TextStyle(
+                            color: AppUi.textSecondaryOf(context),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 10),
             _buildDeliveryInfo(order),
-            const SizedBox(height: 10),
-            if (status == 'pending_sync')
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Order progress starts after the station receives your order.',
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              RefillOrderStatusTimeline(status: status),
+
+            // 7. Cancellation action for pending orders
             if (status == 'pending') ...[
               const SizedBox(height: 10),
               SizedBox(
@@ -1053,7 +1058,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     'Cancel Order',
                     style: TextStyle(
                       color: AppColors.statusCancelled,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
@@ -1070,17 +1075,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 ),
               ),
             ],
-            if (status == 'assigned_to_rider' ||
-                status == 'rider_assigned' ||
-                status == 'out_for_delivery' ||
-                status == 'delivering') ...[
-              const SizedBox(height: 10),
-              _buildRiderContact(order),
-            ],
-            if (status == 'delivered') ...[
-              const SizedBox(height: 10),
-              _buildDeliveryCompleteCompact(),
-            ],
+
           ],
         ),
       ),
@@ -1104,9 +1099,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
               color: AppUi.blueSoft,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.location_pin,
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               size: 18,
             ),
           ),
@@ -1119,7 +1114,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   'DELIVERY TO',
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textSecondaryOf(context),
                     letterSpacing: 0.8,
                   ),
@@ -1131,7 +1126,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
                 ),
@@ -1153,54 +1148,390 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     );
   }
 
-  Widget _buildRiderContact(Map<String, dynamic> order) {
-    final riderId = order['assigned_rider_id'] as String?;
-    if (riderId == null) return const SizedBox.shrink();
+  String _relativeTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} h ago';
+    return _formatDate(time);
+  }
 
-    final riderName = _riderProfile?['full_name'] ?? 'Your Rider';
+  Widget _buildTrackingHeaderWithEta(
+    String status,
+    Map<String, dynamic> order,
+  ) {
+    // Headline + next step come from the real backend status only. No
+    // invented ETAs: the backend does not compute delivery estimates.
+    final String etaText;
+    final String etaSubtitle;
+    switch (OrderStatusColors.normalize(status)) {
+      case 'pending_sync':
+        etaText = 'Saved offline';
+        etaSubtitle = 'Sends automatically when you are back online';
+        break;
+      case 'pending':
+        etaText = 'Waiting for the station';
+        etaSubtitle = 'The station will accept or decline your order';
+        break;
+      case 'accepted':
+        etaText = 'Order accepted';
+        etaSubtitle = 'The station will start preparing your water';
+        break;
+      case 'preparing':
+        etaText = 'Preparing your order';
+        etaSubtitle = 'Containers are being sanitized and filled';
+        break;
+      case 'ready_for_pickup':
+        etaText = 'Ready at the station';
+        etaSubtitle = 'Waiting for a rider to pick up your order';
+        break;
+      case 'out_for_delivery':
+        final assigned = status == 'assigned_to_rider' ||
+            status == 'rider_assigned';
+        etaText = assigned ? 'Rider assigned' : 'On the way';
+        etaSubtitle = assigned
+            ? 'The rider is collecting your order from the station'
+            : 'Your rider is heading to your address';
+        break;
+      case 'delivered':
+        etaText = 'Delivered';
+        etaSubtitle = 'Thanks for ordering with eRefill';
+        break;
+      case 'cancelled':
+        etaText = 'Order cancelled';
+        etaSubtitle = 'This order will not be delivered';
+        break;
+      case 'rejected':
+        etaText = 'Order declined';
+        etaSubtitle = 'The station could not take this order';
+        break;
+      default:
+        etaText = OrderStatusColors.getLabel(status);
+        etaSubtitle = 'We will update this screen as your order moves';
+    }
+    final etaIcon = OrderStatusColors.getIcon(status);
+    final etaColor = OrderStatusColors.getColor(status);
+    final updatedAt = SafeParse.dateTime(order['updated_at']);
+    final updatedLabel = updatedAt == null
+        ? null
+        : _relativeTime(updatedAt.toLocal());
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: AppUi.cardRadius,
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.borderOf(context)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.2
+                  : 0.04,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: OrderStatusColors.outForDelivery,
-                  borderRadius: AppUi.controlRadius,
+                  color: etaColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
-                child: const Icon(
-                  Icons.delivery_dining_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                child: Icon(etaIcon, color: etaColor, size: 24),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Rider is on the way',
+                      etaText,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
+                        color: AppUi.textPrimaryOf(context),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      etaSubtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                         color: AppUi.textSecondaryOf(context),
                       ),
                     ),
+                    if (updatedLabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Updated $updatedLabel',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (status == 'pending_sync')
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Order progress starts after the station receives your order.',
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            RefillOrderStatusTimeline(status: status),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapPreview(String status, Map<String, dynamic> order) {
+    final orderId = order['id']?.toString() ?? '';
+    final riderId = order['assigned_rider_id']?.toString();
+    final isOutForDelivery =
+        status == 'out_for_delivery' || status == 'delivering';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+        border: Border.all(
+          color: isOutForDelivery
+              ? OrderStatusColors.outForDelivery
+              : AppUi.borderOf(context),
+          width: isOutForDelivery ? 1.5 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () =>
+              context.openOrderTrackingMap(orderId: orderId, riderId: riderId),
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isOutForDelivery) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: AppUi.warningBg,
+                      borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                      border: Border.all(color: AppColors.uiWarning),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.notifications_active_rounded,
+                          color: AppUi.warningFg,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Rider is nearby! Please prepare your empty gallons and cash.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppUi.warningFg,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppUi.brandSoftOf(context),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      ),
+                      child: Icon(
+                        Icons.map_rounded,
+                        color: AppUi.brandOf(context),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Live Delivery Map',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: AppUi.textPrimaryOf(context),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isOutForDelivery
+                                ? 'Tap to view live rider GPS tracking'
+                                : 'View station route and delivery destination',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppUi.textSecondaryOf(context),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppUi.bluePrimary,
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Open Map',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRiderContact(Map<String, dynamic> order) {
+    final riderId = order['assigned_rider_id'] as String?;
+    if (riderId == null) return const SizedBox.shrink();
+
+    final riderName = _riderProfile?['full_name'] ?? 'Your Rider';
+    final riderPhone = _riderProfile?['phone']?.toString().trim() ?? '';
+    final status = (order['status'] ?? '').toString();
+    final isOutForDelivery =
+        status == 'out_for_delivery' || status == 'delivering';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: AppUi.cardRadius,
+        border: Border.all(
+          color: isOutForDelivery
+              ? OrderStatusColors.outForDelivery
+              : AppUi.borderOf(context),
+          width: isOutForDelivery ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: OrderStatusColors.outForDelivery.withValues(
+                    alpha: 0.12,
+                  ),
+                  borderRadius: AppUi.controlRadius,
+                ),
+                child: const Icon(
+                  Icons.delivery_dining_rounded,
+                  color: OrderStatusColors.outForDelivery,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isOutForDelivery
+                              ? 'Rider is on the way'
+                              : 'Assigned Rider',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: OrderStatusColors.outForDelivery,
+                          ),
+                        ),
+                        if (isOutForDelivery) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppUi.warningBg,
+                              borderRadius: BorderRadius.circular(AppUi.radiusFull),
+                            ),
+                            child: const Text(
+                              'Nearby',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppUi.warningFg,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
                     Text(
                       riderName,
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
                       ),
                     ),
@@ -1209,41 +1540,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Row(
             children: [
+              if (riderPhone.isNotEmpty) ...[
+                Expanded(
+                  child: SizedBox(
+                    height: AppUi.kMinTouchTarget,
+                    child: OutlinedButton.icon(
+                      onPressed: () => launchUrl(Uri.parse('tel:$riderPhone')),
+                      icon: const Icon(Icons.phone_rounded, size: 18),
+                      label: const Text('Call'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.uiSuccess,
+                        side: const BorderSide(color: AppColors.uiSuccess),
+                        backgroundColor: AppUi.successBg,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppUi.controlRadius,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: SizedBox(
-                  height: 40,
-                  child: ElevatedButton.icon(
+                  height: AppUi.kMinTouchTarget,
+                  child: FilledButton.icon(
                     onPressed: () => _contactRider(riderId, riderName),
                     icon: const Icon(Icons.chat_bubble_rounded, size: 18),
                     label: const Text('Chat'),
-                    style: ElevatedButton.styleFrom(
+                    style: FilledButton.styleFrom(
                       backgroundColor: AppUi.bluePrimary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: AppUi.controlRadius,
                       ),
-                      elevation: 0,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: SizedBox(
-                  height: 40,
+                  height: AppUi.kMinTouchTarget,
                   child: OutlinedButton.icon(
                     onPressed: () => _trackRider(riderId),
                     icon: const Icon(Icons.map_rounded, size: 18),
-                    label: const Text('Live Track'),
+                    label: const Text('Track'),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: AppUi.borderOf(context)),
+                      foregroundColor: AppUi.textPrimaryOf(context),
                       shape: RoundedRectangleBorder(
                         borderRadius: AppUi.controlRadius,
                       ),
-                      foregroundColor: const Color(0xFF475569),
                     ),
                   ),
                 ),
@@ -1254,6 +1605,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       ),
     );
   }
+
 
   Widget _buildDeliveryCompleteCompact() {
     final deliveryNote =
@@ -1290,7 +1642,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   style: TextStyle(
                     color: AppColors.statusCompleted,
                     fontSize: 14,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -1406,7 +1758,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     'Order Receipt',
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
@@ -1442,20 +1794,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 'Order ID',
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: AppUi.textSecondaryOf(context),
                                   letterSpacing: 1.2,
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                '#${order['id']?.toString().substring(0, 12).toUpperCase()}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 13,
-                                  color: AppUi.textPrimaryOf(context),
-                                ),
+                              Builder(
+                                builder: (context) {
+                                  final id = order['id']?.toString() ?? '';
+                                  final shortId = id.length >= 12 ? id.substring(0, 12) : id;
+                                  return Text(
+                                    '#${shortId.toUpperCase()}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: AppUi.textPrimaryOf(context),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -1465,8 +1823,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 'Delivery date',
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: AppUi.textSecondaryOf(context),
                                   letterSpacing: 1.2,
                                 ),
@@ -1482,7 +1840,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                       : '---';
                                 }(),
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                   color: AppUi.textPrimaryOf(context),
                                 ),
@@ -1498,8 +1856,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     Text(
                       'Delivery address',
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                         letterSpacing: 1.5,
                       ),
@@ -1507,9 +1865,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.location_on_rounded,
-                          color: AppUi.bluePrimary,
+                          color: AppUi.brandOf(context),
                           size: 20,
                         ),
                         const SizedBox(width: 12),
@@ -1546,8 +1904,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     Text(
                       'Water refill details',
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                         letterSpacing: 1.5,
                       ),
@@ -1572,14 +1930,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppUi.blueSoft,
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: AppUi.brandSoftOf(context),
+                                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                                 ),
                                 child: Text(
                                   '${item['quantity']}x',
-                                  style: const TextStyle(
-                                    color: AppUi.bluePrimary,
-                                    fontWeight: FontWeight.w900,
+                                  style: TextStyle(
+                                    color: AppUi.brandOf(context),
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -1600,7 +1958,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 '₱${(item['subtotal'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 14,
                                   color: AppUi.textPrimaryOf(context),
                                 ),
@@ -1644,7 +2002,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                   ),
                                 ),
                                 Text(
-                                  '₱${subtotal.toStringAsFixed(2)}',
+                                  formatPeso(subtotal),
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13,
@@ -1666,7 +2024,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                   ),
                                 ),
                                 Text(
-                                  '₱${deliveryFee.toStringAsFixed(2)}',
+                                  formatPeso(deliveryFee),
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13,
@@ -1697,11 +2055,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                           showDialog(
                                             context: context,
                                             builder: (ctx) => AlertDialog(
-                                              title: const Row(
+                                              title: Row(
                                                 children: [
                                                   Icon(
                                                     Icons.info_outline_rounded,
-                                                    color: AppUi.bluePrimary,
+                                                    color: AppUi.brandOf(context),
                                                     size: 20,
                                                   ),
                                                   SizedBox(width: 8),
@@ -1739,7 +2097,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                     ],
                                   ),
                                   Text(
-                                    '₱${serviceFee.toStringAsFixed(2)}',
+                                    formatPeso(serviceFee),
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13,
@@ -1759,8 +2117,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                       Text(
                         'Notes',
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textSecondaryOf(context),
                           letterSpacing: 1.5,
                         ),
@@ -1782,17 +2140,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                         Text(
                           'Total to Pay',
                           style: TextStyle(
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             fontSize: 15,
                             color: AppUi.textPrimaryOf(context),
                           ),
                         ),
                         Text(
                           '₱${(order['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
                             fontSize: 20,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       ],
@@ -1808,15 +2166,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                           ),
                           decoration: BoxDecoration(
                             color: AppUi.chipBgOf(context),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
                           ),
                           child: Text(
                             (order['payment_method'] ?? 'COD')
                                 .toString()
                                 .toUpperCase(),
                             style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                               color: AppUi.textSecondaryOf(context),
                             ),
                           ),
@@ -1837,14 +2195,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                           },
                           icon: const Icon(
                             Icons.cancel_outlined,
-                            color: Color(0xFFEF4444),
+                            color: AppColors.uiError,
                             size: 18,
                           ),
                           label: const Text(
                             'Cancel Order',
                             style: TextStyle(
-                              color: Color(0xFFEF4444),
-                              fontWeight: FontWeight.w800,
+                              color: AppColors.uiError,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
@@ -1872,14 +2230,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                         },
                         icon: const Icon(
                           Icons.report_problem_rounded,
-                          color: Colors.redAccent,
+                          color: AppColors.uiError,
                           size: 18,
                         ),
                         label: const Text(
                           'Report an Issue',
                           style: TextStyle(
-                            color: Colors.redAccent,
-                            fontWeight: FontWeight.w800,
+                            color: AppColors.uiError,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         style: TextButton.styleFrom(
@@ -1906,7 +2264,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                         child: Text(
                           'Close',
                           style: TextStyle(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: AppUi.textSecondaryOf(context),
                           ),
                         ),
@@ -2000,7 +2358,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Failed: $e'),
+                        content: Text('Failed: ${FriendlyErrors.message(e)}'),
                         backgroundColor: AppColors.uiError,
                       ),
                     );

@@ -15,6 +15,7 @@ import 'package:erefill/core/services/road_routing_service.dart';
 import '../../chat/services/chat_service.dart';
 import '../../chat/models/chat_room.dart';
 
+import 'package:erefill/core/utils/friendly_errors.dart';
 class OrderTrackingMap extends StatefulWidget {
   final String orderId;
   final String? riderId;
@@ -298,7 +299,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not start chat: $e')));
+        ).showSnackBar(SnackBar(content: Text('Could not start chat: ${FriendlyErrors.message(e)}')));
       }
     }
   }
@@ -420,7 +421,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                   height: 50,
                   child: const Icon(
                     Icons.location_on_rounded,
-                    color: Colors.redAccent,
+                    color: AppColors.uiError,
                     size: 40,
                   ),
                 ),
@@ -446,7 +447,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                 children: [
                   Icon(
                     Icons.location_off_rounded,
-                    color: Colors.orange,
+                    color: AppColors.uiWarning,
                     size: 18,
                   ),
                   SizedBox(width: 10),
@@ -471,7 +472,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: AppUi.surfaceOf(context),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppUi.radiusFull),
           border: Border.all(color: AppUi.borderOf(context)),
           boxShadow: [
             BoxShadow(
@@ -503,14 +504,14 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                     _statusText,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
                   Text(
-                    'Order ID: #${widget.orderId.substring(0, 8).toUpperCase()}',
+                    'Order ID: #${(widget.orderId.length >= 8 ? widget.orderId.substring(0, 8) : widget.orderId).toUpperCase()}',
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: AppUi.textMuted,
                     ),
@@ -523,7 +524,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                 _formatTime(_riderLocation!['timestamp']),
                 style: const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppUi.textSecondary,
                 ),
               ),
@@ -591,7 +592,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                         _rider!['full_name'] ?? 'Your Rider',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                           color: AppUi.textPrimaryOf(context),
                         ),
                       ),
@@ -600,7 +601,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                           const Icon(
                             Icons.star_rounded,
                             size: 14,
-                            color: Color(0xFFF59E0B),
+                            color: AppColors.uiWarning,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -618,7 +619,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                 ),
                 _buildActionCircle(
                   Icons.phone_rounded,
-                  const Color(0xFF10B981),
+                  AppColors.uiSuccess,
                   _callRider,
                 ),
               ],

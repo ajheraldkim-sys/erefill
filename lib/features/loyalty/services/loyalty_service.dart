@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../models/loyalty_model.dart';
 
+import 'package:erefill/core/utils/money.dart';
 class LoyaltyService {
   final SupabaseClient _supabase;
   final LocalDataCache _cache = LocalDataCache.instance;
@@ -377,7 +378,7 @@ class LoyaltyService {
     await _recordTransaction(
       userId: userId,
       points: earned,
-      description: 'Order Reward: ₱${orderAmount.toStringAsFixed(2)} spent',
+      description: 'Order Reward: ${formatPeso(orderAmount)} spent',
     );
 
     try {

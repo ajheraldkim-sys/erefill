@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../models/payout_model.dart';
 import '../services/payout_service.dart';
 
+import 'package:erefill/core/utils/money.dart';
 class OwnerPayoutRequestsTab extends StatefulWidget {
   final String ownerId;
   const OwnerPayoutRequestsTab({super.key, required this.ownerId});
@@ -84,7 +85,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                   label: Text('Pending ($_pendingCount)'),
                   selected: _filter == 'pending',
                   onSelected: (_) => setState(() => _filter = 'pending'),
-                  selectedColor: const Color(0xFFF59E0B),
+                  selectedColor: AppColors.uiWarning,
                   labelStyle: TextStyle(
                     color: _filter == 'pending'
                         ? Colors.white
@@ -97,7 +98,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                   label: const Text('Disbursed'),
                   selected: _filter == 'disbursed',
                   onSelected: (_) => setState(() => _filter = 'disbursed'),
-                  selectedColor: const Color(0xFF10B981),
+                  selectedColor: AppColors.uiSuccess,
                   labelStyle: TextStyle(
                     color: _filter == 'disbursed'
                         ? Colors.white
@@ -115,7 +116,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
               padding: const EdgeInsets.all(40),
               decoration: BoxDecoration(
                 color: AppUi.surfaceOf(context),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
                 border: Border.all(color: AppUi.borderOf(context)),
               ),
               child: Center(
@@ -177,7 +178,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
         border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Column(
@@ -190,10 +191,10 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 children: [
                   CircleAvatar(
                     radius: 18,
-                    backgroundColor: AppUi.blueSoft,
-                    child: const Icon(
+                    backgroundColor: AppUi.brandSoftOf(context),
+                    child: Icon(
                       Icons.two_wheeler_rounded,
-                      color: AppUi.bluePrimary,
+                      color: AppUi.brandOf(context),
                       size: 20,
                     ),
                   ),
@@ -205,7 +206,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                         req.riderName,
                         style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
@@ -223,13 +224,13 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppUi.radiusSm),
                 ),
                 child: Text(
                   statusLabel,
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     color: statusColor,
                   ),
                 ),
@@ -248,11 +249,11 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                     style: TextStyle(fontSize: 11, color: AppUi.textMuted),
                   ),
                   Text(
-                    '₱${req.amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    formatPeso(req.amount),
+                    style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppUi.bluePrimary,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.brandOf(context),
                     ),
                   ),
                 ],
@@ -264,7 +265,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                     req.payoutMethod.toUpperCase(),
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
@@ -292,7 +293,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
             const SizedBox(height: 8),
             Text(
               'Disbursed Ref: ${req.referenceNumber}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF10B981)),
+              style: const TextStyle(fontSize: 11, color: AppColors.uiSuccess),
             ),
           ],
           if (req.rejectionReason != null &&
@@ -300,7 +301,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
             const SizedBox(height: 8),
             Text(
               'Declined Reason: ${req.rejectionReason}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFFEF4444)),
+              style: const TextStyle(fontSize: 11, color: AppColors.uiError),
             ),
           ],
           if (isPending) ...[
@@ -311,10 +312,10 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                   child: OutlinedButton(
                     onPressed: () => _showRejectDialog(req),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      foregroundColor: AppColors.uiError,
+                      side: const BorderSide(color: AppColors.uiError),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     child: const Text('Decline'),
@@ -325,11 +326,11 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                   child: ElevatedButton(
                     onPressed: () => _showDisburseDialog(req),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: AppColors.uiSuccess,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
                       ),
                     ),
                     child: const Text('Mark as Paid'),
@@ -350,17 +351,17 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppUi.surfaceOf(context),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
         title: const Text(
           'Confirm Payout Disbursed',
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Confirm that ₱${req.amount.toStringAsFixed(2)} was sent to ${req.riderName} via ${req.payoutMethod.toUpperCase()} (${req.accountNumber}).',
+              'Confirm that ${formatPeso(req.amount)} was sent to ${req.riderName} via ${req.payoutMethod.toUpperCase()} (${req.accountNumber}).',
               style: const TextStyle(fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 14),
@@ -370,7 +371,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 labelText: 'Reference # (Optional)',
                 hintText: 'e.g. GCash Ref No.',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
               ),
             ),
@@ -383,7 +384,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: AppColors.uiSuccess,
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
@@ -403,7 +404,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 messenger.showSnackBar(
                   const SnackBar(
                     content: Text('Payout marked as disbursed!'),
-                    backgroundColor: Color(0xFF10B981),
+                    backgroundColor: AppColors.uiSuccess,
                   ),
                 );
                 _loadRequests();
@@ -423,16 +424,16 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppUi.surfaceOf(context),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppUi.radiusSheet)),
         title: const Text(
           'Decline Payout Request',
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Decline withdrawal request of ₱${req.amount.toStringAsFixed(2)} for ${req.riderName}?',
+              'Decline withdrawal request of ${formatPeso(req.amount)} for ${req.riderName}?',
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -442,7 +443,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 labelText: 'Reason for Declining',
                 hintText: 'e.g. Account number mismatch',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
               ),
             ),
@@ -455,7 +456,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
+              backgroundColor: AppColors.uiError,
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
@@ -475,7 +476,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 messenger.showSnackBar(
                   const SnackBar(
                     content: Text('Payout request declined.'),
-                    backgroundColor: Color(0xFFEF4444),
+                    backgroundColor: AppColors.uiError,
                   ),
                 );
                 _loadRequests();

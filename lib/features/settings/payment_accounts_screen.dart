@@ -8,6 +8,7 @@ import '../../core/widgets/app_form_fields.dart';
 import 'payment_account_models.dart';
 import 'payment_settings_service.dart';
 
+import 'package:erefill/core/theme/app_colors.dart';
 class PaymentAccountsScreen extends StatefulWidget {
   final PaymentAccountScope scope;
 
@@ -86,7 +87,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('Check connection again'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppUi.bluePrimary,
+                        foregroundColor: AppUi.brandOf(context),
                         side: BorderSide(color: AppUi.borderOf(context)),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppUi.controlRadius,
@@ -144,7 +145,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lock_outline_rounded, color: AppUi.bluePrimary),
+          Icon(Icons.lock_outline_rounded, color: AppUi.brandOf(context)),
           AppUi.hGapMd,
           Expanded(
             child: Text(
@@ -182,7 +183,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
           ),
           title: Text(
             account.label,
-            style: const TextStyle(fontWeight: FontWeight.w900),
+            style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: Text('${account.maskedValue} • ${account.status}'),
           trailing: PopupMenuButton<String>(
@@ -227,7 +228,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not update this account. Please try again.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.uiError,
         ),
       );
     }
@@ -245,7 +246,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
         children: [
           Icon(icon, size: 42, color: AppUi.textSecondaryOf(context)),
           const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           Text(
             message,
@@ -301,7 +302,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
                         height: 4,
                         decoration: BoxDecoration(
                           color: AppUi.borderOf(context),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(AppUi.radiusXs),
                         ),
                       ),
                     ),
@@ -310,7 +311,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
                       _isCustomer ? 'Add Payment Method' : 'Add Payout Account',
                       style: const TextStyle(
                         fontSize: 20,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -454,7 +455,7 @@ class _PaymentAccountsScreenState extends State<PaymentAccountsScreen> {
                                       'Could not save account. Please try again.',
                                 ),
                               ),
-                              backgroundColor: Colors.red,
+                              backgroundColor: AppColors.uiError,
                             ),
                           );
                         } finally {

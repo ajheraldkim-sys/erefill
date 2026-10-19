@@ -25,7 +25,7 @@ class CheckoutStepIndicator extends StatelessWidget {
               height: 3,
               margin: const EdgeInsets.only(bottom: 18),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(99),
+                borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 color: done ? AppUi.bluePrimary : AppUi.borderOf(context),
               ),
             ),
@@ -56,7 +56,7 @@ class CheckoutStepIndicator extends StatelessWidget {
                         '${step + 1}',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: isActive ? Colors.white : AppUi.textMuted,
                         ),
                       ),
@@ -66,9 +66,9 @@ class CheckoutStepIndicator extends StatelessWidget {
             Text(
               steps[step],
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                color: isActive ? AppUi.bluePrimary : AppUi.textMuted,
+                fontSize: 11,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? AppUi.brandOf(context) : AppUi.textMuted,
               ),
             ),
           ],

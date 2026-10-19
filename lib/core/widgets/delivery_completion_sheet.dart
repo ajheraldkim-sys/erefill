@@ -23,7 +23,7 @@ Future<DeliveryCompletionDetails?> showDeliveryCompletionSheet(
     isScrollControlled: true,
     backgroundColor: AppUi.surfaceOf(context),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppUi.radiusSheet)),
     ),
     builder: (context) => _DeliveryCompletionSheet(
       suggestedEmptyGallons: suggestedEmptyGallons,
@@ -97,7 +97,7 @@ class _DeliveryCompletionSheetState extends State<_DeliveryCompletionSheet> {
               'Review and complete delivery',
               style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
                 color: AppUi.textPrimaryOf(context),
               ),
             ),
@@ -126,7 +126,7 @@ class _DeliveryCompletionSheetState extends State<_DeliveryCompletionSheet> {
                       'Order #${_shortOrderId(widget.orderSummary!['id'])}',
                       style: TextStyle(
                         color: AppUi.textPrimaryOf(context),
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -192,7 +192,7 @@ class _DeliveryCompletionSheetState extends State<_DeliveryCompletionSheet> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
