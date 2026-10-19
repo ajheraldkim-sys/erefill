@@ -594,7 +594,10 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                     content: Text(
                       isFkError
                           ? 'Account profile record is initializing. Please re-open or try again in a moment.'
-                          : 'Could not save address: $e',
+                          : FriendlyErrors.message(
+                              e,
+                              fallback: 'Could not save address. Please try again.',
+                            ),
                     ),
                   ),
                 );
@@ -851,6 +854,16 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                                 mapController.move(newLoc, 16);
                                               } catch (e) {
                                                 debugPrint('GPS error: $e');
+                                                if (mounted) {
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Location access is unavailable. Please place the pin manually.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
                                               } finally {
                                                 setModalState(
                                                     () => isLocating = false);

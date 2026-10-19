@@ -1,58 +1,171 @@
 # eRefill
 
-eRefill is a Flutter and Supabase app for water refilling stations. It supports customer ordering, station owner operations, rider delivery workflows, chat, proof of delivery, offline delivery management, and online payment checkout.
+<p align="center">
+  <img src="assets/images/splash_wordmark.png" alt="eRefill" width="220" />
+</p>
 
-## Stack
+<p align="center">
+  <a href="https://github.com/ajheraldkim-sys/erefill/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ajheraldkim-sys/erefill/ci.yml?branch=main&label=CI" alt="CI status" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/ajheraldkim-sys/erefill" alt="License" /></a>
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter" /></a>
+  <a href="https://supabase.com"><img src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase" alt="Supabase" /></a>
+</p>
 
-- Flutter for Android, iOS, web, desktop UI
-- Supabase Auth, Postgres, Realtime, Storage, RPCs, and Edge Functions
+A modern water refilling and delivery platform for customers, station owners, and riders. eRefill streamlines ordering, station operations, route fulfillment, payments, and live operational workflows in a single mobile-first system.
+
+## 1. Overview
+
+eRefill is a Flutter + Supabase application designed for local water refilling businesses. It supports the full service cycle from customer ordering to station fulfillment and rider delivery. The app is built to handle real-world operations such as live order updates, payment processing, proof of delivery, and offline resilience.
+
+The goal is to reduce manual coordination between customers, owners, and riders while making the refill process reliable, fast, and transparent.
+
+## 2. Why this project exists
+
+Many water refilling stations still rely on fragmented communication methods, manual delivery coordination, and inconsistent order tracking. eRefill centralizes those workflows into a single platform with:
+
+- customer ordering and checkout
+- owner station management
+- rider delivery assignment and task tracking
+- notification and messaging workflows
+- proof-of-delivery validation
+- secure payment handling
+- offline-friendly delivery operations
+
+## 3. Features
+
+### Customer features
+- browse station listings and refill options
+- place delivery orders and manage cart flow
+- save and reuse delivery addresses
+- review payment methods and checkout flow
+- receive order updates and notifications
+
+### Owner features
+- manage station profile, pricing, and locations
+- review incoming orders and dispatch workflows
+- manage rider assignments and station availability
+- track delivery performance and operational updates
+
+### Rider features
+- accept available delivery tasks
+- navigate delivery assignments
+- submit proof of delivery and status updates
+- work with offline queue support during intermittent connectivity
+
+### Operational features
+- real-time update channels through Supabase
+- local SQLite synchronization for delivery tasks
+- app release management and audit tracking
+- secure payment integration with hosted checkout
+
+## 4. Demo / Screenshots
+
+Add screenshots and short walkthrough clips in this section:
+
+```text
+assets/screenshots/overview.png
+assets/screenshots/customer-order.png
+assets/screenshots/owner-dashboard.png
+assets/screenshots/rider-delivery.png
+```
+
+If you want to showcase the app visually, insert a few image previews here with relative paths or a hosted gallery link.
+
+## 5. Tech stack
+
+- Flutter
+- Dart
+- Supabase Auth
+- Supabase Postgres
+- Supabase Realtime
+- Supabase Storage
+- Edge Functions
+- SQLite for offline delivery workflows
 - OpenStreetMap via `flutter_map`
-- Local SQLite sync for the delivery management module
-- PayMongo Checkout for GCash, Maya, and card payments
+- PayMongo Checkout
+- Provider for app state management
 
-## Local Setup
+## 6. Architecture
 
-1. Install Flutter.
-2. Run `flutter pub get`.
-3. Configure Supabase in `lib/core/constants.dart`.
-4. Ensure the base application schema is installed in Supabase; the scripts below assume its tables already exist.
-5. Apply `supabase/scripts/remote_catchup.sql` in the Supabase SQL Editor when using the repository's catch-up schema path.
-6. Apply `supabase/scripts/automated_proof_of_delivery.sql` to install required proof validation, private evidence access, and atomic receipt/chat/notification creation.
-7. Apply `supabase/scripts/app_version_management_system.sql` to create the app release catalog and audit tables. This is required by the App Releases screen and app update checks; without it, Supabase reports that `public.app_releases` is missing.
-8. Apply `supabase/scripts/loyalty_and_referrals.sql` to install customer vouchers and loyalty tables.
-9. If using subscription orders, apply `supabase/scripts/auto_generate_subscription_orders.sql` before the checkout pricing script; it changes the order idempotency column to text and replaces the order-creation function.
-10. Apply `supabase/scripts/fix_customer_checkout_pricing.sql` last. It makes checkout fees and vouchers server-authoritative and makes order retries idempotent.
-11. Deploy the Supabase Edge Functions in `supabase/functions`.
-12. Run the app with `flutter run`.
+The application follows a layered structure:
 
-For an existing Supabase project showing `Could not find the table 'public.app_releases' in the schema cache`, apply `supabase/scripts/app_version_management_system.sql` in the Supabase SQL Editor, then retry the App Releases screen.
+- Flutter UI layer for customer, owner, and rider experiences
+- service and repository layer for Supabase interaction
+- local cache/offline sync layer for delivery workflows
+- Edge Functions for secure payment and backend orchestration
+- database-side business logic and RPCs for critical rules and status transitions
 
-### Realtime and notifications
+This keeps sensitive logic off the client and improves reliability in production use.
 
-The catch-up SQL adds existing application tables to the `supabase_realtime`
-publication. Apply the updated `supabase/scripts/remote_catchup.sql` in the
-Supabase SQL Editor for live order, profile, product, and notification updates.
-The app displays OS local notifications for notification rows received while
-its realtime connection is active. These are not remote push notifications:
-delivery while the app is backgrounded or terminated requires a configured
-push provider (Firebase Cloud Messaging/APNs) and a server-side sender, which
-this repository does not currently configure.
+## 7. Project structure
 
-### Profile recovery
+```text
+.
+├── lib/                         # Flutter app source
+├── admin/                      # Admin-focused Flutter app workspace
+├── supabase/
+│   ├── functions/              # Edge Functions
+│   └── scripts/                # SQL schema and migration scripts
+├── test/                       # Automated tests
+├── docs/                       # Design and implementation docs
+├── assets/                     # Images, fonts, icons, animations
+├── android/                    # Android native config
+├── ios/                        # iOS native config
+├── macos/                      # macOS native config
+├── windows/                    # Windows native config
+├── web/                        # Web entry files
+├── .github/workflows/ci.yml    # CI pipeline
+├── README.md                   # Project documentation
+├── SECURITY.md                 # Security reporting policy
+├── LICENSE                     # MIT license
+├── .env.example                # Environment variable template
+├── pubspec.yaml                # Flutter app dependencies
+├── analysis_options.yaml       # Dart lint and analysis rules
+└── .gitignore
+```
 
-When repairing users whose profile rows are missing, apply
-[`supabase/scripts/fix_missing_profiles_and_addresses.sql`](./supabase/scripts/fix_missing_profiles_and_addresses.sql)
-in the Supabase SQL Editor. Self-service profile creation only permits the
-customer, owner, and rider signup roles; admin roles and rider-to-owner
-associations cannot be supplied through Auth user metadata. Admin roles require
-trusted provisioning, and rider associations are created through the
-server-validated owner workflow.
+## 8. Prerequisites
 
-## Payment Setup
+Before you start, make sure you have:
 
-The app uses a server-side PayMongo Checkout flow for GCash, Maya, and card payments. Do not put PayMongo secret keys in Flutter code.
+- Flutter SDK installed
+- Dart SDK bundled with Flutter
+- a Supabase project configured
+- access to the repository and a local environment for app runs
+- optional: a PayMongo account for payment testing
 
-Required Supabase Edge Function secrets:
+## 9. Installation
+
+Clone the repo:
+
+```bash
+git clone https://github.com/ajheraldkim-sys/erefill.git
+cd erefill
+flutter pub get
+```
+
+Install dependencies and verify Flutter is working correctly:
+
+```bash
+flutter --version
+flutter doctor
+```
+
+## 10. Configuration
+
+Set up your app configuration and secret values carefully.
+
+### Supabase
+Configure your project values in `lib/core/constants.dart` and ensure the required database schema is installed.
+
+### Environment variables
+Use `.env.example` as a template and never commit real secrets into source control.
+
+```bash
+cp .env.example .env.local
+```
+
+For payment processing, configure the required Supabase Edge Function secrets:
 
 ```bash
 supabase secrets set PAYMONGO_SECRET_KEY=sk_live_or_test_key
@@ -61,110 +174,19 @@ supabase secrets set PAYMENT_WEBHOOK_TOKEN=use-a-long-random-token
 supabase secrets set PAYMENT_DATA_ENCRYPTION_KEY=use-a-long-random-encryption-passphrase
 ```
 
-Optional PayMongo webhook signing verification:
+Optional signing verification:
 
 ```bash
 supabase secrets set PAYMONGO_WEBHOOK_SIGNING_SECRET=your_paymongo_webhook_signing_secret
 ```
 
-If configured, the webhook function will verify PayMongo request signatures from `paymongo-signature` or `x-paymongo-signature` before processing.
+## 11. Running locally
 
-Deploy the functions:
+Run the app in development mode:
 
 ```bash
-supabase functions deploy create-payment-checkout
-supabase functions deploy paymongo-webhook
-supabase functions deploy manage-payment-settings
+flutter run
 ```
-
-In the PayMongo dashboard, configure a webhook endpoint that points to:
-
-```text
-https://<project-ref>.functions.supabase.co/paymongo-webhook?token=<PAYMENT_WEBHOOK_TOKEN>
-```
-
-The checkout flow is:
-
-1. Customer selects Cash, GCash, Maya, or Card.
-2. Flutter creates the order through `create_order_atomic`.
-3. For GCash, Maya, or Card, Flutter calls `create-payment-checkout`.
-4. The Edge Function creates a PayMongo Checkout Session and returns a secure checkout URL.
-5. Customer completes payment in PayMongo.
-6. PayMongo calls `paymongo-webhook`.
-7. The webhook updates `orders.payment_status`.
-
-## Payment Settings
-
-eRefill supports role-based payment settings:
-
-- Customers can manage preferred payment methods from Account > Quick Actions > Payment Methods.
-- Owners can manage receiving accounts from Account > Business Configuration > Payout Accounts.
-- Riders do not have access to payment method or payout account settings.
-
-The app uses PayMongo test mode during development. Use a `sk_test_...` key as `PAYMONGO_SECRET_KEY` in Supabase Edge Function secrets. Do not place PayMongo secret keys in Flutter code.
-
-Security rules:
-
-- Do not store full card numbers, CVV, or raw card details.
-- Card support must use a payment gateway token or hosted checkout. eRefill stores only token references and safe display fields such as card brand and last four digits.
-- GCash, Maya, and bank payout account values are masked in the app.
-- Owner payout account references are encrypted in the `manage-payment-settings` Edge Function before being saved.
-- Customer payment method access is restricted to customers.
-- Owner payout account access is restricted to owners.
-- Riders cannot access either payment settings feature.
-
-## Owner / Water Station Setup
-
-To register as a station owner:
-
-1. Open the app.
-2. Choose the owner or water station registration path.
-3. Enter owner name, station name, mobile number, email, password, town, barangay, and station address.
-4. Set the exact station pin on the map.
-5. Submit the registration form.
-6. After login, open `Account`.
-7. Complete or verify:
-   - Station name
-   - Owner contact details
-   - Station town and barangay
-   - Station map pin
-   - Base delivery fee
-   - Price per gallon
-   - Station photo/logo
-8. Open the refill pricing screen and add available water refill options.
-9. Add rider accounts under rider management.
-10. Toggle station availability to open when ready to accept orders.
-
-Operational checklist before accepting orders:
-
-- Station location is accurate.
-- Purified, Mineral, and Alkaline refill prices are correct and available.
-- Delivery fee is correct.
-- At least one rider account exists.
-- Online payment keys and webhooks are configured if accepting GCash, Maya, or card.
-- Test one cash order and one online payment order in sandbox mode.
-
-## Security Notes
-
-- Online payment secrets belong only in Supabase Edge Function secrets.
-- Payment proofs, delivery proofs, and chat attachments should use private buckets and signed URLs.
-- Order totals must be calculated by database RPCs, not trusted from Flutter.
-- Order status transitions should be controlled by RPCs.
-- RLS policies should be tested for customer, owner, rider, anonymous, and service-role access.
-
-### Account email verification
-
-Email changes use Supabase Auth's native email-change verification. Configure
-the Supabase **Authentication > Email Templates > Change Email** template to
-include `{{ .Token }}` so users receive the six-digit code expected by the app.
-If resending a new-account confirmation, the **Confirm signup** template must
-also include `{{ .Token }}`. With secure email changes enabled, users may need
-to confirm both the new address and their current address.
-After deploying the updated app, apply
-`supabase/scripts/gmail_verification_otp.sql` to remove the legacy client-visible
-OTP implementation and keep `profiles.email` synchronized with Auth.
-
-## Quality Checks
 
 Run static analysis:
 
@@ -172,8 +194,110 @@ Run static analysis:
 dart analyze
 ```
 
-Run tests:
+Run the test suite:
 
 ```bash
 flutter test
 ```
+
+## 12. Database and backend setup
+
+This project relies on a working Supabase schema and supporting SQL scripts. Apply the required setup in the recommended order:
+
+```text
+supabase/scripts/remote_catchup.sql
+supabase/scripts/automated_proof_of_delivery.sql
+supabase/scripts/app_version_management_system.sql
+supabase/scripts/loyalty_and_referrals.sql
+supabase/scripts/auto_generate_subscription_orders.sql
+supabase/scripts/fix_customer_checkout_pricing.sql
+```
+
+Important notes:
+- if app release tables are missing, run `app_version_management_system.sql`
+- realtime publication must include the needed app tables
+- missing profile records can be repaired with the profile and address recovery script
+
+## 13. Usage
+
+After setup, the app is used by three primary roles:
+
+1. Customer
+   - browse stations
+   - place refill orders
+   - save local addresses
+   - pay and track delivery updates
+
+2. Station owner
+   - manage pricing and stock availability
+   - process order requests
+   - assign riders
+   - review operational status
+
+3. Rider
+   - accept assignments
+   - update route status
+   - submit proof of delivery
+
+## 14. Testing
+
+This repository includes functional and UI regression tests under `test/`.
+
+Run the suite with:
+
+```bash
+flutter test
+```
+
+Recommended checks before submitting changes:
+
+```bash
+dart analyze
+flutter test
+```
+
+## 15. Roadmap
+
+Planned improvements and expansion areas include:
+
+- stronger role-based access validation and policy checks
+- expanded notification and push support
+- deeper analytics and reporting for owners and admins
+- broader localization and multilingual support
+- improved offline-first synchronization and conflict resolution
+- release automation and deployment checks
+
+## 16. Contributing
+
+Contributions are welcome. To contribute:
+
+1. fork the repository
+2. create a feature branch
+3. make focused changes with tests when needed
+4. run validation checks
+5. open a pull request with a clear summary
+
+Suggested contribution standards:
+
+- keep changes small and well-scoped
+- avoid committing secrets or local environment data
+- document setup changes and configuration updates
+- validate security-sensitive changes carefully
+
+## 17. Security
+
+This project processes customer information, payment references, and operational delivery data. Do not expose secrets or sensitive values in logs or committed files.
+
+Please review [SECURITY.md](./SECURITY.md) for responsible disclosure expectations and vulnerability reporting.
+
+## 18. License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for full details.
+
+## 19. Contact
+
+For project questions, updates, or collaborations, use the repository's GitHub issues or reach out through the maintainer profile associated with this project.
+
+## 20. Acknowledgements
+
+This project builds on Flutter, Supabase, OpenStreetMap tooling, and modern mobile delivery architecture practices. Thanks to the open-source communities supporting the tools used in this repository.
