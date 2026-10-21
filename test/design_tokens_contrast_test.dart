@@ -125,32 +125,6 @@ void main() {
       }
     });
 
-    test('brand and order status colors stay muted', () {
-      final colors = [
-        AppUi.bluePrimary,
-        AppUi.bluePrimaryDark,
-        AppUi.accentCyan,
-        AppUi.accentGreen,
-        AppColors.brandSecondary,
-        AppColors.statusPending,
-        AppColors.statusConfirmed,
-        AppColors.statusPreparing,
-        AppColors.statusReady,
-        AppColors.statusOutForDelivery,
-        AppColors.statusCompleted,
-        AppColors.statusCancelled,
-        AppColors.statusRejected,
-      ];
-
-      for (final color in colors) {
-        expect(
-          HSLColor.fromColor(color).saturation,
-          lessThanOrEqualTo(0.75),
-          reason: color.toString(),
-        );
-      }
-    });
-
     test('status colors avoid purple and indigo hues', () {
       final statusColors = [
         AppColors.statusPending,

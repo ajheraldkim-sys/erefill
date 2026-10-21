@@ -125,14 +125,14 @@ class AppConstants {
 /// (4.5:1 for body text, 3:1 for icons and large text).
 class AppUi {
   // ── Brand (water blue) ─────────────────────────────────────────
-  static const Color bluePrimary = Color(0xFF426779); // 6.1:1 on white
-  static const Color bluePrimaryDark = Color(0xFF354F5E);
-  static const Color blueSoft = Color(0xFFE8EFF4);
-  static const Color blueBorder = Color(0xFFC4D3DF);
-  static const Color bluePale = Color(0xFFF3F6F8);
+  static const Color bluePrimary = Color(0xFF0F71C3); // 5.0:1 on white
+  static const Color bluePrimaryDark = Color(0xFF0C5BA0);
+  static const Color blueSoft = Color(0xFFEEF6FD); // brand text 4.6:1
+  static const Color blueBorder = Color(0xFFBAD7F2);
+  static const Color bluePale = Color(0xFFF1F7FD);
   static const Color deepBlue = Color(0xFF10283B);
-  static const Color accentCyan = Color(0xFF65A8AB); // dark-mode primary
-  static const Color accentGreen = Color(0xFF4E7460);
+  static const Color accentCyan = Color(0xFF42C2C8); // dark-mode primary
+  static const Color accentGreen = Color(0xFF21866A);
 
   /// Legacy aliases
   static const Color tealPrimary = bluePrimary;
@@ -158,23 +158,23 @@ class AppUi {
   static const Color darkTextMuted = Color(0xFF8E9BB0);
 
   // ── Semantic feedback ──────────────────────────────────────────
-  static const Color successBg = Color(0xFFE6EEE8);
-  static const Color successFg = Color(0xFF3F684B);
-  static const Color warningBg = Color(0xFFF2ECE2);
-  static const Color warningFg = Color(0xFF755B34);
-  static const Color errorBg = Color(0xFFF1E7E7);
-  static const Color error = Color(0xFF914646);
-  static const Color errorFg = Color(0xFF7C4141);
+  static const Color successBg = Color(0xFFDCFCE7);
+  static const Color successFg = Color(0xFF166534);
+  static const Color warningBg = Color(0xFFFEF3C7);
+  static const Color warningFg = Color(0xFF92400E);
+  static const Color errorBg = Color(0xFFFEE2E2);
+  static const Color error = Color(0xFFDC2626); // 4.8:1 on white
+  static const Color errorFg = Color(0xFFB91C1C); // 5.3:1 on errorBg
   static const Color infoBg = blueSoft;
   static const Color info = bluePrimary;
   // Tint borders (light) and readable foregrounds on dark surfaces.
-  static const Color successBorder = Color(0xFFC7D8CB);
-  static const Color warningBorder = Color(0xFFDCCFB8);
-  static const Color errorBorder = Color(0xFFDFC7C7);
-  static const Color successFgDark = Color(0xFF9CC8AA);
-  static const Color warningFgDark = Color(0xFFD4BD8F);
-  static const Color errorFgDark = Color(0xFFD6A2A2);
-  static const Color infoFgDark = Color(0xFFA8C4DE);
+  static const Color successBorder = Color(0xFFBBF7D0);
+  static const Color warningBorder = Color(0xFFFDE68A);
+  static const Color errorBorder = Color(0xFFFECACA);
+  static const Color successFgDark = Color(0xFF6EE7B7);
+  static const Color warningFgDark = Color(0xFFFCD34D);
+  static const Color errorFgDark = Color(0xFFFCA5A5);
+  static const Color infoFgDark = Color(0xFF93C5FD);
 
   // ── Radius scale ───────────────────────────────────────────────
   // xs 4 · sm 6 · control 8 · card 12 · sheet 16 · pill 24 · full 999
