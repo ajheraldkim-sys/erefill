@@ -58,7 +58,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   String? _selectedBarangay;
   String? _selectedPurok;
   String? _selectedSuffix;
-  String _preferredWaterType = WaterTypes.purified.name;
+  String _preferredWaterType = (WaterTypes.defaultType?.name ?? '');
 
   final List<String> _suffixOptions = [
     'None',
@@ -154,7 +154,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         user.zipCode ?? AppConstants.municipalityZipCodes[_selectedTown] ?? '';
     _addressController.text = user.completeAddress ?? '';
     _landmarkController.text = user.landmark ?? '';
-    _preferredWaterType = user.preferredWaterType ?? WaterTypes.purified.name;
+    _preferredWaterType = user.preferredWaterType ?? (WaterTypes.defaultType?.name ?? '');
   }
 
   Future<void> _loadProfileData() async {
@@ -228,7 +228,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           _landmarkController.text = profileData['landmark'] ?? '';
           _preferredWaterType =
               profileData['preferred_water_type']?.toString() ??
-              WaterTypes.purified.name;
+              (WaterTypes.defaultType?.name ?? '');
           if (profileData['latitude'] != null &&
               profileData['longitude'] != null) {
             _pickedLocation = LatLng(

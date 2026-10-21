@@ -32,6 +32,7 @@ import 'core/providers/connectivity_provider.dart';
 import 'core/widgets/offline_banner.dart';
 import 'core/services/local_data_cache.dart';
 import 'core/services/app_update_service.dart';
+import 'core/water_types.dart';
 import 'core/localization/app_strings.dart';
 import 'features/update/screens/mandatory_update_screen.dart';
 
@@ -61,6 +62,7 @@ void main() async {
 
     runApp(const ERefillApp());
     unawaited(LocalDataCache.instance.init());
+    unawaited(WaterTypes.load());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(NotificationService.instance.initialize());
       unawaited(AppUpdateService.instance.initialize());

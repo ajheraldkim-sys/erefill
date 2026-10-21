@@ -47,7 +47,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _selectedSuffix;
-  String _selectedWaterType = WaterTypes.purified.name;
+  String? _selectedWaterType = WaterTypes.defaultType?.name;
 
   LatLng _pickedLocation = const LatLng(
     9.3333,
@@ -186,7 +186,8 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
           'complete_address': _addressController.text.trim(),
           'latitude': _pickedLocation.latitude,
           'longitude': _pickedLocation.longitude,
-          'preferred_water_type': _selectedWaterType,
+          'preferred_water_type':
+              _selectedWaterType ?? WaterTypes.defaultType?.name,
         },
       );
       final newUserId = res.user?.id;
@@ -550,11 +551,15 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Wrap(
+            ValueListenableBuilder<List<WaterTypeInfo>>(
+              valueListenable: WaterTypes.catalog,
+              builder: (context, _, _) => Wrap(
               spacing: 8,
               runSpacing: 8,
               children: WaterTypes.all.map((type) {
-                final selected = _selectedWaterType == type.name;
+                final selected = (_selectedWaterType ??
+                        WaterTypes.defaultType?.name) ==
+                    type.name;
                 return ChoiceChip(
                   label: Text(type.shortName),
                   selected: selected,
@@ -570,6 +575,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                   ),
                 );
               }).toList(),
+            ),
             ),
             const SizedBox(height: 32),
             const SizedBox(height: 40),

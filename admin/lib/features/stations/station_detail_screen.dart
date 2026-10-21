@@ -1,6 +1,9 @@
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/water_types.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/admin_api_service.dart';
 import '../../widgets/admin_map.dart';
@@ -409,7 +412,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       'Max Concurrent Orders',
                       '${_settings['max_concurrent_orders'] ?? '—'}',
                     ),
-                    AdminDetailRow('Active Products', '${_products.length}'),
+                    AdminDetailRow(
+                      'Water Type',
+                      _profile['primary_water_type']?.toString() ?? '—',
+                    ),
                     AdminDetailRow(
                       'Active In-Flight Orders',
                       '${_stats['active_orders'] ?? 0}',
@@ -580,21 +586,21 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Water Products (${_products.length})',
+                            'Water product',
                             style: adminSectionTitleStyle(context),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Catalog of container sizes and water types sold by this station',
+                            'Stations sell one water type, priced by the owner',
                             style: adminCaptionTextStyle(context),
                           ),
                         ],
                       ),
                       AdminManageButton(
                         height: 36,
-                        text: 'Add Product',
-                        icon: LucideIcons.plus,
-                        onPressed: _addProduct,
+                        text: 'Change water type',
+                        icon: LucideIcons.droplet,
+                        onPressed: _changeWaterType,
                       ),
                     ],
                   ),
@@ -604,9 +610,8 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                   const Padding(
                     padding: EdgeInsets.all(32),
                     child: AdminEmptyState(
-                      message:
-                          'No products added yet. Click "+ Add Product" to create one.',
-                      icon: LucideIcons.packagePlus,
+                      message: 'This station has no water type yet.',
+                      icon: LucideIcons.droplet,
                     ),
                   )
                 else
@@ -639,32 +644,16 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           ),
                         ),
                         subtitle: Text(
-                          'Category: ${p['category'] ?? "Standard"} • In Stock: $stock',
+                          '${p['is_available'] == false ? 'Paused' : 'Available'} • In stock: $stock',
                           style: adminCaptionTextStyle(context),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              formatPeso(p['price']),
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: AppUi.brandOf(context),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            IconButton(
-                              tooltip: 'Delete product',
-                              icon: Icon(
-                                LucideIcons.trash2,
-                                size: 17,
-                                color: adminSemanticErrorColor(context),
-                              ),
-                              onPressed: () =>
-                                  _deleteProduct(p['id'] as String),
-                            ),
-                          ],
+                        trailing: Text(
+                          '${formatPeso(p['price'])} / gal',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: AppUi.brandOf(context),
+                          ),
                         ),
                       );
                     },
@@ -892,169 +881,91 @@ class _StationDetailScreenState extends State<StationDetailScreen>
     );
   }
 
-  Future<void> _addProduct() async {
-    final formKey = GlobalKey<FormState>();
-    final name = TextEditingController();
-    final price = TextEditingController(text: '25');
-    final stock = TextEditingController(text: '100');
-    String category = 'Purified';
+  /// Stations sell one water type; only admins can switch it. The database
+  /// renames the station's product and keeps its price.
+  Future<void> _changeWaterType() async {
+    await WaterTypes.load();
+    if (!mounted) return;
+    final current = _profile['primary_water_type']?.toString();
+    final options = WaterTypes.all;
+    if (options.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a water type first.')),
+      );
+      return;
+    }
+    String selected = options.any((t) => t.name == current)
+        ? current!
+        : options.first.name;
 
-    final ok = await showDialog<bool>(
+    final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Add Product'),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
+        builder: (ctx, setDialogState) => AdminModalDialog(
+          title: 'Change water type',
+          subtitle: 'The station keeps its price. Customers see the new '
+              'water type right away.',
+          icon: LucideIcons.droplet,
+          maxWidth: 440,
+          actions: [
+            ShadcnOutlineButton(
+              height: 38,
+              text: 'Cancel',
+              onPressed: () => Navigator.pop(ctx),
             ),
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Category'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Purified',
-                          child: Text('Purified'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Mineral',
-                          child: Text('Mineral'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Alkaline',
-                          child: Text('Alkaline'),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => category = v);
-                      },
+            const SizedBox(width: 8),
+            ShadcnPrimaryButton(
+              height: 38,
+              text: 'Change',
+              onPressed: selected == current
+                  ? null
+                  : () => Navigator.pop(ctx, selected),
+            ),
+          ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: RadioGroup<String>(
+              groupValue: selected,
+              onChanged: (v) {
+                if (v != null) setDialogState(() => selected = v);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final type in options)
+                    RadioListTile<String>(
+                      value: type.name,
+                      title: Text(type.name),
+                      subtitle: type.tagline.isEmpty
+                          ? null
+                          : Text(type.tagline),
+                      secondary: Icon(type.icon, color: type.color),
                     ),
-                    TextFormField(
-                      controller: name,
-                      decoration: const InputDecoration(
-                        labelText: 'Product Name',
-                      ),
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Product name is required'
-                          : null,
-                    ),
-                    TextFormField(
-                      controller: price,
-                      decoration: const InputDecoration(labelText: 'Price (₱)'),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) {
-                        final val = double.tryParse(v ?? '');
-                        if (val == null || val <= 0) {
-                          return 'Enter a price greater than 0';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: stock,
-                      decoration: const InputDecoration(
-                        labelText: 'Initial Stock',
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        final val = int.tryParse(v ?? '');
-                        if (val == null || val < 0) {
-                          return 'Enter a valid stock number';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppUi.bluePrimary),
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.pop(ctx, true);
-                }
-              },
-              child: const Text('Add Product'),
-            ),
-          ],
         ),
       ),
     );
-    if (ok != true || !mounted) {
-      name.dispose();
-      price.dispose();
-      stock.dispose();
-      return;
-    }
+    if (picked == null || !mounted) return;
     try {
-      await context.read<AdminApiService>().upsertProduct(
-        ownerId: widget.ownerId,
-        name: name.text.trim(),
-        category: category,
-        price: double.tryParse(price.text),
-        stockLevel: int.tryParse(stock.text),
-      );
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'primary_water_type': picked})
+          .eq('id', widget.ownerId);
       await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Station now sells $picked')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppUi.error),
-      );
-    } finally {
-      name.dispose();
-      price.dispose();
-      stock.dispose();
-    }
-  }
-
-  Future<void> _deleteProduct(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete product?'),
-        content: const Text(
-          'Are you sure you want to delete this product? This action cannot be undone.',
+        SnackBar(
+          content: Text(FriendlyErrors.message(e)),
+          backgroundColor: AppUi.error,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: adminDestructiveButtonColor(context),
-              foregroundColor: adminDestructiveButtonForeground(context),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
-
-    try {
-      await context.read<AdminApiService>().deleteProduct(id);
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppUi.error),
       );
     }
   }

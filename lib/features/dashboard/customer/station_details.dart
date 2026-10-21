@@ -58,8 +58,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   bool _isLoadingPurified = true;
   Map<String, dynamic>? _selectedProduct;
 
-  static const String _sampleStationImage =
-      'https://images.unsplash.com/photo-1564419320461-6870880221ad?auto=format&fit=crop&w=1200&q=60';
 
   @override
   void initState() {
@@ -275,29 +273,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     }
   }
 
+  /// A station sells one product: the refill of its water type.
   void _resolveSelectedProduct(String ownerId) {
     final settingsPrice = _pricePerGallon ?? 0;
-    final previouslySelectedId = _selectedProduct?['id']?.toString();
-    Map<String, dynamic>? previouslySelectedProduct;
-    for (final product in _products) {
-      if (product['id']?.toString() == previouslySelectedId) {
-        previouslySelectedProduct = OrderProductHelpers.withDisplayDefaults(
-          Map<String, dynamic>.from(product),
-        );
-        break;
-      }
-    }
-    final customerPref = _getCustomerWaterPreference();
-    final defaultProduct = OrderProductHelpers.defaultFromList(
-      _products,
-      stationWaterType: _waterType,
-      preferredWaterType: customerPref,
-    );
-    if (previouslySelectedProduct != null) {
-      _selectedProduct = previouslySelectedProduct;
-    } else if (defaultProduct != null) {
+    final stationProduct = OrderProductHelpers.defaultFromList(_products);
+    if (stationProduct != null) {
       _selectedProduct = OrderProductHelpers.withDisplayDefaults(
-        defaultProduct,
+        stationProduct,
       );
     } else if (settingsPrice > 0) {
       _selectedProduct = OrderProductHelpers.displayFallback(
@@ -466,12 +448,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         _stationData['name']?.toString() ??
         'Water Station';
 
-    String selectedWaterType =
-        _selectedProduct?['water_type']?.toString() ?? _waterType ?? 'Purified';
-    double selectedPrice =
-        (_selectedProduct?['price'] as num?)?.toDouble() ??
-        _pricePerGallon ??
-        30.0;
+    final waterType = _stationWaterType;
+    final selectedWaterType = waterType.shortName;
+    final double? selectedPrice =
+        (_selectedProduct?['price'] as num?)?.toDouble() ?? _pricePerGallon;
     int selectedQty = _quantity > 0 ? _quantity : 1;
     String selectedFrequency = 'weekly';
     String selectedTimeSlot = 'morning';
@@ -497,7 +477,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final estimatedPrice = selectedPrice * selectedQty;
+          final estimatedPrice = (selectedPrice ?? 0) * selectedQty;
 
           return Container(
             padding: EdgeInsets.only(
@@ -579,36 +559,19 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   ),
                   const Divider(height: 20),
 
-                  Text(
-                    'Water Type',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppUi.textPrimaryOf(ctx),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: ['Purified', 'Alkaline', 'Mineral', 'Distilled']
-                        .map((type) {
-                          final isSel =
-                              selectedWaterType.toLowerCase() ==
-                              type.toLowerCase();
-                          return ChoiceChip(
-                            label: Text(type),
-                            selected: isSel,
-                            selectedColor: AppUi.bluePrimary.withValues(
-                              alpha: 0.15,
-                            ),
-                            onSelected: (val) {
-                              if (val) {
-                                setSheetState(() => selectedWaterType = type);
-                              }
-                            },
-                          );
-                        })
-                        .toList(),
+                  Row(
+                    children: [
+                      Icon(waterType.icon, size: 18, color: waterType.color),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${waterType.name} refill',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppUi.textPrimaryOf(ctx),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
 
@@ -626,13 +589,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                               color: AppUi.textPrimaryOf(ctx),
                             ),
                           ),
-                          Text(
-                            '${formatPeso(selectedPrice, whole: true)} / bottle',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppUi.textSecondaryOf(ctx),
+                          if (selectedPrice != null)
+                            Text(
+                              '${formatPeso(selectedPrice, whole: true)} / gallon',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppUi.textSecondaryOf(ctx),
+                              ),
                             ),
-                          ),
                         ],
                       ),
                       Row(
@@ -776,6 +740,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   ),
                   const SizedBox(height: 18),
 
+                  if (selectedPrice != null)
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -933,13 +898,14 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
       ownerId,
       selected: _selectedProduct,
       products: _products,
-      waterType: _waterType ?? _stationData['primary_water_type']?.toString(),
-      preferredWaterType: _getCustomerWaterPreference(),
-      settingsPrice:
-          _pricePerGallon ??
-          (_stationData['price_per_gallon'] as num?)?.toDouble(),
     );
   }
+
+  WaterTypeInfo get _stationWaterType => WaterTypes.byName(
+    _waterType ??
+        _stationData['primary_water_type']?.toString() ??
+        _displayProduct['category']?.toString(),
+  );
 
   Future<bool> _ensureCartForThisStation(CartProvider cart) async {
     final targetStationId = _stationData['id']?.toString();
@@ -999,45 +965,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     return true;
   }
 
-  Future<void> _addItemToCart(
-    Map<String, dynamic> product, {
-    int qty = 1,
-  }) async {
-    final cart = context.read<CartProvider>();
-    final allowed = await _ensureCartForThisStation(cart);
-    if (!allowed) return;
-
-    final id = product['id']?.toString() ?? '';
-    final name = product['name']?.toString() ?? 'Water Product';
-    final price = (product['price'] as num?)?.toDouble() ?? 0.0;
-
-    final currentQty = cart.items[id]?.quantity ?? 0;
-    if (currentQty == 0) {
-      cart.addItem(id, name, price);
-      if (qty > 1) {
-        cart.updateQuantity(id, qty);
-      }
-    } else {
-      cart.updateQuantity(id, currentQty + qty);
-    }
-    HapticFeedback.selectionClick();
-  }
-
-  void _removeItemFromCart(String productId) {
-    final cart = context.read<CartProvider>();
-    final currentQty = cart.items[productId]?.quantity ?? 0;
-    if (currentQty <= 1) {
-      cart.removeItem(productId);
-    } else {
-      cart.updateQuantity(productId, currentQty - 1);
-    }
-    HapticFeedback.selectionClick();
-  }
-
-  bool _isContainerOrAccessory(Map<String, dynamic> product) {
-    return OrderProductHelpers.isContainerOrAccessory(product);
-  }
-
   Future<void> _handleOrderNow({
     required bool canOrder,
     required String normalizedAvailability,
@@ -1060,6 +987,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 ? 'Station is busy and not accepting new orders.'
                 : normalizedAvailability == 'maintenance'
                 ? 'Station is under maintenance right now.'
+                : normalizedAvailability == 'paused'
+                ? 'This station has paused refill orders for now.'
                 : 'Station is currently closed.',
           ),
         ),
@@ -1126,215 +1055,350 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   // ─── UI COMPONENTS ─────────────────────────────────────────────────────────
 
   Widget _buildStationHeader(
-    BuildContext context,
-    String stationName,
-    bool isVerified,
-  ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    BuildContext context, {
+    required String stationName,
+    required bool isVerified,
+    required String availability,
+    required String rawTown,
+    required double rating,
+    required int reviewCount,
+  }) {
+    final secondary = AppUi.textSecondaryOf(context);
+    final dot = Text('·', style: TextStyle(color: secondary));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(
-            stationName,
-            style: TextStyle(
-              color: AppUi.textPrimaryOf(context),
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.4,
-              height: 1.2,
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                stationName,
+                style: TextStyle(
+                  color: AppUi.textPrimaryOf(context),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                  height: 1.2,
+                ),
+              ),
             ),
-          ),
+            if (isVerified) ...[
+              const SizedBox(width: 6),
+              Icon(
+                Icons.verified_rounded,
+                color: AppUi.brandOf(context),
+                size: 20,
+                semanticLabel: 'Verified station',
+              ),
+            ],
+          ],
         ),
-        if (isVerified) ...[
-          const SizedBox(width: 8),
-          Icon(Icons.verified_rounded, color: AppUi.brandOf(context), size: 20),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildStationMetaRow(
-    BuildContext context,
-    bool isOpen,
-    String rawTown,
-    double rating,
-    int reviewCount,
-  ) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          // Open / Closed Status Indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-            decoration: BoxDecoration(
-              color: isOpen
-                  ? AppColors.uiSuccess.withValues(alpha: 0.12)
-                  : AppColors.uiError.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppUi.radiusControl),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: isOpen ? AppColors.uiSuccess : AppColors.uiError,
-                    shape: BoxShape.circle,
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _AvailabilityPill(availability: availability),
+            if (rating > 0) ...[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 15,
+                    color: AppColors.uiWarning,
                   ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  isOpen ? 'Open Now' : 'Closed',
-                  style: TextStyle(
-                    color: isOpen ? AppColors.uiSuccess : AppUi.errorFg,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Rating or New indicator
-          if (rating > 0) ...[
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.star_rounded,
-                  size: 15,
-                  color: AppColors.uiWarning,
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  rating.toStringAsFixed(1),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppUi.textPrimaryOf(context),
-                  ),
-                ),
-                if (reviewCount > 0)
+                  const SizedBox(width: 3),
                   Text(
-                    ' ($reviewCount)',
+                    rating.toStringAsFixed(1),
                     style: TextStyle(
-                      fontSize: 11,
-                      color: AppUi.textSecondaryOf(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppUi.textPrimaryOf(context),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            Text('·', style: TextStyle(color: AppUi.textSecondaryOf(context))),
-            const SizedBox(width: 8),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppUi.warningBg,
-                borderRadius: BorderRadius.circular(AppUi.radiusSm),
+                  if (reviewCount > 0)
+                    Text(
+                      ' ($reviewCount)',
+                      style: TextStyle(fontSize: 12, color: secondary),
+                    ),
+                ],
               ),
-              child: const Text(
-                'New Station',
+            ] else
+              Text(
+                'New station',
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.uiWarning,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: secondary,
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text('·', style: TextStyle(color: AppUi.textSecondaryOf(context))),
-            const SizedBox(width: 8),
-          ],
-
-          // Municipality / Town
-          if (rawTown.isNotEmpty) ...[
-            Text(
-              rawTown,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppUi.textSecondaryOf(context),
+            if (rawTown.isNotEmpty) ...[
+              dot,
+              Text(
+                rawTown,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: secondary,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text('·', style: TextStyle(color: AppUi.textSecondaryOf(context))),
-            const SizedBox(width: 8),
+            ],
           ],
-
-          // Delivery Fee
-          Text(
-            'Distance-based delivery',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppUi.brandOf(context),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('·', style: TextStyle(color: AppUi.textSecondaryOf(context))),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppUi.bluePrimary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppUi.radiusSm),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.verified_rounded,
-                  size: 12,
-                  color: AppUi.brandOf(context),
-                ),
-                SizedBox(width: 3),
-                Text(
-                  'Sanitary Permit Valid',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0369A1),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildAddressRow(BuildContext context, String completeAddress) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 1),
-          child: Icon(
-            Icons.place_outlined,
-            size: 16,
-            color: AppUi.brandOf(context),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openInExternalMaps,
+        borderRadius: AppUi.controlRadius,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(
+                  Icons.place_outlined,
+                  size: 16,
+                  color: AppUi.brandOf(context),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  completeAddress,
+                  style: TextStyle(
+                    color: AppUi.textSecondaryOf(context),
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Directions',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppUi.brandOf(context),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            completeAddress,
-            style: TextStyle(
-              color: AppUi.textSecondaryOf(context),
-              fontSize: 13,
-              height: 1.35,
-              fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  /// The station's single product: its water type, price, and what the
+  /// admin catalog says about it.
+  Widget _buildWaterCard(BuildContext context) {
+    final type = _stationWaterType;
+    final product = _displayProduct;
+    final price = (product['price'] as num?)?.toDouble();
+    final isAvailable = product['is_available'] != false;
+    final description =
+        (product['description']?.toString().trim().isNotEmpty == true)
+        ? product['description'].toString().trim()
+        : type.description;
+    final customerPref = _getCustomerWaterPreference();
+    final prefType = (customerPref == null || customerPref.trim().isEmpty)
+        ? null
+        : WaterTypes.byName(customerPref);
+    final matchesPreference =
+        prefType != null &&
+        prefType.shortName.toLowerCase() == type.shortName.toLowerCase();
+
+    final card = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppUi.surfaceOf(context),
+        borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+        border: Border.all(color: AppUi.borderOf(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: type.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                ),
+                alignment: Alignment.center,
+                child: Icon(type.icon, color: type.color, size: 26),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      type.name,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.textPrimaryOf(context),
+                      ),
+                    ),
+                    if (type.tagline.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        type.tagline,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppUi.accentTextOf(context, type.color),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (matchesPreference)
+                _SmallTag(
+                  icon: Icons.favorite_rounded,
+                  label: 'Your pick',
+                  color: AppUi.brandOf(context),
+                ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppUi.textSecondaryOf(context),
+              ),
             ),
+          ],
+          if (type.benefits.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final benefit in type.benefits)
+                  _SmallTag(
+                    icon: Icons.check_rounded,
+                    label: benefit,
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          Divider(height: 1, color: AppUi.dividerOf(context)),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_isLoadingPurified && price == null)
+                      const Skeleton(height: 28, width: 110, borderRadius: 8)
+                    else
+                      AnimatedSwitcher(
+                        duration: AppUi.motion(context, AppUi.motionBase),
+                        child: Text.rich(
+                          key: ValueKey(price),
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: price != null
+                                    ? formatPeso(price)
+                                    : 'Price not set',
+                                style: TextStyle(
+                                  fontSize: price != null ? 24 : 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                  color: AppUi.textPrimaryOf(context),
+                                ),
+                              ),
+                              if (price != null)
+                                TextSpan(
+                                  text: '  per gallon',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppUi.textSecondaryOf(context),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Delivery fee depends on distance and is shown at checkout.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isAvailable)
+                _SmallTag(
+                  icon: Icons.pause_circle_outline_rounded,
+                  label: 'Paused',
+                  color: AppUi.textSecondaryOf(context),
+                ),
+            ],
           ),
-        ),
-      ],
+          if (prefType != null && !matchesPreference) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 15,
+                  color: AppUi.textSecondaryOf(context),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'You usually order ${prefType.name}. This station only '
+                    'sells ${type.name}.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return Semantics(
+      container: true,
+      label:
+          '${type.name}${price != null ? ', ${formatPeso(price)} per gallon' : ''}'
+          '${isAvailable ? '' : ', paused'}',
+      child: card,
     );
   }
 
@@ -1354,12 +1418,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         ),
         const SizedBox(width: 8),
         _buildQuickActionBtn(
-          icon: Icons.autorenew_rounded,
-          label: 'Routine',
-          onTap: _scheduleAutoRefill,
-        ),
-        const SizedBox(width: 8),
-        _buildQuickActionBtn(
           icon: Icons.directions_outlined,
           label: 'Directions',
           onTap: _openInExternalMaps,
@@ -1375,38 +1433,28 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   }) {
     return Expanded(
       child: Material(
-        color: Colors.transparent,
+        color: AppUi.surfaceOf(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppUi.radiusCard),
+          side: BorderSide(color: AppUi.borderOf(context)),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {
             HapticFeedback.lightImpact();
             onTap();
           },
-          borderRadius: BorderRadius.circular(AppUi.radiusCard),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: AppUi.surfaceOf(context),
-              borderRadius: BorderRadius.circular(AppUi.radiusCard),
-              border: Border.all(color: AppUi.borderOf(context)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          child: SizedBox(
+            height: 48,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: AppUi.blueSoft,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(icon, size: 18, color: AppUi.brandOf(context)),
-                ),
-                const SizedBox(height: 6),
+                Icon(icon, size: 18, color: AppUi.brandOf(context)),
+                const SizedBox(width: 6),
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
                   ),
@@ -1419,97 +1467,41 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
     );
   }
 
-  Widget _buildBenefitsSection(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        borderRadius: BorderRadius.circular(AppUi.radiusCard),
-        border: Border.all(color: AppUi.borderOf(context)),
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: AppUi.textPrimaryOf(context),
+        letterSpacing: -0.3,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              children: [
-                _buildBenefitRow(Icons.shield_outlined, 'UV Sterilized'),
-                const SizedBox(height: 8),
-                _buildBenefitRow(
-                  Icons.clean_hands_outlined,
-                  'Free Sanitization',
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 44,
-            color: AppUi.dividerOf(context).withValues(alpha: 0.6),
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                _buildBenefitRow(Icons.water_drop_outlined, 'Purity Tested'),
-                const SizedBox(height: 8),
-                _buildBenefitRow(Icons.speed_rounded, '~15m Fast Prep'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBenefitRow(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 15, color: AppUi.brandOf(context)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppUi.textSecondaryOf(context),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 
   Widget _buildAutoRefillCard(BuildContext context) {
     final hasActive = _activeSubscription != null;
-    final stationName =
-        _stationData['station_name']?.toString() ?? 'this station';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppUi.brandSoftOf(context).withValues(alpha: 0.45),
+        color: AppUi.surfaceOf(context),
         borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-        border: Border.all(
-          color: AppUi.blueBorder.withValues(alpha: 0.7),
-          width: 1,
-        ),
+        border: Border.all(color: AppUi.borderOf(context)),
       ),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppUi.bluePrimary,
+              color: AppUi.brandSoftOf(context),
               borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),
             alignment: Alignment.center,
             child: Icon(
               hasActive ? Icons.event_repeat_rounded : Icons.autorenew_rounded,
-              color: Colors.white,
+              color: AppUi.brandOf(context),
               size: 20,
             ),
           ),
@@ -1519,7 +1511,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hasActive ? 'Active Routine' : 'Automated Refill Routine',
+                  hasActive ? 'Auto-refill is on' : 'Auto-refill',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -1529,8 +1521,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   hasActive
-                      ? '${_activeSubscription!.frequency.replaceAll('_', ' ')} · ${_activeSubscription!.quantity} bottles'
-                      : 'Recurring water deliveries scheduled with $stationName.',
+                      ? '${_activeSubscription!.frequency.replaceAll('_', ' ')} · ${_activeSubscription!.quantity} gallons'
+                      : 'Get refills delivered on a schedule.',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppUi.textSecondaryOf(context),
@@ -1543,535 +1535,23 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          FilledButton(
+          OutlinedButton(
             onPressed: hasActive
                 ? () => context.openOrderList()
                 : _scheduleAutoRefill,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppUi.bluePrimary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppUi.radiusControl),
               ),
             ),
             child: Text(
-              hasActive ? 'Manage' : 'Set Up',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              hasActive ? 'Manage' : 'Set up',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPreferenceNotice() {
-    final customerPref = _getCustomerWaterPreference();
-    if (customerPref == null || customerPref.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final prefInfo = WaterTypes.byName(customerPref);
-
-    // Check if any product offered by the station matches customer's preferred water type
-    bool hasMatchingProduct = false;
-    if (_products.isNotEmpty) {
-      for (final p in _products) {
-        final cat = p['category']?.toString() ?? p['name']?.toString() ?? '';
-        if (WaterTypes.byName(cat).shortName.toLowerCase() ==
-            prefInfo.shortName.toLowerCase()) {
-          hasMatchingProduct = true;
-          break;
-        }
-      }
-    } else if (_waterType != null) {
-      if (WaterTypes.byName(_waterType).shortName.toLowerCase() ==
-          prefInfo.shortName.toLowerCase()) {
-        hasMatchingProduct = true;
-      }
-    }
-
-    if (hasMatchingProduct) {
-      return const SizedBox.shrink();
-    }
-
-    final stationTypeName = _waterType != null
-        ? WaterTypes.byName(_waterType).name
-        : 'Purified Water';
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark
-            ? AppColors.statusReady.withValues(alpha: 0.12)
-            : const Color(0xFFF0FDFA),
-        borderRadius: BorderRadius.circular(AppUi.radiusCard),
-        border: Border.all(
-          color: isDark
-              ? AppColors.statusReady.withValues(alpha: 0.35)
-              : const Color(0xFF99F6E4),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1.5),
-            child: Icon(
-              Icons.info_outline_rounded,
-              size: 16,
-              color: isDark ? const Color(0xFF2DD4BF) : AppColors.statusReady,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Your water preference is ${prefInfo.name}. This station currently provides $stationTypeName refills.',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppUi.textPrimaryOf(context),
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 3 columns on phones (pinned product decision), more on wider screens.
-  SliverGridDelegate _productGridDelegate(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= AppBreakpoints.expanded
-        ? 5
-        : (width >= AppBreakpoints.compact ? 4 : 3);
-    return SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: columns,
-      crossAxisSpacing: AppUi.spacingSm,
-      mainAxisSpacing: AppUi.spacingSm,
-      childAspectRatio: 0.62,
-    );
-  }
-
-  Widget _buildRefillProductsSection(BuildContext context) {
-    final refillProducts = _products
-        .where((p) => !_isContainerOrAccessory(Map<String, dynamic>.from(p)))
-        .toList();
-    final accessoryProducts = _products
-        .where((p) => _isContainerOrAccessory(Map<String, dynamic>.from(p)))
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Water refills',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppUi.textPrimaryOf(context),
-                letterSpacing: -0.3,
-              ),
-            ),
-            if (refillProducts.length > 1)
-              Text(
-                '${refillProducts.length} options',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppUi.textSecondaryOf(context),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildPreferenceNotice(),
-        const SizedBox(height: 10),
-        if (_isLoadingPurified && _products.isEmpty)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 3,
-            gridDelegate: _productGridDelegate(context),
-            itemBuilder: (context, index) =>
-                const Skeleton(height: 160, borderRadius: 14),
-          )
-        else if (refillProducts.isNotEmpty)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: refillProducts.length,
-            gridDelegate: _productGridDelegate(context),
-            itemBuilder: (context, index) {
-              final pMap = OrderProductHelpers.withDisplayDefaults(
-                Map<String, dynamic>.from(refillProducts[index]),
-              );
-              final isSelected =
-                  _selectedProduct?['id']?.toString() == pMap['id']?.toString();
-              return _buildProductGridCard(
-                pMap,
-                isSelected: isSelected,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selectedProduct = pMap);
-                },
-              );
-            },
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 1,
-            gridDelegate: _productGridDelegate(context),
-            itemBuilder: (context, index) {
-              return _buildProductGridCard(
-                _displayProduct,
-                isSelected: true,
-                onTap: () {},
-              );
-            },
-          ),
-
-        if (accessoryProducts.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Containers & accessories',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppUi.textPrimaryOf(context),
-                  letterSpacing: -0.3,
-                ),
-              ),
-              Text(
-                '${accessoryProducts.length} items',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppUi.textSecondaryOf(context),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Containers, caps, and replacement accessories',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppUi.textSecondaryOf(context),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: accessoryProducts.length,
-            gridDelegate: _productGridDelegate(context),
-            itemBuilder: (context, index) {
-              final pMap = OrderProductHelpers.withDisplayDefaults(
-                Map<String, dynamic>.from(accessoryProducts[index]),
-              );
-              final isSelected =
-                  _selectedProduct?['id']?.toString() == pMap['id']?.toString();
-              return _buildProductGridCard(
-                pMap,
-                isSelected: isSelected,
-                isAccessory: true,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selectedProduct = pMap);
-                },
-              );
-            },
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildProductGridCard(
-    Map<String, dynamic> product, {
-    required bool isSelected,
-    required VoidCallback onTap,
-    bool isAccessory = false,
-  }) {
-    final category = OrderProductHelpers.formatCategory(
-      product['category']?.toString(),
-      name: product['name']?.toString(),
-    );
-    final waterType = WaterTypes.byName(category);
-    final price = (product['price'] as num?)?.toDouble();
-    final containerSize =
-        product['container_size']?.toString() ??
-        (isAccessory ? 'Piece' : '5-Gallon');
-    final isAvailable = product['is_available'] != false;
-    final customerPref = _getCustomerWaterPreference();
-    final isCustomerPreferred =
-        !isAccessory &&
-        customerPref != null &&
-        customerPref.trim().isNotEmpty &&
-        WaterTypes.byName(customerPref).shortName.toLowerCase() ==
-            waterType.shortName.toLowerCase();
-
-    final cart = context.watch<CartProvider>();
-    final targetStationId = _stationData['id']?.toString();
-    final pId = product['id']?.toString() ?? '';
-    final isThisStation = cart.stationId == targetStationId;
-    final inCartQty = isThisStation ? (cart.items[pId]?.quantity ?? 0) : 0;
-    final productName = product['name']?.toString() ?? 'item';
-
-    Color badgeBg;
-    Color iconColor;
-    IconData cardIcon;
-    if (isAccessory) {
-      badgeBg = AppUi.warningBg;
-      iconColor = AppColors.uiWarning;
-      cardIcon = Icons.inventory_2_outlined;
-    } else if (category.toLowerCase().contains('alkaline')) {
-      badgeBg = AppColors.statusPreparing.withValues(alpha: 0.1);
-      iconColor = AppColors.statusPreparing;
-      cardIcon = Icons.water_drop_rounded;
-    } else if (category.toLowerCase().contains('mineral')) {
-      badgeBg = AppColors.statusReady.withValues(alpha: 0.1);
-      iconColor = AppColors.statusReady;
-      cardIcon = Icons.water_drop_rounded;
-    } else {
-      badgeBg = AppUi.brandSoftOf(context);
-      iconColor = AppUi.brandOf(context);
-      cardIcon = Icons.water_drop_rounded;
-    }
-
-    return Opacity(
-      opacity: isAvailable ? 1.0 : 0.7,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: isAvailable ? onTap : null,
-          borderRadius: BorderRadius.circular(AppUi.radiusCard),
-          child: AnimatedContainer(
-            duration: AppUi.motion(context, AppUi.motionFast),
-            padding: const EdgeInsets.all(AppUi.spacingSm),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppUi.bluePrimary.withValues(alpha: 0.05)
-                  : (inCartQty > 0
-                        ? AppUi.brandSoftOf(context).withValues(alpha: 0.25)
-                        : AppUi.surfaceOf(context)),
-              borderRadius: BorderRadius.circular(AppUi.radiusCard),
-              border: Border.all(
-                color: isSelected
-                    ? AppUi.bluePrimary
-                    : (inCartQty > 0
-                          ? AppUi.bluePrimary.withValues(alpha: 0.4)
-                          : AppUi.borderOf(context)),
-                width: isSelected ? 1.5 : 1.0,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Top Icon & Badge
-                Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: badgeBg,
-                        borderRadius: BorderRadius.circular(
-                          AppUi.radiusControl,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(cardIcon, color: iconColor, size: 20),
-                    ),
-                    if (isSelected)
-                      Positioned(
-                        top: -3,
-                        right: -5,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: AppUi.bluePrimary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            size: 11,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    if (isCustomerPreferred && !isSelected)
-                      Positioned(
-                        top: -3,
-                        right: -5,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: AppColors.statusReady,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.star_rounded,
-                            size: 11,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-
-                // Name
-                Text(
-                  product['name']?.toString() ?? waterType.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11,
-                    height: 1.15,
-                    color: isSelected
-                        ? AppUi.brandOf(context)
-                        : AppUi.textPrimaryOf(context),
-                  ),
-                ),
-
-                // Container Size badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppUi.surfaceRaisedOf(context),
-                    borderRadius: BorderRadius.circular(AppUi.radiusXs),
-                  ),
-                  child: Text(
-                    containerSize,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppUi.textSecondaryOf(context),
-                    ),
-                  ),
-                ),
-
-                // Price
-                if (price != null)
-                  Text(
-                    formatPeso(price),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: AppUi.textPrimaryOf(context),
-                    ),
-                  ),
-
-                const SizedBox(height: 2),
-
-                // In-cart stepper or Add button (40 dp targets)
-                if (!isAvailable)
-                  Container(
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppUi.surfaceRaisedOf(context),
-                      borderRadius: AppUi.controlRadius,
-                    ),
-                    child: Text(
-                      'Unavailable',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppUi.textSecondaryOf(context),
-                      ),
-                    ),
-                  )
-                else if (inCartQty > 0)
-                  Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppUi.brandSoftOf(context),
-                      borderRadius: AppUi.controlRadius,
-                      border: Border.all(
-                        color: AppUi.brandOf(context).withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _GridStepButton(
-                            icon: Icons.remove_rounded,
-                            tooltip: 'Remove one $productName',
-                            onTap: () => _removeItemFromCart(pId),
-                          ),
-                        ),
-                        Semantics(
-                          label: 'In cart',
-                          value: '$inCartQty',
-                          child: Text(
-                            '$inCartQty',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppUi.onBrandSoftOf(context),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: _GridStepButton(
-                            icon: Icons.add_rounded,
-                            tooltip: 'Add one $productName',
-                            onTap: () => _addItemToCart(product, qty: 1),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  SizedBox(
-                    height: 40,
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      onPressed: () => _addItemToCart(product, qty: 1),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppUi.brandSoftOf(context),
-                        foregroundColor: AppUi.onBrandSoftOf(context),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: const Size(0, 40),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Add'),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -2496,26 +1976,32 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         : ((station['average_rating'] as num?)?.toDouble() ?? 0.0);
     final isVerified =
         station['is_verified'] == true || station['verified'] == true;
-    final photoUrl = station['station_photo_url'] as String?;
-    final photo = (photoUrl == null || photoUrl.isEmpty)
-        ? _sampleStationImage
-        : photoUrl;
+    final photoUrl = station['station_photo_url']?.toString().trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+    final waterType = _stationWaterType;
 
     final isOpen = (station['is_open'] as bool?) ?? true;
     final availability =
         station['station_availability']?.toString() ??
         (isOpen ? 'open' : 'closed');
     final normalizedAvailability = availability.toLowerCase();
+    final selectedProduct = _selectedProduct ?? _displayProduct;
+    final productAvailable = selectedProduct['is_available'] != false;
     final canOrder =
         isOpen &&
+        productAvailable &&
         !{'busy', 'maintenance', 'closed'}.contains(normalizedAvailability);
 
-    final selectedProduct = _selectedProduct ?? _displayProduct;
     final unitPrice =
-        (selectedProduct['price'] as num?)?.toDouble() ??
-        _pricePerGallon ??
-        25.0;
+        (selectedProduct['price'] as num?)?.toDouble() ?? _pricePerGallon ?? 0;
     final subtotal = unitPrice * _quantity;
+    final String blockedLabel = !isOpen || normalizedAvailability == 'closed'
+        ? 'Station closed'
+        : normalizedAvailability == 'maintenance'
+        ? 'Under maintenance'
+        : normalizedAvailability == 'busy'
+        ? 'Station busy'
+        : 'Not available right now';
 
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
@@ -2649,18 +2135,26 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(color: Colors.white),
+                  ColoredBox(color: waterType.color.withValues(alpha: 0.1)),
                   Hero(
                     tag: 'station_image_${station['id'] ?? stationName}',
-                    child: AppCachedImage(
-                      imageUrl: photo,
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.contain,
-                      memCacheWidth: 800,
-                      memCacheHeight: 500,
-                      fallbackIcon: Icons.water_drop_rounded,
-                    ),
+                    child: hasPhoto
+                        ? AppCachedImage(
+                            imageUrl: photoUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 800,
+                            memCacheHeight: 500,
+                            fallbackIcon: waterType.icon,
+                          )
+                        : Center(
+                            child: Icon(
+                              waterType.icon,
+                              size: 72,
+                              color: waterType.color.withValues(alpha: 0.6),
+                            ),
+                          ),
                   ),
                   Positioned(
                     top: 0,
@@ -2683,41 +2177,35 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Station Name & Verified
-                  _buildStationHeader(context, stationName, isVerified),
-                  const SizedBox(height: 8),
-
-                  // 2. Metadata Status Row
-                  _buildStationMetaRow(
+                  // 1. Who: name, status, rating, town
+                  _buildStationHeader(
                     context,
-                    isOpen,
-                    rawTown,
-                    rating,
-                    reviewCount,
+                    stationName: stationName,
+                    isVerified: isVerified || station['is_verified'] == true,
+                    availability: isOpen ? normalizedAvailability : 'closed',
+                    rawTown: rawTown,
+                    rating: rating,
+                    reviewCount: reviewCount,
                   ),
-                  const SizedBox(height: 10),
-
-                  // 3. Dedicated Address Row
+                  const SizedBox(height: 4),
                   _buildAddressRow(context, completeAddress),
                   const SizedBox(height: 16),
 
-                  // 4. Quick Actions
+                  // 2. What they sell: one water type at one price
+                  _buildSectionTitle(context, 'Refill'),
+                  const SizedBox(height: 8),
+                  _buildWaterCard(context),
+                  const SizedBox(height: 12),
+
+                  // 3. Reach the station
                   _buildQuickActions(context),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
 
-                  // 5. Water Quality & Benefits
-                  _buildBenefitsSection(context),
-                  const SizedBox(height: 14),
-
-                  // 6. Automated Refill Routine Card
+                  // 4. Recurring delivery
                   _buildAutoRefillCard(context),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
-                  // 7. Available Water Refills Section
-                  _buildRefillProductsSection(context),
-                  const SizedBox(height: 20),
-
-                  // 8. Customer Ratings & Reviews
+                  // 5. Ratings & reviews
                   _buildReviewsSection(context, rating, reviewCount),
                   const SizedBox(height: 100),
                 ],
@@ -2913,7 +2401,10 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             child: FilledButton(
                               onPressed: () => _handleOrderNow(
                                 canOrder: canOrder,
-                                normalizedAvailability: normalizedAvailability,
+                                normalizedAvailability:
+                                    isOpen && !productAvailable
+                                    ? 'paused'
+                                    : normalizedAvailability,
                               ),
                               style: FilledButton.styleFrom(
                                 backgroundColor: canOrder
@@ -2940,18 +2431,29 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          canOrder
-                                              ? (hasItemsInCart
-                                                    ? 'Add to Cart · ${formatPeso(subtotal, whole: true)}'
-                                                    : 'Order ($_quantity) · ${formatPeso(subtotal, whole: true)}')
-                                              : (isOpen
-                                                    ? 'Station Busy'
-                                                    : 'Station Closed'),
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: -0.2,
+                                        Flexible(
+                                          child: AnimatedSwitcher(
+                                            duration: AppUi.motion(
+                                              context,
+                                              AppUi.motionFast,
+                                            ),
+                                            child: Text(
+                                              !canOrder
+                                                  ? blockedLabel
+                                                  : unitPrice <= 0
+                                                  ? 'Order $_quantity gal'
+                                                  : '${hasItemsInCart ? 'Update cart' : 'Order $_quantity gal'} · ${formatPeso(subtotal, whole: true)}',
+                                              key: ValueKey(
+                                                '$canOrder$_quantity$subtotal$hasItemsInCart',
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                                letterSpacing: -0.2,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                         if (canOrder) ...[
@@ -2979,31 +2481,82 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   }
 }
 
-class _GridStepButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
+class _AvailabilityPill extends StatelessWidget {
+  final String availability;
 
-  const _GridStepButton({
+  const _AvailabilityPill({required this.availability});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (availability) {
+      'busy' => ('Busy', AppColors.uiWarning),
+      'maintenance' => ('Maintenance', AppColors.uiWarning),
+      'closed' => ('Closed', AppColors.uiError),
+      _ => ('Open now', AppColors.uiSuccess),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppUi.accentTextOf(context, color),
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallTag extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SmallTag({
     required this.icon,
-    required this.tooltip,
-    required this.onTap,
+    required this.label,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        borderRadius: AppUi.controlRadius,
-        child: SizedBox(
-          height: 40,
-          child: Icon(icon, size: 18, color: AppUi.onBrandSoftOf(context)),
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppUi.surfaceRaisedOf(context),
+        borderRadius: BorderRadius.circular(AppUi.radiusFull),
+        border: Border.all(color: AppUi.borderOf(context)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppUi.textSecondaryOf(context),
+            ),
+          ),
+        ],
       ),
     );
   }

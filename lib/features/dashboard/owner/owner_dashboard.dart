@@ -951,9 +951,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
           onTap: widget.onOpenAccount,
         ),
         ExperienceStep(
-          label: 'Products & catalog',
+          label: 'Your water & price',
           helper:
-              'At least 1 active orderable refill, container, or accessory.',
+              'Set a price for your water and keep it available.',
           isComplete: status.isProductsComplete,
           onTap: () => context.openOwnerServiceCatalog(),
         ),

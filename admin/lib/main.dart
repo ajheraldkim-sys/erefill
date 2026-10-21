@@ -1,4 +1,5 @@
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/water_types.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   );
 
   final api = AdminApiService(Supabase.instance.client);
+  WaterTypes.load();
   final auth = AdminAuthProvider(api)..init();
 
   runApp(

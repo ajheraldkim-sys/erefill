@@ -326,36 +326,16 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       );
 
       final ownerRows = batchResults[2] as List? ?? const [];
+      // Each station sells one water type; its product row is the fallback
+      // when the profile query didn't return primary_water_type.
       final productRows = batchResults[6] as List? ?? const [];
-      final Map<String, Set<String>> stationWaterTypes = {};
+      final Map<String, String> productWaterTypes = {};
       for (final p in productRows) {
         if (p is Map) {
           final ownerId = p['owner_id']?.toString();
-          if (ownerId != null && ownerId.isNotEmpty) {
-            final types = stationWaterTypes.putIfAbsent(ownerId, () => <String>{});
-            final cat = p['category']?.toString().trim();
-            final name = p['name']?.toString().trim();
-            if (cat != null && cat.isNotEmpty) {
-              types.add(cat);
-              final lowerCat = cat.toLowerCase();
-              if (lowerCat.contains('container') ||
-                  lowerCat.contains('accessor') ||
-                  lowerCat == 'products') {
-                types.add('Accessories');
-              }
-            }
-            if (name != null) {
-              final lower = name.toLowerCase();
-              if (lower.contains('purified')) types.add('Purified');
-              if (lower.contains('alkaline')) types.add('Alkaline');
-              if (lower.contains('mineral')) types.add('Mineral');
-              if (lower.contains('container') ||
-                  lower.contains('bottle') ||
-                  lower.contains('pump') ||
-                  lower.contains('cap')) {
-                types.add('Accessories');
-              }
-            }
+          final label = (p['category'] ?? p['name'])?.toString().trim();
+          if (ownerId != null && label != null && label.isNotEmpty) {
+            productWaterTypes.putIfAbsent(ownerId, () => label);
           }
         }
       }
@@ -366,68 +346,16 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           ownerPrices: ownerPrices,
         );
         final sId = s['id']?.toString();
-        final types = Set<String>.from(stationWaterTypes[sId] ?? const <String>{});
-
-        // Also check cached station bundle in StationDataCache
-        final cached = StationDataCache.instance.get(sId);
-        if (cached != null) {
-          if (cached.waterType != null && cached.waterType!.isNotEmpty) {
-            types.add(cached.waterType!);
-          }
-          for (final prod in cached.products) {
-            if (prod is Map) {
-              final c = prod['category']?.toString();
-              final n = prod['name']?.toString();
-              if (c != null && c.isNotEmpty) {
-                types.add(c);
-                final lowerCat = c.toLowerCase();
-                if (lowerCat.contains('container') ||
-                    lowerCat.contains('accessor') ||
-                    lowerCat == 'products') {
-                  types.add('Accessories');
-                }
-              }
-              if (n != null) {
-                final lower = n.toLowerCase();
-                if (lower.contains('purified')) types.add('Purified');
-                if (lower.contains('alkaline')) types.add('Alkaline');
-                if (lower.contains('mineral')) types.add('Mineral');
-                if (lower.contains('container') ||
-                    lower.contains('bottle') ||
-                    lower.contains('pump') ||
-                    lower.contains('cap')) {
-                  types.add('Accessories');
-                }
-              }
-            }
-          }
-        }
-
-        // Profile primary_water_type
         final primary = s['primary_water_type']?.toString().trim();
-        if (primary != null && primary.isNotEmpty) {
-          types.add(primary);
-          final lower = primary.toLowerCase();
-          if (lower.contains('purified')) types.add('Purified');
-          if (lower.contains('alkaline')) types.add('Alkaline');
-          if (lower.contains('mineral')) types.add('Mineral');
-        }
+        final source = (primary != null && primary.isNotEmpty)
+            ? primary
+            : productWaterTypes[sId] ??
+                  StationDataCache.instance.get(sId)?.waterType;
 
-        // Station name keywords (e.g. "Water Kaw Alkaline Station")
-        final sName = (s['station_name'] ?? s['full_name'] ?? '').toString().toLowerCase();
-        if (sName.contains('purified')) types.add('Purified');
-        if (sName.contains('alkaline')) types.add('Alkaline');
-        if (sName.contains('mineral')) types.add('Mineral');
-
-        // Refill stations by default provide Purified if not specified
-        if (types.isEmpty) {
-          types.add('Purified');
-        }
-
-        // Home snapshots are persisted with jsonEncode. Keep the collection
-        // JSON-safe while retaining the Set's de-duplication and insertion
-        // order for category filtering and display after a cache reload.
-        s['available_water_types'] = types.toList(growable: false);
+        // Home snapshots are persisted with jsonEncode, so keep this a list.
+        s['available_water_types'] = [
+          WaterTypes.byName(source).shortName,
+        ];
         return s;
       }
 
@@ -1075,7 +1003,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         for (final raw in validItems) {
           final productId = raw['product_id'].toString();
           final productName =
-              (raw['product_name'] ?? 'Purified Water Refill').toString();
+              (raw['product_name'] ?? 'Water refill').toString();
           final price = (raw['price_at_purchase'] as num).toDouble();
           final qty = ((raw['quantity'] as num?) ?? 1).toInt();
 
@@ -1186,23 +1114,14 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final cat = _selectedCategory.toLowerCase();
       base = _stations.where((s) {
         final types = s['available_water_types'];
-        if (types is Set<String>) {
-          if (types.any((t) => t.toLowerCase() == cat || t.toLowerCase().contains(cat))) {
-            return true;
-          }
-        } else if (types is Iterable) {
-          if (types.any((t) => t.toString().toLowerCase() == cat || t.toString().toLowerCase().contains(cat))) {
-            return true;
-          }
+        if (types is Iterable &&
+            types.any((t) => t.toString().toLowerCase() == cat)) {
+          return true;
         }
-
-        final primaryType = (s['primary_water_type'] ?? '').toString().toLowerCase();
-        if (primaryType.contains(cat)) return true;
-
-        final name = (s['station_name'] ?? s['full_name'] ?? '').toString().toLowerCase();
-        if (name.contains(cat)) return true;
-
-        return false;
+        return WaterTypes.byName(
+              s['primary_water_type']?.toString(),
+            ).shortName.toLowerCase() ==
+            cat;
       }).toList();
     }
 
@@ -1386,12 +1305,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         ? WaterTypes.byName(prefType).shortName
         : null;
 
-    const categories = [
+    final categories = [
       {'label': 'All Refills', 'icon': Icons.grid_view_rounded, 'filter': 'All'},
-      {'label': 'Purified', 'icon': Icons.water_drop_rounded, 'filter': 'Purified'},
-      {'label': 'Alkaline', 'icon': Icons.science_rounded, 'filter': 'Alkaline'},
-      {'label': 'Mineral', 'icon': Icons.spa_rounded, 'filter': 'Mineral'},
-      {'label': 'Accessories', 'icon': Icons.inventory_2_outlined, 'filter': 'Accessories'},
+      for (final type in WaterTypes.all)
+        {'label': type.shortName, 'icon': type.icon, 'filter': type.shortName},
     ];
 
     return SizedBox(
@@ -1548,7 +1465,11 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         AppUi.vGapMd,
                         _buildQuickOrderButton(context),
                         AppUi.vGapMd,
-                        _buildWaterCategoryRow(context),
+                        ValueListenableBuilder<List<WaterTypeInfo>>(
+                          valueListenable: WaterTypes.catalog,
+                          builder: (context, _, _) =>
+                              _buildWaterCategoryRow(context),
+                        ),
                         AppUi.vGapMd,
                         Row(
                           children: [

@@ -2657,8 +2657,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         children: [
                           AccountNavTile(
                             icon: Icons.water_drop_outlined,
-                            title: 'Water products & catalog',
-                            subtitle: 'Refill sizes, alkalines, and containers',
+                            title: 'Your water & price',
+                            subtitle: 'Set your refill price and availability',
                             badgeText: _setupStatus.productsSection.badgeText,
                             badgeColor: _setupStatus.productsSection.isComplete
                                 ? AppColors.uiSuccess

@@ -31,6 +31,7 @@ import '../../../core/services/offline_order_sync_service.dart';
 import '../../../core/services/payment_launch_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/friendly_errors.dart';
+import '../../../core/water_types.dart';
 import '../../loyalty/models/loyalty_model.dart';
 import '../../loyalty/services/loyalty_service.dart';
 
@@ -2660,18 +2661,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return 'Home';
   }
 
-  String _deriveContainerOrRefillType(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('slim')) return '5-Gallon Slim Refill';
-    if (lower.contains('round')) return '5-Gallon Round Refill';
-    if (lower.contains('gallon') || lower.contains('gal')) {
-      return '5-Gallon Refill';
-    }
-    if (lower.contains('alkaline')) return 'Alkaline Refill';
-    if (lower.contains('mineral')) return 'Mineral Refill';
-    if (lower.contains('purified')) return 'Purified Refill';
-    return 'Water Refill';
-  }
+  String _deriveContainerOrRefillType(String name) =>
+      '${WaterTypes.byName(name).shortName} refill · per gallon';
 
   Widget _paymentBrandBadge(String method) {
     return PaymentBrandMark(method: method, width: 58, height: 36);

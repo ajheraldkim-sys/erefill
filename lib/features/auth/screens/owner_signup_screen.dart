@@ -13,6 +13,7 @@ import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
+import 'package:erefill/core/water_types.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 class OwnerSignupScreen extends StatefulWidget {
@@ -41,7 +42,8 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
 
   String _selectedTown = 'Cantilan';
   String? _selectedBarangay;
-  String _selectedWaterType = 'Purified Water';
+  String? _selectedWaterType = WaterTypes.defaultType?.name;
+  bool _waterTypesLoading = WaterTypes.all.isEmpty;
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _selectedSuffix;
@@ -50,6 +52,25 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
 
   final Map<String, List<String>> _municipalityData =
       AppConstants.municipalityData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWaterTypes();
+  }
+
+  Future<void> _loadWaterTypes() async {
+    setState(() => _waterTypesLoading = WaterTypes.all.isEmpty);
+    await WaterTypes.load(force: true);
+    if (!mounted) return;
+    setState(() {
+      _waterTypesLoading = false;
+      final names = WaterTypes.all.map((t) => t.name);
+      if (!names.contains(_selectedWaterType)) {
+        _selectedWaterType = WaterTypes.defaultType?.name;
+      }
+    });
+  }
 
   void _nextStep() {
     if (_currentStep < 2) {
@@ -86,19 +107,6 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
       }
     }
   }
-
-  final List<Map<String, String>> _waterOptions = const [
-    {
-      'name': 'Purified Water',
-      'desc':
-          'The most common type, treated to remove nearly all contaminants.',
-    },
-    {
-      'name': 'Mineral Water',
-      'desc': 'Often treated to contain specific levels of minerals.',
-    },
-    {'name': 'Alkaline Water', 'desc': 'Water with a higher pH level.'},
-  ];
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +154,10 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
 
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedWaterType == null) {
+      _showMessage('Choose the water your station sells.', isError: true);
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -488,24 +500,51 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
             const SizedBox(height: 32),
             _sectionHeader('Operation Details'),
             const SizedBox(height: 16),
-            _buildDropdownField(
-              label: 'Primary Water Type',
-              initialValue: _selectedWaterType,
-              items: _waterOptions.map((e) => e['name']!).toList(),
-              icon: Icons.water_drop_outlined,
-              onChanged: (val) => setState(() => _selectedWaterType = val!),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _waterOptions.firstWhere(
-                (opt) => opt['name'] == _selectedWaterType,
-              )['desc']!,
-              style: TextStyle(
-                color: AppUi.textSecondaryOf(context),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+            if (_waterTypesLoading)
+              const LinearProgressIndicator()
+            else if (WaterTypes.all.isEmpty)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Water types couldn't load. Check your connection.",
+                      style: TextStyle(
+                        color: AppUi.textSecondaryOf(context),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadWaterTypes,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              )
+            else ...[
+              _buildDropdownField(
+                label: 'Water you sell',
+                initialValue: _selectedWaterType,
+                items: WaterTypes.all.map((t) => t.name).toList(),
+                icon: Icons.water_drop_outlined,
+                onChanged: (val) => setState(() => _selectedWaterType = val),
+                validator: (val) =>
+                    val == null ? 'Choose the water your station sells' : null,
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                [
+                  if (_selectedWaterType != null)
+                    WaterTypes.byName(_selectedWaterType).description,
+                  'This is the only product your station sells. You set its '
+                      'price; only an admin can change the water type later.',
+                ].where((s) => s.isNotEmpty).join('\n\n'),
+                style: TextStyle(
+                  color: AppUi.textSecondaryOf(context),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 40),
           ],
         ),

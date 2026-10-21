@@ -175,7 +175,7 @@ class _CartScreenState extends State<CartScreen> {
                       pose: AxoPose.empty,
                       title: 'Your cart is empty',
                       message:
-                          'Browse water refilling stations to add fresh water, containers, or accessories.',
+                          'Browse water refilling stations to order a refill.',
                       actionLabel: 'Browse stations',
                       onAction: () {
                         if (Navigator.of(context).canPop()) {

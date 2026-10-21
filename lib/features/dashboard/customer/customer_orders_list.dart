@@ -320,7 +320,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
 
     for (final raw in validItems) {
       final productId = raw['product_id'].toString();
-      final productName = (raw['product_name'] ?? 'Purified Water refill')
+      final productName = (raw['product_name'] ?? 'Water refill')
           .toString();
       final price = ((raw['price_at_purchase'] as num?) ?? 0).toDouble();
       final qty = ((raw['quantity'] as num?) ?? 1).toInt();

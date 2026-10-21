@@ -45,7 +45,10 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
   String? _suffix;
   String _town = 'Cantilan';
   String? _barangay;
-  String _waterType = WaterTypes.purified.name;
+  String _waterType = WaterTypes.defaultType?.name ?? '';
+  String get _effectiveWaterType => _waterType.isNotEmpty
+      ? _waterType
+      : (WaterTypes.defaultType?.name ?? '');
   Map<String, dynamic>? _assignedOwner;
   List<Map<String, dynamic>> _municipalityOwners = [];
   bool _loadingOwners = false;
@@ -168,7 +171,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
           town: _town,
           barangay: _barangay!,
           completeAddress: _address.text.trim(),
-          primaryWaterType: _waterType,
+          primaryWaterType: _effectiveWaterType,
           latitude: _pickedLocation.latitude,
           longitude: _pickedLocation.longitude,
           middleInitial: _middleInitial.text.trim(),
@@ -186,7 +189,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
           phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
           town: _town,
           barangay: _role == 'customer' ? _barangay! : '',
-          waterType: _waterType,
+          waterType: _effectiveWaterType,
           middleInitial: _middleInitial.text.trim(),
           suffix: _suffix,
           completeAddress: _role == 'customer' ? _address.text.trim() : null,
@@ -425,11 +428,13 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                   style: adminSectionTitleStyle(context),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
+                ValueListenableBuilder<List<WaterTypeInfo>>(
+                  valueListenable: WaterTypes.catalog,
+                  builder: (context, _, _) => Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: WaterTypes.all.map((type) {
-                    final selected = _waterType == type.name;
+                    final selected = _effectiveWaterType == type.name;
                     return ChoiceChip(
                       label: Text(type.shortName),
                       selected: selected,
@@ -445,6 +450,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                       ),
                     );
                   }).toList(),
+                ),
                 ),
                 AppUi.vGapMd,
                 SizedBox(

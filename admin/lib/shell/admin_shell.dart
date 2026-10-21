@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../features/catalog/water_types_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/fees/platform_fees_screen.dart';
 import '../features/notifications/admin_notifications_screen.dart';
@@ -20,6 +21,7 @@ import '../widgets/admin_ui.dart';
 enum AdminSection {
   dashboard,
   stations,
+  waterTypes,
   orders,
   users,
   releases,
@@ -230,6 +232,7 @@ class _AdminShellState extends State<AdminShell> {
     return switch (section) {
       AdminSection.dashboard => const DashboardScreen(),
       AdminSection.stations => const StationsScreen(),
+      AdminSection.waterTypes => const WaterTypesScreen(),
       AdminSection.orders => const OrdersScreen(),
       AdminSection.users => const UsersScreen(),
       AdminSection.releases => const AppReleasesScreen(),
@@ -280,6 +283,11 @@ class _AdminSidebar extends StatelessWidget {
           AdminSection.stations,
           LucideIcons.store,
           'Water Stations',
+        ),
+        _NavItem(
+          AdminSection.waterTypes,
+          LucideIcons.droplet,
+          'Water Types',
         ),
         _NavItem(
           AdminSection.users,
@@ -625,6 +633,7 @@ class _AdminTopBar extends StatelessWidget {
   String get _title => switch (section) {
     AdminSection.dashboard => 'Dashboard',
     AdminSection.stations => 'Water Stations',
+    AdminSection.waterTypes => 'Water Types',
     AdminSection.orders => 'Refill Orders',
     AdminSection.users => 'Users & Accounts',
     AdminSection.releases => 'App Releases',

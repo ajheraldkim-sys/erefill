@@ -1554,48 +1554,6 @@ class AdminApiService {
     }
   }
 
-  Future<Map<String, dynamic>> upsertProduct({
-    String? productId,
-    String? ownerId,
-    String? name,
-    String? description,
-    double? price,
-    String? category,
-    int? stockLevel,
-    bool? isAvailable,
-    String? reason,
-  }) async {
-    try {
-      final result = await _client.rpc(
-        'admin_upsert_product',
-        params: {
-          'p_product_id': productId,
-          'p_owner_id': ownerId,
-          'p_name': name,
-          'p_description': description,
-          'p_price': price,
-          'p_category': category,
-          'p_stock_level': stockLevel,
-          'p_is_available': isAvailable,
-          'p_reason': reason,
-        },
-      );
-      final map = _asMap(result);
-      if (map.isNotEmpty) return map;
-    } catch (_) {}
-
-    return {};
-  }
-
-  Future<void> deleteProduct(String productId, {String? reason}) async {
-    try {
-      await _client.rpc(
-        'admin_delete_product',
-        params: {'p_product_id': productId, 'p_reason': reason},
-      );
-    } catch (_) {}
-  }
-
   // --- Notifications ---
 
   Future<void> sendNotification({

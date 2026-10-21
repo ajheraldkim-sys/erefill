@@ -6,7 +6,11 @@ import 'package:erefill/core/water_types.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/water_type_fixtures.dart';
+
 void main() {
+  seedTestWaterTypes();
+
   group('shared refill status presentation', () {
     test('maps the full delivery lifecycle to user-facing labels', () {
       expect(OrderStatusPresentation.fromStatus('pending').label, 'Pending');
@@ -85,7 +89,7 @@ void main() {
                   color: Colors.blue,
                 ),
                 WaterTypeCard(
-                  type: WaterTypes.alkaline,
+                  type: testAlkaline,
                   price: 45,
                   containerSize: '5 gallon',
                   preparationMinutes: 20,

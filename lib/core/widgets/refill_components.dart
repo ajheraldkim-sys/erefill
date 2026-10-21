@@ -96,6 +96,13 @@ class WaterTypeFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<List<WaterTypeInfo>>(
+      valueListenable: WaterTypes.catalog,
+      builder: (context, _, _) => _buildChips(context),
+    );
+  }
+
+  Widget _buildChips(BuildContext context) {
     final options = [
       if (includeAll) 'all',
       ...WaterTypes.all.map((t) => t.shortName),
