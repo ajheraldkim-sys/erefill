@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../constants.dart';
+import '../../utils/money.dart';
 
 /// Fades and slides its child up into place once, after [delay]. Use a small
 /// increasing delay on sibling sections for a staggered entrance. Shows the
@@ -78,6 +79,64 @@ class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
         ),
       ),
     );
+  }
+}
+
+/// A peso amount that counts from its previous value to the new one when it
+/// changes (no count-up on first show). Instant with reduced motion.
+class AnimatedPeso extends StatefulWidget {
+  const AnimatedPeso(this.amount, {super.key, this.style});
+
+  final double amount;
+  final TextStyle? style;
+
+  @override
+  State<AnimatedPeso> createState() => _AnimatedPesoState();
+}
+
+class _AnimatedPesoState extends State<AnimatedPeso> {
+  late double _from = widget.amount;
+
+  @override
+  void didUpdateWidget(AnimatedPeso oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.amount != widget.amount) _from = oldWidget.amount;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: _from, end: widget.amount),
+      duration: AppUi.motion(context, AppUi.motionSlow),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) => Text(
+        formatPeso(value),
+        style: (widget.style ?? const TextStyle()).copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+  }
+}
+
+/// Staggers list items in only while a list first appears. Items built later
+/// (scrolled into view, or rebuilt after the window) show immediately, so
+/// scrolling never replays the entrance. Keep one per list in a State and
+/// call [reset] when the list is reloaded.
+class ListEntrance {
+  ListEntrance({this.window = const Duration(milliseconds: 600)});
+
+  final Duration window;
+  final Stopwatch _clock = Stopwatch();
+
+  void reset() => _clock
+    ..reset()
+    ..stop();
+
+  Widget wrap(int index, Widget child) {
+    if (!_clock.isRunning) _clock.start();
+    if (_clock.elapsed > window || index > 8) return child;
+    return Reveal(delay: Duration(milliseconds: 40 * index), child: child);
   }
 }
 

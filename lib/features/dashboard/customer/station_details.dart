@@ -19,6 +19,7 @@ import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/water_types.dart';
 import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/widgets/auth_dialogs.dart';
+import '../../../core/widgets/motion/motion.dart';
 import '../../../core/widgets/skeleton.dart';
 import 'package:erefill/core/models/cart_model.dart';
 import '../../chat/models/chat_room.dart';
@@ -57,7 +58,6 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
   List<dynamic> _reviews = [];
   bool _isLoadingPurified = true;
   Map<String, dynamic>? _selectedProduct;
-
 
   @override
   void initState() {
@@ -741,34 +741,36 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   const SizedBox(height: 18),
 
                   if (selectedPrice != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppUi.brandSoftOf(context).withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Estimated Total / Refill:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: AppUi.textPrimaryOf(ctx),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppUi.brandSoftOf(
+                          context,
+                        ).withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Estimated Total / Refill:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: AppUi.textPrimaryOf(ctx),
+                            ),
                           ),
-                        ),
-                        Text(
-                          formatPeso(estimatedPrice),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                            color: AppUi.brandOf(context),
+                          Text(
+                            formatPeso(estimatedPrice),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: AppUi.brandOf(context),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 14),
 
                   SizedBox(
@@ -2161,9 +2163,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     left: 0,
                     right: 0,
                     height: 70,
-                    child: const ColoredBox(
-                      color: Color(0x1F000000),
-                    ),
+                    child: const ColoredBox(color: Color(0x1F000000)),
                   ),
                 ],
               ),
@@ -2194,19 +2194,28 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   // 2. What they sell: one water type at one price
                   _buildSectionTitle(context, 'Refill'),
                   const SizedBox(height: 8),
-                  _buildWaterCard(context),
+                  Reveal(child: _buildWaterCard(context)),
                   const SizedBox(height: 12),
 
                   // 3. Reach the station
-                  _buildQuickActions(context),
+                  Reveal(
+                    delay: const Duration(milliseconds: 60),
+                    child: _buildQuickActions(context),
+                  ),
                   const SizedBox(height: 20),
 
                   // 4. Recurring delivery
-                  _buildAutoRefillCard(context),
+                  Reveal(
+                    delay: const Duration(milliseconds: 120),
+                    child: _buildAutoRefillCard(context),
+                  ),
                   const SizedBox(height: 24),
 
                   // 5. Ratings & reviews
-                  _buildReviewsSection(context, rating, reviewCount),
+                  Reveal(
+                    delay: const Duration(milliseconds: 180),
+                    child: _buildReviewsSection(context, rating, reviewCount),
+                  ),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -2396,75 +2405,78 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
 
                         // Order Action CTA Button
                         Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: FilledButton(
-                              onPressed: () => _handleOrderNow(
-                                canOrder: canOrder,
-                                normalizedAvailability:
-                                    isOpen && !productAvailable
-                                    ? 'paused'
-                                    : normalizedAvailability,
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: canOrder
-                                    ? AppUi.bluePrimary
-                                    : AppUi.textMutedOf(context),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppUi.radiusPill,
-                                  ),
+                          child: TapScale(
+                            enabled: canOrder,
+                            child: SizedBox(
+                              height: 48,
+                              child: FilledButton(
+                                onPressed: () => _handleOrderNow(
+                                  canOrder: canOrder,
+                                  normalizedAvailability:
+                                      isOpen && !productAvailable
+                                      ? 'paused'
+                                      : normalizedAvailability,
                                 ),
-                                elevation: 0,
-                              ),
-                              child: _isPlacingOrder
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2.2,
-                                      ),
-                                    )
-                                  : Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Flexible(
-                                          child: AnimatedSwitcher(
-                                            duration: AppUi.motion(
-                                              context,
-                                              AppUi.motionFast,
-                                            ),
-                                            child: Text(
-                                              !canOrder
-                                                  ? blockedLabel
-                                                  : unitPrice <= 0
-                                                  ? 'Order $_quantity gal'
-                                                  : '${hasItemsInCart ? 'Update cart' : 'Order $_quantity gal'} · ${formatPeso(subtotal, whole: true)}',
-                                              key: ValueKey(
-                                                '$canOrder$_quantity$subtotal$hasItemsInCart',
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w700,
-                                                letterSpacing: -0.2,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        if (canOrder) ...[
-                                          const SizedBox(width: 6),
-                                          const Icon(
-                                            Icons.arrow_forward_rounded,
-                                            size: 17,
-                                          ),
-                                        ],
-                                      ],
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: canOrder
+                                      ? AppUi.bluePrimary
+                                      : AppUi.textMutedOf(context),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      AppUi.radiusPill,
                                     ),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: _isPlacingOrder
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.2,
+                                        ),
+                                      )
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Flexible(
+                                            child: AnimatedSwitcher(
+                                              duration: AppUi.motion(
+                                                context,
+                                                AppUi.motionFast,
+                                              ),
+                                              child: Text(
+                                                !canOrder
+                                                    ? blockedLabel
+                                                    : unitPrice <= 0
+                                                    ? 'Order $_quantity gal'
+                                                    : '${hasItemsInCart ? 'Update cart' : 'Order $_quantity gal'} · ${formatPeso(subtotal, whole: true)}',
+                                                key: ValueKey(
+                                                  '$canOrder$_quantity$subtotal$hasItemsInCart',
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: -0.2,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          if (canOrder) ...[
+                                            const SizedBox(width: 6),
+                                            const Icon(
+                                              Icons.arrow_forward_rounded,
+                                              size: 17,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                              ),
                             ),
                           ),
                         ),

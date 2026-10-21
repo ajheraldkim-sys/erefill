@@ -26,6 +26,7 @@ import '../../../core/services/local_data_cache.dart';
 
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
 
 class StationListScreen extends StatefulWidget {
   const StationListScreen({super.key, this.initialFilter});
@@ -38,6 +39,7 @@ class StationListScreen extends StatefulWidget {
 }
 
 class _StationListScreenState extends State<StationListScreen> {
+  final _listEntrance = ListEntrance();
   final supabase = Supabase.instance.client;
   late final StreamController<List<Map<String, dynamic>>> _stationsController;
   late final Stream<List<Map<String, dynamic>>> _stationsStream;
@@ -1435,10 +1437,13 @@ class _StationListScreenState extends State<StationListScreen> {
                                     separatorBuilder: (context, index) =>
                                         const SizedBox(height: 10),
                                     itemBuilder: (context, index) =>
-                                        RepaintBoundary(
+                                        _listEntrance.wrap(
+                                          index,
+                                          RepaintBoundary(
                                           child: _buildStationListTile(
                                             stations[index],
                                           ),
+                                        ),
                                         ),
                                   ),
                                 ),

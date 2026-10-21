@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
@@ -7,8 +8,8 @@ import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/models/cart_model.dart';
-
-import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/water_types.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
 
 class CartScreen extends StatefulWidget {
   final Map<String, dynamic>? station;
@@ -20,6 +21,7 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  final _listEntrance = ListEntrance();
   SupabaseClient? get _supabase {
     try {
       return Supabase.instance.client;
@@ -218,19 +220,21 @@ class _CartScreenState extends State<CartScreen> {
                           ],
                         ),
                         const SizedBox(height: AppUi.spacingXs),
-                        ...itemsList.map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppUi.spacingSm,
-                            ),
-                            child: _CartLineItem(
-                              item: item,
-                              onQuantityChanged: (q) =>
-                                  cart.updateQuantity(item.id, q),
-                              onRemove: () => _removeWithUndo(cart, item),
+                        for (final (index, item) in itemsList.indexed)
+                          _listEntrance.wrap(
+                            index,
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppUi.spacingSm,
+                              ),
+                              child: _CartLineItem(
+                                item: item,
+                                onQuantityChanged: (q) =>
+                                    cart.updateQuantity(item.id, q),
+                                onRemove: () => _removeWithUndo(cart, item),
+                              ),
                             ),
                           ),
-                        ),
                         const SizedBox(height: AppUi.spacingLg),
                         AppCard(child: _buildSummary(cart)),
                       ],
@@ -300,24 +304,28 @@ class _CartScreenState extends State<CartScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      formatPeso(estimate),
+                    AnimatedPeso(
+                      estimate,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: AppUi.spacingMd),
-              FilledButton.icon(
-                onPressed: _proceedToCheckout,
-                iconAlignment: IconAlignment.end,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                label: const Text('Checkout'),
+              TapScale(
+                child: FilledButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _proceedToCheckout();
+                  },
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                  label: const Text('Checkout'),
+                ),
               ),
             ],
           ),
@@ -390,15 +398,8 @@ class _CartLineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = item.name.toLowerCase();
-    final isAccessory = name.contains('container') ||
-        name.contains('cap') ||
-        name.contains('accessory');
-    final accent = isAccessory
-        ? (AppUi.isDark(context)
-              ? AppUi.accentCyan
-              : AppColors.statusPreparing)
-        : AppUi.brandOf(context);
+    final type = WaterTypes.byName(item.name);
+    final accent = type.color;
 
     return AppCard(
       padding: const EdgeInsets.all(AppUi.spacingMd),
@@ -411,11 +412,7 @@ class _CartLineItem extends StatelessWidget {
               color: accent.withValues(alpha: AppUi.isDark(context) ? 0.16 : 0.1),
               borderRadius: AppUi.controlRadius,
             ),
-            child: Icon(
-              isAccessory ? Icons.inventory_2_outlined : Icons.water_drop_rounded,
-              color: accent,
-              size: 22,
-            ),
+            child: Icon(type.icon, color: accent, size: 22),
           ),
           const SizedBox(width: AppUi.spacingMd),
           Expanded(
@@ -430,17 +427,16 @@ class _CartLineItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${formatPeso(item.price)} each',
+                  '${formatPeso(item.price)} per gallon',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: AppUi.spacingXs),
-                Text(
-                  formatPeso(item.price * item.quantity),
+                AnimatedPeso(
+                  item.price * item.quantity,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],

@@ -31,6 +31,7 @@ import '../../../core/widgets/offline_sync_status_pill.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
 
@@ -43,6 +44,7 @@ class CustomerHomeTab extends StatefulWidget {
 class _CustomerHomeTabState extends State<CustomerHomeTab>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final supabase = Supabase.instance.client;
+  final _listEntrance = ListEntrance();
   final PageController _homeBannerController = PageController();
 
   String _userFirstName = 'there';
@@ -1536,12 +1538,15 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                               childAspectRatio: 0.74,
                             ),
                         delegate: SliverChildBuilderDelegate(
-                          (context, index) => StationCard(
-                            station: displayedStations[index],
-                            compact: true,
-                            onTap: () => context.openStationDetails(
-                              displayedStations[index],
-                            ),
+                          (context, index) => _listEntrance.wrap(
+                            index,
+                            StationCard(
+                              station: displayedStations[index],
+                              compact: true,
+                              onTap: () => context.openStationDetails(
+                                displayedStations[index],
+                              ),
+                          ),
                           ),
                           childCount: displayedStations.length,
                         ),

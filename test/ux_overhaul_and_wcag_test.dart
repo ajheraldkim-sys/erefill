@@ -208,7 +208,7 @@ void main() {
   });
 
   group('StationCard Trust Signals & Badges Tests', () {
-    testWidgets('List card displays Sanitary Verified trust badge', (tester) async {
+    testWidgets('List card shows verification only when the station is verified', (tester) async {
       final sampleStation = {
         'id': 'st-101',
         'station_name': 'Aqua Pure Cantilan',
@@ -218,6 +218,8 @@ void main() {
         'price_per_gallon': 35.0,
         'average_rating': 4.8,
         'review_count': 12,
+        'is_verified': true,
+        'primary_water_type': 'Mineral Water',
       };
 
       await tester.pumpWidget(
@@ -233,13 +235,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Sanitary Verified'), findsOneWidget);
+      expect(find.text('Sanitary Verified'), findsNothing,
+          reason: 'No permit data exists, so the card must not claim one');
       expect(find.byIcon(Icons.verified_rounded), findsOneWidget);
       expect(find.text('Aqua Pure Cantilan'), findsOneWidget);
+      expect(find.text('Mineral'), findsOneWidget);
       expect(find.text('₱35 / gallon'), findsOneWidget);
     });
 
-    testWidgets('Grid card displays verified checkmark icon next to station name', (tester) async {
+    testWidgets('Grid card hides the verified checkmark for unverified stations', (tester) async {
       final sampleStation = {
         'id': 'st-102',
         'station_name': 'Crystal Clear Madrid',
@@ -267,7 +271,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Crystal Clear Madrid'), findsOneWidget);
-      expect(find.byIcon(Icons.verified_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.verified_rounded), findsNothing);
     });
   });
 

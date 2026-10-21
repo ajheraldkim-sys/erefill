@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -34,6 +35,7 @@ import '../../../core/utils/friendly_errors.dart';
 import '../../../core/water_types.dart';
 import '../../loyalty/models/loyalty_model.dart';
 import '../../loyalty/services/loyalty_service.dart';
+import '../../../core/widgets/motion/motion.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Map<String, dynamic> station;
@@ -3089,8 +3091,8 @@ class _CheckoutBottomBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    formatPeso(total),
+                  AnimatedPeso(
+                    total,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -3102,33 +3104,46 @@ class _CheckoutBottomBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            SizedBox(
-              height: 52,
-              child: FilledButton(
-                onPressed: canSubmit ? onConfirm : null,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  minimumSize: const Size(0, 52),
-                ),
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+            TapScale(
+              enabled: canSubmit,
+              child: SizedBox(
+                height: 52,
+                child: FilledButton(
+                  onPressed: canSubmit
+                      ? () {
+                          HapticFeedback.mediumImpact();
+                          onConfirm();
+                        }
+                      : null,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    minimumSize: const Size(0, 52),
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: AppUi.motion(context, AppUi.motionFast),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            key: ValueKey('submitting'),
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Place order',
+                            key: ValueKey('label'),
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
                           ),
-                        ),
-                      )
-                    : const Text(
-                        'Checkout',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
+                  ),
+                ),
               ),
             ),
           ],

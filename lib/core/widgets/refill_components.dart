@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../constants.dart';
 import '../water_types.dart';
 import 'app_cached_image.dart';
+import 'motion/motion.dart';
 import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
@@ -142,7 +143,8 @@ class WaterTypeFilterChips extends StatelessWidget {
   }
 }
 
-/// Station card for list and grid views.
+/// Station card for list and grid views. Each station sells one water type,
+/// so the card leads with that type and its price per gallon.
 class StationCard extends StatelessWidget {
   final Map<String, dynamic> station;
   final VoidCallback? onTap;
@@ -169,388 +171,341 @@ class StationCard extends StatelessWidget {
     return station['full_name']?.toString() ?? 'Water Station';
   }
 
+  String get _location {
+    final barangay = station['barangay']?.toString() ?? '';
+    final town = station['town']?.toString() ?? '';
+    return [barangay, town].where((part) => part.isNotEmpty).join(', ');
+  }
+
+  double? get _price {
+    final price = (station['price_per_gallon'] as num?)?.toDouble();
+    return price != null && price > 0 ? price : null;
+  }
+
+  String get _availability =>
+      station['station_availability']?.toString() ??
+      ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
+
+  bool get _isVerified => station['is_verified'] == true;
+
+  /// The station's water type, if the row carries one.
+  WaterTypeInfo? get _waterType {
+    final primary = station['primary_water_type']?.toString().trim();
+    if (primary != null && primary.isNotEmpty) {
+      return WaterTypes.byName(primary);
+    }
+    final types = station['available_water_types'];
+    if (types is Iterable && types.isNotEmpty) {
+      return WaterTypes.byName(types.first.toString());
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (compact) return _buildGridCard(context);
-    return _buildListCard(context);
+    final isClosed = _availability.toLowerCase() == 'closed';
+    final card = compact ? _buildGridCard(context) : _buildListCard(context);
+    return Opacity(
+      opacity: isClosed ? 0.65 : 1.0,
+      child: TapScale(enabled: onTap != null, child: card),
+    );
+  }
+
+  Widget _cardShell(BuildContext context, {required Widget child}) {
+    return Material(
+      color: AppUi.surfaceOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: AppUi.cardRadius,
+        side: BorderSide(color: AppUi.borderOf(context)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: onTap, child: child),
+    );
+  }
+
+  Widget _photo(BuildContext context, {double? size, required double iconSize}) {
+    final photoUrl = station['station_photo_url']?.toString().trim();
+    final type = _waterType;
+    final fallback = ColoredBox(
+      color: (type?.color ?? AppUi.bluePrimary).withValues(alpha: 0.12),
+      child: Center(
+        child: Icon(
+          type?.icon ?? Icons.water_drop_rounded,
+          size: iconSize,
+          color: type?.color ?? AppUi.brandOf(context),
+        ),
+      ),
+    );
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return SizedBox(width: size, height: size, child: fallback);
+    }
+    return AppCachedImage(
+      imageUrl: photoUrl,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      memCacheWidth: 480,
+      memCacheHeight: 480,
+      placeholder: fallback,
+      errorWidget: fallback,
+    );
+  }
+
+  Widget _favoriteButton(BuildContext context, {bool onPhoto = false}) {
+    return Material(
+      color: onPhoto
+          ? AppUi.surfaceOf(context).withValues(alpha: 0.92)
+          : Colors.transparent,
+      shape: const CircleBorder(),
+      child: IconButton(
+        tooltip: isFavorite ? 'Remove favorite' : 'Add favorite',
+        visualDensity: VisualDensity.compact,
+        onPressed: onFavoriteToggle,
+        icon: AnimatedSwitcher(
+          duration: AppUi.motion(context, AppUi.motionFast),
+          transitionBuilder: (child, animation) =>
+              ScaleTransition(scale: animation, child: child),
+          child: Icon(
+            isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            key: ValueKey(isFavorite),
+            size: 20,
+            color: isFavorite ? AppUi.error : AppUi.textSecondaryOf(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _priceText(BuildContext context, {required bool large}) {
+    final price = _price;
+    if (price == null) {
+      return Text(
+        'Price not listed',
+        style: AppUi.captionText.copyWith(
+          color: AppUi.textSecondaryOf(context),
+        ),
+      );
+    }
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '₱${_formatPrice(price)}',
+            style: TextStyle(
+              fontSize: large ? 17 : 13,
+              fontWeight: FontWeight.w700,
+              color: AppUi.textPrimaryOf(context),
+            ),
+          ),
+          TextSpan(
+            text: large ? ' / gallon' : '/gal',
+            style: TextStyle(
+              fontSize: large ? 12 : 11,
+              fontWeight: FontWeight.w500,
+              color: AppUi.textSecondaryOf(context),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildGridCard(BuildContext context) {
-    final barangay = station['barangay']?.toString() ?? '';
-    final town = station['town']?.toString() ?? '';
-    final location = [barangay, town].where((part) => part.isNotEmpty).join(', ');
     final rating = (station['average_rating'] as num?)?.toDouble() ?? 0.0;
-    final price = (station['price_per_gallon'] as num?)?.toDouble();
-    final availability =
-        station['station_availability']?.toString() ??
-        ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
-    final photoUrl = station['station_photo_url']?.toString();
+    final type = _waterType;
+    final location = _location;
 
-    final bool isClosed = availability.toLowerCase() == 'closed';
-
-    return Opacity(
-      opacity: isClosed ? 0.65 : 1.0,
-      child: Material(
-        color: AppUi.surfaceOf(context),
-        borderRadius: AppUi.cardRadius,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppUi.cardRadius,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: AppUi.cardRadius,
-              border: Border.all(color: AppUi.borderOf(context)),
+    return _cardShell(
+      context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _photo(context, iconSize: 36),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: StationAvailabilityBadge(availability: _availability),
+                ),
+                if (showFavorite)
+                  Positioned(
+                    top: 4,
+                    left: 4,
+                    child: _favoriteButton(context, onPhoto: true),
+                  ),
+              ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Expanded(
-                child: Stack(
+                Row(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: AppUi.brandSoftOf(context),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(AppUi.radiusCard),
-                        ),
-                      ),
-                      child: AppCachedImage(
-                        imageUrl: photoUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 480,
-                        memCacheHeight: 480,
-                        placeholder: _placeholderIcon(),
-                        errorWidget: _placeholderIcon(),
+                    Expanded(
+                      child: Text(
+                        _name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppUi.sectionTitle.copyWith(fontSize: 13),
                       ),
                     ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: StationAvailabilityBadge(availability: availability),
-                    ),
-                    if (showFavorite)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Material(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            onTap: onFavoriteToggle,
-                            customBorder: const CircleBorder(),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(
-                                isFavorite
-                                    ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
-                                size: 18,
-                                color: isFavorite
-                                    ? AppUi.error
-                                    : AppUi.textSecondaryOf(context),
-                              ),
-                            ),
-                          ),
-                        ),
+                    if (_isVerified) ...[
+                      const SizedBox(width: 3),
+                      Icon(
+                        Icons.verified_rounded,
+                        size: 13,
+                        color: AppUi.brandOf(context),
                       ),
+                    ],
                   ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 3),
+                Text(
+                  type != null
+                      ? type.shortName
+                      : (location.isEmpty ? 'Location unavailable' : location),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppUi.captionText.copyWith(
+                    color: AppUi.textSecondaryOf(context),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppUi.sectionTitle.copyWith(fontSize: 13),
-                          ),
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 14,
+                      color: AppColors.uiWarning,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      rating > 0 ? rating.toStringAsFixed(1) : 'New',
+                      style: AppUi.captionText.copyWith(
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    ),
+                    const Spacer(),
+                    _priceText(context, large: false),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListCard(BuildContext context) {
+    final rating = (station['average_rating'] as num?)?.toDouble() ?? 0.0;
+    final reviewCount = (station['review_count'] as num?)?.toInt() ?? 0;
+    final type = _waterType;
+    final location = _location;
+
+    return _cardShell(
+      context,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppUi.radiusControl),
+              child: _photo(context, size: 72, iconSize: 30),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppUi.sectionTitle,
                         ),
-                        const SizedBox(width: 3),
+                      ),
+                      if (_isVerified) ...[
+                        const SizedBox(width: 4),
                         Icon(
                           Icons.verified_rounded,
-                          size: 13,
+                          size: 15,
                           color: AppUi.brandOf(context),
+                          semanticLabel: 'Verified station',
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 3),
+                    ],
+                  ),
+                  if (location.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      location.isEmpty ? 'Location unavailable' : location,
+                      location,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppUi.captionText.copyWith(
                         color: AppUi.textSecondaryOf(context),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, size: 14, color: AppColors.uiWarning),
-                        const SizedBox(width: 3),
-                        Text(
-                          rating > 0 ? rating.toStringAsFixed(1) : 'New',
-                          style: AppUi.captionText.copyWith(
-                            color: AppUi.textSecondaryOf(context),
-                          ),
-                        ),
-                        if (price != null && price > 0) ...[
-                          const Spacer(),
-                          Text(
-                            '₱${_formatPrice(price)}/gal',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
-                              color: AppUi.brandOf(context),
-                            ),
-                          ),
-                        ] else ...[
-                          const Spacer(),
-                          Text(
-                            'Price not listed',
-                            style: AppUi.captionText.copyWith(
-                              color: AppUi.textSecondaryOf(context),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
                   ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    );
-  }
-
-  Widget _buildListCard(BuildContext context) {
-    final barangay = station['barangay']?.toString() ?? '';
-    final town = station['town']?.toString() ?? '';
-    final location = [barangay, town].where((s) => s.isNotEmpty).join(', ');
-    final rating = (station['average_rating'] as num?)?.toDouble() ?? 0.0;
-    final reviewCount = (station['review_count'] as num?)?.toInt() ?? 0;
-    final price = (station['price_per_gallon'] as num?)?.toDouble();
-    final availability =
-        station['station_availability']?.toString() ??
-        ((station['is_open'] as bool? ?? true) ? 'open' : 'closed');
-    final photoUrl = station['station_photo_url']?.toString();
-    final bool isClosed = availability.toLowerCase() == 'closed';
-
-    return Opacity(
-      opacity: isClosed ? 0.65 : 1.0,
-      child: Material(
-        color: AppUi.surfaceOf(context),
-        borderRadius: AppUi.cardRadius,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppUi.cardRadius,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: AppUi.cardDecorationOf(context),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                child: SizedBox(
-                  width: 68,
-                  height: 68,
-                  child: AppCachedImage(
-                    imageUrl: photoUrl,
-                    width: 68,
-                    height: 68,
-                    fit: BoxFit.cover,
-                    memCacheWidth: 180,
-                    memCacheHeight: 180,
-                    fallbackIcon: Icons.water_drop_rounded,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppUi.sectionTitle,
-                          ),
-                        ),
-                        if (showFavorite)
-                          IconButton(
-                            tooltip: isFavorite
-                                ? 'Remove favorite'
-                                : 'Add favorite',
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 36,
-                              height: 36,
-                            ),
-                            padding: EdgeInsets.zero,
-                            onPressed: onFavoriteToggle,
-                            icon: Icon(
-                              isFavorite
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              size: 20,
-                              color: isFavorite
-                                  ? AppUi.error
-                                  : AppUi.textSecondaryOf(context),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (location.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        location,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppUi.captionText.copyWith(
-                          color: AppUi.textSecondaryOf(context),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        StationAvailabilityBadge(availability: availability),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(AppUi.radiusSm),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.verified_rounded,
-                                size: 12,
-                                color: AppUi.brandOf(context),
-                              ),
-                              SizedBox(width: 3),
-                              Text(
-                                'Sanitary Verified',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0369A1),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      StationAvailabilityBadge(availability: _availability),
+                      if (type != null)
                         _StationCardMeta(
-                          icon: Icons.star_rounded,
-                          label: reviewCount > 0
-                              ? '${rating.toStringAsFixed(1)} · $reviewCount reviews'
-                              : 'New station',
-                          iconColor: AppColors.uiWarning,
+                          icon: type.icon,
+                          label: type.shortName,
+                          iconColor: type.color,
                         ),
-                        if (distanceLabel != null &&
-                            distanceLabel!.isNotEmpty)
-                          _StationCardMeta(
-                            icon: Icons.near_me_outlined,
-                            label: distanceLabel!,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      price != null && price > 0
-                          ? '₱${_formatPrice(price)} / gallon'
-                          : 'Price not listed',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: price != null && price > 0
-                                ? AppUi.brandOf(context)
-                                : AppUi.textSecondaryOf(context),
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ],
-                ),
+                      _StationCardMeta(
+                        icon: Icons.star_rounded,
+                        label: reviewCount > 0
+                            ? '${rating.toStringAsFixed(1)} · $reviewCount reviews'
+                            : 'New station',
+                        iconColor: AppColors.uiWarning,
+                      ),
+                      if (distanceLabel != null && distanceLabel!.isNotEmpty)
+                        _StationCardMeta(
+                          icon: Icons.near_me_outlined,
+                          label: distanceLabel!,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _priceText(context, large: true),
+                ],
               ),
-              if (!showFavorite)
-                Icon(
+            ),
+            if (showFavorite)
+              _favoriteButton(context)
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: Icon(
                   Icons.chevron_right_rounded,
                   color: AppUi.textSecondaryOf(context),
                 ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    );
-  }
-
-  String _formatPrice(double price) {
-    return price % 1 == 0
-        ? price.toStringAsFixed(0)
-        : price.toStringAsFixed(2);
-  }
-
-  Widget _placeholderIcon() {
-    return Container(
-      color: AppUi.blueSoft,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.85),
-                shape: BoxShape.circle,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x0A000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
               ),
-              child: Icon(
-                Icons.water_drop_rounded,
-                size: 28,
-                color: AppUi.bluePrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Water Station',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppUi.bluePrimary,
-                letterSpacing: 0.2,
-              ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatPrice(double price) {
+    return price % 1 == 0 ? price.toStringAsFixed(0) : price.toStringAsFixed(2);
   }
 }
 
