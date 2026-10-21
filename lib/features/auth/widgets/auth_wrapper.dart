@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/widgets/brand/erefill_logo.dart';
+import 'package:erefill/core/widgets/brand/water_fill_mark.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/utils/app_roles.dart';
 import 'package:erefill/features/auth/screens/auth_entry_screen.dart';
@@ -356,6 +358,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
 // ─── In-App Splash Screen ───────────────────────────────────────────────────
 
+/// Shown while the app starts and while the signed-in profile loads. Uses the
+/// native splash background so the handoff from the OS splash is seamless.
 class _SplashScreen extends StatefulWidget {
   const _SplashScreen();
 
@@ -365,23 +369,29 @@ class _SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<_SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fade;
-  late final Animation<double> _scale;
+  static const _background = Color(0xFF0A0F1A);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+  late final Animation<double> _textFade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.35, 1, curve: Curves.easeOut),
+  );
+  late final Animation<Offset> _textSlide = Tween(
+    begin: const Offset(0, 0.25),
+    end: Offset.zero,
+  ).animate(_textFade);
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
-
-    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-    _scale = Tween<double>(
-      begin: 0.85,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (AppUi.reduceMotion(context)) {
+      _controller.value = 1;
+    } else if (!_controller.isAnimating && _controller.value == 0) {
+      _controller.forward();
+    }
   }
 
   @override
@@ -397,72 +407,41 @@ class _SplashScreenState extends State<_SplashScreen>
         statusBarColor: Colors.transparent,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0F1A),
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background image
-            Image.asset(
-              'assets/images/onboarding_bg.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-              errorBuilder: (context, error, stackTrace) =>
-                  const SizedBox.shrink(),
-            ),
-            const ColoredBox(color: Color(0xCC0A0F1A)),
-            Center(
-              child: FadeTransition(
-                opacity: _fade,
-                child: ScaleTransition(
-                  scale: _scale,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 32,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppUi.darkSurface,
-                      borderRadius: BorderRadius.circular(AppUi.radiusPill),
-                      border: Border.all(color: AppUi.borderDark),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'eRefill',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -1.5,
-                          ),
+        backgroundColor: _background,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const WaterFillMark(size: 84),
+              const SizedBox(height: 28),
+              FadeTransition(
+                opacity: _textFade,
+                child: SlideTransition(
+                  position: _textSlide,
+                  child: const Column(
+                    children: [
+                      ERefillLogo(
+                        size: 40,
+                        showMark: false,
+                        color: Colors.white,
+                        markColor: AppUi.accentCyan,
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Water refills, delivered',
+                        style: TextStyle(
+                          color: AppUi.darkTextSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.2,
                         ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Smart Water Delivery',
-                          style: TextStyle(
-                            color: AppUi.borderStrongLight,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: AppUi.infoFgDark,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
