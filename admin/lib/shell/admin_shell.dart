@@ -362,22 +362,15 @@ class _AdminSidebar extends StatelessWidget {
                           child: IconButton(
                             tooltip: 'Expand menu',
                             onPressed: onToggle,
-                            icon: const Icon(
-                              LucideIcons.droplets,
-                              color: AppUi.bluePrimary,
-                              size: 24,
-                            ),
+                            icon: const ERefillMark(size: 28),
                           ),
                         )
                       : Row(
                           children: [
                             Expanded(
-                              child: ERefillLogo(
-                                size: 34,
-                                showMark: false,
-                                showWordmark: true,
-                                color: AppUi.textPrimaryOf(context),
-                                markColor: AppUi.bluePrimary,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: ERefillLogo(size: 30),
                               ),
                             ),
                             IconButton(

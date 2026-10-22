@@ -62,24 +62,43 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.4.1
 
+# Brand assets are rendered from lib/core/widgets/brand/erefill_mark.dart by
+# `flutter test tool/render_brand_assets.dart`; re-run that, then these two
+# generators, whenever the mark changes.
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   remove_alpha_ios: true
   image_path: "assets/icon/app-icon.png"
-  adaptive_icon_background: "#2196F3"
-  adaptive_icon_foreground: "assets/icon/app-icon.png"
-  min_sdk_size: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app-icon-foreground.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/icon/app-icon.png"
+    background_color: "#0F1F3D"
+    theme_color: "#1858D8"
+  windows:
+    generate: true
+    image_path: "assets/icon/app-icon.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/icon/app-icon.png"
 
 flutter_native_splash:
-  color: "#0A0F1A"
+  color: "#0F1F3D"
   image: "assets/images/splash_wordmark.png"
-  color_dark: "#0A0F1A"
+  color_dark: "#0F1F3D"
   image_dark: "assets/images/splash_wordmark.png"
   android_12:
-    image: "assets/images/splash_wordmark_android12.png"
-    icon_background_color: "#0A0F1A"
-    color: "#0A0F1A"
+    image: "assets/images/splash_icon_android12.png"
+    icon_background_color: "#FFFFFF"
+    color: "#0F1F3D"
+    image_dark: "assets/images/splash_icon_android12.png"
+    icon_background_color_dark: "#FFFFFF"
+    color_dark: "#0F1F3D"
+  web: true
 
 flutter:
   uses-material-design: true

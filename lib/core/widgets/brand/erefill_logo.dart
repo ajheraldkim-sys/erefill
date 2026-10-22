@@ -1,166 +1,123 @@
 import 'package:flutter/material.dart';
 
 import '../../constants.dart';
+import 'erefill_mark.dart';
 
-/// Modern eRefill brand mark — rounded icon + clean wordmark.
+export 'erefill_mark.dart' show BrandColors, ERefillMark;
+
+/// eRefill logo lockup: the ribbon "e" mark, the "eRefill" wordmark and,
+/// optionally, the "CLEAN WATER. MADE EASY." tagline.
+///
+/// The wordmark is navy on light surfaces and white on dark ones, like the
+/// brand board. Pass [color] to force a wordmark color (e.g. white on a
+/// blue hero) and [markColor] for a one-color mark.
 class ERefillLogo extends StatelessWidget {
   const ERefillLogo({
     super.key,
     this.size = 48,
     this.showWordmark = true,
     this.showMark = true,
+    this.showTagline = false,
     this.stacked = false,
     this.color,
     this.markColor,
   });
 
+  /// Height of the mark; the wordmark scales with it.
   final double size;
   final bool showWordmark;
 
-  /// When false, only the wordmark is shown (e.g. login header).
+  /// When false, only the wordmark is shown.
   final bool showMark;
+  final bool showTagline;
 
-  /// Icon above wordmark (login / splash).
+  /// Mark above the wordmark (login, splash) instead of beside it.
   final bool stacked;
+
+  /// Wordmark color; defaults to navy, or white in dark mode.
   final Color? color;
+
+  /// One-color mark; null keeps the brand gradient.
   final Color? markColor;
 
   @override
   Widget build(BuildContext context) {
-    final fg = color ?? AppUi.textPrimaryOf(context);
-    final primary = markColor ?? AppUi.bluePrimary;
-
-    final mark = _BrandMark(size: size, primary: primary);
-    final wordmark = _Wordmark(
-      fg: fg,
-      primary: primary,
-      size: size,
-      wordmarkOnly: !showMark,
-    );
-
-    if (!showMark) return wordmark;
+    final fg =
+        color ??
+        (AppUi.isDark(context) ? Colors.white : BrandColors.navy);
+    final mark = ERefillMark(size: size, color: markColor);
     if (!showWordmark) return mark;
+
+    final wordmark = _Wordmark(
+      color: fg,
+      fontSize: showMark ? size * 0.62 : size,
+      showTagline: showTagline,
+      center: stacked,
+    );
+    if (!showMark) return wordmark;
 
     if (stacked) {
       return Column(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          mark,
-          SizedBox(height: size * 0.22),
-          wordmark,
-        ],
+        children: [mark, SizedBox(height: size * 0.18), wordmark],
       );
     }
-
     return Row(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        mark,
-        SizedBox(width: size * 0.2),
-        wordmark,
-      ],
-    );
-  }
-}
-
-class _BrandMark extends StatelessWidget {
-  const _BrandMark({required this.size, required this.primary});
-
-  final double size;
-  final Color primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final dim = size * 1.05;
-    return Container(
-      width: dim,
-      height: dim,
-      decoration: BoxDecoration(
-        color: primary,
-        borderRadius: BorderRadius.circular(dim * 0.28),
-      ),
-      child: CustomPaint(painter: _DropGlyphPainter(), size: Size(dim, dim)),
+      children: [mark, SizedBox(width: size * 0.16), wordmark],
     );
   }
 }
 
 class _Wordmark extends StatelessWidget {
   const _Wordmark({
-    required this.fg,
-    required this.primary,
-    required this.size,
-    this.wordmarkOnly = false,
+    required this.color,
+    required this.fontSize,
+    required this.showTagline,
+    required this.center,
   });
 
-  final Color fg;
-  final Color primary;
-  final double size;
-  final bool wordmarkOnly;
+  final Color color;
+  final double fontSize;
+  final bool showTagline;
+  final bool center;
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = wordmarkOnly ? size : size * 0.58;
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: 'e',
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w700,
-              color: primary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          TextSpan(
-            text: 'Refill',
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w700,
-              color: fg,
-              letterSpacing: -0.8,
-            ),
-          ),
-        ],
+    final name = Text(
+      'eRefill',
+      semanticsLabel: 'eRefill',
+      style: TextStyle(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -fontSize * 0.02,
+        height: 1.05,
+        color: color,
       ),
     );
-  }
-}
+    if (!showTagline) return name;
 
-class _DropGlyphPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w * 0.5;
-
-    final drop = Path()
-      ..moveTo(cx, h * 0.22)
-      ..cubicTo(w * 0.78, h * 0.38, w * 0.72, h * 0.72, cx, h * 0.78)
-      ..cubicTo(w * 0.28, h * 0.72, w * 0.22, h * 0.38, cx, h * 0.22)
-      ..close();
-
-    canvas.drawPath(
-      drop,
-      Paint()..color = Colors.white.withValues(alpha: 0.95),
-    );
-
-    final highlight = Paint()
-      ..color = Colors.white.withValues(alpha: 0.45)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.045
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, h * 0.52), radius: w * 0.14),
-      2.4,
-      2.2,
-      false,
-      highlight,
+    final taglineColor = color == BrandColors.navy
+        ? BrandColors.slate
+        : color.withValues(alpha: 0.72);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: center
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        name,
+        SizedBox(height: fontSize * 0.08),
+        Text(
+          BrandColors.tagline,
+          style: TextStyle(
+            fontSize: (fontSize * 0.2).clamp(9, 18),
+            fontWeight: FontWeight.w600,
+            letterSpacing: fontSize * 0.055,
+            color: taglineColor,
+          ),
+        ),
+      ],
     );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

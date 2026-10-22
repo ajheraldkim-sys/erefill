@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
+import 'brand_colors.dart';
 
 /// Centralized, single source of truth for all brand, semantic status,
 /// UI state, and neutral surface colors across the eRefill application.
@@ -14,6 +15,12 @@ class AppColors {
   static const Color brandSoft = AppUi.blueSoft;
   static const Color brandBorder = AppUi.blueBorder;
   static const Color brandPale = AppUi.bluePale;
+
+  /// Logo identity colors (see [BrandColors]): use for the mark, splash and
+  /// brand moments, not for everyday UI accents.
+  static const Color brandNavy = BrandColors.navy;
+  static const Color brandSky = BrandColors.sky;
+  static const Color brandRoyal = BrandColors.royal;
   static const Color deepNavy = AppUi.deepBlue;
   static const Color accentCyan = AppUi.accentCyan;
 

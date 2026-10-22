@@ -20,7 +20,8 @@ This page is the "how do I use it in code" companion.
    backend hasn't answered, say so ("Calculated at checkout").
 6. **Keep surfaces flat.** No gradients, purple/indigo
    accents, backdrop blur, or glass-style cards. Use solid, opaque surfaces and
-   the shared color tokens.
+   the shared color tokens. (The logo mark's own gradient is the one
+   exception; always show the logo with `ERefillLogo` / `ERefillMark`.)
 
 ## Tokens at a glance
 

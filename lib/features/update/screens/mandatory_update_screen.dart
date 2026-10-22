@@ -111,7 +111,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Brand Icon & Logo
-                    const ERefillLogo(size: 80),
+                    const ERefillLogo(size: 64, showTagline: true),
                     const SizedBox(height: 24),
 
                     // Critical Alert Icon Badge

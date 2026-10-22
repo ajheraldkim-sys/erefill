@@ -169,8 +169,13 @@ void main() {
         );
         final offenders = <String>[];
 
+        // The logo mark is the one sanctioned gradient: it is the brand
+        // artwork itself, not a UI surface (see design-system MASTER.md).
+        bool isBrandMark(File f) => f.path
+            .replaceAll(r'\', '/')
+            .endsWith('lib/core/widgets/brand/erefill_mark.dart');
         final sourceFiles = [
-          ..._dartFiles(Directory('lib')),
+          ..._dartFiles(Directory('lib')).where((f) => !isBrandMark(f)),
           ..._dartFiles(Directory('admin/lib')),
           File('web/download.html'),
         ];

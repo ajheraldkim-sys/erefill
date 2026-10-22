@@ -2,6 +2,7 @@ import 'dart:convert' show utf8;
 import 'package:erefill/core/utils/money.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart' show BuildContext, debugPrint;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -31,6 +32,19 @@ class ReceiptService {
   }
 
   /// Generates receipt PDF byte array
+  /// Logo + wordmark + tagline (rendered by `tool/render_brand_assets.dart`).
+  /// Null if the asset cannot be read, in which case the header falls back
+  /// to text in the brand colors.
+  static Future<pw.MemoryImage?> _loadBrandLockup() async {
+    try {
+      final data = await rootBundle.load('assets/images/brand_lockup_light.png');
+      return pw.MemoryImage(data.buffer.asUint8List());
+    } catch (e) {
+      debugPrint('Receipt brand lockup unavailable: $e');
+      return null;
+    }
+  }
+
   static Future<Uint8List> generateReceiptPdf({
     required Map<String, dynamic> order,
     List<Map<String, dynamic>> items = const [],
@@ -40,6 +54,7 @@ class ReceiptService {
     Uint8List? recipientSignature,
   }) async {
     final pdf = pw.Document();
+    final brandLockup = await _loadBrandLockup();
 
     final orderId = (order['id'] ?? '').toString();
     final shortId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId.toUpperCase();
@@ -115,27 +130,31 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'eRefill',
-                        style: pw.TextStyle(
-                          fontSize: 28,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColor.fromHex('#2563EB'),
+                  if (brandLockup != null)
+                    pw.Image(brandLockup, height: 44)
+                  else
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'eRefill',
+                          style: pw.TextStyle(
+                            fontSize: 28,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColor.fromHex('#0F1F3D'),
+                          ),
                         ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        'Water Refilling & Delivery Service',
-                        style: const pw.TextStyle(
-                          fontSize: 10,
-                          color: PdfColors.grey700,
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'CLEAN WATER. MADE EASY.',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            letterSpacing: 1.5,
+                            color: PdfColor.fromHex('#4A5A78'),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   pw.Container(
                     padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: pw.BoxDecoration(

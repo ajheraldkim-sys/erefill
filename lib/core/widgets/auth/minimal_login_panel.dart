@@ -154,10 +154,9 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                           Reveal(
                             child: Center(
                               child: ERefillLogo(
-                                size: compact ? 40 : 46,
+                                size: compact ? 52 : 64,
                                 stacked: true,
-                                color: titleColor,
-                                markColor: accentColor,
+                                showTagline: true,
                               ),
                             ),
                           ),

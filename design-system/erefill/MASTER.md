@@ -133,6 +133,21 @@ Use solid fills throughout the system: no gradients, purple/indigo accents,
 backdrop blur, or translucent glass-style cards. Keep status colors saturated,
 distinct, and contrast-safe.
 
+**One exception: the logo.** The eRefill mark (`ERefillMark`, in
+`lib/core/widgets/brand/erefill_mark.dart`) keeps its sky → royal gradient
+because it is brand artwork, not a surface. Never copy that gradient onto
+buttons, cards, headers or backgrounds.
+
+## Brand
+
+| Element | Spec |
+|---|---|
+| Mark | Ribbon "e" with a water drop. Always `ERefillMark` / `ERefillLogo` — never redraw it or use an icon font drop as the logo. |
+| Lockup | `ERefillLogo(showTagline: true)`: mark, "eRefill" (Plus Jakarta Sans 800), tagline `CLEAN WATER. MADE EASY.` |
+| Colors | `BrandColors`: sky `#3CCBFA`, azure `#2196F3`, royal `#1858D8`, navy `#0F1F3D` (wordmark, splash), slate `#4A5A78` (tagline). |
+| On dark / blue | Wordmark white. On a blue fill, use the one-color mark: `ERefillMark(color: Colors.white)`. |
+| Icon & splash | Rendered from the mark by `flutter test tool/render_brand_assets.dart`, then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`. |
+
 ## Controls
 
 | Control | Spec |

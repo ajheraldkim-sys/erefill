@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/erefill_logo.dart';
-import 'package:erefill/core/widgets/brand/water_fill_mark.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/utils/app_roles.dart';
 import 'package:erefill/features/auth/screens/auth_entry_screen.dart';
@@ -369,7 +368,11 @@ class _SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<_SplashScreen>
     with SingleTickerProviderStateMixin {
-  static const _background = Color(0xFF0A0F1A);
+  /// Same navy and same lockup size as the native splash
+  /// (`flutter_native_splash` in pubspec, image from
+  /// `tool/render_brand_assets.dart`), so the handoff does not jump.
+  static const _background = BrandColors.navy;
+  static const _logoSize = 62.5;
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
@@ -409,34 +412,28 @@ class _SplashScreenState extends State<_SplashScreen>
       child: Scaffold(
         backgroundColor: _background,
         body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          // The lockup stays exactly where the native splash drew it; the
+          // tagline fades in underneath without pushing it up.
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
-              const WaterFillMark(size: 84),
-              const SizedBox(height: 28),
-              FadeTransition(
-                opacity: _textFade,
-                child: SlideTransition(
-                  position: _textSlide,
-                  child: const Column(
-                    children: [
-                      ERefillLogo(
-                        size: 40,
-                        showMark: false,
-                        color: Colors.white,
-                        markColor: AppUi.accentCyan,
+              const ERefillLogo(size: _logoSize, color: Colors.white),
+              Transform.translate(
+                offset: const Offset(0, _logoSize * 0.95),
+                child: FadeTransition(
+                  opacity: _textFade,
+                  child: SlideTransition(
+                    position: _textSlide,
+                    child: const Text(
+                      BrandColors.tagline,
+                      style: TextStyle(
+                        color: Color(0xFFB7C4DC),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 3,
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        'Water refills, delivered',
-                        style: TextStyle(
-                          color: AppUi.darkTextSecondary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
