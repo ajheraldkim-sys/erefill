@@ -259,7 +259,7 @@ class NotificationProvider extends ChangeNotifier {
       if (generation != _listenGeneration) return;
 
       if (res is Map) {
-        final parsedChats = (res['unread_chats'] as num?)?.toInt() ?? 0;
+        final parsedChats = (res['unread_chat'] as num?)?.toInt() ?? 0;
         final parsedOrders = (res['new_orders'] as num?)?.toInt() ?? 0;
 
         _unreadChatCount = parsedChats;
@@ -290,7 +290,8 @@ class NotificationProvider extends ChangeNotifier {
             .from('messages')
             .select('id')
             .neq('sender_id', userId)
-            .not('read_by', 'cs', '{"$userId"}')
+            // read_by is jsonb, so containment needs a JSON array.
+            .not('read_by', 'cs', '["$userId"]')
             .limit(100);
         if (generation == _listenGeneration) {
           _unreadChatCount = (unreadRes as List).length;

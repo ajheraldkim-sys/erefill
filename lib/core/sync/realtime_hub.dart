@@ -105,6 +105,7 @@ class _HubChannel {
   late final StreamController<RealtimeEvent> _controller;
   RealtimeChannel? _channel;
   Timer? _retryTimer;
+  Timer? _stableTimer;
   int _attempt = 0;
   bool _hasSubscribedOnce = false;
   bool _closed = false;
@@ -149,7 +150,11 @@ class _HubChannel {
         case RealtimeSubscribeStatus.subscribed:
           final isReconnect = _hasSubscribedOnce;
           _hasSubscribedOnce = true;
-          _attempt = 0;
+          // Realtime can accept a join and fail it moments later when the
+          // database is overloaded; only a channel that stays up earns a
+          // backoff reset, otherwise retries never slow down.
+          _stableTimer?.cancel();
+          _stableTimer = Timer(_stableAfter, () => _attempt = 0);
           if (isReconnect && !_controller.isClosed) {
             _controller.add(RealtimeEvent.resync(watch));
           }
@@ -161,7 +166,10 @@ class _HubChannel {
     });
   }
 
+  static const _stableAfter = Duration(seconds: 30);
+
   void _scheduleRetry(Object? error) {
+    _stableTimer?.cancel();
     if (_closed || (_retryTimer?.isActive ?? false)) return;
     _attempt++;
     final seconds = math.min(30, 2 << math.min(_attempt, 4));
@@ -184,6 +192,7 @@ class _HubChannel {
     if (_closed) return;
     _closed = true;
     _retryTimer?.cancel();
+    _stableTimer?.cancel();
     final channel = _channel;
     _channel = null;
     if (channel != null) unawaited(_client.removeChannel(channel));

@@ -1,6 +1,9 @@
 -- ==============================================================================
 -- EREFILL REAL-TIME NOTIFICATIONS, BADGES, AND ACCOUNT SECURITY MIGRATION
 -- ==============================================================================
+-- SUPERSEDED: do not run. Its order notification triggers duplicate the
+-- notifications the order RPCs already send. Apply
+-- notification_badges_and_acknowledgment.sql instead.
 
 -- 1. Orders table enhancement for Owner & Admin Acknowledgment
 ALTER TABLE public.orders
