@@ -14,6 +14,68 @@
 
 BEGIN;
 
+-- 0. Ensure prerequisite tables, columns, indexes, and helper functions exist -
+CREATE TABLE IF NOT EXISTS public.system_config (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    key text NOT NULL,
+    value jsonb NOT NULL,
+    description text,
+    updated_at timestamptz DEFAULT now(),
+    updated_by uuid
+);
+
+ALTER TABLE public.system_config ADD COLUMN IF NOT EXISTS updated_by uuid;
+ALTER TABLE public.system_config ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE public.system_config ADD COLUMN IF NOT EXISTS description text;
+
+-- Ensure unique index on key so ON CONFLICT (key) never fails
+CREATE UNIQUE INDEX IF NOT EXISTS system_config_key_idx ON public.system_config (key);
+
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at timestamptz DEFAULT now(),
+    actor_id uuid,
+    action text NOT NULL,
+    entity_type text NOT NULL,
+    entity_id text NOT NULL,
+    old_value jsonb,
+    new_value jsonb,
+    metadata jsonb
+);
+
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS actor_id uuid;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS action text;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS entity_type text;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS entity_id text;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS old_value jsonb;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS new_value jsonb;
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS metadata jsonb;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF current_user IN ('postgres', 'service_role') THEN
+    RETURN true;
+  END IF;
+
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('admin', 'superadmin')
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon, service_role;
+
 -- 1. Default configuration --------------------------------------------------
 INSERT INTO public.system_config (key, value, updated_at)
 VALUES (
@@ -147,6 +209,7 @@ DECLARE
   v_old jsonb;
   v_val jsonb;
   v_admin_email text;
+  v_admin_id uuid;
   v_rule text;
 BEGIN
   IF NOT public.is_admin() THEN
@@ -165,7 +228,12 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  SELECT email INTO v_admin_email FROM public.profiles WHERE id = auth.uid();
+  v_admin_id := auth.uid();
+  IF v_admin_id IS NOT NULL THEN
+    SELECT email INTO v_admin_email FROM public.profiles WHERE id = v_admin_id;
+  ELSE
+    v_admin_email := 'admin@erefill.com';
+  END IF;
   SELECT value INTO v_old FROM public.system_config WHERE key = 'delivery_fee_config';
 
   v_val := jsonb_build_object(
@@ -176,21 +244,21 @@ BEGIN
     'enabled', coalesce(p_enabled, true),
     'reason', p_reason,
     'updated_at', now(),
-    'updated_by', auth.uid(),
+    'updated_by', v_admin_id,
     'updated_by_email', v_admin_email
   );
 
   INSERT INTO public.system_config (key, value, updated_at, updated_by)
-  VALUES ('delivery_fee_config', v_val, now(), auth.uid())
+  VALUES ('delivery_fee_config', v_val, now(), v_admin_id)
   ON CONFLICT (key) DO UPDATE
   SET value = EXCLUDED.value,
       updated_at = now(),
-      updated_by = auth.uid();
+      updated_by = v_admin_id;
 
   INSERT INTO public.audit_logs
     (actor_id, action, entity_type, entity_id, old_value, new_value, metadata)
   VALUES (
-    auth.uid(), 'set_delivery_fee_config', 'config', 'delivery_fee_config',
+    v_admin_id, 'set_delivery_fee_config', 'config', 'delivery_fee_config',
     v_old, v_val, jsonb_build_object('reason', p_reason)
   );
 
@@ -243,6 +311,36 @@ REVOKE ALL ON FUNCTION public.admin_get_delivery_fee_history(int) FROM PUBLIC, a
 GRANT EXECUTE ON FUNCTION public.admin_get_delivery_fee_config() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_set_delivery_fee_config(numeric, numeric, numeric, text, boolean, text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_get_delivery_fee_history(int) TO authenticated, service_role;
+
+-- 5. RLS Policies & Realtime Publication -------------------------------------
+ALTER TABLE public.system_config ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view system config" ON public.system_config;
+CREATE POLICY "Anyone can view system config"
+  ON public.system_config FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage system config" ON public.system_config;
+CREATE POLICY "Admins can manage system config"
+  ON public.system_config FOR ALL
+  TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+ALTER TABLE public.system_config REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'system_config'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.system_config;
+    END IF;
+  END IF;
+END $$;
 
 COMMIT;
 
