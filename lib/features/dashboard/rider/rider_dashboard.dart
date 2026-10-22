@@ -1566,7 +1566,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       borderRadius: AppUi.controlRadius,
                     ),
                     fixedSize: const Size(
-                      AppUi.kRiderTouchTarget,
+                      46,
                       AppUi.kRiderTouchTarget,
                     ),
                   ),
@@ -1586,7 +1586,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       borderRadius: AppUi.controlRadius,
                     ),
                     fixedSize: const Size(
-                      AppUi.kRiderTouchTarget,
+                      46,
                       AppUi.kRiderTouchTarget,
                     ),
                   ),
@@ -1608,7 +1608,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                         borderRadius: AppUi.controlRadius,
                       ),
                       fixedSize: const Size(
-                        AppUi.kRiderTouchTarget,
+                        46,
                         AppUi.kRiderTouchTarget,
                       ),
                     ),
@@ -1638,14 +1638,17 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   : Icons.arrow_forward_rounded,
                               size: 20,
                             ),
-                            label: Text(
-                              status == 'preparing'
-                                  ? 'Start Delivery'
-                                  : 'Complete Delivery',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                status == 'preparing'
+                                    ? 'Start Delivery'
+                                    : 'Complete Delivery',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
                             style: ElevatedButton.styleFrom(

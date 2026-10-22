@@ -31,59 +31,77 @@ class _RiderSwipeToAcceptSliderState extends State<RiderSwipeToAcceptSlider> {
           borderRadius: AppUi.controlRadius,
         ),
         alignment: Alignment.center,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Accepted & Starting!',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Accepted & Starting!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxSlide = (constraints.maxWidth - AppUi.kRiderTouchTarget).clamp(
+        final touchSize = AppUi.kRiderTouchTarget;
+        final maxSlide = (constraints.maxWidth - touchSize).clamp(
           0.0,
           500.0,
         );
+        final isCompact = constraints.maxWidth < 190;
+        final label = isCompact ? 'Accept Order' : widget.label;
 
         return Container(
-          height: AppUi.kRiderTouchTarget,
+          height: touchSize,
           decoration: BoxDecoration(
             color: AppUi.bluePrimary,
             borderRadius: AppUi.controlRadius,
           ),
           child: Stack(
             children: [
-              Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Colors.white70,
-                      size: 20,
+              Positioned.fill(
+                left: touchSize - 6,
+                right: 8,
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white70,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      widget.label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               Positioned(
@@ -91,6 +109,14 @@ class _RiderSwipeToAcceptSliderState extends State<RiderSwipeToAcceptSlider> {
                 top: 2,
                 bottom: 2,
                 child: GestureDetector(
+                  onTap: maxSlide < 40 ? () {
+                    setState(() {
+                      _position = maxSlide;
+                      _accepted = true;
+                    });
+                    HapticFeedback.heavyImpact();
+                    widget.onAccepted();
+                  } : null,
                   onHorizontalDragUpdate: (details) {
                     setState(() {
                       _position = (_position + details.delta.dx).clamp(
