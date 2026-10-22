@@ -31,17 +31,25 @@ abstract final class OrderProductHelpers {
 
   static bool isRealProduct(Map<String, dynamic>? product) {
     if (product == null || isDisplayOnly(product)) return false;
-    return isValidProductId(product['id']);
+    return isValidProductId(product['id']) && !isNonWaterProduct(product);
+  }
+
+  /// Categories of legacy containers/caps that are not the station's water.
+  static const _nonWaterCategories = {'accessories', 'products', 'containers'};
+
+  static bool isNonWaterProduct(Map<String, dynamic>? product) {
+    final category = product?['category']?.toString().trim().toLowerCase();
+    return category != null && _nonWaterCategories.contains(category);
   }
 
   /// The station's product from a loaded list (older data may still hold
-  /// several rows; the first real one wins).
+  /// several rows, including containers; the first real water one wins).
   static Map<String, dynamic>? defaultFromList(List<dynamic> products) {
     Map<String, dynamic>? fallback;
     for (final row in products.whereType<Map>()) {
       final product = Map<String, dynamic>.from(row);
       if (isRealProduct(product)) return product;
-      fallback ??= product;
+      if (!isNonWaterProduct(product)) fallback ??= product;
     }
     return fallback;
   }
@@ -104,11 +112,9 @@ abstract final class OrderProductHelpers {
           .select(catalogSelectFields)
           .eq('owner_id', ownerId)
           .order('is_available', ascending: false)
-          .order('created_at', ascending: true)
-          .limit(1);
-      if (rows.isNotEmpty) {
-        return withDisplayDefaults(Map<String, dynamic>.from(rows.first));
-      }
+          .order('created_at', ascending: true);
+      final product = defaultFromList(rows);
+      if (product != null) return withDisplayDefaults(product);
     } catch (e) {
       debugPrint('fetchStationProduct error: $e');
     }

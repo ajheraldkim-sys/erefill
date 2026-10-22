@@ -73,10 +73,16 @@ CREATE TRIGGER trg_touch_water_type
 ALTER TABLE public.profiles
   ALTER COLUMN primary_water_type TYPE text USING primary_water_type::text;
 
--- Owners whose registration choice was lost: infer it from their existing
--- refill product, otherwise fall back to the first catalog entry.
+-- Owners whose registration choice never reached their profile: restore it
+-- from their signup metadata, else infer it from their existing refill
+-- product, otherwise fall back to the first catalog entry.
 UPDATE public.profiles p
 SET primary_water_type = COALESCE(
+  (SELECT wt.name
+     FROM auth.users u
+     JOIN public.water_types wt
+       ON wt.name = NULLIF(trim(u.raw_user_meta_data->>'primary_water_type'), '')
+    WHERE u.id = p.id),
   (SELECT wt.name
      FROM public.products pr
      JOIN public.water_types wt
@@ -356,10 +362,14 @@ CREATE POLICY "Owners can update own products"
 
 -- Admin per-station product RPCs: one product per station, so admins adjust
 -- it instead of adding or deleting products.
+-- Parameter defaults match the deployed signature; CREATE OR REPLACE cannot
+-- drop them.
 CREATE OR REPLACE FUNCTION public.admin_upsert_product(
-  p_product_id uuid, p_owner_id uuid, p_name text, p_description text,
-  p_price numeric, p_category text, p_stock_level integer,
-  p_is_available boolean, p_reason text
+  p_product_id uuid DEFAULT NULL, p_owner_id uuid DEFAULT NULL,
+  p_name text DEFAULT NULL, p_description text DEFAULT NULL,
+  p_price numeric DEFAULT NULL, p_category text DEFAULT NULL,
+  p_stock_level integer DEFAULT NULL, p_is_available boolean DEFAULT true,
+  p_reason text DEFAULT NULL
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE
@@ -390,7 +400,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'product', v_row);
 END; $$;
 
-CREATE OR REPLACE FUNCTION public.admin_delete_product(p_product_id uuid, p_reason text)
+CREATE OR REPLACE FUNCTION public.admin_delete_product(p_product_id uuid, p_reason text DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 BEGIN

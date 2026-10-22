@@ -79,6 +79,36 @@ void main() {
       expect(product?['name'], 'Mineral Water');
     });
 
+    test('defaultFromList skips legacy containers and caps', () {
+      final product = OrderProductHelpers.defaultFromList([
+        {
+          'id': '7f1c2c1e-2222-4a6b-9c1d-2a3b4c5d6e7f',
+          'name': 'Non spill Cap for 5 Gallon Round',
+          'category': 'Accessories',
+          'price': 10,
+        },
+        {
+          'id': '7f1c2c1e-3333-4a6b-9c1d-2a3b4c5d6e7f',
+          'name': 'Alkaline Water',
+          'category': 'Alkaline',
+          'price': 30,
+        },
+      ]);
+      expect(product?['name'], 'Alkaline Water');
+    });
+
+    test('defaultFromList returns null when only accessories exist', () {
+      final product = OrderProductHelpers.defaultFromList([
+        {
+          'id': '7f1c2c1e-4444-4a6b-9c1d-2a3b4c5d6e7f',
+          'name': 'Empty 5 Gallon Round Water Container',
+          'category': 'Accessories',
+          'price': 150,
+        },
+      ]);
+      expect(product, isNull);
+    });
+
     test('display fallback uses the catalog description and cannot be ordered', () {
       final fallback = OrderProductHelpers.displayFallback(
         ownerId: 'owner',
