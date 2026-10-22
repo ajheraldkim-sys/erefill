@@ -1970,7 +1970,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
         : ((station['average_rating'] as num?)?.toDouble() ?? 0.0);
     final isVerified =
         station['is_verified'] == true || station['verified'] == true;
-    final photoUrl = station['station_photo_url']?.toString().trim();
+    final photoUrl = (station['station_photo_url'] ??
+            station['station_logo_url'] ??
+            station['avatar_url'] ??
+            station['photo_url'] ??
+            station['logo_url'])
+        ?.toString()
+        .trim();
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
     final waterType = _stationWaterType;
 

@@ -1,4 +1,4 @@
-﻿import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/money.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +16,7 @@ import 'package:path/path.dart' as path;
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
@@ -2472,7 +2473,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (image == null) return;
 
       final fileBytes = await image.readAsBytes();
-      final fileName = 'avatar_${user.id}${path.extension(image.name)}';
+      final ext = path.extension(image.name);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'avatar_${user.id}_$timestamp$ext';
       await supabase.storage
           .from('avatars')
           .uploadBinary(
@@ -2481,15 +2484,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
             fileOptions: const FileOptions(upsert: true),
           );
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+      final oldAvatar = _avatarUrl;
       await supabase
           .from('profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', user.id);
+      if (oldAvatar.isNotEmpty) {
+        unawaited(AppCachedImage.evict(oldAvatar));
+      }
       if (mounted) {
-        setState(
-          () => _avatarUrl =
-              '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-        );
+        setState(() => _avatarUrl = publicUrl);
       }
     } finally {
       if (mounted) setState(() => _isUploadingImage = false);
@@ -2511,7 +2515,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (image == null) return;
 
       final fileBytes = await image.readAsBytes();
-      final fileName = 'cover_${user.id}${path.extension(image.name)}';
+      final ext = path.extension(image.name);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'cover_${user.id}_$timestamp$ext';
       await supabase.storage
           .from('avatars')
           .uploadBinary(
@@ -2520,15 +2526,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
             fileOptions: const FileOptions(upsert: true),
           );
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+      final oldCover = _coverPhotoUrl;
       await supabase
           .from('profiles')
           .update({'station_photo_url': publicUrl})
           .eq('id', user.id);
+      if (oldCover.isNotEmpty) {
+        unawaited(AppCachedImage.evict(oldCover));
+      }
       if (mounted) {
-        setState(() {
-          _coverPhotoUrl =
-              '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-        });
+        setState(() => _coverPhotoUrl = publicUrl);
       }
     } finally {
       if (mounted) setState(() => _isUploadingCover = false);

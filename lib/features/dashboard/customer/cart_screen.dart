@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
+import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/hero_header.dart';
@@ -99,7 +100,7 @@ class _CartScreenState extends State<CartScreen> {
       final res = await client
           .from('profiles')
           .select(
-            'id, station_name, complete_address, town, barangay, latitude, longitude, lat, lng, price_per_gallon, primary_water_type, is_open, station_availability',
+            'id, station_name, complete_address, town, barangay, latitude, longitude, lat, lng, price_per_gallon, primary_water_type, station_photo_url, station_logo_url, avatar_url, is_open, station_availability',
           )
           .eq('id', sId)
           .maybeSingle();
@@ -219,6 +220,11 @@ class _CartScreenState extends State<CartScreen> {
                         _StationStrip(
                           name: cart.stationName ?? 'Water Station',
                           itemCount: cart.totalItems,
+                          logoUrl: (_resolvedStation?['station_logo_url'] ??
+                                  _resolvedStation?['avatar_url'] ??
+                                  _resolvedStation?['station_photo_url'])
+                              ?.toString()
+                              .trim(),
                         ),
                         const SizedBox(height: AppUi.spacingLg),
                         Row(
@@ -361,11 +367,17 @@ class _CartScreenState extends State<CartScreen> {
 class _StationStrip extends StatelessWidget {
   final String name;
   final int itemCount;
+  final String? logoUrl;
 
-  const _StationStrip({required this.name, required this.itemCount});
+  const _StationStrip({
+    required this.name,
+    required this.itemCount,
+    this.logoUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasLogo = logoUrl != null && logoUrl!.isNotEmpty;
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -377,11 +389,24 @@ class _StationStrip extends StatelessWidget {
               color: AppUi.brandSoftOf(context),
               borderRadius: AppUi.controlRadius,
             ),
-            child: Icon(
-              Icons.storefront_rounded,
-              color: AppUi.onBrandSoftOf(context),
-              size: 20,
-            ),
+            child: hasLogo
+                ? ClipRRect(
+                    borderRadius: AppUi.controlRadius,
+                    child: AppCachedImage(
+                      imageUrl: logoUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 120,
+                      memCacheHeight: 120,
+                      fallbackIcon: Icons.storefront_rounded,
+                    ),
+                  )
+                : Icon(
+                    Icons.storefront_rounded,
+                    color: AppUi.onBrandSoftOf(context),
+                    size: 20,
+                  ),
           ),
           const SizedBox(width: AppUi.spacingMd),
           Expanded(

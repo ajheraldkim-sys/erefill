@@ -213,3 +213,4 @@ EXECUTE FUNCTION public.sync_order_rider_columns();
 
 -- Reload PostgREST schema cache
 NOTIFY pgrst, 'reload schema';
+

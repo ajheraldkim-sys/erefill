@@ -13,6 +13,7 @@ import 'package:erefill/features/chat/models/chat_room.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
 import 'package:erefill/core/providers/theme_provider.dart';
@@ -2697,7 +2698,8 @@ class _RiderDashboardState extends State<RiderDashboard>
 
       final fileBytes = await image.readAsBytes();
       final extension = image.name.split('.').last;
-      final fileName = 'avatar_${user.id}.$extension';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'avatar_${user.id}_$timestamp.$extension';
 
       await supabase.storage
           .from('avatars')
@@ -2708,15 +2710,19 @@ class _RiderDashboardState extends State<RiderDashboard>
           );
 
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+      final oldAvatar = _profile?['avatar_url']?.toString();
       await supabase
           .from('profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', user.id);
 
+      if (oldAvatar != null && oldAvatar.isNotEmpty) {
+        unawaited(AppCachedImage.evict(oldAvatar));
+      }
+
       if (mounted) {
         setState(() {
-          _profile?['avatar_url'] =
-              '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+          _profile?['avatar_url'] = publicUrl;
         });
         ScaffoldMessenger.of(
           context,

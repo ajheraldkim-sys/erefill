@@ -1,14 +1,18 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/payment_checkout_service.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
+import 'package:erefill/core/widgets/water_type_thumb.dart';
 import 'services/checkout_order_service.dart';
 
 import '../../../core/utils/profile_query_helpers.dart';
@@ -75,7 +79,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _deliveryFeeConfig;
   double? _stationLat;
   double? _stationLng;
+  late Map<String, dynamic> _liveStationData =
+      Map<String, dynamic>.from(widget.station);
   RealtimeChannel? _configRealtimeChannel;
+  StreamSubscription<RealtimeEvent>? _ownerSettingsSub;
+  StreamSubscription<RealtimeEvent>? _stationProfileSub;
   Map<String, dynamic>? _platformFeeConfig;
   String? _pricingSetupError;
   String? _paymentMethodsError;
@@ -129,6 +137,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             },
           )
           .subscribe();
+
+      final ownerId = widget.station['id']?.toString() ??
+          widget.station['station_id']?.toString() ??
+          widget.station['owner_id']?.toString();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        _ownerSettingsSub = RealtimeHub.instance.listen(
+          TableWatch('owner_settings', column: 'owner_id', value: ownerId),
+          (_) {
+            _loadStationSettings();
+            _refreshStationAvailability();
+          },
+        );
+        _stationProfileSub = RealtimeHub.instance.listen(
+          TableWatch('profiles', column: 'id', value: ownerId),
+          (_) {
+            _loadStationSettings();
+            _refreshStationAvailability();
+          },
+        );
+      }
     } catch (e) {
       debugPrint('Realtime config channel subscription failed: $e');
     }
@@ -136,6 +164,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _ownerSettingsSub?.cancel();
+    _stationProfileSub?.cancel();
     final channel = _configRealtimeChannel;
     if (channel != null) {
       supabase.removeChannel(channel);
@@ -225,19 +255,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw StateError('Station ID is missing.');
       }
 
-      // Ensure station coordinates are available
-      if (_stationLat == null || _stationLng == null) {
-        try {
-          final stationProfile = await supabase
-              .from('profiles')
-              .select('latitude, longitude, lat, lng, town')
-              .eq('id', ownerId)
-              .maybeSingle();
-          if (stationProfile != null) {
-            _stationLat = (stationProfile['latitude'] as num?)?.toDouble() ??
+      // Fetch full station profile for latest branding, coordinates, and availability
+      try {
+        final stationProfile = await supabase
+            .from('profiles')
+            .select(
+              'id, station_name, full_name, complete_address, town, barangay, '
+              'latitude, longitude, lat, lng, station_photo_url, station_logo_url, '
+              'avatar_url, is_open, station_availability',
+            )
+            .eq('id', ownerId)
+            .maybeSingle();
+        if (stationProfile != null && mounted) {
+          setState(() {
+            _liveStationData = {..._liveStationData, ...stationProfile};
+            final lat = (stationProfile['latitude'] as num?)?.toDouble() ??
                 (stationProfile['lat'] as num?)?.toDouble();
-            _stationLng = (stationProfile['longitude'] as num?)?.toDouble() ??
+            final lng = (stationProfile['longitude'] as num?)?.toDouble() ??
                 (stationProfile['lng'] as num?)?.toDouble();
+            if (lat != null && lat != 0) _stationLat = lat;
+            if (lng != null && lng != 0) _stationLng = lng;
             if ((_stationLat == null || _stationLat == 0) &&
                 stationProfile['town'] != null) {
               final center =
@@ -247,10 +284,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _stationLng = center.longitude;
               }
             }
-          }
-        } catch (e) {
-          debugPrint('Error loading station coordinates from profile: $e');
+          });
         }
+      } catch (e) {
+        debugPrint('Error loading station profile: $e');
       }
 
       // If station coordinates are still missing, fallback to Cantilan center
@@ -1745,6 +1782,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     String stationName,
     CartProvider cart,
   ) {
+    final resolvedStationName =
+        _liveStationData['station_name']?.toString() ??
+        _liveStationData['name']?.toString() ??
+        widget.station['station_name']?.toString() ??
+        stationName;
+    final stationLogoUrl = (_liveStationData['station_logo_url'] ??
+            _liveStationData['avatar_url'] ??
+            _liveStationData['station_photo_url'] ??
+            widget.station['station_logo_url'] ??
+            widget.station['avatar_url'] ??
+            widget.station['station_photo_url'])
+        ?.toString()
+        .trim();
+    final hasStationLogo =
+        stationLogoUrl != null && stationLogoUrl.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
@@ -1759,22 +1812,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: AppUi.brandSoftOf(context),
                   borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: Icon(
-                  Icons.water_drop_rounded,
-                  color: AppUi.brandOf(context),
-                  size: 16,
-                ),
+                child: hasStationLogo
+                    ? ClipRRect(
+                        borderRadius:
+                            BorderRadius.circular(AppUi.radiusControl),
+                        child: AppCachedImage(
+                          imageUrl: stationLogoUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 96,
+                          memCacheHeight: 96,
+                          fallbackIcon: Icons.water_drop_rounded,
+                        ),
+                      )
+                    : Icon(
+                        Icons.water_drop_rounded,
+                        color: AppUi.brandOf(context),
+                        size: 18,
+                      ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  stationName,
+                  resolvedStationName,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -1790,6 +1857,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           // Items list
           ...cart.items.values.map((item) {
+            final itemPhotoUrl = item.imageUrl?.trim();
+            final hasCustomPhoto =
+                itemPhotoUrl != null && itemPhotoUrl.isNotEmpty;
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: Row(
@@ -1806,27 +1877,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         ),
                         alignment: Alignment.center,
-                        child:
-                            item.imageUrl != null && item.imageUrl!.isNotEmpty
+                        child: hasCustomPhoto
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                                child: CachedNetworkImage(
-                                  imageUrl: item.imageUrl!,
+                                borderRadius:
+                                    BorderRadius.circular(AppUi.radiusCard),
+                                child: AppCachedImage(
+                                  imageUrl: itemPhotoUrl,
                                   width: 52,
                                   height: 52,
                                   fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      Icon(
-                                        Icons.water_drop_outlined,
-                                        color: AppUi.brandOf(context),
-                                        size: 26,
-                                      ),
+                                  memCacheWidth: 150,
+                                  memCacheHeight: 150,
+                                  fallbackIcon: Icons.water_drop_outlined,
                                 ),
                               )
-                            : Icon(
-                                Icons.water_drop_rounded,
-                                color: AppUi.brandOf(context),
-                                size: 26,
+                            : WaterTypeThumb(
+                                typeName: item.name,
+                                size: 52,
+                                radius: AppUi.radiusCard,
+                                iconSize: 26,
                               ),
                       ),
                       Positioned(

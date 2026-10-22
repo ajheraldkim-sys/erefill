@@ -224,7 +224,13 @@ class StationCard extends StatelessWidget {
   }
 
   Widget _photo(BuildContext context, {double? size, required double iconSize}) {
-    final photoUrl = station['station_photo_url']?.toString().trim();
+    final photoUrl = (station['station_photo_url'] ??
+            station['station_logo_url'] ??
+            station['avatar_url'] ??
+            station['photo_url'] ??
+            station['logo_url'])
+        ?.toString()
+        .trim();
     final type = _waterType;
     final fallback = ColoredBox(
       color: (type?.color ?? AppUi.bluePrimary).withValues(alpha: 0.12),
