@@ -464,6 +464,36 @@ class AdminApiService {
     }
   }
 
+  // --- Service Fee Wallets ---
+
+  /// Every station's service fee wallet; fee and top-up totals cover
+  /// [from]..[to] when given.
+  Future<List<FeeWalletRow>> listFeeWallets({DateTime? from, DateTime? to}) async {
+    final result = await _client.rpc(
+      'admin_list_fee_wallets',
+      params: {
+        'p_from': from?.toUtc().toIso8601String(),
+        'p_to': to?.toUtc().toIso8601String(),
+      },
+    );
+    if (result is! List) return const [];
+    return result.map((r) => FeeWalletRow.fromJson(_asMap(r))).toList();
+  }
+
+  /// Credits (positive) or debits (negative) a station's wallet; [reason] is
+  /// required and written to the audit log. Returns the new balance.
+  Future<double> adjustFeeWallet({
+    required String ownerId,
+    required double amount,
+    required String reason,
+  }) async {
+    final result = await _client.rpc(
+      'admin_adjust_fee_wallet',
+      params: {'p_owner_id': ownerId, 'p_amount': amount, 'p_reason': reason},
+    );
+    return safeDouble(result);
+  }
+
   // --- Regions, Stations & Orders ---
 
   Future<List<Map<String, dynamic>>> listRegions() async {
@@ -1786,4 +1816,35 @@ class AdminPagedResult<T> {
 
   final int total;
   final List<T> rows;
+}
+
+
+class FeeWalletRow {
+  const FeeWalletRow({
+    required this.ownerId,
+    required this.stationName,
+    required this.balance,
+    required this.codLocked,
+    required this.feesCollected,
+    required this.topupsReceived,
+    this.lastTopupAt,
+  });
+
+  factory FeeWalletRow.fromJson(Map<String, dynamic> json) => FeeWalletRow(
+    ownerId: json['owner_id']?.toString() ?? '',
+    stationName: json['station_name']?.toString() ?? 'Station',
+    balance: safeDouble(json['balance']),
+    codLocked: json['cod_locked'] == true,
+    feesCollected: safeDouble(json['fees_collected']),
+    topupsReceived: safeDouble(json['topups_received']),
+    lastTopupAt: DateTime.tryParse(json['last_topup_at']?.toString() ?? ''),
+  );
+
+  final String ownerId;
+  final String stationName;
+  final double balance;
+  final bool codLocked;
+  final double feesCollected;
+  final double topupsReceived;
+  final DateTime? lastTopupAt;
 }

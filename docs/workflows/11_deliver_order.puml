@@ -1,0 +1,8 @@
+@startuml
+start
+:View assigned delivery and details;
+:Start delivery (Out for Delivery);
+:Navigate to the customer’s address;
+:Hand over the order and collect payment if Cash on Delivery;
+stop
+@enduml

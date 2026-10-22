@@ -1,0 +1,7 @@
+@startuml
+start
+:Choose payment method;
+:Complete payment in PayMongo checkout (online) or pay the rider upon delivery (Cash on Delivery);
+:View payment result and receipt;
+stop
+@enduml

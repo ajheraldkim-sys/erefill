@@ -1,0 +1,9 @@
+@startuml
+start
+:Tap Complete Delivery;
+:Take a photo;
+:Get the customer’s signature;
+:Record returned containers;
+:Submit;
+stop
+@enduml

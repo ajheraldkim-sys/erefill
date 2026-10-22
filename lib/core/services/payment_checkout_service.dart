@@ -5,12 +5,33 @@ class PaymentVerification {
   const PaymentVerification({
     required this.isPaid,
     required this.paymentStatus,
+    this.livemode = false,
   });
 
   final bool isPaid;
 
+  /// False while the gateway runs on PayMongo test keys (no real money).
+  final bool livemode;
+
   /// Lower-cased `payment_status` reported by the server, e.g. `processing`.
   final String paymentStatus;
+}
+
+/// A hosted checkout page for an order or a wallet top-up.
+class CheckoutSession {
+  const CheckoutSession({
+    required this.url,
+    this.livemode = false,
+    this.topupId,
+  });
+
+  final String url;
+
+  /// Set for a service fee wallet top-up.
+  final String? topupId;
+
+  /// False while the gateway runs on PayMongo test keys (no real money).
+  final bool livemode;
 }
 
 /// A payment-gateway failure; [message] is safe to show to the customer.
@@ -53,14 +74,40 @@ class PaymentCheckoutService {
     required String paymentMethod,
     bool forceNewCheckout = false,
   }) async {
-    final data = await _invoke({
-      'order_id': orderId,
-      'payment_method': normalizeMethod(paymentMethod),
-      if (forceNewCheckout) 'force_new_checkout': true,
-    });
+    final session = await createCheckoutSession(
+      orderId: orderId,
+      paymentMethod: paymentMethod,
+      forceNewCheckout: forceNewCheckout,
+    );
+    return session.url;
+  }
+
+  /// Like [createCheckout], but also reports whether the gateway is live.
+  Future<CheckoutSession> createCheckoutSession({
+    required String orderId,
+    required String paymentMethod,
+    bool forceNewCheckout = false,
+  }) async {
+    return sessionFrom(
+      await _invoke({
+        'order_id': orderId,
+        'payment_method': normalizeMethod(paymentMethod),
+        if (forceNewCheckout) 'force_new_checkout': true,
+      }),
+    );
+  }
+
+  /// Reads a checkout response from the `create-payment-checkout` function.
+  static CheckoutSession sessionFrom(Object? data) {
     if (data is Map) {
       final url = data['checkout_url']?.toString().trim();
-      if (url != null && url.isNotEmpty) return url;
+      if (url != null && url.isNotEmpty) {
+        return CheckoutSession(
+          url: url,
+          livemode: data['livemode'] == true,
+          topupId: data['topup_id']?.toString(),
+        );
+      }
       if (data['error'] != null) throw PaymentCheckoutException(data['error'].toString());
     }
     throw PaymentCheckoutException('Payment checkout session was not created.');
@@ -75,6 +122,7 @@ class PaymentCheckoutService {
     return PaymentVerification(
       isPaid: map['verified'] == true || isPaidStatus(status),
       paymentStatus: status,
+      livemode: map['livemode'] == true,
     );
   }
 

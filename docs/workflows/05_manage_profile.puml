@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Account;
+:Edit profile details or saved addresses;
+:Save changes;
+stop
+@enduml

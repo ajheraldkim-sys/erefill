@@ -1,0 +1,7 @@
+@startuml
+start
+:Open the application;
+:Input username or email and password, or choose Google Sign-In;
+:Tap Log In;
+stop
+@enduml

@@ -1389,3 +1389,75 @@ ALTER TABLE IF EXISTS public.dm_deliveries
 ALTER TABLE IF EXISTS public.dm_credits
   ADD COLUMN IF NOT EXISTS rider_name text;
 
+-- Centralized Delivery Fee Configuration (20261022)
+CREATE TABLE IF NOT EXISTS public.system_config (
+    key text PRIMARY KEY,
+    value jsonb NOT NULL,
+    updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.system_config ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'system_config' AND policyname = 'system_config_read_policy'
+  ) THEN
+    CREATE POLICY system_config_read_policy ON public.system_config
+      FOR SELECT USING (true);
+  END IF;
+END $$;
+
+INSERT INTO public.system_config (key, value, updated_at)
+VALUES (
+    'delivery_fee_config',
+    jsonb_build_object(
+        'enabled', true,
+        'rate_per_km', 10.0,
+        'minimum_fee', 20.0,
+        'min_billable_distance_km', 1.0,
+        'rounding_rule', 'exact',
+        'reason', 'Centralized delivery fee system defaults'
+    ),
+    now()
+)
+ON CONFLICT (key) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.get_delivery_fee_config()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_cfg jsonb;
+    v_admin_email text;
+BEGIN
+    SELECT value INTO v_cfg
+    FROM public.system_config
+    WHERE key = 'delivery_fee_config';
+
+    IF v_cfg IS NULL THEN
+        v_cfg := jsonb_build_object(
+            'enabled', true,
+            'rate_per_km', 10.0,
+            'minimum_fee', 20.0,
+            'min_billable_distance_km', 1.0,
+            'rounding_rule', 'exact'
+        );
+    END IF;
+
+    IF v_cfg->>'updated_by' IS NOT NULL THEN
+        SELECT email INTO v_admin_email
+        FROM public.profiles
+        WHERE id = (v_cfg->>'updated_by')::uuid;
+
+        v_cfg := v_cfg || jsonb_build_object('updated_by_email', v_admin_email);
+    END IF;
+
+    RETURN v_cfg;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_delivery_fee_config() TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.get_delivery_fee_config() TO service_role;

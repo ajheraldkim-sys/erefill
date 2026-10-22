@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1380" viewBox="0 0 1300 1380">
+  <defs>
+    <style>
+      .line { stroke: #111; stroke-width: 1.3; fill: none; }
+      .oval { stroke: #111; stroke-width: 1.5; fill: #fff; }
+      .label { font: 16px Arial, Helvetica, sans-serif; fill: #111; }
+      .actor { font: italic 18px Arial, Helvetica, sans-serif; fill: #111; }
+      .title { font: bold 20px Arial, Helvetica, sans-serif; fill: #111; }
+    </style>
+  </defs>
+  <rect width="1300" height="1380" fill="#fff"/>
+  <rect x="290" y="20" width="720" height="1340" class="line"/>
+  <text x="650" y="62" text-anchor="middle" class="title">eRefill: Water Refilling Ordering and Delivery System</text>
+  <line x1="155" y1="430" x2="515" y2="130" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="130" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="188" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="188" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="188" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="188" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="246" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="246" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="246" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="246" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="304" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="304" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="304" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="362" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="420" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="478" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="536" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="536" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="594" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="652" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="710" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="768" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="768" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="768" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="826" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="826" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="826" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="884" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="884" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="884" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="884" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="942" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="1000" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="1000" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="1058" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="1058" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="1116" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="1116" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="1174" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="1232" class="line"/>
+  <line x1="155" y1="430" x2="515" y2="1290" class="line"/>
+  <line x1="155" y1="930" x2="515" y2="1290" class="line"/>
+  <line x1="1145" y1="430" x2="785" y2="1290" class="line"/>
+  <line x1="1145" y1="930" x2="785" y2="1290" class="line"/>
+  <ellipse cx="650" cy="130" rx="135" ry="24" class="oval"/>
+  <text x="650" y="130" text-anchor="middle" dominant-baseline="central" class="label">1. Register Account</text>
+  <ellipse cx="650" cy="188" rx="135" ry="24" class="oval"/>
+  <text x="650" y="188" text-anchor="middle" dominant-baseline="central" class="label">2. Log In</text>
+  <ellipse cx="650" cy="246" rx="135" ry="24" class="oval"/>
+  <text x="650" y="246" text-anchor="middle" dominant-baseline="central" class="label">3. View Dashboard</text>
+  <ellipse cx="650" cy="304" rx="135" ry="24" class="oval"/>
+  <text x="650" y="304" text-anchor="middle" dominant-baseline="central" class="label">4. Manage Profile</text>
+  <ellipse cx="650" cy="362" rx="135" ry="24" class="oval"/>
+  <text x="650" y="362" text-anchor="middle" dominant-baseline="central" class="label">5. Browse Stations</text>
+  <ellipse cx="650" cy="420" rx="135" ry="24" class="oval"/>
+  <text x="650" y="420" text-anchor="middle" dominant-baseline="central" class="label">6. Place Order</text>
+  <ellipse cx="650" cy="478" rx="135" ry="24" class="oval"/>
+  <text x="650" y="478" text-anchor="middle" dominant-baseline="central" class="label">7. Pay for Order</text>
+  <ellipse cx="650" cy="536" rx="135" ry="24" class="oval"/>
+  <text x="650" y="536" text-anchor="middle" dominant-baseline="central" class="label">8. Manage Orders</text>
+  <ellipse cx="650" cy="594" rx="135" ry="24" class="oval"/>
+  <text x="650" y="594" text-anchor="middle" dominant-baseline="central" class="label">9. Assign Rider</text>
+  <ellipse cx="650" cy="652" rx="135" ry="24" class="oval"/>
+  <text x="650" y="652" text-anchor="middle" dominant-baseline="central" class="label">10. Deliver Order</text>
+  <ellipse cx="650" cy="710" rx="135" ry="24" class="oval"/>
+  <text x="650" y="710" text-anchor="middle" dominant-baseline="central" class="label">11. Submit Proof of Delivery</text>
+  <ellipse cx="650" cy="768" rx="135" ry="24" class="oval"/>
+  <text x="650" y="768" text-anchor="middle" dominant-baseline="central" class="label">12. Track Order</text>
+  <ellipse cx="650" cy="826" rx="135" ry="24" class="oval"/>
+  <text x="650" y="826" text-anchor="middle" dominant-baseline="central" class="label">13. Send Messages</text>
+  <ellipse cx="650" cy="884" rx="135" ry="24" class="oval"/>
+  <text x="650" y="884" text-anchor="middle" dominant-baseline="central" class="label">14. View Notifications</text>
+  <ellipse cx="650" cy="942" rx="135" ry="24" class="oval"/>
+  <text x="650" y="942" text-anchor="middle" dominant-baseline="central" class="label">15. Rate and Review</text>
+  <ellipse cx="650" cy="1000" rx="135" ry="24" class="oval"/>
+  <text x="650" y="1000" text-anchor="middle" dominant-baseline="central" class="label">16. Manage Stations</text>
+  <ellipse cx="650" cy="1058" rx="135" ry="24" class="oval"/>
+  <text x="650" y="1058" text-anchor="middle" dominant-baseline="central" class="label">17. Manage Riders</text>
+  <ellipse cx="650" cy="1116" rx="135" ry="24" class="oval"/>
+  <text x="650" y="1116" text-anchor="middle" dominant-baseline="central" class="label">18. View Reports</text>
+  <ellipse cx="650" cy="1174" rx="135" ry="24" class="oval"/>
+  <text x="650" y="1174" text-anchor="middle" dominant-baseline="central" class="label">19. Manage Users</text>
+  <ellipse cx="650" cy="1232" rx="135" ry="24" class="oval"/>
+  <text x="650" y="1232" text-anchor="middle" dominant-baseline="central" class="label">20. Manage Water Types</text>
+  <ellipse cx="650" cy="1290" rx="135" ry="24" class="oval"/>
+  <text x="650" y="1290" text-anchor="middle" dominant-baseline="central" class="label">21. Log Out</text>
+  <circle cx="110" cy="380" r="18" class="line"/>
+  <line x1="110" y1="398" x2="110" y2="455" class="line"/>
+  <line x1="70" y1="430" x2="150" y2="430" class="line"/>
+  <line x1="110" y1="455" x2="80" y2="505" class="line"/>
+  <line x1="110" y1="455" x2="140" y2="505" class="line"/>
+  <text x="110" y="530" text-anchor="middle" class="actor">Customer</text>
+  <circle cx="110" cy="880" r="18" class="line"/>
+  <line x1="110" y1="898" x2="110" y2="955" class="line"/>
+  <line x1="70" y1="930" x2="150" y2="930" class="line"/>
+  <line x1="110" y1="955" x2="80" y2="1005" class="line"/>
+  <line x1="110" y1="955" x2="140" y2="1005" class="line"/>
+  <text x="110" y="1030" text-anchor="middle" class="actor">Station Owner</text>
+  <circle cx="1190" cy="380" r="18" class="line"/>
+  <line x1="1190" y1="398" x2="1190" y2="455" class="line"/>
+  <line x1="1150" y1="430" x2="1230" y2="430" class="line"/>
+  <line x1="1190" y1="455" x2="1160" y2="505" class="line"/>
+  <line x1="1190" y1="455" x2="1220" y2="505" class="line"/>
+  <text x="1190" y="530" text-anchor="middle" class="actor">Delivery Rider</text>
+  <circle cx="1190" cy="880" r="18" class="line"/>
+  <line x1="1190" y1="898" x2="1190" y2="955" class="line"/>
+  <line x1="1150" y1="930" x2="1230" y2="930" class="line"/>
+  <line x1="1190" y1="955" x2="1160" y2="1005" class="line"/>
+  <line x1="1190" y1="955" x2="1220" y2="1005" class="line"/>
+  <text x="1190" y="1030" text-anchor="middle" class="actor">Admin</text>
+</svg>

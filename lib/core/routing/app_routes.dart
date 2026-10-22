@@ -23,6 +23,7 @@ abstract final class AppRoutes {
   static const ownerMenu = '/owner/menu';
   static const ownerServiceCatalog = '/owner/service-catalog';
   static const ownerInventory = '/owner/inventory';
+  static const feeWallet = '/owner/fee-wallet';
   static const deliveryManagement = '/owner/delivery-mgmt';
   static const paymentAccounts = '/settings/payment-accounts';
   static const settingsHub = '/settings';

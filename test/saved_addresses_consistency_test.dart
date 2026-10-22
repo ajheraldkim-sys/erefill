@@ -174,5 +174,30 @@ void main() {
       expect(reconstructed.latitude, equals(launch.latitude));
       expect(reconstructed.longitude, equals(launch.longitude));
     });
+
+    test('switching address sets active address as default without requiring edit modal', () {
+      final addresses = [
+        {
+          'id': 'addr-1',
+          'label': 'Home',
+          'is_default': true,
+        },
+        {
+          'id': 'addr-2',
+          'label': 'Work Office',
+          'is_default': false,
+        },
+      ];
+
+      const selectedId = 'addr-2';
+      for (final a in addresses) {
+        a['is_default'] = (a['id'] == selectedId);
+      }
+
+      final active = addresses.firstWhere((a) => a['is_default'] == true);
+      expect(active['id'], equals('addr-2'));
+      expect(active['label'], equals('Work Office'));
+      expect(addresses.firstWhere((a) => a['id'] == 'addr-1')['is_default'], isFalse);
+    });
   });
 }

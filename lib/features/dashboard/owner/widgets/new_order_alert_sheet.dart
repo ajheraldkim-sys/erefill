@@ -6,6 +6,7 @@ import '../../../../core/utils/app_haptics.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/features/dashboard/customer/checkout_rules.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 /// Full-screen urgent alert sheet displayed to station owners when a new refill order arrives.
 /// Features a continuous repeating haptic alert, visual countdown timer (60s),
@@ -410,7 +411,11 @@ class _NewOrderAlertSheetState extends State<NewOrderAlertSheet>
                 child: SizedBox(
                   height: AppUi.kRiderTouchTarget,
                   child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _handleAccept,
+                    // The server refuses unpaid online orders.
+                    onPressed:
+                        _isProcessing || !CheckoutRules.canTrackOrder(widget.order)
+                        ? null
+                        : _handleAccept,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.uiSuccess,
                       foregroundColor: Colors.white,

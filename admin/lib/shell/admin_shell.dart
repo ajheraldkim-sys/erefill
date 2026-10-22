@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/catalog/water_types_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/fees/fee_wallets_screen.dart';
 import '../features/fees/platform_fees_screen.dart';
 import '../features/notifications/admin_notifications_screen.dart';
 import '../features/orders/orders_screen.dart';
@@ -26,6 +27,7 @@ enum AdminSection {
   users,
   releases,
   notifications,
+  feeWallets,
   settings,
 }
 
@@ -237,6 +239,7 @@ class _AdminShellState extends State<AdminShell> {
       AdminSection.users => const UsersScreen(),
       AdminSection.releases => const AppReleasesScreen(),
       AdminSection.notifications => const AdminNotificationsScreen(),
+      AdminSection.feeWallets => const FeeWalletsScreen(),
       AdminSection.settings => const PlatformFeesScreen(),
     };
   }
@@ -308,6 +311,11 @@ class _AdminSidebar extends StatelessWidget {
           AdminSection.releases,
           LucideIcons.packageCheck,
           'App Releases',
+        ),
+        _NavItem(
+          AdminSection.feeWallets,
+          LucideIcons.wallet,
+          'Service Fees',
         ),
         _NavItem(
           AdminSection.settings,
@@ -638,6 +646,7 @@ class _AdminTopBar extends StatelessWidget {
     AdminSection.users => 'Users & Accounts',
     AdminSection.releases => 'App Releases',
     AdminSection.notifications => 'Live Notifications',
+    AdminSection.feeWallets => 'Service Fees',
     AdminSection.settings => 'System Settings',
   };
 

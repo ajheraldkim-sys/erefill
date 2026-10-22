@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 
@@ -78,7 +79,7 @@ class _DeliveryCompletionSheetState extends State<_DeliveryCompletionSheet> {
         : const <String>[];
     final amount = widget.orderSummary?['total_amount'];
     final amountText = amount is num
-        ? 'PHP ${amount.toStringAsFixed(2)}'
+        ? 'PHP ${formatAmount(amount)}'
         : 'Amount unavailable';
 
     return Padding(

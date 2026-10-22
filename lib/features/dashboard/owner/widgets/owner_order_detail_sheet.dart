@@ -49,6 +49,8 @@ class _OwnerOrderDetailSheetState extends State<OwnerOrderDetailSheet> {
     final order = widget.order;
     final orderId = (order['id'] ?? '').toString();
     final rawStatus = (order['status'] ?? 'pending').toString();
+    // The server refuses to move an unpaid online order; say so up front.
+    final awaitingOnlinePayment = !CheckoutRules.canTrackOrder(order);
     final assignedRiderId = order['assigned_rider_id'];
 
     // Snapshot-based fields for absolute precision
@@ -644,6 +646,17 @@ class _OwnerOrderDetailSheetState extends State<OwnerOrderDetailSheet> {
 
                   // Order Action Buttons
                   if (rawStatus == 'pending') ...[
+                    if (awaitingOnlinePayment) ...[
+                      Text(
+                        'This order is waiting for online payment.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.uiWarning,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Row(
                       children: [
                         Expanded(
@@ -673,10 +686,12 @@ class _OwnerOrderDetailSheetState extends State<OwnerOrderDetailSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              widget.onUpdateStatus(orderId, 'accepted');
-                            },
+                            onPressed: awaitingOnlinePayment
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                    widget.onUpdateStatus(orderId, 'accepted');
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: OrderStatusColors.getColor(
                                 'accepted',

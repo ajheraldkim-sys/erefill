@@ -20,6 +20,7 @@ import '../../../core/widgets/brand/axo_states.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import 'widgets/payment_method_selector.dart';
 import 'widgets/payment_brand_mark.dart';
+import 'widgets/test_mode_label.dart';
 import 'package:erefill/core/models/cart_model.dart';
 import 'checkout_rules.dart';
 import '../../../core/routing/app_navigation.dart';
@@ -217,32 +218,88 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _loadStationSettings() async {
     try {
-      final ownerId = widget.station['id']?.toString();
+      final ownerId = widget.station['id']?.toString() ??
+          widget.station['station_id']?.toString() ??
+          widget.station['owner_id']?.toString();
       if (ownerId == null || ownerId.isEmpty) {
         throw StateError('Station ID is missing.');
       }
 
       // Ensure station coordinates are available
       if (_stationLat == null || _stationLng == null) {
-        final stationProfile = await supabase
-            .from('profiles')
-            .select('latitude, longitude')
-            .eq('id', ownerId)
-            .maybeSingle();
-        if (stationProfile != null) {
-          _stationLat = (stationProfile['latitude'] as num?)?.toDouble();
-          _stationLng = (stationProfile['longitude'] as num?)?.toDouble();
+        try {
+          final stationProfile = await supabase
+              .from('profiles')
+              .select('latitude, longitude, lat, lng, town')
+              .eq('id', ownerId)
+              .maybeSingle();
+          if (stationProfile != null) {
+            _stationLat = (stationProfile['latitude'] as num?)?.toDouble() ??
+                (stationProfile['lat'] as num?)?.toDouble();
+            _stationLng = (stationProfile['longitude'] as num?)?.toDouble() ??
+                (stationProfile['lng'] as num?)?.toDouble();
+            if ((_stationLat == null || _stationLat == 0) &&
+                stationProfile['town'] != null) {
+              final center =
+                  AppConstants.municipalityCenters[stationProfile['town']];
+              if (center != null) {
+                _stationLat = center.latitude;
+                _stationLng = center.longitude;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error loading station coordinates from profile: $e');
         }
       }
 
-      final cfg = await supabase.rpc('get_delivery_fee_config');
-      if (cfg is! Map) {
-        throw StateError('Delivery fee configuration was invalid.');
+      // If station coordinates are still missing, fallback to Cantilan center
+      final defaultCenter = AppConstants.municipalityCenters['Cantilan'] ??
+          AppConstants.municipalityCenters.values.first;
+      _stationLat ??= defaultCenter.latitude;
+      _stationLng ??= defaultCenter.longitude;
+
+      // 1. Try RPC get_delivery_fee_config first
+      Map<String, dynamic>? cfg;
+      try {
+        final res = await supabase.rpc('get_delivery_fee_config');
+        if (res is Map) {
+          cfg = Map<String, dynamic>.from(res);
+        }
+      } catch (e) {
+        debugPrint(
+          'get_delivery_fee_config RPC unavailable, checking system_config: $e',
+        );
       }
+
+      // 2. If RPC is missing/fails, query public.system_config table directly
+      if (cfg == null) {
+        try {
+          final row = await supabase
+              .from('system_config')
+              .select('value')
+              .eq('key', 'delivery_fee_config')
+              .maybeSingle();
+          if (row != null && row['value'] is Map) {
+            cfg = Map<String, dynamic>.from(row['value'] as Map);
+          }
+        } catch (e) {
+          debugPrint('system_config table check error: $e');
+        }
+      }
+
+      // 3. Standard fallback matching centralized delivery fee rules
+      cfg ??= const <String, dynamic>{
+        'enabled': true,
+        'rate_per_km': 10.0,
+        'minimum_fee': 20.0,
+        'min_billable_distance_km': 1.0,
+        'rounding_rule': 'exact',
+      };
 
       if (mounted) {
         setState(() {
-          _deliveryFeeConfig = Map<String, dynamic>.from(cfg);
+          _deliveryFeeConfig = Map<String, dynamic>.from(cfg!);
           _deliveryFeeEnabled = _deliveryFeeConfig?['enabled'] != false;
           _deliveryRatePerKm =
               (_deliveryFeeConfig?['rate_per_km'] as num?)?.toDouble() ?? 10.0;
@@ -255,6 +312,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _deliveryRoundingRule =
               (_deliveryFeeConfig?['rounding_rule'] ?? 'exact').toString();
           _stationSettingsLoaded = true;
+          _pricingSetupError = null;
         });
         _recalculateDeliveryFee();
 
@@ -381,13 +439,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _loadPlatformFeeConfig() async {
     try {
-      final cfg = await supabase.rpc('get_platform_fee_config');
-      if (cfg is! Map) {
-        throw StateError('Platform fee configuration response was invalid.');
+      Map<String, dynamic>? cfg;
+      try {
+        final res = await supabase.rpc('get_platform_fee_config');
+        if (res is Map) {
+          cfg = Map<String, dynamic>.from(res);
+        }
+      } catch (e) {
+        debugPrint(
+          'get_platform_fee_config RPC unavailable, checking system_config: $e',
+        );
       }
+
+      if (cfg == null) {
+        try {
+          final row = await supabase
+              .from('system_config')
+              .select('value')
+              .eq('key', 'platform_fee')
+              .maybeSingle();
+          if (row != null && row['value'] is Map) {
+            cfg = Map<String, dynamic>.from(row['value'] as Map);
+          }
+        } catch (_) {}
+      }
+
+      cfg ??= const <String, dynamic>{
+        'enabled': true,
+        'percent': 1.0,
+        'fixed': 0.0,
+      };
+
       if (!mounted) return;
       setState(() {
-        _platformFeeConfig = Map<String, dynamic>.from(cfg);
+        _platformFeeConfig = Map<String, dynamic>.from(cfg!);
         _platformFeeConfigLoaded = true;
       });
     } catch (e) {
@@ -818,9 +903,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : 0.0;
 
     var totalAmount = CheckoutRules.calculateOrderTotal(
-      subtotal: cart.totalAmount,
+      subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
       deliveryFee: _deliveryFee,
-      platformFee: _platformFeeFor(cart.totalAmount),
+      platformFee: _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount)),
       voucherDiscount: voucherDiscount,
     );
 
@@ -840,7 +925,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             quantity: item.quantity,
           ),
       ],
-      subtotal: cart.totalAmount,
+      subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
       deliveryFee: _deliveryFee,
       deliveryDistanceKm: _deliveryDistanceKm,
       deliveryRatePerKm: _deliveryRatePerKm,
@@ -875,10 +960,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (CheckoutRules.isOnlinePayment(paymentMethod)) {
         try {
-          final checkoutUrl = await _paymentService.createCheckout(
+          final session = await _paymentService.createCheckoutSession(
             orderId: orderId,
             paymentMethod: paymentMethod,
           );
+          final checkoutUrl = session.url;
           if (!mounted) return;
           final launched = await PaymentLaunchService.launchCheckoutUrl(
             checkoutUrl,
@@ -902,6 +988,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             totalAmount: totalAmount,
             paymentMethod: paymentMethod,
             cart: cart,
+            livemode: session.livemode,
           );
           return;
         } catch (e) {
@@ -978,9 +1065,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             stationName: stationName,
             items: itemsData,
             totalAmount: totalAmount,
-            subtotal: cart.totalAmount,
+            subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
             deliveryFee: _deliveryFee,
-            platformFee: _platformFeeFor(cart.totalAmount),
+            platformFee: _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount)),
             deliveryAddress: completeAddress,
             paymentMethod: selectedPayment,
             idempotencyKey: _orderAttemptKey,
@@ -1010,7 +1097,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               'id': queuedId,
               'station_name': stationName,
               'total_amount': totalAmount,
-              'subtotal': cart.totalAmount,
+              'subtotal': CheckoutRules.roundSubtotal(cart.totalAmount),
               'delivery_fee': _deliveryFee,
               'payment_method': paymentMethod,
               'status': 'pending_sync',
@@ -1040,6 +1127,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required double totalAmount,
     required String paymentMethod,
     required CartProvider cart,
+    bool livemode = false,
   }) async {
     if (!mounted) return;
 
@@ -1056,6 +1144,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           stationName: stationName,
           totalAmount: totalAmount,
           paymentMethod: paymentMethod,
+          livemode: livemode,
           onPaymentSuccess: (orderRecord) {
             Navigator.of(bottomSheetContext).pop();
             if (mounted) {
@@ -1156,10 +1245,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required CartProvider cart,
   }) async {
     try {
-      final checkoutUrl = await _paymentService.createCheckout(
+      final session = await _paymentService.createCheckoutSession(
         orderId: orderId,
         paymentMethod: paymentMethod,
       );
+      final checkoutUrl = session.url;
       if (!mounted) return;
       final launched = await PaymentLaunchService.launchCheckoutUrl(
         checkoutUrl,
@@ -1181,6 +1271,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         totalAmount: totalAmount,
         paymentMethod: paymentMethod,
         cart: cart,
+        livemode: session.livemode,
       );
     } catch (error) {
       if (!mounted) return;
@@ -1201,14 +1292,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final platformFee = _platformFeeFor(cart.totalAmount);
+    final platformFee = _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount));
     final voucherDiscount = _appliedVoucher != null
         ? (_appliedVoucher!.isDeliveryDiscount
               ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
               : _appliedVoucher!.discountAmount)
         : 0.0;
     final totalWithDelivery = CheckoutRules.calculateOrderTotal(
-      subtotal: cart.totalAmount,
+      subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
       deliveryFee: _deliveryFee,
       platformFee: platformFee,
       voucherDiscount: voucherDiscount,
@@ -2453,7 +2544,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _summaryRow(
             context,
             'Subtotal (${cart.totalItems} item${cart.totalItems == 1 ? '' : 's'})',
-            formatPeso(cart.totalAmount),
+            formatPeso(CheckoutRules.roundSubtotal(cart.totalAmount)),
           ),
           const SizedBox(height: AppUi.spacingSm),
           _feeRow(
@@ -2675,6 +2766,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'gcash' => 'Fast e-wallet payment',
       'maya' => 'Fast e-wallet payment',
       'card' => 'Debit or credit card',
+      'qrph' => 'Scan with any bank or e-wallet app',
       _ => 'Pay in cash upon arrival',
     };
   }
@@ -3159,6 +3251,7 @@ class _PaymentVerificationModal extends StatefulWidget {
   final String stationName;
   final double totalAmount;
   final String paymentMethod;
+  final bool livemode;
   final void Function(Map<String, dynamic> orderRecord) onPaymentSuccess;
   final VoidCallback onClose;
 
@@ -3168,6 +3261,7 @@ class _PaymentVerificationModal extends StatefulWidget {
     required this.stationName,
     required this.totalAmount,
     required this.paymentMethod,
+    this.livemode = false,
     required this.onPaymentSuccess,
     required this.onClose,
   });
@@ -3444,6 +3538,10 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
               ),
             ],
           ),
+          if (!widget.livemode) ...[
+            const SizedBox(height: 16),
+            TestModeLabel(qrph: widget.paymentMethod == 'qrph'),
+          ],
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),

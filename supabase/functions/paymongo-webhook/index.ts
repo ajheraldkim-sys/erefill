@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import type { CheckoutKind } from "../_shared/paymongo.ts";
 
 const parseWebhookSignature = (header: string | null): string | null => {
   if (!header) return null;
@@ -88,7 +89,8 @@ const verifyWebhookSignature = async (
 };
 
 serve(async (req) => {
-  let adminClient: ReturnType<typeof createClient> | null = null;
+  // deno-lint-ignore no-explicit-any
+  let adminClient: any = null;
   let webhookEventId: string | null = null;
   try {
     const rawBody = await req.text();
@@ -132,6 +134,10 @@ serve(async (req) => {
       throw new Error("Missing provider checkout id.");
     }
 
+    // Sessions created before metadata existed are orders.
+    const kind: CheckoutKind =
+      resource?.attributes?.metadata?.kind === "wallet_topup" ? "wallet_topup" : "order";
+
     const isPaid =
       String(eventType).includes("paid") ||
       ["paid", "succeeded", "completed"].includes(String(providerStatus));
@@ -143,6 +149,32 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
     adminClient = supabase;
+
+    if (kind === "wallet_topup") {
+      // credit_wallet_topup credits once, so retries and the app's verify
+      // call racing this webhook are harmless.
+      const topupId = resource?.attributes?.metadata?.topup_id;
+      const { data: topup } = topupId
+        ? await supabase.from("station_fee_topups").select("id, status").eq("id", topupId).maybeSingle()
+        : await supabase.from("station_fee_topups").select("id, status")
+          .eq("provider_checkout_id", providerCheckoutId).maybeSingle();
+      if (!topup) throw new Error(`Top-up not found for provider id: ${providerCheckoutId}`);
+
+      if (isPaid) {
+        const { error } = await supabase.rpc("credit_wallet_topup", { p_topup_id: topup.id });
+        if (error) throw error;
+      } else if (isFailed) {
+        await supabase
+          .from("station_fee_topups")
+          .update({ status: String(providerStatus) === "expired" ? "expired" : "failed" })
+          .eq("id", topup.id)
+          .eq("status", "pending");
+      }
+      return new Response(JSON.stringify({ ok: true, kind }), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     let checkout = null;
     const { data: directCheckout } = await supabase

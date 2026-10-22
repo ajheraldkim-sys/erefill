@@ -1,0 +1,8 @@
+@startuml
+start
+:Open the completed order;
+:Rate the service;
+:Write feedback;
+:Submit review;
+stop
+@enduml

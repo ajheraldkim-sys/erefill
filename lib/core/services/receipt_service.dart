@@ -1,4 +1,5 @@
 import 'dart:convert' show utf8;
+import 'package:erefill/core/utils/money.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart' show BuildContext, debugPrint;
 import 'package:pdf/pdf.dart';
@@ -395,11 +396,11 @@ class ReceiptService {
                         ),
                         pw.Expanded(
                           flex: 2,
-                          child: pw.Text('PHP ${unitPrice.toStringAsFixed(2)}', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 10)),
+                          child: pw.Text('PHP ${formatAmount(unitPrice)}', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 10)),
                         ),
                         pw.Expanded(
                           flex: 2,
-                          child: pw.Text('PHP ${lineTotal.toStringAsFixed(2)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                          child: pw.Text('PHP ${formatAmount(lineTotal)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -420,7 +421,7 @@ class ReceiptService {
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
                             pw.Text('Subtotal:', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                            pw.Text('PHP ${subtotal.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                            pw.Text('PHP ${formatAmount(subtotal)}', style: const pw.TextStyle(fontSize: 10)),
                           ],
                         ),
                         pw.SizedBox(height: 4),
@@ -428,7 +429,7 @@ class ReceiptService {
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
                             pw.Text('Delivery Fee:', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                            pw.Text('PHP ${deliveryFee.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                            pw.Text('PHP ${formatAmount(deliveryFee)}', style: const pw.TextStyle(fontSize: 10)),
                           ],
                         ),
                         if (serviceFee > 0) ...[
@@ -437,7 +438,7 @@ class ReceiptService {
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
                               pw.Text('Service Fee:', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
-                              pw.Text('PHP ${serviceFee.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                              pw.Text('PHP ${formatAmount(serviceFee)}', style: const pw.TextStyle(fontSize: 10)),
                             ],
                           ),
                         ],
@@ -449,7 +450,7 @@ class ReceiptService {
                           children: [
                             pw.Text('Grand Total:', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#1E3A8A'))),
                             pw.Text(
-                              'PHP ${totalAmount.toStringAsFixed(2)}',
+                              'PHP ${formatAmount(totalAmount)}',
                               style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#2563EB')),
                             ),
                           ],
@@ -467,7 +468,7 @@ class ReceiptService {
                                 ),
                               ),
                               pw.Text(
-                                'PHP ${((deliveryReceipt['amount_paid'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                                'PHP ${formatAmount(((deliveryReceipt['amount_paid'] as num?)?.toDouble() ?? 0))}',
                                 style: const pw.TextStyle(fontSize: 10),
                               ),
                             ],
@@ -484,7 +485,7 @@ class ReceiptService {
                                 ),
                               ),
                               pw.Text(
-                                'PHP ${((deliveryReceipt['outstanding_balance'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                                'PHP ${formatAmount(((deliveryReceipt['outstanding_balance'] as num?)?.toDouble() ?? 0))}',
                                 style: pw.TextStyle(
                                   fontSize: 10,
                                   fontWeight: pw.FontWeight.bold,
@@ -740,7 +741,7 @@ class ReceiptService {
                     pw.Expanded(
                       child: pw.Text('$qty x $name', style: const pw.TextStyle(fontSize: 8)),
                     ),
-                    pw.Text('P${price.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text('P${formatAmount(price)}', style: const pw.TextStyle(fontSize: 8)),
                   ],
                 );
               }),
@@ -749,14 +750,14 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Subtotal:', style: const pw.TextStyle(fontSize: 8)),
-                  pw.Text('P${subtotal.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
+                  pw.Text('P${formatAmount(subtotal)}', style: const pw.TextStyle(fontSize: 8)),
                 ],
               ),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Delivery Fee:', style: const pw.TextStyle(fontSize: 8)),
-                  pw.Text('P${deliveryFee.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 8)),
+                  pw.Text('P${formatAmount(deliveryFee)}', style: const pw.TextStyle(fontSize: 8)),
                 ],
               ),
               pw.SizedBox(height: 2),
@@ -764,7 +765,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('TOTAL DUE:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                  pw.Text('P${totalAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                  pw.Text('P${formatAmount(totalAmount)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
                 ],
               ),
               pw.SizedBox(height: 2),
@@ -878,7 +879,7 @@ class ReceiptService {
       final name = (it['product_name'] ?? 'Refill').toString();
       final price = ((it['total_price'] ?? 0) as num).toDouble();
       final itemDesc = '$qty x $name';
-      final priceStr = 'P${price.toStringAsFixed(2)}';
+      final priceStr = 'P${formatAmount(price)}';
       final spaces = widthChars - itemDesc.length - priceStr.length;
       if (spaces > 0) {
         writeLine('$itemDesc${' ' * spaces}$priceStr');
@@ -890,17 +891,17 @@ class ReceiptService {
 
     writeLine(divider);
     // Subtotal & Delivery
-    final subStr = 'P${subtotal.toStringAsFixed(2)}';
+    final subStr = 'P${formatAmount(subtotal)}';
     writeLine('Subtotal:${' ' * (widthChars - 9 - subStr.length)}$subStr');
 
-    final delStr = 'P${deliveryFee.toStringAsFixed(2)}';
+    final delStr = 'P${formatAmount(deliveryFee)}';
     writeLine('Delivery:${' ' * (widthChars - 9 - delStr.length)}$delStr');
 
     writeLine(divider);
 
     // ESC E 1 (Bold ON)
     writeBytes([0x1B, 0x45, 0x01]);
-    final totalStr = 'P${totalAmount.toStringAsFixed(2)}';
+    final totalStr = 'P${formatAmount(totalAmount)}';
     writeLine('TOTAL:${' ' * (widthChars - 6 - totalStr.length)}$totalStr');
     writeBytes([0x1B, 0x45, 0x00]);
 

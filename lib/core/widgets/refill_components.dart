@@ -924,7 +924,7 @@ class ActiveOrderCard extends StatelessWidget {
         (order['payment_method'] ?? 'cod').toString().toLowerCase();
     final paymentStatus =
         (order['payment_status'] ?? 'pending').toString().toLowerCase();
-    final isOnline = {'gcash', 'maya', 'card'}.contains(paymentMethod);
+    final isOnline = {'gcash', 'maya', 'card', 'qrph'}.contains(paymentMethod);
     final isPaid = paymentStatus == 'success' || paymentStatus == 'paid';
     final stage = _currentStage(status);
 

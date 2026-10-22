@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Water Types;
+:Add or edit a water type;
+:Save changes;
+stop
+@enduml

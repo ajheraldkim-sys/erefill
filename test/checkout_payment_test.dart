@@ -124,7 +124,7 @@ void main() {
           minimumFee: 10,
           minBillableDistanceKm: 1.5,
         ),
-        22.5, // 1.5 km * 15 = 22.50
+        23, // 1.5 km * 15 = 22.50, rounded to whole pesos
       );
     });
 
@@ -247,6 +247,8 @@ void main() {
       expect(CheckoutRules.isOnlinePayment('gcash'), isTrue);
       expect(CheckoutRules.isOnlinePayment('maya'), isTrue);
       expect(CheckoutRules.isOnlinePayment('card'), isTrue);
+      expect(CheckoutRules.isOnlinePayment('qrph'), isTrue);
+      expect(CheckoutRules.paymentLabel('qrph'), 'QR Ph');
       expect(CheckoutRules.isOnlinePayment('cod'), isFalse);
     });
 
@@ -347,15 +349,16 @@ void main() {
     });
 
     test(
-      'standardPaymentMethods contains cod, gcash, maya, and card all available',
+      'standardPaymentMethods contains cod, gcash, maya, card and qrph all available',
       () {
         final methods = CheckoutRules.standardPaymentMethods;
-        expect(methods, hasLength(4));
+        expect(methods, hasLength(5));
         expect(methods.map((m) => m.type).toList(), [
           'cod',
           'gcash',
           'maya',
           'card',
+          'qrph',
         ]);
         for (final m in methods) {
           expect(
@@ -371,7 +374,7 @@ void main() {
       },
     );
 
-    testWidgets('renders all 4 payment methods and allows selection', (
+    testWidgets('renders all 5 payment methods and allows selection', (
       tester,
     ) async {
       String selected = 'cod';
@@ -395,6 +398,7 @@ void main() {
       expect(find.text('GCash'), findsOneWidget);
       expect(find.text('Maya'), findsOneWidget);
       expect(find.text('Credit/Debit Card'), findsOneWidget);
+      expect(find.text('QR Ph'), findsOneWidget);
       expect(find.bySemanticsLabel('Visa logo'), findsOneWidget);
       expect(find.bySemanticsLabel('Mastercard logo'), findsOneWidget);
 
@@ -409,6 +413,11 @@ void main() {
       await tester.tap(find.text('Credit/Debit Card'));
       await tester.pumpAndSettle();
       expect(selected, 'card');
+
+      await tester.ensureVisible(find.text('QR Ph'));
+      await tester.tap(find.text('QR Ph'));
+      await tester.pumpAndSettle();
+      expect(selected, 'qrph');
     });
   });
 

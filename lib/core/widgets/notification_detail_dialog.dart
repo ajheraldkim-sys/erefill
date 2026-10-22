@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/utils/money.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -233,7 +234,7 @@ Future<void> showNotificationDetailDialog(
                           _buildDetailRow(
                             context,
                             'Amount',
-                            '₱${amount is num ? amount.toStringAsFixed(2) : amount}',
+                            amount is num ? formatPeso(amount) : '₱$amount',
                           ),
                         ],
                       ],

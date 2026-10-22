@@ -1,0 +1,9 @@
+@startuml
+start
+:Open Orders;
+:Select an order;
+:Accept or cancel the order;
+:Mark as Preparing, then Ready for Pickup;
+:Record payment or credit;
+stop
+@enduml

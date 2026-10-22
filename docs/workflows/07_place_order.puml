@@ -1,0 +1,8 @@
+@startuml
+start
+:Select station;
+:Enter quantity;
+:Choose delivery address;
+:Confirm order;
+stop
+@enduml

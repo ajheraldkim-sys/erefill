@@ -6,7 +6,11 @@ serve(async (req) => {
   const status = url.searchParams.get("status") ?? "success";
   const isSuccess = status === "success";
 
-  const deepLink = `io.supabase.erefill://payment-callback?order_id=${encodeURIComponent(orderId)}&status=${encodeURIComponent(status)}`;
+  const topupId = url.searchParams.get("topup_id") ?? "";
+  const reference = topupId
+    ? `topup_id=${encodeURIComponent(topupId)}`
+    : `order_id=${encodeURIComponent(orderId)}`;
+  const deepLink = `io.supabase.erefill://payment-callback?${reference}&status=${encodeURIComponent(status)}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">

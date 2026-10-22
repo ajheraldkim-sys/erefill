@@ -50,12 +50,34 @@ class _CartScreenState extends State<CartScreen> {
     final client = _supabase;
     if (client == null) return;
     try {
-      final res = await client.rpc('get_delivery_fee_config');
-      if (res is Map && mounted) {
-        // Same keys checkout reads from get_delivery_fee_config
-        // (`minimum_fee`, `enabled`), so cart and checkout always agree.
+      Map<String, dynamic>? res;
+      try {
+        final rpcRes = await client.rpc('get_delivery_fee_config');
+        if (rpcRes is Map) res = Map<String, dynamic>.from(rpcRes);
+      } catch (_) {}
+
+      if (res == null) {
+        try {
+          final row = await client
+              .from('system_config')
+              .select('value')
+              .eq('key', 'delivery_fee_config')
+              .maybeSingle();
+          if (row != null && row['value'] is Map) {
+            res = Map<String, dynamic>.from(row['value'] as Map);
+          }
+        } catch (_) {}
+      }
+
+      res ??= const {
+        'enabled': true,
+        'rate_per_km': 10.0,
+        'minimum_fee': 20.0,
+      };
+
+      if (mounted) {
         setState(() {
-          _ratePerKm = (res['rate_per_km'] as num?)?.toDouble();
+          _ratePerKm = (res!['rate_per_km'] as num?)?.toDouble();
           _minDeliveryFee = (res['minimum_fee'] as num?)?.toDouble();
           _deliveryFeeEnabled = res['enabled'] != false;
         });

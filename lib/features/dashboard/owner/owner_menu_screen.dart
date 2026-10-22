@@ -1,6 +1,7 @@
 ﻿import 'package:erefill/core/utils/money.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -92,7 +93,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   final _commissionController = TextEditingController();
 
   // Payment methods
-  List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+  List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card', 'qrph'];
   double? _systemDeliveryRate;
 
   final Map<String, List<String>> _municipalityData =
@@ -202,11 +203,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     setState(() {
       if (settings['price_per_gallon'] != null) {
         _priceController.text = (settings['price_per_gallon'] as num)
-            .toStringAsFixed(2);
+            .toStringAsFixed(0);
       }
       if (settings['base_delivery_fee'] != null) {
         _deliveryFeeController.text = (settings['base_delivery_fee'] as num)
-            .toStringAsFixed(2);
+            .toStringAsFixed(0);
       }
       if (settings['opening_time'] != null &&
           settings['opening_time'].toString().isNotEmpty) {
@@ -225,7 +226,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (configuredMethods is List) {
         final parsed = configuredMethods
             .whereType<String>()
-            .where((m) => ['cod', 'gcash', 'maya', 'card'].contains(m))
+            .where((m) => ['cod', 'gcash', 'maya', 'card', 'qrph'].contains(m))
             .toSet()
             .toList();
         if (parsed.isNotEmpty) {
@@ -283,7 +284,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (profile['price_per_gallon'] != null &&
           _priceController.text.isEmpty) {
         _priceController.text = (profile['price_per_gallon'] as num)
-            .toStringAsFixed(2);
+            .toStringAsFixed(0);
       }
 
       final lat = (profile['latitude'] ?? profile['lat']) as num?;
@@ -409,12 +410,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
         if (settings != null) {
           _priceController.text =
-              (settings['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
-              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
-              '15.00';
+              (settings['price_per_gallon'] as num?)?.toStringAsFixed(0) ??
+              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(0) ??
+              '15';
           _deliveryFeeController.text =
-              (settings['base_delivery_fee'] as num?)?.toStringAsFixed(2) ??
-              '25.00';
+              (settings['base_delivery_fee'] as num?)?.toStringAsFixed(0) ??
+              '25';
           if (settings['opening_time'] != null &&
               settings['opening_time'].toString().isNotEmpty) {
             _openingTime = settings['opening_time'].toString();
@@ -433,19 +434,19 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           if (configuredMethods is List) {
             _enabledPaymentMethods = configuredMethods
                 .whereType<String>()
-                .where((m) => ['cod', 'gcash', 'maya', 'card'].contains(m))
+                .where((m) => ['cod', 'gcash', 'maya', 'card', 'qrph'].contains(m))
                 .toSet()
                 .toList();
             if (_enabledPaymentMethods.isEmpty) {
-              _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+              _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card', 'qrph'];
             }
           }
         } else {
           _priceController.text =
-              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
-              '15.00';
-          _deliveryFeeController.text = '25.00';
-          _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(0) ??
+              '15';
+          _deliveryFeeController.text = '25';
+          _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card', 'qrph'];
         }
 
         _isLoading = false;
@@ -503,6 +504,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
               ? 'COD'
               : m == 'card'
               ? 'Card'
+              : m == 'qrph'
+              ? 'QR Ph'
               : m.toUpperCase(),
         )
         .join(', ');
@@ -1688,7 +1691,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           label: 'Price per Gallon (₱)',
           controller: _priceController,
           prefixIcon: Icons.payments_outlined,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           compact: true,
         ),
         AppUi.vGapMd,
@@ -1937,6 +1941,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         'Credit / Debit Card',
         Icons.credit_card_rounded,
         'Online card payments powered by payment gateway',
+      ),
+      (
+        'qrph',
+        'QR Ph',
+        Icons.qr_code_2,
+        'Customer scans a QR code with any bank or e-wallet app',
       ),
     ];
 

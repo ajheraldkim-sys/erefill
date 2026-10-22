@@ -66,6 +66,21 @@ class PaymentBrandMark extends StatelessWidget {
           ],
         ),
       ),
+      'qrph' => Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppUi.radiusSm),
+        ),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.qr_code_2,
+          color: Color(0xFF0F6CBD),
+          size: 24,
+          semanticLabel: 'QR Ph logo',
+        ),
+      ),
       _ => Container(
         width: height,
         height: height,

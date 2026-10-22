@@ -1934,7 +1934,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                 ),
                               ),
                               Text(
-                                '₱${(item['subtotal'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                formatPeso(item['subtotal'] as num?),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14,
@@ -2124,7 +2124,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                           ),
                         ),
                         Text(
-                          '₱${(order['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                          formatPeso(order['total_amount'] as num?),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 20,

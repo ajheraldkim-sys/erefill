@@ -112,6 +112,49 @@ void main() {
     expect(h.declines, ['abcdef12-0000-0000-0000-000000000000']);
   });
 
+  testWidgets('unpaid online order cannot be accepted', (tester) async {
+    final h = _Harness();
+    final order = {..._order('pending'), 'payment_method': 'gcash'};
+    await _open(tester, h.sheet(order));
+    await tester.scrollUntilVisible(
+      find.text('Accept Order'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    final accept = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Accept Order'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
+    );
+    expect(accept.onPressed, isNull);
+    expect(find.text('This order is waiting for online payment.'), findsOneWidget);
+
+    // Declining an unpaid order is still allowed.
+    await tester.ensureVisible(find.text('Decline'));
+    await tester.tap(find.text('Decline'));
+    await tester.pumpAndSettle();
+    expect(h.declines, ['abcdef12-0000-0000-0000-000000000000']);
+  });
+
+  testWidgets('paid online order can be accepted', (tester) async {
+    final h = _Harness();
+    final order = {
+      ..._order('pending'),
+      'payment_method': 'qrph',
+      'payment_status': 'success',
+    };
+    await _open(tester, h.sheet(order));
+    await tester.scrollUntilVisible(
+      find.text('Accept Order'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Accept Order'));
+    await tester.pumpAndSettle();
+    expect(h.updates, ['abcdef12-0000-0000-0000-000000000000:accepted']);
+  });
+
   test('shared formatting helpers', () {
     expect(shortOrderId('abcdef12-3456'), '#ABCDEF12');
     expect(shortOrderId('abc'), '#ABC');

@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Riders;
+:Add or update a rider;
+:View rider status, deliveries or payouts;
+stop
+@enduml

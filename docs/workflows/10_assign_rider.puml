@@ -1,0 +1,8 @@
+@startuml
+start
+:Open the ready order;
+:Tap Assign Rider;
+:Select a rider;
+:Confirm assignment;
+stop
+@enduml

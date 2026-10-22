@@ -187,6 +187,7 @@ class PaymentMethodSelector extends StatelessWidget {
       'gcash' => 'Pay with GCash',
       'maya' => 'Pay with Maya',
       'card' => 'Debit/Credit card',
+      'qrph' => 'Scan with any bank or e-wallet app',
       _ => 'Pay on delivery',
     };
   }
@@ -196,6 +197,7 @@ class PaymentMethodSelector extends StatelessWidget {
       'gcash' => const Color(0xFF007DFE),
       'maya' => const Color(0xFF00A86B),
       'card' => const Color(0xFF1E3A8A),
+      'qrph' => const Color(0xFF0F6CBD),
       _ => AppColors.uiWarning,
     };
   }

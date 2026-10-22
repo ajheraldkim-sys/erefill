@@ -89,6 +89,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   final supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _addresses = [];
   bool _isLoading = true;
+  bool _isSwitchingAddress = false;
 
   @override
   void initState() {
@@ -208,6 +209,14 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       final town = addr['town']?.toString();
       final zip =
           town != null ? AppConstants.municipalityZipCodes[town] : null;
+      var lat = (addr['latitude'] as num?)?.toDouble() ?? 0.0;
+      var lng = (addr['longitude'] as num?)?.toDouble() ?? 0.0;
+      if ((lat == 0 || lng == 0) && town != null && town.isNotEmpty) {
+        final center = AppConstants.municipalityCenters[town] ??
+            AppConstants.municipalityCenters.values.first;
+        lat = center.latitude;
+        lng = center.longitude;
+      }
       final payload = <String, dynamic>{
         'complete_address': addr['complete_address'],
         'town': town,
@@ -217,10 +226,22 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         // municipality's purok produces an internally inconsistent profile.
         'purok': null,
         'zip_code': zip,
-        'latitude': (addr['latitude'] as num?)?.toDouble() ?? 0.0,
-        'longitude': (addr['longitude'] as num?)?.toDouble() ?? 0.0,
+        'latitude': lat != 0 ? lat : null,
+        'longitude': lng != 0 ? lng : null,
       };
-      await supabase.from('profiles').update(payload).eq('id', customerId);
+      if (town != null && town.isNotEmpty) {
+        payload['map_pin_town'] = town;
+      }
+      try {
+        await supabase.from('profiles').update(payload).eq('id', customerId);
+      } catch (e) {
+        if (e.toString().contains('map_pin_town')) {
+          payload.remove('map_pin_town');
+          await supabase.from('profiles').update(payload).eq('id', customerId);
+        } else {
+          rethrow;
+        }
+      }
       // Invalidate customer home and station caches so screens update immediately
       await LocalDataCache.instance.invalidatePattern('customer_home_');
       await LocalDataCache.instance.invalidate('cached_owner_stations');
@@ -261,7 +282,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
   Future<void> _setDefault(String id) async {
     final customerId = supabase.auth.currentUser?.id;
-    if (customerId == null) return;
+    if (customerId == null || _isSwitchingAddress) return;
 
     final target = _addresses.firstWhere(
       (a) => a['id'].toString() == id,
@@ -269,27 +290,32 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     );
     if (target.isEmpty) return;
 
-    if (savedAddressNeedsPinConfirmation(target)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Confirm this address on the map before making it your default.',
-            ),
-          ),
-        );
+    // 1. Immediately update UI state for instant visual feedback
+    setState(() {
+      _isSwitchingAddress = true;
+      for (final a in _addresses) {
+        a['is_default'] = (a['id'].toString() == id);
       }
-      await _showAddressForm(initial: {...target, 'is_default': true});
-      return;
-    }
+    });
 
     try {
-      // 1. Immediately update UI state for instant visual feedback
-      setState(() {
-        for (final a in _addresses) {
-          a['is_default'] = (a['id'].toString() == id);
-        }
-      });
+      final town = target['town']?.toString();
+      var lat = (target['latitude'] as num?)?.toDouble() ?? 0.0;
+      var lng = (target['longitude'] as num?)?.toDouble() ?? 0.0;
+      if ((lat == 0 || lng == 0) && town != null && town.isNotEmpty) {
+        final center = AppConstants.municipalityCenters[town] ??
+            AppConstants.municipalityCenters.values.first;
+        lat = center.latitude;
+        lng = center.longitude;
+        target['latitude'] = lat;
+        target['longitude'] = lng;
+      }
+      if (town != null &&
+          town.isNotEmpty &&
+          (target['map_pin_town'] == null ||
+              target['map_pin_town'].toString().isEmpty)) {
+        target['map_pin_town'] = town;
+      }
 
       // 2. Clear default flag from all other addresses for this customer
       await supabase
@@ -299,11 +325,35 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
           .neq('id', id);
 
       // 3. Set the target address as default
-      await supabase
-          .from('customer_addresses')
-          .update({'is_default': true})
-          .eq('id', id)
-          .eq('customer_id', customerId);
+      final updatePayload = <String, dynamic>{
+        'is_default': true,
+      };
+      if (lat != 0 && lng != 0) {
+        updatePayload['latitude'] = lat;
+        updatePayload['longitude'] = lng;
+      }
+      if (town != null && town.isNotEmpty) {
+        updatePayload['map_pin_town'] = town;
+      }
+
+      try {
+        await supabase
+            .from('customer_addresses')
+            .update(updatePayload)
+            .eq('id', id)
+            .eq('customer_id', customerId);
+      } catch (e) {
+        if (e.toString().contains('map_pin_town')) {
+          updatePayload.remove('map_pin_town');
+          await supabase
+              .from('customer_addresses')
+              .update(updatePayload)
+              .eq('id', id)
+              .eq('customer_id', customerId);
+        } else {
+          rethrow;
+        }
+      }
 
       await _syncToProfile(target);
       await _loadAddresses();
@@ -314,6 +364,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
             content: Text(
               'Selected "${target['label'] ?? 'Address'}" as your default delivery address.',
             ),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -321,10 +372,18 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       debugPrint('Error setting default address: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update default address: ${FriendlyErrors.message(e)}')),
+          SnackBar(
+            content: Text(
+              'Could not update default address: ${FriendlyErrors.message(e)}',
+            ),
+          ),
         );
       }
       await _loadAddresses();
+    } finally {
+      if (mounted) {
+        setState(() => _isSwitchingAddress = false);
+      }
     }
   }
 
@@ -408,15 +467,14 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   Future<void> _showAddressForm({Map<String, dynamic>? initial}) async {
     final isEditing = initial != null;
     final labelController = TextEditingController(
-      text: initial?['label']?.toString() ?? 'Home',
+      text: initial?['label']?.toString() ??
+          (_addresses.isEmpty ? 'Home' : ''),
     );
     final addressController = TextEditingController(
-      text: initial?['complete_address']?.toString() ??
-          (isEditing ? '' : widget.launch.address),
+      text: initial?['complete_address']?.toString() ?? '',
     );
     final landmarkController = TextEditingController(
-      text: initial?['landmark']?.toString() ??
-          (isEditing ? '' : widget.launch.landmark),
+      text: initial?['landmark']?.toString() ?? '',
     );
 
     final municipalityData = AppConstants.municipalityData;
@@ -428,7 +486,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     }
 
     String? selectedBarangay =
-        initial?['barangay']?.toString() ?? widget.launch.barangay;
+        initial?['barangay']?.toString() ??
+        (isEditing ? widget.launch.barangay : null);
     final barangays = municipalityData[selectedTown] ?? [];
     if (selectedBarangay != null && !barangays.contains(selectedBarangay)) {
       selectedBarangay = barangays.isNotEmpty ? barangays.first : null;
@@ -436,11 +495,12 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       selectedBarangay = barangays.first;
     }
 
-    final initialCenter = AppConstants.municipalityCenters[selectedTown];
+    final initialCenter = AppConstants.municipalityCenters[selectedTown] ??
+        AppConstants.municipalityCenters.values.first;
     double initLat = (initial?['latitude'] as num?)?.toDouble() ??
-        widget.launch.latitude;
+        initialCenter.latitude;
     double initLng = (initial?['longitude'] as num?)?.toDouble() ??
-        widget.launch.longitude;
+        initialCenter.longitude;
     final hasInitialPin =
         initLat >= -90 &&
         initLat <= 90 &&
@@ -448,8 +508,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         initLng <= 180 &&
         (initLat != 0 || initLng != 0);
     if (!hasInitialPin) {
-      initLat = initialCenter?.latitude ?? 9.3333;
-      initLng = initialCenter?.longitude ?? 125.9833;
+      initLat = initialCenter.latitude;
+      initLng = initialCenter.longitude;
     }
 
     LatLng pickedLocation = LatLng(initLat, initLng);
@@ -1078,19 +1138,22 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: AppUi.cardRadius,
-                          onTap: () {
-                            if (!isDefault) {
-                              _setDefault(saved['id'].toString());
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '"$label" is already your default delivery address.',
-                                  ),
-                                ),
-                              );
-                            }
-                          },
+                          onTap: _isSwitchingAddress
+                              ? null
+                              : () {
+                                  if (!isDefault) {
+                                    _setDefault(saved['id'].toString());
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '"$label" is already your default delivery address.',
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                },
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(

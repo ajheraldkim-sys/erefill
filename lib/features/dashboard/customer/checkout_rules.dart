@@ -40,7 +40,7 @@ class CheckoutPreflightResult {
 class CheckoutRules {
   const CheckoutRules._();
 
-  static const onlinePaymentMethods = {'gcash', 'maya', 'card'};
+  static const onlinePaymentMethods = {'gcash', 'maya', 'card', 'qrph'};
 
   static const cashPaymentOption = CheckoutPaymentOption(
     type: 'cod',
@@ -70,6 +70,7 @@ class CheckoutRules {
       label: 'Credit/Debit Card',
       available: true,
     ),
+    CheckoutPaymentOption(type: 'qrph', label: 'QR Ph', available: true),
   ];
 
   static bool isOnlinePayment(String? method) {
@@ -96,6 +97,8 @@ class CheckoutRules {
         return 'Maya';
       case 'card':
         return 'Credit/Debit Card';
+      case 'qrph':
+        return 'QR Ph';
       case 'credit':
         return 'Store Credit / Utang';
       default:
@@ -189,8 +192,12 @@ class CheckoutRules {
     if (minimumFee > 0 && fee < minimumFee) {
       fee = minimumFee;
     }
-    return double.parse(fee.toStringAsFixed(2));
+    return fee.roundToDouble();
   }
+
+  /// Subtotal, delivery fee and voucher discounts are whole pesos; only the
+  /// service fee keeps centavos. Mirrors `public.price_order` on the server.
+  static double roundSubtotal(double raw) => raw <= 0 ? 0 : raw.roundToDouble();
 
   static double calculatePlatformFee({
     required double subtotal,
@@ -210,7 +217,8 @@ class CheckoutRules {
     required double platformFee,
     required double voucherDiscount,
   }) {
-    return (subtotal + deliveryFee + platformFee - voucherDiscount)
+    final discount = voucherDiscount <= 0 ? 0.0 : voucherDiscount.roundToDouble();
+    return (subtotal + deliveryFee + platformFee - discount)
         .clamp(0.0, double.infinity)
         .toDouble();
   }

@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Messages;
+:Select a conversation;
+:Type and send message;
+stop
+@enduml

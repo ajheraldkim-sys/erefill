@@ -17,6 +17,7 @@ import 'package:erefill/core/widgets/notification_preview_sheet.dart';
 import 'package:erefill/core/widgets/role_bottom_nav_bar.dart';
 import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
 import 'order_management_screen.dart';
+import '../../fee_wallet/widgets/fee_wallet_dashboard_card.dart';
 import 'riders_screen.dart';
 import '../../chat/services/chat_service.dart';
 import '../../chat/models/system_notification.dart';
@@ -1195,6 +1196,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                   final side = <Widget>[
                     station,
                     ?setup,
+                    const FeeWalletDashboardCard(),
                     _buildInventoryCard(),
                     _buildQuickActions(),
                   ];
@@ -1204,6 +1206,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                     ?setup,
                     _buildTodaySection(),
                     _buildPipelineCard(),
+                    const FeeWalletDashboardCard(),
                     _buildInventoryCard(),
                     _buildQuickActions(),
                     _buildRecentOrders(),
