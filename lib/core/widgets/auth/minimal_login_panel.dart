@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,6 +6,7 @@ import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/theme/app_theme.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/widgets/brand/erefill_logo.dart';
+import 'package:erefill/core/widgets/brand/google_logo.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
 import 'package:erefill/features/auth/services/auth_service.dart';
 
@@ -379,7 +378,7 @@ class _MinimalLoginPanelState extends State<MinimalLoginPanel> {
                                     Expanded(
                                       child: _SocialLoginButton(
                                         label: 'Google',
-                                        icon: _GoogleIcon(),
+                                        icon: const GoogleLogo(),
                                         onPressed: _isLoading
                                             ? null
                                             : () => _runAuth(
@@ -804,73 +803,4 @@ class _LoginErrorBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-// ─── Google "G" Icon ────────────────────────────────────────────────────────
-
-class _GoogleIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: CustomPaint(
-        painter: _GooglePainter(cutoutColor: AppUi.surfaceOf(context)),
-      ),
-    );
-  }
-}
-
-class _GooglePainter extends CustomPainter {
-  _GooglePainter({required this.cutoutColor});
-
-  /// Matches the button surface so the "G" reads in light and dark mode.
-  final Color cutoutColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final radius = size.width / 2;
-    final ringRadius = radius * 0.9;
-    final ringPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = radius * 0.38
-      ..strokeCap = StrokeCap.round;
-
-    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: ringRadius);
-
-    ringPaint.color = const Color(0xFF4285F4);
-    canvas.drawArc(rect, 1.9 * math.pi, 1.0 * math.pi, false, ringPaint);
-
-    ringPaint.color = const Color(0xFF34A853);
-    canvas.drawArc(rect, 0.1 * math.pi, 0.9 * math.pi, false, ringPaint);
-
-    ringPaint.color = const Color(0xFFFBBC05);
-    canvas.drawArc(rect, 0.95 * math.pi, 0.9 * math.pi, false, ringPaint);
-
-    ringPaint.color = const Color(0xFFEA4335);
-    canvas.drawArc(rect, -0.9 * math.pi, 0.9 * math.pi, false, ringPaint);
-
-    final cutout = Paint()..color = cutoutColor;
-    canvas.drawCircle(Offset(cx + radius * 0.08, cy), radius * 0.58, cutout);
-
-    final accentBar = Paint()..color = const Color(0xFF4285F4);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          cx + radius * 0.12,
-          cy - radius * 0.18,
-          radius * 0.68,
-          radius * 0.36,
-        ),
-        Radius.circular(radius * 0.12),
-      ),
-      accentBar,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_GooglePainter oldDelegate) =>
-      oldDelegate.cutoutColor != cutoutColor;
 }

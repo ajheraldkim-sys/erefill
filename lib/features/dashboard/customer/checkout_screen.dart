@@ -2026,10 +2026,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildContainerExchangeCard(BuildContext context, CartProvider cart) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF161F30) : Colors.white;
-    final borderColor = isDark
-        ? const Color(0xFF1E2D4A)
-        : AppUi.borderLight;
+    final cardBg = AppUi.surfaceOf(context);
+    final borderColor = AppUi.borderOf(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -2275,9 +2273,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 // Left soft-green badge matching reference screenshot
                 Container(
                   width: 64,
-                  color: isDark
-                      ? const Color(0xFF132D21)
-                      : const Color(0xFFE8F5E9),
+                  color: StatusToneStyle.of(
+                    StatusTone.success,
+                    isDark: isDark,
+                  ).background,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2386,13 +2385,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2E5E3B),
-                              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+                              color: AppUi.brandOf(context),
+                              borderRadius: AppUi.controlRadius,
                             ),
-                            child: const Text(
+                            child: Text(
                               'Select',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: AppUi.onBrandOf(context),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),

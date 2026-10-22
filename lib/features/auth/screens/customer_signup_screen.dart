@@ -5,6 +5,7 @@ import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
 import 'package:erefill/features/auth/widgets/signup_flow_widgets.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
+import 'package:erefill/core/widgets/brand/google_logo.dart';
 import 'package:erefill/core/widgets/checkout_step_indicator.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -826,7 +827,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               children: [
                 Expanded(
                   child: _SocialSignupTile(
-                    icon: Icons.g_mobiledata_rounded,
+                    icon: const GoogleLogo(size: 22),
                     label: 'Google',
                     onPressed: _isLoading
                         ? null
@@ -836,7 +837,11 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _SocialSignupTile(
-                    icon: Icons.facebook_rounded,
+                    icon: Icon(
+                      Icons.facebook_rounded,
+                      size: 24,
+                      color: AppUi.textPrimaryOf(context),
+                    ),
                     label: 'Facebook',
                     onPressed: _isLoading
                         ? null
@@ -1065,7 +1070,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
 }
 
 class _SocialSignupTile extends StatelessWidget {
-  final IconData icon;
+  final Widget icon;
   final String label;
   final VoidCallback? onPressed;
 
@@ -1081,7 +1086,7 @@ class _SocialSignupTile extends StatelessWidget {
       height: 56,
       child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 24, color: AppUi.textPrimaryOf(context)),
+        icon: icon,
         label: Text(
           label,
           style: TextStyle(
