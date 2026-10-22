@@ -13,7 +13,7 @@ import '../../../core/utils/station_query_helpers.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/experience_widgets.dart';
 import '../../../core/widgets/refill_components.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -333,7 +333,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final productRows = batchResults[6] as List? ?? const [];
       final Map<String, String> productWaterTypes = {};
       for (final p in productRows) {
-        if (p is Map) {
+        if (p is Map &&
+            !OrderProductHelpers.isNonWaterProduct(
+              Map<String, dynamic>.from(p),
+            )) {
           final ownerId = p['owner_id']?.toString();
           final label = (p['category'] ?? p['name'])?.toString().trim();
           if (ownerId != null && label != null && label.isNotEmpty) {
@@ -1026,11 +1029,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
               .select('*')
               .eq('owner_id', stationId)
               .eq('is_available', true)
-              .order('price', ascending: true)
-              .limit(1);
-          if (prods.isNotEmpty) {
-            defaultProduct = prods.first;
-          }
+              .order('created_at', ascending: true);
+          defaultProduct = OrderProductHelpers.defaultFromList(prods);
         } catch (_) {}
 
         final prodId = defaultProduct?['id']?.toString();
@@ -1190,13 +1190,13 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
                 child: _isProcessingQuickOrder
-                    ? const Center(
+                    ? Center(
                         child: SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       )
@@ -1271,7 +1271,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 ),
                 child: Row(
@@ -1279,16 +1279,16 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   children: [
                     Text(
                       isReorder ? 'Reorder' : 'Order',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppUi.onBrandOf(context),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 3),
-                    const Icon(
+                    Icon(
                       Icons.arrow_forward_rounded,
-                      color: Colors.white,
+                      color: AppUi.onBrandOf(context),
                       size: 13,
                     ),
                   ],
@@ -1433,7 +1433,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           ),
           Expanded(
             child: RefreshIndicator(
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               onRefresh: _fetchData,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
@@ -1502,8 +1502,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         horizontal: AppUi.screenPadding,
                       ),
                       sliver: SliverToBoxAdapter(
-                        child: AxoEmptyState(
-                          pose: AxoPose.empty,
+                        child: EmptyStateCard(
+                          visual: EmptyStateVisual.empty,
                           title: _selectedCategory == 'All'
                               ? 'No stations nearby yet'
                               : 'No $_selectedCategory stations found',

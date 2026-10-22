@@ -11,7 +11,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../core/constants.dart';
 import '../../../core/water_types.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/refill_components.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
@@ -204,7 +204,7 @@ class _StationListScreenState extends State<StationListScreen> {
           .select('owner_id, price_per_gallon');
       final productsFuture = supabase
           .from('products')
-          .select('owner_id, price, is_available')
+          .select('owner_id, price, category, is_available')
           .eq('is_available', true);
 
       final results = await Future.wait([settingsFuture, productsFuture]);
@@ -565,9 +565,9 @@ class _StationListScreenState extends State<StationListScreen> {
                       ),
                       SliderTheme(
                         data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: AppUi.bluePrimary,
-                          inactiveTrackColor: AppUi.blueBorder,
-                          thumbColor: AppUi.bluePrimary,
+                          activeTrackColor: AppUi.brandOf(context),
+                          inactiveTrackColor: AppUi.borderOf(context),
+                          thumbColor: AppUi.brandOf(context),
                         ),
                         child: Slider(
                           value: _filterMaxPrice,
@@ -682,8 +682,8 @@ class _StationListScreenState extends State<StationListScreen> {
                             Navigator.pop(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppUi.bluePrimary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppUi.brandOf(context),
+                            foregroundColor: AppUi.onBrandOf(context),
                             shape: RoundedRectangleBorder(
                               borderRadius: AppUi.cardRadius,
                             ),
@@ -693,7 +693,7 @@ class _StationListScreenState extends State<StationListScreen> {
                             'Apply Advanced Filters',
                             style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
-                                  color: Colors.white,
+                                  color: AppUi.onBrandOf(context),
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
@@ -901,8 +901,8 @@ class _StationListScreenState extends State<StationListScreen> {
           return Scaffold(
             backgroundColor: AppUi.pageBgOf(context),
             body: Center(
-              child: AxoEmptyState(
-                pose: AxoPose.thinking,
+              child: EmptyStateCard(
+                visual: EmptyStateVisual.thinking,
                 title: 'Could not load stations',
                 message: FriendlyErrors.message(
                   snapshot.error!,
@@ -945,8 +945,8 @@ class _StationListScreenState extends State<StationListScreen> {
 
         Widget buildMapView() {
           if (mappableStations.isEmpty) {
-            return AxoEmptyState(
-              pose: AxoPose.thinking,
+            return EmptyStateCard(
+              visual: EmptyStateVisual.thinking,
               compact: true,
               title: 'No map pins yet',
               message:
@@ -1412,8 +1412,8 @@ class _StationListScreenState extends State<StationListScreen> {
                           ),
                           stations.isEmpty
                               ? SliverFillRemaining(
-                                  child: AxoEmptyState(
-                                    pose: AxoPose.empty,
+                                  child: EmptyStateCard(
+                                    visual: EmptyStateVisual.empty,
                                     title: 'No matching stations',
                                     message: prefLabel != null
                                         ? 'No $prefLabel stations in $titleTown right now. Try another filter or update your water preference in Account.'

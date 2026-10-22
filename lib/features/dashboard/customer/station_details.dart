@@ -778,8 +778,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     height: 48,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppUi.bluePrimary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppUi.brandOf(context),
+                        foregroundColor: AppUi.onBrandOf(context),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         ),
@@ -935,8 +935,8 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppUi.bluePrimary,
-                foregroundColor: Colors.white,
+                backgroundColor: AppUi.brandOf(context),
+                foregroundColor: AppUi.onBrandOf(context),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
@@ -2639,8 +2639,8 @@ class _QuantityInputDialogState extends State<_QuantityInputDialog> {
         FilledButton(
           onPressed: _applyQuantity,
           style: FilledButton.styleFrom(
-            backgroundColor: AppUi.bluePrimary,
-            foregroundColor: Colors.white,
+            backgroundColor: AppUi.brandOf(context),
+            foregroundColor: AppUi.onBrandOf(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppUi.radiusControl),
             ),

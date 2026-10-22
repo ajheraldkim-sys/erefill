@@ -1,4 +1,4 @@
-// lib/core/constants.dart
+﻿// lib/core/constants.dart
 import 'package:flutter/material.dart';
 
 /// Shared brand tones used by account setup screens.
@@ -351,6 +351,10 @@ class AppUi {
   /// Brand accent that stays readable in both modes (cyan on dark).
   static Color brandOf(BuildContext context) =>
       isDark(context) ? accentCyan : bluePrimary;
+
+  /// Text/icon color on a solid [brandOf] fill (dark text on cyan, white on blue).
+  static Color onBrandOf(BuildContext context) =>
+      isDark(context) ? darkPageBg : Colors.white;
 
   /// Soft brand tint for icon tiles, selected chips and tonal buttons.
   static Color brandSoftOf(BuildContext context) =>
