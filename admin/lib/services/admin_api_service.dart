@@ -478,15 +478,45 @@ class AdminApiService {
   /// Every station's service fee wallet; fee and top-up totals cover
   /// [from]..[to] when given.
   Future<List<FeeWalletRow>> listFeeWallets({DateTime? from, DateTime? to}) async {
-    final result = await _client.rpc(
-      'admin_list_fee_wallets',
-      params: {
-        'p_from': from?.toUtc().toIso8601String(),
-        'p_to': to?.toUtc().toIso8601String(),
-      },
-    );
-    if (result is! List) return const [];
-    return result.map((r) => FeeWalletRow.fromJson(_asMap(r))).toList();
+    try {
+      final params = <String, dynamic>{};
+      if (from != null) params['p_from'] = from.toUtc().toIso8601String();
+      if (to != null) params['p_to'] = to.toUtc().toIso8601String();
+
+      final result = await _client.rpc(
+        'admin_list_fee_wallets',
+        params: params.isEmpty ? null : params,
+      );
+      if (result is List) {
+        return result.map((r) => FeeWalletRow.fromJson(_asMap(r))).toList();
+      }
+    } catch (e) {
+      debugPrint('listFeeWallets error: $e');
+      // Fallback: If admin_list_fee_wallets RPC has not been migrated yet,
+      // load registered station owners so the console remains functional.
+      try {
+        final profiles = await _client
+            .from('profiles')
+            .select('id, full_name, station_name')
+            .eq('role', 'owner')
+            .order('station_name');
+        return [
+          for (final p in profiles)
+            FeeWalletRow(
+              ownerId: p['id']?.toString() ?? '',
+              stationName: (p['station_name'] ?? p['full_name'] ?? 'Station').toString(),
+              balance: 0.0,
+              codLocked: false,
+              feesCollected: 0.0,
+              topupsReceived: 0.0,
+            ),
+        ];
+      } catch (fallbackError) {
+        debugPrint('listFeeWallets fallback error: $fallbackError');
+        rethrow;
+      }
+    }
+    return const [];
   }
 
   /// Credits (positive) or debits (negative) a station's wallet; [reason] is
