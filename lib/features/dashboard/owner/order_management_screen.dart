@@ -10,7 +10,7 @@ import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'add_order_dialog.dart';
 import '../customer/checkout_rules.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
@@ -2058,8 +2058,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
   Widget _buildEmptyState() {
     final isAll = _selectedStatus == 'all';
-    return AxoEmptyState(
-      pose: isAll ? AxoPose.happy : AxoPose.thinking,
+    return EmptyStateCard(
+      visual: isAll ? EmptyStateVisual.happy : EmptyStateVisual.thinking,
       compact: true,
       title: isAll
           ? 'No active refill orders'

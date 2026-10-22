@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/widgets/notification_detail_dialog.dart';
@@ -326,7 +326,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? const AxoLoader(message: 'Loading notifications...')
+                ? const LoadingStateCard(message: 'Loading notifications...')
                 : SingleChildScrollView(
                     padding: AppUi.pagePadding,
                     child: Column(
@@ -386,7 +386,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         if (_notifications.isEmpty)
                           const SizedBox(
                             height: 220,
-                            child: AxoEmptyState(
+                            child: EmptyStateCard(
                               title: 'No notifications yet',
                               message:
                                   'Refill orders, payment updates, and delivery alerts will appear here.',

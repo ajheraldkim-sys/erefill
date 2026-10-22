@@ -3,7 +3,6 @@ import '../../constants.dart';
 
 /// Compatibility enum retained for safe static references.
 enum RefillAnimation {
-  axoBob(''),
   orderSuccess(''),
   waterDrop(''),
   deliveryRider('');
@@ -38,19 +37,6 @@ class RefillLottie extends StatelessWidget {
     this.onLoaded,
     this.fallback,
   });
-
-  const RefillLottie.mascot({
-    super.key,
-    this.width = 110,
-    this.height = 110,
-    this.repeat = true,
-    this.fit = BoxFit.contain,
-    this.fallback,
-  })  : animation = RefillAnimation.axoBob,
-        reverse = false,
-        alignment = Alignment.center,
-        controller = null,
-        onLoaded = null;
 
   const RefillLottie.success({
     super.key,
@@ -93,8 +79,6 @@ class RefillLottie extends StatelessWidget {
 
   IconData _iconForAnimation() {
     switch (animation) {
-      case RefillAnimation.axoBob:
-        return Icons.water_drop_rounded;
       case RefillAnimation.orderSuccess:
         return Icons.check_circle_rounded;
       case RefillAnimation.waterDrop:

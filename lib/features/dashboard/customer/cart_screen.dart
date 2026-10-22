@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/widgets/app_ui_kit.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/models/cart_model.dart';
 import 'package:erefill/core/water_types.dart';
@@ -195,8 +195,8 @@ class _CartScreenState extends State<CartScreen> {
           Expanded(
             child: !hasItems
                 ? Center(
-                    child: AxoEmptyState(
-                      pose: AxoPose.empty,
+                    child: EmptyStateCard(
+                      visual: EmptyStateVisual.empty,
                       title: 'Your cart is empty',
                       message:
                           'Browse water refilling stations to order a refill.',

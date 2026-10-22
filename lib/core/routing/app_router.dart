@@ -41,7 +41,7 @@ import '../providers/user_provider.dart';
 import '../utils/app_roles.dart';
 import '../services/app_update_service.dart';
 import '../../features/update/screens/mandatory_update_screen.dart';
-import '../widgets/brand/axo_states.dart';
+import '../widgets/brand/state_cards.dart';
 import 'app_page_transitions.dart';
 import 'app_routes.dart';
 
@@ -328,7 +328,7 @@ class AppRouter {
   static Widget _missingRoute(String message) {
     return Scaffold(
       body: Center(
-        child: AxoEmptyState(title: message, message: 'Go back and try again.'),
+        child: EmptyStateCard(title: message, message: 'Go back and try again.'),
       ),
     );
   }

@@ -56,7 +56,7 @@ AppUi.motion(context)      // 200 ms, or zero when reduce-motion is on
 
 Other shared widgets: `OrderStatusBadge`, `AvailabilityBadge`,
 `RefillOrderStatusTimeline` (`refill_status_widgets.dart`), `EmptyStateCard` /
-`LoadingStateCard` (`brand/axo_states.dart`), `AppLoadingSkeleton`
+`LoadingStateCard` (`brand/state_cards.dart`), `AppLoadingSkeleton`
 (`skeleton.dart`), `RoleBottomNavBar`, `AppFormField`
 (`app_form_fields.dart`). Admin console primitives live in
 `admin/lib/widgets/admin_ui.dart` and read the same tokens.

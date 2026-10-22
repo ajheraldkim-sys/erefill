@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/payment_checkout_service.dart';
 
 import '../../../core/constants.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/app_widgets.dart';
 import 'checkout_rules.dart';
 import 'widgets/test_mode_label.dart';
@@ -113,7 +113,7 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
       backgroundColor: AppUi.pageBgOf(context),
       body: SafeArea(
         child: _isLoading
-            ? const AxoLoader(message: 'Loading payment result...')
+            ? const LoadingStateCard(message: 'Loading payment result...')
             : ListView(
                 padding: const EdgeInsets.fromLTRB(
                   AppUi.spacingXl,

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
@@ -234,7 +234,7 @@ class RiderHomeOverview extends StatelessWidget {
                           ],
                         ),
                         AppUi.vGapLg,
-                        AxoTipCard(
+                        QuickTipCard(
                           title: 'Deliver fast, earn more',
                           message:
                               'Quick deliveries and proof-of-delivery photos help you get priority jobs from your station.',

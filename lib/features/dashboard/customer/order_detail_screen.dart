@@ -9,7 +9,7 @@ import '../../chat/services/chat_service.dart';
 import '../../chat/models/chat_room.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import '../../../core/widgets/erefill_header.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
@@ -688,7 +688,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     if (_isLoadingOrder) {
       return Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
-        body: const AxoLoader(message: 'Loading order...'),
+        body: const LoadingStateCard(message: 'Loading order...'),
       );
     }
 
@@ -696,7 +696,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     if (order == null) {
       return Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
-        body: AxoEmptyState(
+        body: EmptyStateCard(
           title: _loadError ?? 'Order not found',
           message: 'Return home and open the order from your history.',
           actionLabel: _loadError == null ? null : 'Retry',

@@ -7,7 +7,7 @@ import 'package:erefill/core/models/cart_model.dart';
 import '../../../core/routing/app_navigation.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
@@ -557,8 +557,8 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
 
   Widget _buildEmptyState() {
     final isActive = _activeSegment == 0;
-    return AxoEmptyState(
-      pose: isActive ? AxoPose.thinking : AxoPose.happy,
+    return EmptyStateCard(
+      visual: isActive ? EmptyStateVisual.thinking : EmptyStateVisual.happy,
       title: isActive ? 'No active refills' : 'No order history yet',
       message: isActive
           ? 'When you order water from a station, your active deliveries will show up here.'

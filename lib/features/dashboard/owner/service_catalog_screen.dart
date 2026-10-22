@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/db_tables.dart';
 import 'package:erefill/core/utils/order_product_helpers.dart';
 import 'package:erefill/core/water_types.dart';
@@ -181,11 +181,11 @@ class _ServiceCatalogScreenState extends State<ServiceCatalogScreen> {
 
   Widget _buildBody(BuildContext context) {
     if (_isLoading) {
-      return const AxoLoader(message: 'Loading your water...');
+      return const LoadingStateCard(message: 'Loading your water...');
     }
     if (_loadError != null || _product == null || _waterType == null) {
-      return AxoEmptyState(
-        pose: AxoPose.thinking,
+      return EmptyStateCard(
+        visual: EmptyStateVisual.thinking,
         compact: true,
         title: _loadError != null
             ? "Couldn't load your water"

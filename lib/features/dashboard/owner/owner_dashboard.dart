@@ -10,7 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/notification_preview_sheet.dart';
@@ -1303,8 +1303,8 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         ),
         const SizedBox(height: AppUi.spacingSm),
         if (_recentOrders.isEmpty)
-          AxoEmptyState(
-            pose: AxoPose.empty,
+          EmptyStateCard(
+            visual: EmptyStateVisual.empty,
             title: 'No orders yet',
             message:
                 'When customers place refill orders, they will appear here instantly.',

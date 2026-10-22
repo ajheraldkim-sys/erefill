@@ -8,7 +8,7 @@ import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import 'package:erefill/core/widgets/water_fill_loading_indicator.dart';
 import 'package:erefill/core/widgets/brand/refill_lottie.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -340,7 +340,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: EmptyStateCard(
-              pose: AxoPose.happy,
+              visual: EmptyStateVisual.happy,
               title: 'No active refills',
               message: 'When you order water, your active deliveries will show up here.',
               actionLabel: 'Find a station',

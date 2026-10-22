@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/brand/axo_states.dart';
+import '../../../../core/widgets/brand/state_cards.dart';
 
 import 'package:erefill/core/utils/money.dart';
 class CustomerCreditSheet extends StatefulWidget {
@@ -294,11 +294,11 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
 
           Expanded(
             child: _isLoading
-                ? const AxoLoader(message: 'Checking credit ledger...')
+                ? const LoadingStateCard(message: 'Checking credit ledger...')
                 : _error != null
                     ? Center(
-                        child: AxoEmptyState(
-                          pose: AxoPose.thinking,
+                        child: EmptyStateCard(
+                          visual: EmptyStateVisual.thinking,
                           title: 'Could not load credits',
                           message: _error!,
                           actionLabel: 'Retry',
@@ -308,8 +308,8 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
                       )
                     : _credits.isEmpty
                         ? Center(
-                            child: AxoEmptyState(
-                              pose: AxoPose.happy,
+                            child: EmptyStateCard(
+                              visual: EmptyStateVisual.happy,
                               title: 'Zero outstanding utang',
                               message:
                                   'You have no pending credits or utang balances with your refilling stations.',

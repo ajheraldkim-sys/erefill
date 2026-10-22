@@ -6,17 +6,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('RefillLottie Widget Tests', () {
-    testWidgets('renders RefillLottie.mascot successfully', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: RefillLottie.mascot(width: 80, height: 80),
-          ),
-        ),
-      );
-      expect(find.byType(RefillLottie), findsOneWidget);
-    });
-
     testWidgets('renders RefillLottie.success successfully', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -51,8 +40,7 @@ void main() {
     });
 
     testWidgets('RefillAnimation tracks removed motion assets as static placeholders', (tester) async {
-      expect(RefillAnimation.values.length, 4);
-      expect(RefillAnimation.axoBob.assetPath, isEmpty);
+      expect(RefillAnimation.values.length, 3);
       expect(RefillAnimation.orderSuccess.assetPath, isEmpty);
       expect(RefillAnimation.waterDrop.assetPath, isEmpty);
       expect(RefillAnimation.deliveryRider.assetPath, isEmpty);

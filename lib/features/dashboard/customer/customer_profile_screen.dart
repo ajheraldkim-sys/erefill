@@ -10,7 +10,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/account/account_ui.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/utils/profile_query_helpers.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
@@ -1124,11 +1124,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
       body: _isLoading
-          ? const AxoLoader(message: 'Loading your account...')
+          ? const LoadingStateCard(message: 'Loading your account...')
           : _loadError != null
           ? Center(
-              child: AxoEmptyState(
-                pose: AxoPose.thinking,
+              child: EmptyStateCard(
+                visual: EmptyStateVisual.thinking,
                 title: 'Profile unavailable',
                 message: _loadError!,
                 actionLabel: 'Retry',

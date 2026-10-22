@@ -17,7 +17,7 @@ import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
 import 'package:erefill/core/providers/theme_provider.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
@@ -1093,7 +1093,7 @@ class _RiderDashboardState extends State<RiderDashboard>
         body: SafeArea(
           bottom: false,
           child: _isLoading
-              ? const AxoLoader(message: 'Preparing your rider dashboard...')
+              ? const LoadingStateCard(message: 'Preparing your rider dashboard...')
               : LazyIndexedStack(index: _selectedIndex, children: pages),
         ),
         bottomNavigationBar: Consumer<NotificationProvider>(

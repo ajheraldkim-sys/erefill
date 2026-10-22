@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
@@ -104,8 +104,8 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
             child: _isLoading
                 ? const SkeletonList(itemCount: 5)
                 : _deliveredOrders.isEmpty
-                ? AxoEmptyState(
-                    pose: AxoPose.thinking,
+                ? EmptyStateCard(
+                    visual: EmptyStateVisual.thinking,
                     title: 'No completed logs yet',
                     message:
                         'Finished deliveries will appear here for your records.',

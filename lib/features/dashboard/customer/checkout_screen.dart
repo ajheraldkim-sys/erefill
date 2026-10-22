@@ -16,7 +16,7 @@ import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/map_tiles.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import 'widgets/payment_method_selector.dart';
 import 'widgets/payment_brand_mark.dart';
@@ -1386,7 +1386,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       backgroundColor: AppUi.pageBgOf(context),
       appBar: _buildCustomHeader(context),
       body: _isBootstrapping
-          ? const AxoLoader(message: 'Loading checkout...')
+          ? const LoadingStateCard(message: 'Loading checkout...')
           : SingleChildScrollView(
               physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),

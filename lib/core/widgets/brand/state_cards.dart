@@ -5,11 +5,11 @@ import '../experience_widgets.dart';
 import '../skeleton.dart';
 import 'refill_lottie.dart';
 
-enum AxoPose { wave, happy, thinking, delivery, empty, success }
+enum EmptyStateVisual { wave, happy, thinking, delivery, empty, success }
 
 /// Empty, loading, and success state widgets used across the app.
 class EmptyStateCard extends StatelessWidget {
-  final AxoPose pose;
+  final EmptyStateVisual visual;
   final String title;
   final String message;
   final String? actionLabel;
@@ -18,7 +18,7 @@ class EmptyStateCard extends StatelessWidget {
 
   const EmptyStateCard({
     super.key,
-    this.pose = AxoPose.empty,
+    this.visual = EmptyStateVisual.empty,
     required this.title,
     required this.message,
     this.actionLabel,
@@ -28,7 +28,7 @@ class EmptyStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final axoSize = compact ? 80.0 : 110.0;
+    final visualSize = compact ? 80.0 : 110.0;
     return Padding(
       padding: EdgeInsets.all(compact ? AppUi.spacingLg : AppUi.spacing2xl),
       child: Column(
@@ -40,17 +40,17 @@ class EmptyStateCard extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 ExperienceIllustration(
-                  scene: pose == AxoPose.success
+                  scene: visual == EmptyStateVisual.success
                       ? ExperienceScene.success
                       : ExperienceScene.empty,
                   height: compact ? 94 : 126,
                 ),
-                if (pose == AxoPose.success)
-                  RefillLottie.success(width: axoSize, height: axoSize)
-                else if (pose == AxoPose.delivery)
-                  RefillLottie.rider(width: axoSize * 1.2, height: axoSize)
+                if (visual == EmptyStateVisual.success)
+                  RefillLottie.success(width: visualSize, height: visualSize)
+                else if (visual == EmptyStateVisual.delivery)
+                  RefillLottie.rider(width: visualSize * 1.2, height: visualSize)
                 else
-                  RefillLottie.mascot(width: axoSize, height: axoSize),
+                  RefillLottie.waterDrop(width: visualSize, height: visualSize),
               ],
             ),
           ),
@@ -177,11 +177,5 @@ class QuickTipCard extends StatelessWidget {
   }
 }
 
-@Deprecated('Use EmptyStateCard instead')
-typedef AxoEmptyState = EmptyStateCard;
 
-@Deprecated('Use LoadingStateCard instead')
-typedef AxoLoader = LoadingStateCard;
 
-@Deprecated('Use QuickTipCard instead')
-typedef AxoTipCard = QuickTipCard;
