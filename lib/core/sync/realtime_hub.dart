@@ -68,9 +68,13 @@ class RealtimeHub {
     return channel.events.listen(onEvent);
   }
 
-  /// Re-opens every channel. Called when connectivity returns or the app
-  /// comes back to the foreground, since sockets are often dropped silently
-  /// while the device is offline or the app is suspended.
+  /// Re-opens channels that are down. Called when connectivity returns or
+  /// the app comes back to the foreground, since sockets are often dropped
+  /// silently while the device is offline or the app is suspended.
+  ///
+  /// Healthy channels are left alone: every re-open is a new subscription
+  /// for Realtime to create in the database, and re-opening all of them on
+  /// each resume exhausted Realtime's database pool (Oct 22 outage).
   void reconnectAll() {
     for (final channel in _channels.values.toList()) {
       channel.reconnect();
@@ -110,6 +114,13 @@ class _HubChannel {
   bool _hasSubscribedOnce = false;
   bool _closed = false;
 
+  /// True while the current channel's join is confirmed.
+  bool _subscribed = false;
+
+  /// The last drop was the database itself timing out, so the backoff
+  /// should hold even when the app resumes or the network flaps.
+  bool _backingOffFromDb = false;
+
   Stream<RealtimeEvent> get events => _controller.stream;
 
   SupabaseClient get _client => Supabase.instance.client;
@@ -117,6 +128,7 @@ class _HubChannel {
   void _open() {
     if (_closed) return;
     _retryTimer?.cancel();
+    _subscribed = false;
     final previous = _channel;
     _channel = null;
     if (previous != null) unawaited(_client.removeChannel(previous));
@@ -162,6 +174,8 @@ class _HubChannel {
         case RealtimeSubscribeStatus.subscribed:
           final isReconnect = _hasSubscribedOnce;
           _hasSubscribedOnce = true;
+          _subscribed = true;
+          _backingOffFromDb = false;
           // Realtime can accept a join and fail it moments later when the
           // database is overloaded; only a channel that stays up earns a
           // backoff reset, otherwise retries never slow down.
@@ -182,12 +196,14 @@ class _HubChannel {
 
   void _scheduleRetry(Object? error) {
     _stableTimer?.cancel();
+    _subscribed = false;
     if (_closed || (_retryTimer?.isActive ?? false)) return;
     _attempt++;
     final errorStr = error?.toString() ?? '';
     final isDbTimeout = errorStr.contains('Too many database timeouts') ||
         errorStr.contains('504') ||
         errorStr.contains('Gateway Timeout');
+    _backingOffFromDb = isDbTimeout;
     final baseSeconds = isDbTimeout ? 6 : 2;
     final seconds = math.min(60, baseSeconds << math.min(_attempt, 4));
     if (kDebugMode) {
@@ -200,7 +216,10 @@ class _HubChannel {
   }
 
   void reconnect() {
-    if (_closed) return;
+    if (_closed || _subscribed) return;
+    // A database-side failure is not fixed by the app resuming; keep the
+    // scheduled backoff instead of piling on fresh subscription requests.
+    if (_backingOffFromDb && (_retryTimer?.isActive ?? false)) return;
     _attempt = 0;
     _open();
   }
