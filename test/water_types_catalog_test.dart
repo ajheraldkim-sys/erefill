@@ -26,6 +26,22 @@ void main() {
       expect(type.benefits, ['No minerals', 'Clean taste']);
       expect(type.icon, Icons.filter_alt_rounded);
       expect(type.isActive, isFalse);
+      expect(type.photoUrl, isNull);
+    });
+
+    test('keeps a photo url and survives the offline cache round trip', () {
+      const url = 'https://example.com/water_types/mineral.jpg';
+      final type = WaterTypeInfo.fromJson({
+        'name': 'Mineral Water',
+        'photo_url': ' $url ',
+      });
+      expect(type.photoUrl, url);
+      expect(WaterTypeInfo.fromJson(type.toJson()).photoUrl, url);
+      expect(
+        WaterTypeInfo.fromJson({'name': 'Mineral Water', 'photo_url': ''})
+            .photoUrl,
+        isNull,
+      );
     });
 
     test('only active types are offered', () {

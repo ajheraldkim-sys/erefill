@@ -7,6 +7,7 @@ import '../../../core/routing/app_navigation.dart';
 import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/hero_header.dart';
+import '../../../core/widgets/water_type_thumb.dart';
 import 'package:erefill/core/models/cart_model.dart';
 import 'package:erefill/core/water_types.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
@@ -421,20 +422,16 @@ class _CartLineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = WaterTypes.byName(item.name);
-    final accent = type.color;
 
     return AppCard(
       padding: const EdgeInsets.all(AppUi.spacingMd),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: AppUi.isDark(context) ? 0.16 : 0.1),
-              borderRadius: AppUi.controlRadius,
-            ),
-            child: Icon(type.icon, color: accent, size: 22),
+          WaterTypeThumb(
+            type: type,
+            size: 44,
+            radius: AppUi.radiusControl,
+            iconSize: 22,
           ),
           const SizedBox(width: AppUi.spacingMd),
           Expanded(

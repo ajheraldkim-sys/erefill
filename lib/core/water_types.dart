@@ -18,6 +18,9 @@ class WaterTypeInfo {
   final String badge;
   final List<String> benefits;
   final String iconKey;
+
+  /// Admin-uploaded product photo; the icon stands in when it's missing.
+  final String? photoUrl;
   final int sortOrder;
   final bool isActive;
 
@@ -30,6 +33,7 @@ class WaterTypeInfo {
     this.badge = '',
     this.benefits = const [],
     this.iconKey = WaterTypes.defaultIconKey,
+    this.photoUrl,
     this.sortOrder = 0,
     this.isActive = true,
   });
@@ -53,6 +57,10 @@ class WaterTypeInfo {
               .toList() ??
           const [],
       iconKey: json['icon_key']?.toString() ?? WaterTypes.defaultIconKey,
+      photoUrl: switch (json['photo_url']?.toString().trim()) {
+        final url? when url.isNotEmpty => url,
+        _ => null,
+      },
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       isActive: json['is_active'] != false,
     );
@@ -67,6 +75,7 @@ class WaterTypeInfo {
         'badge': badge,
         'benefits': benefits,
         'icon_key': iconKey,
+        'photo_url': photoUrl,
         'sort_order': sortOrder,
         'is_active': isActive,
       };

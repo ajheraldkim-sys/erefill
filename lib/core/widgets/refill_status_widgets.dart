@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../theme/app_colors.dart';
 import '../water_types.dart';
+import 'water_type_thumb.dart';
 import 'order_card.dart';
 
 import 'package:erefill/core/utils/money.dart';
@@ -253,13 +254,11 @@ class WaterTypeCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: type.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppUi.radiusControl),
-              ),
-              child: Icon(type.icon, size: 16, color: type.color),
+            WaterTypeThumb(
+              type: type,
+              size: 28,
+              radius: AppUi.radiusControl,
+              iconSize: 16,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -309,14 +308,7 @@ class WaterTypeCard extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: type.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-              ),
-              child: Icon(type.icon, color: type.color, size: 24),
-            ),
+            WaterTypeThumb(type: type, size: 44, iconSize: 24),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

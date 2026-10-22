@@ -18,6 +18,7 @@ import '../../../core/utils/order_product_helpers.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/water_types.dart';
 import '../../../core/widgets/app_cached_image.dart';
+import '../../../core/widgets/water_type_thumb.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/motion/motion.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -1233,16 +1234,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: type.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                ),
-                alignment: Alignment.center,
-                child: Icon(type.icon, color: type.color, size: 26),
-              ),
+              WaterTypeThumb(type: type, size: 48, iconSize: 26),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -2143,6 +2135,16 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     child: hasPhoto
                         ? AppCachedImage(
                             imageUrl: photoUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 800,
+                            memCacheHeight: 500,
+                            fallbackIcon: waterType.icon,
+                          )
+                        : waterType.photoUrl != null
+                        ? AppCachedImage(
+                            imageUrl: waterType.photoUrl,
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
