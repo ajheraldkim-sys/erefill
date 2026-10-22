@@ -1,6 +1,9 @@
 -- ==============================================================================
 -- Centralized Delivery Fee Management System (Admin-Controlled)
 -- ==============================================================================
+-- SUPERSEDED: do not run. It writes audit_logs.user_id / details, which do
+-- not exist, and replaces create_order_atomic. Apply
+-- delivery_fee_config_rpcs.sql for the fee config and history RPCs.
 -- 1. Ensure public.orders has historical snapshot columns for distance & rate
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_distance_km numeric(10, 2);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_rate_per_km numeric(10, 2);

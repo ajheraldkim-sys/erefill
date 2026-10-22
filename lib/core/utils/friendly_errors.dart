@@ -35,6 +35,13 @@ class FriendlyErrors {
         lower.contains('rls')) {
       return 'You do not have permission to make that change.';
     }
+    if (lower.contains('504') ||
+        lower.contains('502') ||
+        lower.contains('503') ||
+        lower.contains('bad gateway') ||
+        lower.contains('gateway timeout')) {
+      return 'The server is temporarily slow or undergoing maintenance. Please try again in a moment.';
+    }
     if (lower.contains('timeout')) {
       return 'The request took too long. Please try again.';
     }

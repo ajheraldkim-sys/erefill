@@ -263,7 +263,7 @@ class StationDataCache {
           }
         }
       }(),
-    ]);
+    ]).timeout(const Duration(seconds: 12));
 
     final productData = (results[0] as List? ?? const []).cast<dynamic>();
     final settingsData = results[1] as Map<String, dynamic>?;

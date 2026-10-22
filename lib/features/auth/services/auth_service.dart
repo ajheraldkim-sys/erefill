@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
 
 import 'login_email_resolver.dart';
 
@@ -140,11 +142,13 @@ class AuthService {
         final profileEmail = await resolveLoginEmail(
           _supabase,
           cleanIdentifier,
-        );
+        ).timeout(const Duration(seconds: 12));
         if (profileEmail == null) {
           throw 'Username not found.';
         }
         email = profileEmail;
+      } on TimeoutException {
+        throw 'Connection timed out while looking up your username. Please try logging in with your email address.';
       } finally {
         if (kDebugMode) {
           debugPrint(
@@ -156,7 +160,9 @@ class AuthService {
 
     try {
       final signInTimer = Stopwatch()..start();
-      await _supabase.auth.signInWithPassword(email: email, password: password);
+      await _supabase.auth
+          .signInWithPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 15));
       if (kDebugMode) {
         debugPrint(
           'auth.password_sign_in_ms=${signInTimer.elapsedMilliseconds}',
@@ -164,8 +170,13 @@ class AuthService {
       }
     } on AuthException catch (e) {
       throw e.message;
+    } on TimeoutException {
+      throw 'Sign in request timed out. The server or network is slow, please try again.';
     } catch (e) {
-      throw 'Unable to login right now: $e';
+      throw FriendlyErrors.message(
+        e,
+        fallback: 'Unable to login right now. Please try again.',
+      );
     } finally {
       if (kDebugMode) {
         debugPrint('auth.login_total_ms=${loginTimer.elapsedMilliseconds}');

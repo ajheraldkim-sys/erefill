@@ -170,7 +170,7 @@ class CheckoutOrderService {
         'p_order_data': request.toOrderData(idempotencyKey),
         'p_items_data': request.itemsData,
       },
-    );
+    ).timeout(const Duration(seconds: 15));
     if (response is! Map) {
       throw StateError('Order creation failed: invalid server response.');
     }

@@ -273,7 +273,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
   Future<dynamic> _safeHomeQuery(Future<dynamic> request, String label) async {
     try {
-      return await request;
+      return await request.timeout(const Duration(seconds: 12));
     } catch (error) {
       // A nonessential home query (for example, prices or favorites) should
       // not hide nearby stations that are otherwise available to the customer.

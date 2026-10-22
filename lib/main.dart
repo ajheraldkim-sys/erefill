@@ -31,6 +31,7 @@ import 'core/services/offline_order_sync_service.dart';
 import 'core/providers/connectivity_provider.dart';
 import 'core/widgets/offline_banner.dart';
 import 'core/services/local_data_cache.dart';
+import 'core/services/resilient_http_client.dart';
 import 'core/sync/sync_store.dart';
 import 'core/services/app_update_service.dart';
 import 'core/water_types.dart';
@@ -59,6 +60,9 @@ void main() async {
       url: AppConstants.supabaseUrl,
       // ignore: deprecated_member_use
       anonKey: AppConstants.supabaseAnonKey,
+      // Deadlines and safe read retries, so a gateway outage surfaces as an
+      // error state instead of a spinner that waits minutes.
+      httpClient: ResilientHttpClient(),
     );
 
     // Load the offline cache before the first frame so every screen can show
