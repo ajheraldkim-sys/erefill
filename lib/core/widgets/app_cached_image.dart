@@ -33,6 +33,16 @@ class AppCachedImage extends StatelessWidget {
     this.fallbackIcon = Icons.water_drop_outlined,
   });
 
+  /// Evicts [url] from both memory and disk caches so updated assets reload.
+  static Future<void> evict(String? url) async {
+    final clean = url?.trim();
+    if (clean != null && clean.isNotEmpty) {
+      try {
+        await CachedNetworkImage.evictFromCache(clean);
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final url = imageUrl?.trim();

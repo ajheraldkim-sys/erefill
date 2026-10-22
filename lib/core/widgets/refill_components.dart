@@ -237,21 +237,27 @@ class StationCard extends StatelessWidget {
       ),
     );
     if (photoUrl == null || photoUrl.isEmpty) {
-      // No station photo: show the water it sells instead.
-      final typePhoto = type?.photoUrl;
-      if (typePhoto != null) {
-        return AppCachedImage(
-          imageUrl: typePhoto,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          memCacheWidth: 480,
-          memCacheHeight: 480,
-          placeholder: fallback,
-          errorWidget: fallback,
-        );
-      }
-      return SizedBox(width: size, height: size, child: fallback);
+      // No station photo: show the water it sells instead, live-updating if catalog updates.
+      return ValueListenableBuilder<List<WaterTypeInfo>>(
+        valueListenable: WaterTypes.catalog,
+        builder: (context, _, _) {
+          final liveType = _waterType;
+          final typePhoto = liveType?.photoUrl;
+          if (typePhoto != null) {
+            return AppCachedImage(
+              imageUrl: typePhoto,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              memCacheWidth: 480,
+              memCacheHeight: 480,
+              placeholder: fallback,
+              errorWidget: fallback,
+            );
+          }
+          return SizedBox(width: size, height: size, child: fallback);
+        },
+      );
     }
     return AppCachedImage(
       imageUrl: photoUrl,

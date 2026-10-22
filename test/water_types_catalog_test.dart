@@ -1,5 +1,7 @@
 import 'package:erefill/core/utils/order_product_helpers.dart';
 import 'package:erefill/core/water_types.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
+import 'package:erefill/core/widgets/water_type_thumb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -79,6 +81,49 @@ void main() {
       expect(WaterTypes.byName(null), same(testPurified));
       WaterTypes.setCatalog(const []);
       expect(WaterTypes.byName('').shortName, 'Refill');
+    });
+
+    testWidgets('WaterTypeThumb updates in real time when catalog changes',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: WaterTypeThumb(
+              typeName: 'Mineral Water',
+              size: 48,
+            ),
+          ),
+        ),
+      );
+
+      // Initially no photo, renders the spa icon
+      expect(find.byIcon(Icons.spa_rounded), findsOneWidget);
+      expect(find.byType(AppCachedImage), findsNothing);
+
+      // Realtime catalog update arrives: admin uploaded a photo for Mineral Water
+      WaterTypes.setCatalog([
+        testPurified,
+        testMineral.copyWith(
+          photoUrl: 'https://example.com/water_types/mineral.jpg',
+        ),
+        testAlkaline,
+      ]);
+      await tester.pump();
+
+      // Instantly re-renders with the photo
+      expect(find.byType(AppCachedImage), findsOneWidget);
+
+      // Realtime catalog update arrives: admin removed the photo
+      WaterTypes.setCatalog([
+        testPurified,
+        testMineral,
+        testAlkaline,
+      ]);
+      await tester.pump();
+
+      // Instantly re-renders back to the icon
+      expect(find.byIcon(Icons.spa_rounded), findsOneWidget);
+      expect(find.byType(AppCachedImage), findsNothing);
     });
   });
 

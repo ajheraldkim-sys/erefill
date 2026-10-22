@@ -2142,22 +2142,30 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             memCacheHeight: 500,
                             fallbackIcon: waterType.icon,
                           )
-                        : waterType.photoUrl != null
-                        ? AppCachedImage(
-                            imageUrl: waterType.photoUrl,
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 800,
-                            memCacheHeight: 500,
-                            fallbackIcon: waterType.icon,
-                          )
-                        : Center(
-                            child: Icon(
-                              waterType.icon,
-                              size: 72,
-                              color: waterType.color.withValues(alpha: 0.6),
-                            ),
+                        : ValueListenableBuilder<List<WaterTypeInfo>>(
+                            valueListenable: WaterTypes.catalog,
+                            builder: (context, _, _) {
+                              final liveWaterType = _stationWaterType;
+                              final typePhoto = liveWaterType.photoUrl;
+                              if (typePhoto != null) {
+                                return AppCachedImage(
+                                  imageUrl: typePhoto,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: 800,
+                                  memCacheHeight: 500,
+                                  fallbackIcon: liveWaterType.icon,
+                                );
+                              }
+                              return Center(
+                                child: Icon(
+                                  liveWaterType.icon,
+                                  size: 72,
+                                  color: liveWaterType.color.withValues(alpha: 0.6),
+                                ),
+                              );
+                            },
                           ),
                   ),
                   Positioned(

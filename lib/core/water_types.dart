@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'constants.dart';
+import 'sync/realtime_hub.dart';
+import 'widgets/app_cached_image.dart';
 
 /// One entry of the admin-managed `water_types` catalog. A station sells
 /// exactly one product: the refill of its registered water type.
@@ -40,6 +42,33 @@ class WaterTypeInfo {
 
   IconData get icon => WaterTypes.iconFor(iconKey);
   Color get color => WaterTypes.colorFor(iconKey);
+
+  WaterTypeInfo copyWith({
+    String? id,
+    String? name,
+    String? shortName,
+    String? tagline,
+    String? description,
+    String? badge,
+    List<String>? benefits,
+    String? iconKey,
+    String? photoUrl,
+    int? sortOrder,
+    bool? isActive,
+  }) =>
+      WaterTypeInfo(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        shortName: shortName ?? this.shortName,
+        tagline: tagline ?? this.tagline,
+        description: description ?? this.description,
+        badge: badge ?? this.badge,
+        benefits: benefits ?? this.benefits,
+        iconKey: iconKey ?? this.iconKey,
+        photoUrl: photoUrl ?? this.photoUrl,
+        sortOrder: sortOrder ?? this.sortOrder,
+        isActive: isActive ?? this.isActive,
+      );
 
   factory WaterTypeInfo.fromJson(Map<String, dynamic> json) {
     final name = json['name']?.toString().trim() ?? '';
@@ -133,16 +162,41 @@ class WaterTypes {
     return active.isEmpty ? null : active.first;
   }
 
+  static StreamSubscription<RealtimeEvent>? _realtimeSub;
+
   /// Loads the catalog. Concurrent callers share one request; failures keep
-  /// the cached catalog.
+  /// the cached catalog. Subscribes to Supabase Realtime so admin updates
+  /// propagate to listeners immediately.
   static Future<List<WaterTypeInfo>> load({
     SupabaseClient? client,
     bool force = false,
   }) {
+    _ensureRealtimeSub();
     if (!force && catalog.value.isNotEmpty && _inFlight == null) {
       return Future.value(catalog.value);
     }
     return _inFlight ??= _fetch(client).whenComplete(() => _inFlight = null);
+  }
+
+  static void _ensureRealtimeSub() {
+    if (_realtimeSub != null) return;
+    try {
+      _realtimeSub = RealtimeHub.instance.listen(
+        const TableWatch(table),
+        (event) {
+          unawaited(load(force: true));
+        },
+      );
+    } catch (e) {
+      debugPrint('WaterTypes realtime listener error: $e');
+    }
+  }
+
+  /// Cancels the realtime subscription (for testing).
+  @visibleForTesting
+  static void cancelRealtimeSubscription() {
+    _realtimeSub?.cancel();
+    _realtimeSub = null;
   }
 
   static Future<List<WaterTypeInfo>> _fetch(SupabaseClient? client) async {
@@ -158,6 +212,17 @@ class WaterTypes {
           .map((r) => WaterTypeInfo.fromJson(Map<String, dynamic>.from(r)))
           .where((t) => t.name.isNotEmpty)
           .toList();
+
+      // Evict old photo URLs from cache if they changed or were removed
+      for (final oldType in catalog.value) {
+        if (oldType.photoUrl == null) continue;
+        final matching = types
+            .where((t) => t.id == oldType.id || t.name == oldType.name);
+        if (matching.isEmpty || matching.first.photoUrl != oldType.photoUrl) {
+          unawaited(AppCachedImage.evict(oldType.photoUrl));
+        }
+      }
+
       catalog.value = List.unmodifiable(types);
       unawaited(_saveCache(types));
     } catch (e) {
