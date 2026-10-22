@@ -15,6 +15,7 @@ import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/utils/profile_query_helpers.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/utils/app_haptics.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -88,6 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextStep() {
+    AppHaptics.light();
     if (_currentStep == 0 && _selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select your role.')),
@@ -279,15 +281,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _roleCard(String role, String title, String desc, IconData icon) {
     bool isSelected = _selectedRole == role;
     return InkWell(
-      onTap: () => setState(() => _selectedRole = role),
-      borderRadius: AppUi.pillRadius,
+      onTap: () {
+        AppHaptics.selection();
+        setState(() => _selectedRole = role);
+      },
+      borderRadius: AppUi.cardRadius,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isSelected
               ? OnboardingPalette.bluePrimary.withValues(alpha: 0.05)
               : Colors.white,
-          borderRadius: AppUi.pillRadius,
+          borderRadius: AppUi.cardRadius,
           border: Border.all(
             color: isSelected ? OnboardingPalette.bluePrimary : AppUi.borderColor,
             width: isSelected ? 2 : 1,
@@ -494,13 +499,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             height: 200,
             decoration: BoxDecoration(
-              borderRadius: AppUi.pillRadius,
+              borderRadius: AppUi.cardRadius,
               border: Border.all(color: AppUi.borderColor),
             ),
             child: Stack(
               children: [
                 ClipRRect(
-                  borderRadius: AppUi.pillRadius,
+                  borderRadius: AppUi.cardRadius,
                   child: FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
@@ -633,6 +638,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.only(right: 12),
               child: OutlinedButton(
                 onPressed: () {
+                  AppHaptics.light();
                   _pageController.previousPage(
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeInOut,

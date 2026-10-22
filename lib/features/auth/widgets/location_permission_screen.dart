@@ -144,7 +144,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                   !_isServiceEnabled
                       ? Icons.location_off_rounded
                       : Icons.security_rounded,
-                  color: OnboardingPalette.bluePrimary,
+                  color: AppUi.brandOf(context),
                   size: 64,
                 ),
               ),
@@ -171,9 +171,9 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               ),
               const SizedBox(height: 32),
               // Status Indicators
-              _buildStatusIndicator('GPS Service', _isServiceEnabled),
+              _buildStatusIndicator(context, 'GPS Service', _isServiceEnabled),
               const SizedBox(height: 8),
-              _buildStatusIndicator('App Permission', hasPermission),
+              _buildStatusIndicator(context, 'App Permission', hasPermission),
               const SizedBox(height: 48),
               SizedBox(
                 width: double.infinity,
@@ -181,7 +181,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
                 child: ElevatedButton(
                   onPressed: _requestAccess,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: OnboardingPalette.bluePrimary,
+                    backgroundColor: AppUi.brandOf(context),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: AppUi.cardRadius,
@@ -203,10 +203,10 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               TextButton.icon(
                 onPressed: _checkStatus,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text(
+                label: Text(
                   'Try Again',
                   style: TextStyle(
-                    color: OnboardingPalette.bluePrimary,
+                    color: AppUi.brandOf(context),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -218,21 +218,26 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
     );
   }
 
-  Widget _buildStatusIndicator(String label, bool isOk) {
+  Widget _buildStatusIndicator(BuildContext context, String label, bool isOk) {
+    final isDark = AppUi.isDark(context);
+    final style = StatusToneStyle.of(
+      isOk ? StatusTone.success : StatusTone.danger,
+      isDark: isDark,
+    );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isOk ? AppUi.successBg : AppUi.errorBg,
-        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+        color: style.background,
+        borderRadius: BorderRadius.circular(AppUi.radiusControl),
         border: Border.all(
-          color: isOk ? AppUi.successBg : AppUi.errorBg,
+          color: style.border,
         ),
       ),
       child: Row(
         children: [
           Icon(
             isOk ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            color: isOk ? AppColors.uiSuccess : AppColors.uiError,
+            color: style.foreground,
             size: 18,
           ),
           const SizedBox(width: 12),
@@ -241,7 +246,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: isOk ? AppUi.successFg : AppUi.errorFg,
+              color: style.foreground,
             ),
           ),
           const Spacer(),
@@ -251,7 +256,7 @@ class _LocationPermissionScreenState extends State<LocationPermissionScreen>
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0,
-              color: isOk ? AppColors.uiSuccess : AppColors.uiError,
+              color: style.foreground,
             ),
           ),
         ],
