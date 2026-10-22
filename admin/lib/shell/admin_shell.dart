@@ -9,14 +9,19 @@ import 'package:erefill/core/sync/sync_store.dart';
 import 'package:erefill/core/sync/synced_state.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../features/audit/audit_log_screen.dart';
 import '../features/catalog/water_types_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/fees/fee_wallets_screen.dart';
 import '../features/fees/platform_fees_screen.dart';
+import '../features/moderation/moderation_screen.dart';
 import '../features/notifications/admin_notifications_screen.dart';
 import '../features/orders/orders_screen.dart';
+import '../features/payments/payment_failures_screen.dart';
 import '../features/releases/app_releases_screen.dart';
+import '../features/riders/riders_map_screen.dart';
 import '../features/stations/stations_screen.dart';
+import '../features/system/system_config_screen.dart';
 import '../features/users/users_screen.dart';
 import '../providers/admin_auth_provider.dart';
 import '../sync/admin_sync_widgets.dart';
@@ -32,6 +37,11 @@ enum AdminSection {
   notifications,
   feeWallets,
   settings,
+  ridersMap,
+  moderation,
+  paymentFailures,
+  auditLog,
+  systemConfig,
 }
 
 class AdminShell extends StatefulWidget {
@@ -197,6 +207,11 @@ class _AdminShellState extends State<AdminShell> with SyncedState {
       AdminSection.notifications => const AdminNotificationsScreen(),
       AdminSection.feeWallets => const FeeWalletsScreen(),
       AdminSection.settings => const PlatformFeesScreen(),
+      AdminSection.ridersMap => const RidersMapScreen(),
+      AdminSection.moderation => const ModerationScreen(),
+      AdminSection.paymentFailures => const PaymentFailuresScreen(),
+      AdminSection.auditLog => const AuditLogScreen(),
+      AdminSection.systemConfig => const SystemConfigScreen(),
     };
   }
 }
@@ -233,51 +248,44 @@ class _AdminSidebar extends StatelessWidget {
     (
       'Operations',
       [
+        _NavItem(AdminSection.orders, LucideIcons.shoppingBag, 'Refill Orders'),
+        _NavItem(AdminSection.stations, LucideIcons.store, 'Water Stations'),
+        _NavItem(AdminSection.waterTypes, LucideIcons.droplet, 'Water Types'),
+        _NavItem(AdminSection.users, LucideIcons.users, 'Users & Accounts'),
+        _NavItem(AdminSection.ridersMap, LucideIcons.mapPin, 'Live Riders'),
         _NavItem(
-          AdminSection.orders,
-          LucideIcons.shoppingBag,
-          'Refill Orders',
-        ),
-        _NavItem(
-          AdminSection.stations,
-          LucideIcons.store,
-          'Water Stations',
-        ),
-        _NavItem(
-          AdminSection.waterTypes,
-          LucideIcons.droplet,
-          'Water Types',
-        ),
-        _NavItem(
-          AdminSection.users,
-          LucideIcons.users,
-          'Users & Accounts',
+          AdminSection.moderation,
+          LucideIcons.shieldAlert,
+          'Trust & Moderation',
         ),
       ],
     ),
     (
       'Platform',
       [
-        _NavItem(
-          AdminSection.notifications,
-          LucideIcons.bell,
-          'Notifications',
-        ),
+        _NavItem(AdminSection.notifications, LucideIcons.bell, 'Notifications'),
         _NavItem(
           AdminSection.releases,
           LucideIcons.packageCheck,
           'App Releases',
         ),
-        _NavItem(
-          AdminSection.feeWallets,
-          LucideIcons.wallet,
-          'Service Fees',
-        ),
+        _NavItem(AdminSection.feeWallets, LucideIcons.wallet, 'Service Fees'),
         _NavItem(
           AdminSection.settings,
           LucideIcons.settings,
           'System Settings',
         ),
+        _NavItem(
+          AdminSection.systemConfig,
+          LucideIcons.toggleRight,
+          'Feature Toggles',
+        ),
+        _NavItem(
+          AdminSection.paymentFailures,
+          LucideIcons.creditCard,
+          'Payment Failures',
+        ),
+        _NavItem(AdminSection.auditLog, LucideIcons.history, 'Audit Trail'),
       ],
     ),
   ];
@@ -293,10 +301,7 @@ class _AdminSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppUi.pageBgOf(context),
         border: Border(
-          right: BorderSide(
-            color: AppUi.borderOf(context),
-            width: 1,
-          ),
+          right: BorderSide(color: AppUi.borderOf(context), width: 1),
         ),
       ),
       child: SafeArea(
@@ -417,7 +422,9 @@ class _AdminSidebar extends StatelessWidget {
                         )
                       : InkWell(
                           onTap: onSignOut,
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                          borderRadius: BorderRadius.circular(
+                            AppUi.radiusControl,
+                          ),
                           child: const Padding(
                             padding: EdgeInsets.symmetric(
                               horizontal: 14,
@@ -471,7 +478,9 @@ class _AdminSidebar extends StatelessWidget {
         child: InkWell(
           onTap: () => onSelect(item.section),
           borderRadius: BorderRadius.circular(AppUi.radiusControl),
-          hoverColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          hoverColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: compactLayout ? 0 : 14,
@@ -525,8 +534,9 @@ class _AdminSidebar extends StatelessWidget {
                             color: active
                                 ? activeFg
                                 : AppUi.textPrimaryOf(context),
-                            fontWeight:
-                                active ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             fontSize: 14,
                           ),
                         ),
@@ -597,6 +607,11 @@ class _AdminTopBar extends StatelessWidget {
     AdminSection.notifications => 'Live Notifications',
     AdminSection.feeWallets => 'Service Fees',
     AdminSection.settings => 'System Settings',
+    AdminSection.ridersMap => 'Live Riders',
+    AdminSection.moderation => 'Trust & Moderation',
+    AdminSection.paymentFailures => 'Payment Failures',
+    AdminSection.auditLog => 'Audit Trail',
+    AdminSection.systemConfig => 'Feature Toggles',
   };
 
   @override
@@ -664,7 +679,10 @@ class _AdminTopBar extends StatelessWidget {
               isLabelVisible: unreadNotifications > 0,
               label: Text(
                 unreadNotifications > 99 ? '99+' : '$unreadNotifications',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               child: const Icon(LucideIcons.bell, size: 19),
             ),
