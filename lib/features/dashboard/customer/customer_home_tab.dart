@@ -25,6 +25,7 @@ import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/utils/app_haptics.dart';
+import '../../../core/utils/poll_backoff.dart';
 import '../../../core/widgets/live_order_progress_tracker.dart';
 import '../../../core/widgets/offline_sync_status_pill.dart';
 import 'package:erefill/core/sync/realtime_hub.dart';
@@ -65,6 +66,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   int _homeFetchGeneration = 0;
   Timer? _homeBannerTimer;
   Timer? _activeOrderPollTimer;
+  final _activeOrderPoll = PollBackoff(
+    base: const Duration(seconds: 15),
+    max: const Duration(minutes: 2),
+  );
   String _selectedCategory = 'All';
 
   StreamSubscription? _ordersSub;
@@ -144,13 +149,47 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
+  /// Safety net for missed realtime order events. It re-reads only the active
+  /// order (the full home fetch is 7 queries, 3 of them whole tables) and
+  /// slows down while requests fail.
   void _startActiveOrderPollTimer() {
     _activeOrderPollTimer?.cancel();
-    _activeOrderPollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-      if (mounted && _activeOrder != null) {
-        _fetchData();
+    _activeOrderPollTimer = Timer(_activeOrderPoll.current, () async {
+      if (!mounted) return;
+      if (_activeOrder != null) await _refreshActiveOrder();
+      // Paused or disposed while the request ran: don't restart.
+      if (mounted && _activeOrderPollTimer != null) {
+        _startActiveOrderPollTimer();
       }
     });
+  }
+
+  Future<void> _refreshActiveOrder() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final rows = await supabase
+          .from('orders')
+          .select('*, profiles:owner_id(station_name)')
+          .eq('customer_id', userId)
+          .not('status', 'in', '(delivered,cancelled)')
+          .order('created_at', ascending: false)
+          .limit(1);
+      _activeOrderPoll.succeeded();
+      if (!mounted || supabase.auth.currentUser?.id != userId) return;
+      final next = rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
+      if (next == null ||
+          next['id'] != _activeOrder?['id'] ||
+          next['status'] != _activeOrder?['status']) {
+        // Finished or moved on: quick reorder and the station cards follow it.
+        _debouncedFetchData();
+      } else {
+        setState(() => _activeOrder = next);
+      }
+    } catch (e) {
+      _activeOrderPoll.failed();
+      debugPrint('Active order poll failed: $e');
+    }
   }
 
   Future<void> _loadCachedHome() async {

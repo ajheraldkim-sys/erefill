@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/utils/poll_backoff.dart';
 import '../models/chat_room.dart';
 import '../models/quick_reply.dart';
 import '../models/system_notification.dart';
@@ -42,6 +43,11 @@ class ChatService {
       return;
     }
 
+    final poll = PollBackoff(
+      base: const Duration(seconds: 8),
+      max: const Duration(minutes: 2),
+    );
+
     // A helper to fetch everything in one go with direct fallback and enrichment
     Future<List<ChatRoom>> fetchAll() async {
       final userId = _supabase.auth.currentUser?.id;
@@ -53,7 +59,9 @@ class ChatService {
         if (response is List) {
           rooms = response.map((json) => ChatRoom.fromJson(json)).toList();
         }
+        poll.succeeded();
       } catch (e) {
+        poll.failed();
         debugPrint('Error fetching aggregated chat rooms via RPC: $e');
       }
 
@@ -85,9 +93,12 @@ class ChatService {
       return await fetchAll();
     }
 
-    // Safely poll for room updates without overloading Postgres replication slots
-    yield* Stream.periodic(const Duration(seconds: 8))
-        .asyncMap((_) => throttledFetchAll());
+    // Poll for room updates; the interval grows while the RPC keeps failing.
+    // The loop ends when the listener cancels at the next yield.
+    while (true) {
+      await Future<void>.delayed(poll.current);
+      yield await throttledFetchAll();
+    }
   }
 
   /// Get chat rooms by type for the current user
