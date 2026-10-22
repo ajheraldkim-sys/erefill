@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -432,8 +432,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                   _loadRiderData(); // Refresh to ensure data is fresh
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppUi.bluePrimary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppUi.brandOf(context),
+                  foregroundColor: AppUi.onBrandOf(context),
                   shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
                   elevation: 0,
                 ),
@@ -889,8 +889,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                       if (context.mounted) Navigator.pop(context, data);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppUi.bluePrimary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppUi.brandOf(context),
+                      foregroundColor: AppUi.onBrandOf(context),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: AppUi.controlRadius,
@@ -1470,7 +1470,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                           color: isCod
-                              ? const Color(0xFF78350F)
+                              ? (AppUi.isDark(context)
+                                  ? AppUi.warningFgDark
+                                  : AppUi.warningFg)
                               : AppUi.textPrimaryOf(context),
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -1530,7 +1532,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                           color: isPaid
                               ? AppUi.successFg
                               : isCod
-                              ? const Color(0xFF78350F)
+                              ? (AppUi.isDark(context)
+                                  ? AppUi.warningFgDark
+                                  : AppUi.warningFg)
                               : AppUi.errorFg,
                           letterSpacing: 0.3,
                         ),

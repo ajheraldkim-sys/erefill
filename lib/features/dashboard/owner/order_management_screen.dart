@@ -149,8 +149,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     } else {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
+        SnackBar(
+          content: const Row(
             children: [
               Icon(Icons.bolt, color: AppColors.uiWarning),
               SizedBox(width: 8),
@@ -158,8 +158,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
             ],
           ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Color(0xFF0077B6),
-          duration: Duration(seconds: 4),
+          backgroundColor: AppUi.brandOf(context),
+          duration: const Duration(seconds: 4),
         ),
       );
     }

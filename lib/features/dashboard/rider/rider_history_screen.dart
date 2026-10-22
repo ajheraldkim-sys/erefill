@@ -432,33 +432,49 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                           })),
                         ]),
                         const SizedBox(height: AppUi.bottomPadding),
-                        Container(
-                          padding: AppUi.cardPaddingLoose,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF14532D),
-                            borderRadius: AppUi.pillRadius,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Total collected',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                  color: Colors.white70,
+                        Builder(
+                          builder: (ctx) {
+                            final isDark = AppUi.isDark(ctx);
+                            return Container(
+                              padding: AppUi.cardPaddingLoose,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.uiSuccess.withValues(alpha: 0.2)
+                                    : AppUi.successBg,
+                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppColors.uiSuccess.withValues(alpha: 0.35)
+                                      : AppUi.successBorder,
                                 ),
                               ),
-                              Text(
-                                formatPeso(_safeDouble(order['total_amount'])),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 22,
-                                  color: Colors.white,
-                                ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Total collected',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: isDark
+                                          ? AppUi.successFgDark
+                                          : AppUi.successFg,
+                                    ),
+                                  ),
+                                  Text(
+                                    formatPeso(_safeDouble(order['total_amount'])),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 22,
+                                      color: isDark
+                                          ? AppUi.successFgDark
+                                          : AppUi.successFg,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -495,10 +511,10 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppUi.bluePrimary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: AppUi.brandOf(context),
+                          foregroundColor: AppUi.onBrandOf(context),
                           shape: RoundedRectangleBorder(
-                            borderRadius: AppUi.pillRadius,
+                            borderRadius: AppUi.cardRadius,
                           ),
                           elevation: 0,
                         ),
@@ -578,7 +594,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                     content: const Text(
                                       'Receipt details copied to clipboard!',
                                     ),
-                                    backgroundColor: AppUi.bluePrimary,
+                                    backgroundColor: AppUi.brandOf(context),
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: AppUi.cardRadius,
@@ -710,7 +726,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
             const Divider(height: 12),
             ListTile(
               leading: CircleAvatar(
-                backgroundColor: Color(0xFFEFF6FF),
+                backgroundColor: AppUi.brandSoftOf(context),
                 child: Icon(Icons.receipt_long_rounded, color: AppUi.brandOf(context)),
               ),
               title: const Text('Official Invoice (Standard / A4)',
