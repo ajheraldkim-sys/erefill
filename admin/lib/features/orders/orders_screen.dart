@@ -5,11 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../utils/csv_export.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 import 'order_detail_screen.dart';
 
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 enum OrderViewMode { cards, table }
 
 class OrdersScreen extends StatefulWidget {
@@ -19,18 +24,17 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersScreenState extends State<OrdersScreen> with SyncedState {
   final _searchController = TextEditingController();
   Timer? _searchDebounce;
-  AdminPagedResult<Map<String, dynamic>>? _page;
+  final _orders = AdminLiveQuery<AdminPage>();
   Map<String, dynamic>? _selected;
-  bool _loading = true;
-  String? _error;
   String _lifecyclePill = 'all';
   OrderViewMode _viewMode = OrderViewMode.cards;
   int _offset = 0;
-  int _loadGeneration = 0;
   static const _pageSize = 50;
+
+  AdminPage? get _page => _orders.data;
 
   @override
   void initState() {
@@ -45,37 +49,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.dispose();
   }
 
-  Future<void> _load({bool resetOffset = true}) async {
+  /// Points the screen at the query for the current filters. Data comes from
+  /// the shared, cache-first resource and stays live through realtime.
+  void _load({bool resetOffset = true}) {
     _searchDebounce?.cancel();
     _searchDebounce = null;
-    if (resetOffset) _offset = 0;
-    final generation = ++_loadGeneration;
-    final offset = _offset;
     setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final page = await context.read<AdminApiService>().listOrders(
-        limit: _pageSize,
-        offset: offset,
-        status: _lifecyclePill,
-        search: _searchController.text.trim().isEmpty
-            ? null
-            : _searchController.text.trim(),
+      if (resetOffset) _offset = 0;
+      _orders.resource = rebindSynced(
+        _orders.resource,
+        AdminSync.orders(
+          context.read<AdminApiService>(),
+          status: _lifecyclePill,
+          search: _searchController.text,
+          offset: _offset,
+          limit: _pageSize,
+        ),
       );
-      if (!mounted || generation != _loadGeneration) return;
-      setState(() {
-        _page = page;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted || generation != _loadGeneration) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
+    });
   }
 
   List<Map<String, dynamic>> get _allRows => _page?.rows ?? [];
@@ -134,7 +125,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not export orders: ${FriendlyErrors.message(e)}'),
+          content: Text(
+            'Could not export orders: ${FriendlyErrors.message(e)}',
+          ),
           backgroundColor: AppUi.error,
         ),
       );
@@ -142,26 +135,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _openOrder(Map<String, dynamic> order) async {
+    // Changes made there refresh this list through realtime and tags.
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
             OrderDetailScreen(orderId: order['id'] as String, initial: order),
       ),
     );
-    await _load(resetOffset: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const AdminLoadingState();
-    if (_error != null) {
-      return AdminErrorState(message: _error!, onRetry: _load);
-    }
+    final placeholder = _orders.placeholder;
+    if (placeholder != null) return placeholder;
 
     final rows = _filteredRows;
     final total = _page?.total ?? 0;
 
-    return AdminWorkspaceLayout(
+    final content = AdminWorkspaceLayout(
       header: AdminSectionHeader(
         title: 'Refill Orders',
         subtitle: 'Track transactions, Service Fees, and delivery fulfillment.',
@@ -227,7 +218,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                     IconButton(
                       tooltip: 'Refresh',
-                      onPressed: _load,
+                      onPressed: () => _orders.resource?.refresh(),
                       icon: const Icon(LucideIcons.refreshCw, size: 18),
                     ),
                   ],
@@ -243,10 +234,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 _load();
               },
               items: [
-                AdminFilterPillItem(
-                  value: 'all',
-                  label: 'All Orders',
-                ),
+                AdminFilterPillItem(value: 'all', label: 'All Orders'),
                 AdminFilterPillItem(
                   value: 'pending',
                   label: 'Pending',
@@ -354,6 +342,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
     );
+    final resource = _orders.resource!;
+    return AdminSyncedFrame(
+      resources: [resource],
+      child: Column(
+        children: [
+          if (_orders.isSwitching) const LinearProgressIndicator(minHeight: 2),
+          Expanded(child: content),
+        ],
+      ),
+    );
   }
 
   Widget _paginationBar(int total, int loaded) {
@@ -444,7 +442,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: statusColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                                  borderRadius: BorderRadius.circular(
+                                    AppUi.radiusControl,
+                                  ),
                                 ),
                                 child: Icon(
                                   LucideIcons.packageCheck,
@@ -509,7 +509,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           color: Theme.of(
                             context,
                           ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                          borderRadius: BorderRadius.circular(
+                            AppUi.radiusControl,
+                          ),
                           border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Row(

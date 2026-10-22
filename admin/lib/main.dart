@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/sync_store.dart';
 import 'package:erefill/core/water_types.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -16,8 +20,16 @@ Future<void> main() async {
     anonKey: AppConstants.supabaseAnonKey,
   );
 
+  // Load the offline cache before the first frame so the console shows saved
+  // data immediately, even offline. Bounded so a slow disk never blocks
+  // startup; resources fall back to an async cache read.
+  await LocalDataCache.instance.init().timeout(
+    const Duration(milliseconds: 800),
+    onTimeout: () => debugPrint('startup.cache_init_timed_out'),
+  );
+
   final api = AdminApiService(Supabase.instance.client);
-  WaterTypes.load();
+  unawaited(WaterTypes.load());
   final auth = AdminAuthProvider(api)..init();
 
   runApp(
@@ -29,4 +41,5 @@ Future<void> main() async {
       child: const AdminApp(),
     ),
   );
+  SyncStore.instance.start();
 }

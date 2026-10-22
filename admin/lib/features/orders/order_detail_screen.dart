@@ -2,7 +2,12 @@ import 'package:erefill/core/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -15,11 +20,12 @@ class OrderDetailScreen extends StatefulWidget {
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
-class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  bool _loading = true;
-  String? _error;
-  Map<String, dynamic>? _detail;
+class _OrderDetailScreenState extends State<OrderDetailScreen>
+    with SyncedState {
+  late final SyncedResource<Map<String, dynamic>> _res;
   bool _acting = false;
+
+  Map<String, dynamic>? get _detail => _res.data;
 
   Map<String, dynamic> get _order {
     final o = _detail?['order'];
@@ -29,27 +35,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _res = useSynced(
+      AdminSync.orderDetail(context.read<AdminApiService>(), widget.orderId),
+    );
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final detail = await context.read<AdminApiService>().getOrderDetail(
-        widget.orderId,
-      );
-      if (!mounted) return;
-      setState(() => _detail = detail);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  /// After an admin action: this order, plus every list showing orders.
+  Future<void> _syncAfterAction() => SyncStore.instance.refreshTagged(AdminSync.tagOrders);
 
   Future<void> _cancel() async {
     final reason = await _promptReason('Cancel order');
@@ -64,7 +56,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Order cancelled')));
-      await _load();
+      await _syncAfterAction();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,7 +80,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Order refunded')));
-      await _load();
+      await _syncAfterAction();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -135,11 +127,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   color: AppUi.bluePrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: Icon(LucideIcons.user, size: 18, color: AppUi.brandOf(context)),
+                child: Icon(
+                  LucideIcons.user,
+                  size: 18,
+                  color: AppUi.brandOf(context),
+                ),
               ),
-              title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              title: Text(
+                name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
               subtitle: phone.isNotEmpty
-                  ? Text(phone, style: TextStyle(fontSize: 13, color: AppUi.textSecondaryOf(context)))
+                  ? Text(
+                      phone,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppUi.textSecondaryOf(context),
+                      ),
+                    )
                   : null,
               trailing: const Icon(LucideIcons.chevronRight, size: 16),
               onTap: () => Navigator.pop(ctx, r['id'] as String),
@@ -160,7 +168,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Rider reassigned')));
-      await _load();
+      await _syncAfterAction();
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
@@ -213,27 +221,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onPressed: _cancel,
             ),
             const SizedBox(width: 6),
-            ShadcnOutlineButton(
-              height: 34,
-              text: 'Refund',
-              onPressed: _refund,
-            ),
+            ShadcnOutlineButton(height: 34, text: 'Refund', onPressed: _refund),
             const SizedBox(width: 8),
           ],
           IconButton(
             tooltip: 'Refresh',
-            onPressed: _load,
+            onPressed: _res.refresh,
             icon: const Icon(LucideIcons.refreshCw, size: 18),
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: _loading
-          ? const AdminLoadingState()
-          : _error != null
-          ? AdminErrorState(message: _error!, onRetry: _load)
-          : AdminPageScaffold(
-              onRefresh: _load,
+      body:
+          adminSyncPlaceholder([_res]) ??
+          AdminSyncedFrame(
+            resources: [_res],
+            child: AdminPageScaffold(
+              onRefresh: _res.refresh,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -293,6 +297,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ],
               ),
             ),
+          ),
     );
   }
 
@@ -360,7 +365,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Line items (${items.length})', style: adminSectionTitleStyle(context)),
+          Text(
+            'Line items (${items.length})',
+            style: adminSectionTitleStyle(context),
+          ),
           AppUi.vGapMd,
           if (items.isEmpty)
             Text('No line items recorded.', style: adminBodyTextStyle(context))

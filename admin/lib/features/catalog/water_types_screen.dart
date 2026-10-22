@@ -1,9 +1,17 @@
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/water_types.dart';
+import 'package:erefill/core/widgets/water_type_thumb.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 
 /// Admin catalog of water types. Each station sells exactly one product: the
@@ -16,48 +24,23 @@ class WaterTypesScreen extends StatefulWidget {
   State<WaterTypesScreen> createState() => _WaterTypesScreenState();
 }
 
-class _WaterTypesScreenState extends State<WaterTypesScreen> {
+class _WaterTypesScreenState extends State<WaterTypesScreen> with SyncedState {
   SupabaseClient get _client => Supabase.instance.client;
 
-  bool _loading = true;
-  Object? _error;
-  Map<String, int> _stationCounts = const {};
+  /// Per-type station counts; refreshing it also reloads the shared
+  /// [WaterTypes] catalog, which keeps its own offline copy.
+  late final SyncedResource<Map<String, int>> _counts;
+
+  Map<String, int> get _stationCounts => _counts.data ?? const {};
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _counts = useSynced(AdminSync.waterTypeStationCounts());
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      await WaterTypes.load(client: _client, force: true);
-      final rows = await _client
-          .from('profiles')
-          .select('primary_water_type')
-          .eq('role', 'owner');
-      final counts = <String, int>{};
-      for (final row in rows) {
-        final name = row['primary_water_type']?.toString();
-        if (name != null) counts[name] = (counts[name] ?? 0) + 1;
-      }
-      if (!mounted) return;
-      setState(() {
-        _stationCounts = counts;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e;
-        _loading = false;
-      });
-    }
-  }
+  Future<void> _load() =>
+      SyncStore.instance.refreshTagged(AdminSync.tagCatalog);
 
   void _snack(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -78,7 +61,9 @@ class _WaterTypesScreenState extends State<WaterTypesScreen> {
     );
     if (saved == true) {
       await _load();
-      if (mounted) _snack(type == null ? 'Water type added' : 'Water type updated');
+      if (mounted) {
+        _snack(type == null ? 'Water type added' : 'Water type updated');
+      }
     }
   }
 
@@ -107,7 +92,8 @@ class _WaterTypesScreenState extends State<WaterTypesScreen> {
     final confirmed = await showAdminConfirmDialog(
       context,
       title: 'Delete ${type.name}?',
-      message: 'New stations will no longer be able to pick it. '
+      message:
+          'New stations will no longer be able to pick it. '
           'Customers who prefer it will see their default instead.',
       confirmLabel: 'Delete',
       isDestructive: true,
@@ -124,35 +110,33 @@ class _WaterTypesScreenState extends State<WaterTypesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AdminPageScaffold(
-      onRefresh: _load,
-      header: const AdminSectionHeader(
-        title: 'Water Types',
-        subtitle:
-            'The products stations can sell. Each station sells one water '
-            'type, chosen at registration, at its own price.',
-      ),
-      actions: [
-        ShadcnPrimaryButton(
-          height: 38,
-          icon: LucideIcons.plus,
-          text: 'Add water type',
-          onPressed: () => _edit(),
+    return AdminSyncedFrame(
+      resources: [_counts],
+      child: AdminPageScaffold(
+        onRefresh: _load,
+        header: const AdminSectionHeader(
+          title: 'Water Types',
+          subtitle:
+              'The products stations can sell. Each station sells one water '
+              'type, chosen at registration, at its own price.',
         ),
-      ],
-      child: _buildBody(context),
+        actions: [
+          ShadcnPrimaryButton(
+            height: 38,
+            icon: LucideIcons.plus,
+            text: 'Add water type',
+            onPressed: () => _edit(),
+          ),
+        ],
+        child: _buildBody(context),
+      ),
     );
   }
 
   Widget _buildBody(BuildContext context) {
-    if (_loading && WaterTypes.catalog.value.isEmpty) {
-      return const AdminLoadingState();
-    }
-    if (_error != null && WaterTypes.catalog.value.isEmpty) {
-      return AdminErrorState(
-        message: FriendlyErrors.message(_error!),
-        onRetry: _load,
-      );
+    if (WaterTypes.catalog.value.isEmpty) {
+      final placeholder = adminSyncPlaceholder([_counts]);
+      if (placeholder != null) return placeholder;
     }
     final types = WaterTypes.catalog.value;
     if (types.isEmpty) {
@@ -199,13 +183,11 @@ class _WaterTypeRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: type.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppUi.radiusControl),
-            ),
-            child: Icon(type.icon, color: type.color, size: 22),
+          WaterTypeThumb(
+            type: type,
+            size: 56,
+            radius: AppUi.radiusControl,
+            iconSize: 22,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -295,17 +277,91 @@ class _WaterTypeDialogState extends State<_WaterTypeDialog> {
   late final _name = TextEditingController(text: widget.type?.name);
   late final _shortName = TextEditingController(text: widget.type?.shortName);
   late final _tagline = TextEditingController(text: widget.type?.tagline);
-  late final _description =
-      TextEditingController(text: widget.type?.description);
+  late final _description = TextEditingController(
+    text: widget.type?.description,
+  );
   late final _badge = TextEditingController(text: widget.type?.badge);
-  late final _benefits =
-      TextEditingController(text: widget.type?.benefits.join(', '));
-  late String _iconKey = widget.type?.iconKey ?? WaterTypes.defaultIconKey;
+  late final _benefits = TextEditingController(
+    text: widget.type?.benefits.join(', '),
+  );
+  late String? _photoUrl = widget.type?.photoUrl;
+  Uint8List? _pickedBytes;
+  String? _pickedExtension;
   bool _saving = false;
+
+  static const _photoBucket = 'product_images';
+  static const _maxPhotoBytes = 5 * 1024 * 1024;
+  static const _photoTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+  };
+
+  Future<void> _pickPhoto() async {
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (file == null || !mounted) return;
+    final extension = file.name.split('.').last.toLowerCase();
+    if (!_photoTypes.containsKey(extension)) {
+      _showError('Choose a JPG, PNG, or WebP photo.');
+      return;
+    }
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    if (bytes.length > _maxPhotoBytes) {
+      _showError('That photo is over 5 MB. Choose a smaller one.');
+      return;
+    }
+    setState(() {
+      _pickedBytes = bytes;
+      _pickedExtension = extension;
+    });
+  }
+
+  void _removePhoto() => setState(() {
+    _pickedBytes = null;
+    _pickedExtension = null;
+    _photoUrl = null;
+  });
+
+  /// Uploads a newly picked photo and returns its public URL; otherwise the
+  /// current URL (null when removed).
+  Future<String?> _uploadPhotoIfPicked(String name) async {
+    final bytes = _pickedBytes;
+    final extension = _pickedExtension;
+    if (bytes == null || extension == null) return _photoUrl;
+    final slug = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    final path =
+        'water_types/$slug-${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final storage = Supabase.instance.client.storage.from(_photoBucket);
+    await storage.uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(contentType: _photoTypes[extension]),
+    );
+    return storage.getPublicUrl(path);
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppUi.error),
+    );
+  }
 
   @override
   void dispose() {
-    for (final c in [_name, _shortName, _tagline, _description, _badge, _benefits]) {
+    for (final c in [
+      _name,
+      _shortName,
+      _tagline,
+      _description,
+      _badge,
+      _benefits,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -315,6 +371,15 @@ class _WaterTypeDialogState extends State<_WaterTypeDialog> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final name = _name.text.trim();
+    final String? photoUrl;
+    try {
+      photoUrl = await _uploadPhotoIfPicked(name);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _showError("The photo couldn't upload. ${FriendlyErrors.message(e)}");
+      return;
+    }
     final payload = {
       'name': name,
       'short_name': _shortName.text.trim().isEmpty
@@ -328,7 +393,7 @@ class _WaterTypeDialogState extends State<_WaterTypeDialog> {
           .map((b) => b.trim())
           .where((b) => b.isNotEmpty)
           .toList(),
-      'icon_key': _iconKey,
+      'photo_url': photoUrl,
     };
     try {
       final table = Supabase.instance.client.from(WaterTypes.table);
@@ -342,17 +407,81 @@ class _WaterTypeDialogState extends State<_WaterTypeDialog> {
       if (!mounted) return;
       setState(() => _saving = false);
       final lower = e.toString().toLowerCase();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            lower.contains('duplicate') || lower.contains('unique')
-                ? 'A water type named "$name" already exists.'
-                : FriendlyErrors.message(e),
-          ),
-          backgroundColor: AppUi.error,
-        ),
+      _showError(
+        lower.contains('duplicate') || lower.contains('unique')
+            ? 'A water type named "$name" already exists.'
+            : FriendlyErrors.message(e),
       );
     }
+  }
+
+  Widget _buildPhotoField(BuildContext context) {
+    final pickedBytes = _pickedBytes;
+    final hasPhoto = pickedBytes != null || _photoUrl != null;
+    const previewSize = 96.0;
+    final preview = pickedBytes != null
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+            child: Image.memory(
+              pickedBytes,
+              width: previewSize,
+              height: previewSize,
+              fit: BoxFit.cover,
+            ),
+          )
+        : WaterTypeThumb(
+            type: WaterTypeInfo(
+              name: _name.text,
+              shortName: _name.text,
+              iconKey: widget.type?.iconKey ?? WaterTypes.defaultIconKey,
+              photoUrl: _photoUrl,
+            ),
+            size: previewSize,
+            radius: AppUi.radiusControl,
+            iconSize: 32,
+          );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        preview,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Shown to customers on station pages and in their cart. '
+                'JPG, PNG, or WebP, up to 5 MB.',
+                style: adminCaptionTextStyle(context),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ShadcnOutlineButton(
+                    height: 34,
+                    icon: LucideIcons.imagePlus,
+                    text: hasPhoto ? 'Replace photo' : 'Choose photo',
+                    onPressed: _saving ? null : _pickPhoto,
+                  ),
+                  if (hasPhoto)
+                    TextButton(
+                      onPressed: _saving ? null : _removePhoto,
+                      child: Text(
+                        'Remove',
+                        style: TextStyle(
+                          color: adminSemanticErrorColor(context),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -426,24 +555,9 @@ class _WaterTypeDialogState extends State<_WaterTypeDialog> {
                 hint: 'Comma separated, e.g. No minerals, Clean taste',
               ),
               AppUi.vGapMd,
-              Text('Icon', style: adminSectionTitleStyle(context)),
+              Text('Photo', style: adminSectionTitleStyle(context)),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final entry in WaterTypes.iconOptions.entries)
-                    ChoiceChip(
-                      label: Icon(
-                        entry.value,
-                        size: 18,
-                        color: WaterTypes.colorFor(entry.key),
-                      ),
-                      selected: _iconKey == entry.key,
-                      onSelected: (_) => setState(() => _iconKey = entry.key),
-                    ),
-                ],
-              ),
+              _buildPhotoField(context),
             ],
           ),
         ),

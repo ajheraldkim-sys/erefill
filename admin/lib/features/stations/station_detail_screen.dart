@@ -5,7 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_map.dart';
 import '../../widgets/admin_timeline.dart';
 import '../../widgets/admin_ui.dart';
@@ -26,22 +31,31 @@ class StationDetailScreen extends StatefulWidget {
 }
 
 class _StationDetailScreenState extends State<StationDetailScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, SyncedState {
   late TabController _tabs;
-  bool _loading = true;
-  String? _error;
-  Map<String, dynamic>? _detail;
-  AdminPagedResult<Map<String, dynamic>>? _riders;
-  AdminPagedResult<Map<String, dynamic>>? _customers;
-  List<Map<String, dynamic>> _products = [];
-  AdminPagedResult<Map<String, dynamic>>? _ledger;
-  List<Map<String, dynamic>> _timeline = [];
+  late final SyncedResource<Map<String, dynamic>> _res;
+
+  Map<String, dynamic> get _snapshot => _res.data ?? const {};
+  Map<String, dynamic>? get _detail {
+    final d = _snapshot['detail'];
+    return d is Map ? Map<String, dynamic>.from(d) : null;
+  }
+
+  AdminPage get _riders => AdminSync.pageOf(_snapshot['riders']);
+  AdminPage get _customers => AdminSync.pageOf(_snapshot['customers']);
+  List<Map<String, dynamic>> get _products =>
+      AdminSync.rowsOf(_snapshot['products']);
+  AdminPage get _ledger => AdminSync.pageOf(_snapshot['ledger']);
+  List<Map<String, dynamic>> get _timeline =>
+      AdminSync.rowsOf(_snapshot['timeline']);
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
-    _load();
+    _res = useSynced(
+      AdminSync.stationDetail(context.read<AdminApiService>(), widget.ownerId),
+    );
   }
 
   @override
@@ -65,61 +79,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
     return s is Map ? Map<String, dynamic>.from(s) : {};
   }
 
+  /// Refreshes this station and every list showing stations, e.g. after an
+  /// admin action or pull-to-refresh.
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final api = context.read<AdminApiService>();
-    try {
-      final detail = await api.getStationDetail(widget.ownerId);
-      final results = await Future.wait([
-        api
-            .listStationRiders(widget.ownerId)
-            .catchError(
-              (_) => const AdminPagedResult<Map<String, dynamic>>(
-                rows: [],
-                total: 0,
-              ),
-            ),
-        api
-            .listStationCustomers(widget.ownerId)
-            .catchError(
-              (_) => const AdminPagedResult<Map<String, dynamic>>(
-                rows: [],
-                total: 0,
-              ),
-            ),
-        api
-            .listStationProducts(widget.ownerId)
-            .catchError((_) => <Map<String, dynamic>>[]),
-        api
-            .listInventoryLedger(widget.ownerId)
-            .catchError(
-              (_) => const AdminPagedResult<Map<String, dynamic>>(
-                rows: [],
-                total: 0,
-              ),
-            ),
-        api
-            .getActivityTimeline('station', widget.ownerId)
-            .catchError((_) => <Map<String, dynamic>>[]),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _detail = detail;
-        _riders = results[0] as AdminPagedResult<Map<String, dynamic>>;
-        _customers = results[1] as AdminPagedResult<Map<String, dynamic>>;
-        _products = results[2] as List<Map<String, dynamic>>;
-        _ledger = results[3] as AdminPagedResult<Map<String, dynamic>>;
-        _timeline = results[4] as List<Map<String, dynamic>>;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    await SyncStore.instance.refreshTagged(AdminSync.tagStations);
   }
 
   Future<void> _setAvailability(String availability) async {
@@ -267,11 +230,11 @@ class _StationDetailScreenState extends State<StationDetailScreen>
           ],
         ),
       ),
-      body: _loading
-          ? const AdminLoadingState()
-          : _error != null
-          ? AdminErrorState(message: _error!, onRetry: _load)
-          : TabBarView(
+      body:
+          adminSyncPlaceholder([_res]) ??
+          AdminSyncedFrame(
+            resources: [_res],
+            child: TabBarView(
               controller: _tabs,
               children: [
                 _stationInfoTab(),
@@ -279,6 +242,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                 _ridersTab(),
               ],
             ),
+          ),
     );
   }
 
@@ -314,7 +278,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
             children: [
               AdminKpiTile(
                 label: 'Riders Assigned',
-                value: '${_stats['rider_count'] ?? _riders?.rows.length ?? 0}',
+                value: '${_stats['rider_count'] ?? _riders.rows.length ?? 0}',
                 icon: LucideIcons.bike,
                 color: AppUi.accentCyan,
                 compact: true,
@@ -322,7 +286,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
               AdminKpiTile(
                 label: 'Registered Customers',
                 value:
-                    '${_stats['customer_count'] ?? _customers?.rows.length ?? 0}',
+                    '${_stats['customer_count'] ?? _customers.rows.length ?? 0}',
                 icon: LucideIcons.users,
                 color: AppUi.bluePrimary,
                 compact: true,
@@ -480,7 +444,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           SizedBox(
                             height: 220,
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                               child: AdminSingleStationMap(
                                 latitude: lat,
                                 longitude: lng,
@@ -628,7 +594,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusControl,
+                            ),
                           ),
                           child: Icon(
                             LucideIcons.droplets,
@@ -678,14 +646,14 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Recent Inventory Log (${_ledger?.total ?? 0})',
+                        'Recent Inventory Log (${_ledger.total})',
                         style: adminSectionTitleStyle(context),
                       ),
                     ],
                   ),
                 ),
                 const Divider(height: 1),
-                if ((_ledger?.rows ?? []).isEmpty)
+                if (_ledger.rows.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(32),
                     child: AdminEmptyState(
@@ -697,10 +665,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: (_ledger?.rows ?? []).length,
+                    itemCount: _ledger.rows.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, i) {
-                      final l = (_ledger?.rows ?? [])[i];
+                      final l = _ledger.rows[i];
                       return ListTile(
                         leading: Icon(
                           LucideIcons.circleArrowRight,
@@ -739,7 +707,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
 
   // ── Tab 3: Riders & Station Fleet ──
   Widget _ridersTab() {
-    final rows = _riders?.rows ?? [];
+    final rows = _riders.rows;
 
     return AdminPageScaffold(
       onRefresh: _load,
@@ -889,9 +857,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
     final current = _profile['primary_water_type']?.toString();
     final options = WaterTypes.all;
     if (options.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add a water type first.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Add a water type first.')));
       return;
     }
     String selected = options.any((t) => t.name == current)
@@ -903,7 +871,8 @@ class _StationDetailScreenState extends State<StationDetailScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AdminModalDialog(
           title: 'Change water type',
-          subtitle: 'The station keeps its price. Customers see the new '
+          subtitle:
+              'The station keeps its price. Customers see the new '
               'water type right away.',
           icon: LucideIcons.droplet,
           maxWidth: 440,
@@ -956,9 +925,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
           .eq('id', widget.ownerId);
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Station now sells $picked')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Station now sells $picked')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -977,15 +946,17 @@ class _StationDetailScreenState extends State<StationDetailScreen>
 
     final consequenceMsg = isSuspension
         ? (activeOrders > 0
-            ? 'Warning: Suspending "$name" will interrupt $activeOrders active in-flight customer orders!\nDeliveries currently on the road will be paused.'
-            : 'Are you sure you want to suspend "$name"? New orders and dispatch will be blocked.')
+              ? 'Warning: Suspending "$name" will interrupt $activeOrders active in-flight customer orders!\nDeliveries currently on the road will be paused.'
+              : 'Are you sure you want to suspend "$name"? New orders and dispatch will be blocked.')
         : 'Setting station availability to "$action"';
 
     final reason = await showAdminPromptDialog(
       context,
       title: isSuspension ? 'Suspend Station: $name' : 'Update Station Status',
       subtitle: consequenceMsg,
-      icon: isSuspension ? LucideIcons.triangleAlert : LucideIcons.messageSquare,
+      icon: isSuspension
+          ? LucideIcons.triangleAlert
+          : LucideIcons.messageSquare,
       iconColor: isSuspension ? adminSemanticErrorColor(context) : null,
       label: isSuspension
           ? 'Audit note / suspension reason (required)'

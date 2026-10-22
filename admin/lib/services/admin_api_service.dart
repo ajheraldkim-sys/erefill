@@ -168,14 +168,7 @@ class AdminApiService {
       };
     } catch (e) {
       debugPrint('Direct dashboard stats fallback error: $e');
-      return {
-        'customers': 0,
-        'owners': 0,
-        'riders': 0,
-        'stations_count': 0,
-        'orders_count': 0,
-        'total_gmv': 0.0,
-      };
+      rethrow;
     }
   }
 
@@ -227,7 +220,7 @@ class AdminApiService {
       };
     } catch (e) {
       debugPrint('revenueAnalytics fallback error: $e');
-      return {'total_revenue': 0.0, 'daily_series': []};
+      rethrow;
     }
   }
 
@@ -291,6 +284,7 @@ class AdminApiService {
       });
     } catch (e) {
       debugPrint('setPlatformFee fallback error: $e');
+      rethrow;
     }
     return payload;
   }
@@ -408,6 +402,7 @@ class AdminApiService {
       }
     } catch (e) {
       debugPrint('setDeliveryFeeConfig fallback error: $e');
+      rethrow;
     }
     return payload;
   }
@@ -423,17 +418,31 @@ class AdminApiService {
       }
     } catch (_) {}
 
+    // audit_logs records the admin as actor_id and the saved config as
+    // new_value; map them onto the RPC's row shape the history list reads.
     try {
       final rows = await _client
           .from('audit_logs')
-          .select('id, user_id, details, created_at')
+          .select('id, actor_id, new_value, created_at, '
+              'actor:profiles!audit_logs_actor_id_fkey(email, full_name)')
           .eq('action', 'set_delivery_fee_config')
           .order('created_at', ascending: false)
           .limit(limit);
-      return List<Map<String, dynamic>>.from(rows);
+      return [
+        for (final row in rows)
+          {
+            'id': row['id'],
+            'user_id': row['actor_id'],
+            'admin_email': (row['actor'] as Map?)?['email'],
+            'admin_name': (row['actor'] as Map?)?['full_name'],
+            'details': row['new_value'],
+            'created_at': row['created_at'],
+          },
+      ];
     } catch (e) {
+      // History is secondary; an empty list keeps the fees screen loading.
       debugPrint('getDeliveryFeeHistory fallback error: $e');
-      return [];
+      return const [];
     }
   }
 
@@ -563,7 +572,7 @@ class AdminApiService {
       );
     } catch (e) {
       debugPrint('listStations fallback error: $e');
-      return const AdminPagedResult(total: 0, rows: []);
+      rethrow;
     }
   }
 
@@ -684,7 +693,7 @@ class AdminApiService {
       );
     } catch (e) {
       debugPrint('listUsers fallback error: $e');
-      return const AdminPagedResult(total: 0, rows: []);
+      rethrow;
     }
   }
 
@@ -750,6 +759,7 @@ class AdminApiService {
       });
     } catch (e) {
       debugPrint('setSystemConfig fallback error: $e');
+      rethrow;
     }
   }
 
@@ -782,6 +792,7 @@ class AdminApiService {
           .eq('owner_id', ownerId);
     } catch (e) {
       debugPrint('setStationAvailability fallback error: $e');
+      rethrow;
     }
   }
 
@@ -810,7 +821,7 @@ class AdminApiService {
       return {'station': station ?? {}, 'owner': owner ?? {}};
     } catch (e) {
       debugPrint('getStationDetail fallback error: $e');
-      return {};
+      rethrow;
     }
   }
 
@@ -891,7 +902,7 @@ class AdminApiService {
       return profile == null ? {} : Map<String, dynamic>.from(profile);
     } catch (e) {
       debugPrint('getUserDetail fallback error: $e');
-      return {};
+      rethrow;
     }
   }
 
@@ -961,7 +972,7 @@ class AdminApiService {
       return updated == null ? updates : Map<String, dynamic>.from(updated);
     } catch (e) {
       debugPrint('updateUserProfile fallback error: $e');
-      return updates;
+      rethrow;
     }
   }
 
@@ -1030,6 +1041,7 @@ class AdminApiService {
           .eq('owner_id', ownerId);
     } catch (e) {
       debugPrint('updateStationProfile fallback error: $e');
+      rethrow;
     }
     return stationUpdates;
   }
@@ -1112,7 +1124,7 @@ class AdminApiService {
       return order == null ? {} : Map<String, dynamic>.from(order);
     } catch (e) {
       debugPrint('getOrderDetail fallback error: $e');
-      return {};
+      rethrow;
     }
   }
 
@@ -1205,7 +1217,7 @@ class AdminApiService {
       return List<Map<String, dynamic>>.from(riders);
     } catch (e) {
       debugPrint('listLiveRiders fallback error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1617,6 +1629,7 @@ class AdminApiService {
       });
     } catch (e) {
       debugPrint('sendNotification fallback error: $e');
+      rethrow;
     }
   }
 
@@ -1663,7 +1676,7 @@ class AdminApiService {
       return rows.length;
     } catch (e) {
       debugPrint('broadcastNotification fallback error: $e');
-      return 0;
+      rethrow;
     }
   }
 
@@ -1761,7 +1774,7 @@ class AdminApiService {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint('listAppReleases error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1775,7 +1788,7 @@ class AdminApiService {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint('listAppReleaseAuditLogs error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1847,4 +1860,14 @@ class FeeWalletRow {
   final double feesCollected;
   final double topupsReceived;
   final DateTime? lastTopupAt;
+
+  Map<String, dynamic> toJson() => {
+    'owner_id': ownerId,
+    'station_name': stationName,
+    'balance': balance,
+    'cod_locked': codLocked,
+    'fees_collected': feesCollected,
+    'topups_received': topupsReceived,
+    'last_topup_at': lastTopupAt?.toIso8601String(),
+  };
 }

@@ -4,7 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 
 /// Every station's prepaid service fee wallet. Top-ups and COD fee deductions
@@ -24,20 +29,45 @@ class FeeWalletsScreen extends StatefulWidget {
   State<FeeWalletsScreen> createState() => _FeeWalletsScreenState();
 }
 
-class _FeeWalletsScreenState extends State<FeeWalletsScreen> {
-  List<FeeWalletRow> _rows = const [];
-  bool _loading = true;
-  String? _error;
+class _FeeWalletsScreenState extends State<FeeWalletsScreen> with SyncedState {
+  /// Synced, cache-first wallets; null when a test injects [loadWallets].
+  SyncedResource<List<FeeWalletRow>>? _wallets;
+
+  // Injected loader state (tests only), kept outside the sync layer.
+  List<FeeWalletRow>? _injectedRows;
+  Object? _injectedError;
+
+  List<FeeWalletRow> get _rows => _wallets?.data ?? _injectedRows ?? const [];
 
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.loadWallets == null) {
+      final api = context.read<AdminApiService>();
+      _wallets = useSynced(AdminSync.feeWallets(api.listFeeWallets));
+    } else {
+      _loadInjected();
+    }
   }
 
-  Future<List<FeeWalletRow>> _fetch() =>
-      widget.loadWallets?.call() ??
-      context.read<AdminApiService>().listFeeWallets();
+  Future<void> _loadInjected() async {
+    try {
+      final rows = await widget.loadWallets!();
+      if (mounted) setState(() => _injectedRows = rows);
+    } catch (e) {
+      if (mounted) setState(() => _injectedError = e);
+    }
+  }
+
+  Future<void> _refresh() async {
+    final wallets = _wallets;
+    if (wallets != null) {
+      await SyncStore.instance.refreshTagged(AdminSync.tagFees);
+    } else {
+      setState(() => _injectedError = null);
+      await _loadInjected();
+    }
+  }
 
   Future<double> _adjust(String ownerId, double amount, String reason) =>
       widget.adjustWallet?.call(ownerId, amount, reason) ??
@@ -47,27 +77,6 @@ class _FeeWalletsScreenState extends State<FeeWalletsScreen> {
         reason: reason,
       );
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final rows = await _fetch();
-      if (!mounted) return;
-      setState(() {
-        _rows = rows;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
   Future<void> _openAdjust(FeeWalletRow row) async {
     final saved = await showDialog<bool>(
       context: context,
@@ -76,88 +85,114 @@ class _FeeWalletsScreenState extends State<FeeWalletsScreen> {
         onSave: (amount, reason) => _adjust(row.ownerId, amount, reason),
       ),
     );
-    if (saved == true) _load();
+    if (saved == true) await _refresh();
+  }
+
+  Widget? get _placeholder {
+    final wallets = _wallets;
+    if (wallets != null) return adminSyncPlaceholder([wallets]);
+    if (_injectedRows != null) return null;
+    final error = _injectedError;
+    return error == null
+        ? const AdminLoadingState()
+        : AdminErrorState(message: error.toString(), onRetry: _refresh);
   }
 
   @override
   Widget build(BuildContext context) {
+    final wallets = _wallets;
+    final content = _buildContent(context);
+    return wallets == null
+        ? content
+        : AdminSyncedFrame(resources: [wallets], child: content);
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final placeholder = _placeholder;
     final totalFees = _rows.fold<double>(0, (sum, r) => sum + r.feesCollected);
-    final totalTopups = _rows.fold<double>(0, (sum, r) => sum + r.topupsReceived);
+    final totalTopups = _rows.fold<double>(
+      0,
+      (sum, r) => sum + r.topupsReceived,
+    );
     final codOff = _rows.where((r) => r.codLocked).length;
 
     return AdminPageScaffold(
-      onRefresh: _load,
+      onRefresh: _refresh,
       header: const AdminSectionHeader(
         title: 'Service Fees',
         subtitle:
             'Station wallets for Cash on Delivery service fees. Online orders pay their fee through PayMongo.',
       ),
-      child: _loading
-          ? const AdminLoadingState()
-          : _error != null
-          ? AdminErrorState(message: _error!, onRetry: _load)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Wrap(
-                  spacing: AppUi.spacingLg,
-                  runSpacing: AppUi.spacingLg,
-                  children: [
-                    _Total(label: 'Service fees collected', value: formatPeso(totalFees)),
-                    _Total(label: 'Top-ups received', value: formatPeso(totalTopups)),
-                    _Total(label: 'Stations with COD off', value: '$codOff'),
-                  ],
-                ),
-                AppUi.vGapMd,
-                Text(
-                  FeeWalletsScreen.payoutNote,
-                  style: TextStyle(color: AppUi.textSecondaryOf(context)),
-                ),
-                AppUi.vGapLg,
-                AdminCard(
-                  padding: EdgeInsets.zero,
-                  child: _rows.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text('No stations yet.'),
-                        )
-                      : Column(
-                          children: [
-                            for (final row in _rows)
-                              ListTile(
-                                title: Text(row.stationName),
-                                subtitle: Text(
-                                  'Fees ${formatPeso(row.feesCollected)} · Top-ups ${formatPeso(row.topupsReceived)}',
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (row.codLocked) ...[
-                                      const AdminBadge(
-                                        label: 'COD off',
-                                        color: AppColors.uiError,
-                                      ),
-                                      AppUi.hGapSm,
-                                    ],
-                                    Text(
-                                      formatPeso(row.balance),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
+      child:
+          placeholder ??
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: AppUi.spacingLg,
+                runSpacing: AppUi.spacingLg,
+                children: [
+                  _Total(
+                    label: 'Service fees collected',
+                    value: formatPeso(totalFees),
+                  ),
+                  _Total(
+                    label: 'Top-ups received',
+                    value: formatPeso(totalTopups),
+                  ),
+                  _Total(label: 'Stations with COD off', value: '$codOff'),
+                ],
+              ),
+              AppUi.vGapMd,
+              Text(
+                FeeWalletsScreen.payoutNote,
+                style: TextStyle(color: AppUi.textSecondaryOf(context)),
+              ),
+              AppUi.vGapLg,
+              AdminCard(
+                padding: EdgeInsets.zero,
+                child: _rows.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('No stations yet.'),
+                      )
+                    : Column(
+                        children: [
+                          for (final row in _rows)
+                            ListTile(
+                              title: Text(row.stationName),
+                              subtitle: Text(
+                                'Fees ${formatPeso(row.feesCollected)} · Top-ups ${formatPeso(row.topupsReceived)}',
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (row.codLocked) ...[
+                                    const AdminBadge(
+                                      label: 'COD off',
+                                      color: AppColors.uiError,
                                     ),
                                     AppUi.hGapSm,
-                                    TextButton(
-                                      onPressed: () => _openAdjust(row),
-                                      child: const Text('Adjust'),
-                                    ),
                                   ],
-                                ),
+                                  Text(
+                                    formatPeso(row.balance),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  AppUi.hGapSm,
+                                  TextButton(
+                                    onPressed: () => _openAdjust(row),
+                                    child: const Text('Adjust'),
+                                  ),
+                                ],
                               ),
-                          ],
-                        ),
-                ),
-              ],
-            ),
+                            ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
     );
   }
 }
@@ -176,7 +211,10 @@ class _Total extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(color: AppUi.textSecondaryOf(context))),
+            Text(
+              label,
+              style: TextStyle(color: AppUi.textSecondaryOf(context)),
+            ),
             AppUi.vGapXs,
             Text(
               value,
@@ -254,8 +292,13 @@ class _AdjustDialogState extends State<_AdjustDialog> {
             AppUi.vGapMd,
             TextField(
               controller: _amount,
-              keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d{0,2}'))],
+              keyboardType: const TextInputType.numberWithOptions(
+                signed: true,
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d{0,2}')),
+              ],
               decoration: const InputDecoration(
                 labelText: 'Amount (₱)',
                 helperText: 'Use a negative amount to debit.',

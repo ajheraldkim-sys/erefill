@@ -4,7 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 import '../onboarding/create_dialogs.dart';
 import '../orders/order_detail_screen.dart';
@@ -12,6 +17,7 @@ import '../stations/station_detail_screen.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -19,72 +25,31 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  Map<String, dynamic>? _stats;
-  List<Map<String, dynamic>> _pendingStations = [];
-  List<Map<String, dynamic>> _recentOrders = [];
-  int _onlineRiders = 0;
-  int _openDisputes = 0;
-  bool _loading = true;
-  String? _error;
+class _DashboardScreenState extends State<DashboardScreen> with SyncedState {
+  late final SyncedResource<Map<String, dynamic>> _res;
+
+  Map<String, dynamic> get _snapshot => _res.data ?? const {};
+  Map<String, dynamic>? get _stats {
+    final s = _snapshot['stats'];
+    return s is Map ? Map<String, dynamic>.from(s) : null;
+  }
+
+  List<Map<String, dynamic>> get _pendingStations =>
+      AdminSync.rowsOf(_snapshot['pending_stations']);
+  List<Map<String, dynamic>> get _recentOrders =>
+      AdminSync.rowsOf(_snapshot['recent_orders']);
+  int get _onlineRiders => safeInt(_snapshot['online_riders']);
+  int get _openDisputes => safeInt(_snapshot['open_disputes']);
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _res = useSynced(AdminSync.dashboard(context.read<AdminApiService>()));
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final api = context.read<AdminApiService>();
-      final stats = await api.dashboardStats();
-      var onlineRiders = 0;
-      var openDisputes = 0;
-      List<Map<String, dynamic>> pendingStations = [];
-      List<Map<String, dynamic>> recentOrders = [];
-
-      try {
-        final riders = await api.listLiveRiders();
-        onlineRiders = riders.where((r) => r['is_online'] == true).length;
-      } catch (_) {}
-
-      try {
-        final disputes = await api.listDisputes(status: 'open', limit: 1);
-        openDisputes = disputes.total;
-      } catch (_) {}
-
-      try {
-        final stations = await api.listStations(limit: 20);
-        pendingStations = stations.rows.where((s) {
-          final st = s['status']?.toString().toLowerCase();
-          return st == 'pending' || st == 'pending_verification';
-        }).toList();
-      } catch (_) {}
-
-      try {
-        final ordersResult = await api.listOrders(limit: 6);
-        recentOrders = ordersResult.rows;
-      } catch (_) {}
-
-      if (!mounted) return;
-      setState(() {
-        _stats = stats;
-        _onlineRiders = onlineRiders;
-        _openDisputes = openDisputes;
-        _pendingStations = pendingStations;
-        _recentOrders = recentOrders;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  /// Refreshes the dashboard and the screens it summarizes, e.g. after an
+  /// action taken from here.
+  Future<void> _load() => SyncStore.instance.refreshAll();
 
   int get _totalUsers {
     final s = _stats ?? {};
@@ -116,7 +81,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to approve station: ${FriendlyErrors.message(e)}'),
+            content: Text(
+              'Failed to approve station: ${FriendlyErrors.message(e)}',
+            ),
             backgroundColor: AppUi.error,
           ),
         );
@@ -128,10 +95,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(target ? 'Enable Maintenance Mode?' : 'Disable Maintenance Mode?'),
-        content: Text(target
-            ? 'Users will see a maintenance notice and will not be able to place new orders.'
-            : 'System will resume normal operations for customers and water refill stations.'),
+        title: Text(
+          target ? 'Enable Maintenance Mode?' : 'Disable Maintenance Mode?',
+        ),
+        content: Text(
+          target
+              ? 'Users will see a maintenance notice and will not be able to place new orders.'
+              : 'System will resume normal operations for customers and water refill stations.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -151,37 +122,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (confirmed != true || !mounted) return;
     try {
       await context.read<AdminApiService>().setSystemConfig(
-            'maintenance_mode',
-            target,
-            reason: 'Toggled from Dashboard',
-          );
+        'maintenance_mode',
+        target,
+        reason: 'Toggled from Dashboard',
+      );
       if (!mounted) return;
       await _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
+        SnackBar(
+          content: Text('Error: ${FriendlyErrors.message(e)}'),
+          backgroundColor: AppUi.error,
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const AdminLoadingState();
-    }
-    if (_error != null) {
-      return AdminErrorState(message: _error!, onRetry: _load);
-    }
+    final placeholder = adminSyncPlaceholder([_res]);
+    if (placeholder != null) return placeholder;
 
     final stats = _stats ?? {};
     final maintenance = stats['maintenance_mode'] == true;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final warningColor = isDark ? AppUi.warningFgDark : AppUi.warningFg;
-    final maintenanceSurface = isDark ? AppUi.darkSurfaceRaised : AppUi.warningBg;
+    final maintenanceSurface = isDark
+        ? AppUi.darkSurfaceRaised
+        : AppUi.warningBg;
     final now = DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now());
 
-    return AdminPageScaffold(
+    final content = AdminPageScaffold(
       onRefresh: _load,
       header: AdminSectionHeader(
         title: 'Welcome back, Admin',
@@ -194,7 +166,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(AppUi.radiusSheet),
               onTap: () => _toggleMaintenanceMode(!maintenance),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: maintenance
                       ? maintenanceSurface
@@ -255,11 +230,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (Theme.of(context).brightness == Brightness.dark
-                                  ? AppUi.warningFgDark
-                                  : AppColors.uiWarning)
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                          color:
+                              (Theme.of(context).brightness == Brightness.dark
+                                      ? AppUi.warningFgDark
+                                      : AppColors.uiWarning)
+                                  .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(
+                            AppUi.radiusControl,
+                          ),
                         ),
                         child: Icon(
                           LucideIcons.shieldAlert,
@@ -276,7 +254,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: Theme.of(context).brightness == Brightness.dark
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
                                 ? AppUi.warningBorder
                                 : AppUi.warningFg,
                           ),
@@ -295,7 +274,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ..._pendingStations.map(
                     (s) => Container(
                       margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: AppUi.surfaceOf(context),
                         borderRadius: BorderRadius.circular(AppUi.radiusCard),
@@ -308,7 +290,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  s['name'] ?? s['station_name'] ?? 'Water Station',
+                                  s['name'] ??
+                                      s['station_name'] ??
+                                      'Water Station',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 15,
@@ -336,11 +320,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => StationDetailScreen(
-                                        ownerId: s['owner_id']?.toString() ??
+                                        ownerId:
+                                            s['owner_id']?.toString() ??
                                             s['id']?.toString() ??
                                             '',
                                         initialName:
-                                            s['name'] ?? s['station_name']?.toString(),
+                                            s['name'] ??
+                                            s['station_name']?.toString(),
                                       ),
                                     ),
                                   );
@@ -425,11 +411,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.sparkles, size: 18, color: AppUi.brandOf(context)),
+                    Icon(
+                      LucideIcons.sparkles,
+                      size: 18,
+                      color: AppUi.brandOf(context),
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Quick Actions',
-                      style: adminSectionTitleStyle(context).copyWith(fontSize: 14),
+                      style: adminSectionTitleStyle(
+                        context,
+                      ).copyWith(fontSize: 14),
                     ),
                   ],
                 ),
@@ -485,7 +477,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Recent Orders', style: adminSectionTitleStyle(context)),
+                              Text(
+                                'Recent Orders',
+                                style: adminSectionTitleStyle(context),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 'Latest refill requests across water stations',
@@ -493,7 +488,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ],
                           ),
-                          Icon(LucideIcons.shoppingBag, size: 18, color: AppUi.brandOf(context)),
+                          Icon(
+                            LucideIcons.shoppingBag,
+                            size: 18,
+                            color: AppUi.brandOf(context),
+                          ),
                         ],
                       ),
                     ),
@@ -515,7 +514,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         itemBuilder: (ctx, i) {
                           final o = _recentOrders[i];
                           final id = o['id']?.toString() ?? '';
-                          final shortId = id.length >= 8 ? id.substring(0, 8) : id;
+                          final shortId = id.length >= 8
+                              ? id.substring(0, 8)
+                              : id;
                           final status = o['status']?.toString() ?? 'pending';
                           final statusColor = adminStatusColor(context, status);
 
@@ -538,9 +539,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                                borderRadius: BorderRadius.circular(
+                                  AppUi.radiusControl,
+                                ),
                               ),
-                              child: Icon(LucideIcons.packageCheck, size: 16, color: statusColor),
+                              child: Icon(
+                                LucideIcons.packageCheck,
+                                size: 16,
+                                color: statusColor,
+                              ),
                             ),
                             title: Row(
                               children: [
@@ -588,7 +595,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('System Overview', style: adminSectionTitleStyle(context)),
+                        Text(
+                          'System Overview',
+                          style: adminSectionTitleStyle(context),
+                        ),
                         Icon(
                           LucideIcons.activity,
                           size: 18,
@@ -614,28 +624,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _overviewRow(
                       context,
                       label: 'Customer Inquiries / Disputes',
-                      value: _openDisputes == 0 ? 'All clear (0 open)' : '$_openDisputes need review',
+                      value: _openDisputes == 0
+                          ? 'All clear (0 open)'
+                          : '$_openDisputes need review',
                       isGood: _openDisputes == 0,
                     ),
                     const Divider(height: 20),
                     _overviewRow(
                       context,
                       label: 'Active Water Stations',
-                      value: '${stats['open_stations'] ?? 0} of ${stats['stations_count'] ?? 0} open',
+                      value:
+                          '${stats['open_stations'] ?? 0} of ${stats['stations_count'] ?? 0} open',
                       isGood: true,
                     ),
                     const SizedBox(height: 20),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(
+                          AppUi.radiusControl,
+                        ),
                         border: Border.all(color: AppUi.borderOf(context)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(LucideIcons.info, size: 16, color: AppUi.brandOf(context)),
+                          Icon(
+                            LucideIcons.info,
+                            size: 16,
+                            color: AppUi.brandOf(context),
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -677,6 +698,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+    return AdminSyncedFrame(resources: [_res], child: content);
   }
 
   Widget _overviewRow(
@@ -687,8 +709,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final color = isGood
         ? (Theme.of(context).brightness == Brightness.dark
-            ? AppUi.successFgDark
-            : AppUi.accentGreen)
+              ? AppUi.successFgDark
+              : AppUi.accentGreen)
         : adminSemanticErrorColor(context);
 
     return Row(
@@ -699,9 +721,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: color,
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Text(label, style: adminBodyTextStyle(context)),
-        ),
+        Expanded(child: Text(label, style: adminBodyTextStyle(context))),
         Text(
           value,
           style: TextStyle(

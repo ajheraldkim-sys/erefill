@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/features/auth/services/login_email_resolver.dart';
 import 'package:flutter/foundation.dart';
@@ -44,15 +45,26 @@ class AdminAuthProvider extends ChangeNotifier {
       (_profile?['email']?.toString()) ??
       'Admin';
 
+  /// Last verified admin, so a relaunch without network opens the console on
+  /// saved data instead of the login screen. Cleared with the rest of the
+  /// cache on sign-out.
+  static const _verifiedKey = 'admin_auth_verified_v1';
+
   void init() {
+    _restoreVerified();
     _authSub = _client.auth.onAuthStateChange.listen(
       (_) {
         _refresh();
       },
       onError: (error) {
+        // Usually a token refresh that failed while offline; the session is
+        // still there, so keep a verified admin on saved data.
         debugPrint('Admin auth state change error: $error');
-        _profile = null;
-        _isAdmin = false;
+        final userId = _client.auth.currentSession?.user.id;
+        if (userId == null || !_hasVerified(userId)) {
+          _profile = null;
+          _isAdmin = false;
+        }
         _initializing = false;
         notifyListeners();
       },
@@ -82,6 +94,34 @@ class AdminAuthProvider extends ChangeNotifier {
       }
     }
   }
+
+  void _restoreVerified() {
+    final userId = _client.auth.currentSession?.user.id;
+    if (userId == null) return;
+    final saved = LocalDataCache.instance.getMemory<Map<String, dynamic>>(
+      _verifiedKey,
+    );
+    if (saved == null || saved['user_id'] != userId) return;
+    final profile = saved['profile'];
+    _profile = profile is Map ? Map<String, dynamic>.from(profile) : null;
+    _isAdmin = true;
+    _initializing = false;
+  }
+
+  void _saveVerified(String userId) {
+    unawaited(
+      LocalDataCache.instance.set(_verifiedKey, {
+        'user_id': userId,
+        'profile': _profile,
+      }),
+    );
+  }
+
+  bool _hasVerified(String userId) =>
+      LocalDataCache.instance.getMemory<Map<String, dynamic>>(
+        _verifiedKey,
+      )?['user_id'] ==
+      userId;
 
   bool _isStale(String? userId) =>
       _client.auth.currentSession?.user.id != userId;
@@ -120,9 +160,14 @@ class AdminAuthProvider extends ChangeNotifier {
       if (_isStale(userId)) return;
       _profile = loadedProfile;
       _isAdmin = rpcCheck || hasAdminRole;
+      if (_isAdmin) _saveVerified(userId);
     } catch (e) {
       if (_isStale(userId)) return;
       debugPrint('Admin auth refresh failed: $e');
+      // A failed check (offline, timeout) is not a "no": keep a previously
+      // verified admin signed in on saved data. Only a definite answer from
+      // the server above revokes access.
+      if (userId != null && _hasVerified(userId)) return;
       _profile = null;
       _isAdmin = false;
     } finally {

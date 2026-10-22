@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../utils/csv_export.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 import '../onboarding/create_dialogs.dart';
 import '../stations/station_detail_screen.dart';
@@ -11,6 +16,7 @@ import 'user_manage_dialog.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 enum UserViewMode { cards, list }
 
 class UsersScreen extends StatefulWidget {
@@ -20,19 +26,16 @@ class UsersScreen extends StatefulWidget {
   State<UsersScreen> createState() => _UsersScreenState();
 }
 
-class _UsersScreenState extends State<UsersScreen> {
+class _UsersScreenState extends State<UsersScreen> with SyncedState {
   final _searchController = TextEditingController();
-  AdminPagedResult<Map<String, dynamic>>? _page;
-  final Map<String, Map<int, AdminPagedResult<Map<String, dynamic>>>>
-  _pageCache = {};
+  final _users = AdminLiveQuery<AdminPage>();
   Map<String, dynamic>? _selected;
-  bool _loading = true;
-  String? _error;
   String _rolePill = 'all';
   UserViewMode _viewMode = UserViewMode.cards;
   int _offset = 0;
-  int _loadRequestId = 0;
   static const _pageSize = 60;
+
+  AdminPage? get _page => _users.data;
 
   @override
   void initState() {
@@ -46,57 +49,28 @@ class _UsersScreenState extends State<UsersScreen> {
     super.dispose();
   }
 
-  String _cacheKey(String? role, String search) => '${role ?? 'all'}|$search';
-
-  void _invalidateUserCache() => _pageCache.clear();
-
-  Future<void> _load({bool resetPage = true, bool forceRefresh = true}) async {
-    if (resetPage) _offset = 0;
-    final roleFilter = _rolePill == 'all' ? null : _rolePill;
-    final search = _searchController.text.trim();
-    final cacheKey = _cacheKey(roleFilter, search);
-    final offset = _offset;
-    final requestId = ++_loadRequestId;
-
-    if (forceRefresh) {
-      _pageCache.remove(cacheKey);
-    } else {
-      final cachedPage = _pageCache[cacheKey]?[offset];
-      if (cachedPage != null) {
-        setState(() {
-          _page = cachedPage;
-          _loading = false;
-          _error = null;
-        });
-        return;
-      }
-    }
-
+  /// Points the screen at the query for the current role, search and page.
+  /// Results are shared, cache-first and kept live by realtime, so the old
+  /// hand-rolled page cache and its invalidation are no longer needed.
+  void _load({bool resetPage = true}) {
     setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final page = await context.read<AdminApiService>().listUsers(
-        role: roleFilter,
-        search: search.isEmpty ? null : search,
-        limit: _pageSize,
-        offset: offset,
+      if (resetPage) _offset = 0;
+      _users.resource = rebindSynced(
+        _users.resource,
+        AdminSync.users(
+          context.read<AdminApiService>(),
+          role: _rolePill == 'all' ? null : _rolePill,
+          search: _searchController.text,
+          offset: _offset,
+          limit: _pageSize,
+        ),
       );
-      if (!mounted || requestId != _loadRequestId) return;
-      _pageCache.putIfAbsent(cacheKey, () => {})[offset] = page;
-      setState(() {
-        _page = page;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted || requestId != _loadRequestId) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
+    });
   }
+
+  /// After an admin action: every screen showing users refreshes.
+  Future<void> _syncAfterAction() =>
+      SyncStore.instance.refreshTagged(AdminSync.tagUsers);
 
   Future<void> _manageUser(Map<String, dynamic> user) async {
     final changed = await showUserManageDialog(
@@ -106,8 +80,7 @@ class _UsersScreenState extends State<UsersScreen> {
     );
     if (changed == true) {
       if (_selected?['id'] == user['id']) setState(() => _selected = null);
-      _invalidateUserCache();
-      await _load(resetPage: false);
+      await _syncAfterAction();
     }
   }
 
@@ -144,12 +117,14 @@ class _UsersScreenState extends State<UsersScreen> {
               ..['is_suspended'] = false;
           });
         }
-        _invalidateUserCache();
-        await _load(resetPage: false);
+        await _syncAfterAction();
       } catch (e) {
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Error: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     } else {
@@ -184,12 +159,14 @@ class _UsersScreenState extends State<UsersScreen> {
               ..['suspended_reason'] = reason;
           });
         }
-        _invalidateUserCache();
-        await _load(resetPage: false);
+        await _syncAfterAction();
       } catch (e) {
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Error: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     }
@@ -253,19 +230,15 @@ class _UsersScreenState extends State<UsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading && _page == null) {
-      return const AdminLoadingState();
-    }
-    if (_error != null) {
-      return AdminErrorState(message: _error!, onRetry: () => _load());
-    }
+    final placeholder = _users.placeholder;
+    if (placeholder != null) return placeholder;
 
     final rows = _page?.rows ?? [];
     final total = _page?.total ?? 0;
     final canPrev = _offset > 0;
     final canNext = _offset + _pageSize < total;
 
-    return AdminWorkspaceLayout(
+    final content = AdminWorkspaceLayout(
       header: AdminSectionHeader(
         title: 'Users & Access',
         subtitle: 'Review directory, update roles, and manage permissions.',
@@ -291,7 +264,7 @@ class _UsersScreenState extends State<UsersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_loading) ...[
+            if (_users.isSwitching) ...[
               const LinearProgressIndicator(minHeight: 2),
               const SizedBox(height: 8),
             ],
@@ -328,8 +301,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       onPressed: () async {
                         final created = await showCreateUserDialog(context);
                         if (created == true) {
-                          _invalidateUserCache();
-                          _load();
+                          _syncAfterAction();
                         }
                       },
                       icon: LucideIcons.userPlus,
@@ -337,7 +309,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     ),
                     IconButton(
                       tooltip: 'Refresh',
-                      onPressed: _load,
+                      onPressed: () => _users.resource?.refresh(),
                       icon: const Icon(LucideIcons.refreshCw, size: 18),
                     ),
                   ],
@@ -350,7 +322,7 @@ class _UsersScreenState extends State<UsersScreen> {
               selected: _rolePill,
               onSelected: (val) {
                 setState(() => _rolePill = val);
-                _load(forceRefresh: false);
+                _load();
               },
               items: const [
                 AdminFilterPillItem(
@@ -524,6 +496,7 @@ class _UsersScreenState extends State<UsersScreen> {
           ? _cardsBody(rows, total, canPrev, canNext)
           : _listBody(rows, total, canPrev, canNext),
     );
+    return AdminSyncedFrame(resources: [_users.resource!], child: content);
   }
 
   Widget _cardsBody(
@@ -729,7 +702,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     onPressed: canPrev
                         ? () {
                             _offset = (_offset - _pageSize).clamp(0, total);
-                            _load(resetPage: false, forceRefresh: false);
+                            _load(resetPage: false);
                           }
                         : null,
                     icon: const Icon(LucideIcons.chevronLeft, size: 20),
@@ -746,7 +719,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     onPressed: canNext
                         ? () {
                             _offset += _pageSize;
-                            _load(resetPage: false, forceRefresh: false);
+                            _load(resetPage: false);
                           }
                         : null,
                     icon: const Icon(LucideIcons.chevronRight, size: 20),
@@ -778,7 +751,7 @@ class _UsersScreenState extends State<UsersScreen> {
             onPressed: canPrev
                 ? () {
                     _offset = (_offset - _pageSize).clamp(0, total);
-                    _load(resetPage: false, forceRefresh: false);
+                    _load(resetPage: false);
                   }
                 : null,
             icon: const Icon(LucideIcons.chevronLeft, size: 18),
@@ -788,7 +761,7 @@ class _UsersScreenState extends State<UsersScreen> {
             onPressed: canNext
                 ? () {
                     _offset += _pageSize;
-                    _load(resetPage: false, forceRefresh: false);
+                    _load(resetPage: false);
                   }
                 : null,
             icon: const Icon(LucideIcons.chevronRight, size: 18),
