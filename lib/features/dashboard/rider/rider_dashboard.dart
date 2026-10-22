@@ -327,6 +327,7 @@ class _RiderDashboardState extends State<RiderDashboard>
 
   void _listenForNewJobs(String myId) {
     void handleOrderEvent(RealtimeEvent event) {
+      if (!mounted) return;
       final payload = event.payload;
       if (payload == null) {
         _dash?.refresh();

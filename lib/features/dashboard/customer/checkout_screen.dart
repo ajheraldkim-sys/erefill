@@ -145,6 +145,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _ownerSettingsSub = RealtimeHub.instance.listen(
           TableWatch('owner_settings', column: 'owner_id', value: ownerId),
           (_) {
+            if (!mounted) return;
             _loadStationSettings();
             _refreshStationAvailability();
           },
@@ -152,6 +153,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _stationProfileSub = RealtimeHub.instance.listen(
           TableWatch('profiles', column: 'id', value: ownerId),
           (_) {
+            if (!mounted) return;
             _loadStationSettings();
             _refreshStationAvailability();
           },

@@ -31,7 +31,9 @@ class _FeeWalletDashboardCardState extends State<FeeWalletDashboardCard> {
     if (ownerId != null) {
       _walletSub = RealtimeHub.instance.listen(
         TableWatch('station_fee_wallets', column: 'owner_id', value: ownerId),
-        (_) => _load(),
+        (_) {
+          if (mounted) _load();
+        },
       );
     }
   }
