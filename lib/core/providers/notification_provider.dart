@@ -273,17 +273,28 @@ class NotificationProvider extends ChangeNotifier {
       if (generation != _listenGeneration) return;
       _unreadChatCount = (chatRes as num?)?.toInt() ?? 0;
     } catch (_) {
-      // Direct message query fallback
+      // Direct message query fallback scoped to user's chat rooms
       try {
-        final unreadRes = await _supabase
-            .from('messages')
-            .select('id')
-            .neq('sender_id', userId)
-            // read_by is jsonb, so containment needs a JSON array.
-            .not('read_by', 'cs', '["$userId"]')
-            .limit(100);
-        if (generation == _listenGeneration) {
-          _unreadChatCount = (unreadRes as List).length;
+        final participantRooms = await _supabase
+            .from('chat_participants')
+            .select('room_id')
+            .eq('user_id', userId)
+            .limit(20);
+        final roomIds = (participantRooms as List)
+            .map((r) => r['room_id']?.toString())
+            .whereType<String>()
+            .toList();
+        if (roomIds.isNotEmpty) {
+          final unreadRes = await _supabase
+              .from('messages')
+              .select('id')
+              .inFilter('room_id', roomIds)
+              .neq('sender_id', userId)
+              .not('read_by', 'cs', '["$userId"]')
+              .limit(100);
+          if (generation == _listenGeneration) {
+            _unreadChatCount = (unreadRes as List).length;
+          }
         }
       } catch (_) {}
     }
@@ -294,18 +305,32 @@ class NotificationProvider extends ChangeNotifier {
       if (generation != _listenGeneration) return;
       _newOrdersCount = (ordersRes as num?)?.toInt() ?? 0;
     } catch (_) {
-      // Direct orders query fallback
+      // Direct orders query fallback filtered by owner_id
       try {
         final pendingRes = await _supabase
             .from('orders')
             .select('id')
+            .eq('owner_id', userId)
             .eq('status', 'pending')
             .isFilter('owner_acknowledged_at', null)
             .limit(100);
         if (generation == _listenGeneration) {
           _newOrdersCount = (pendingRes as List).length;
         }
-      } catch (_) {}
+      } catch (_) {
+        // Tolerates missing owner_acknowledged_at column gracefully
+        try {
+          final pendingRes = await _supabase
+              .from('orders')
+              .select('id')
+              .eq('owner_id', userId)
+              .eq('status', 'pending')
+              .limit(100);
+          if (generation == _listenGeneration) {
+            _newOrdersCount = (pendingRes as List).length;
+          }
+        } catch (_) {}
+      }
     }
 
     if (generation == _listenGeneration) {
