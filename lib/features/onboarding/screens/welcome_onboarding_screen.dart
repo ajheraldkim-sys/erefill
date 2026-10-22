@@ -35,21 +35,9 @@ class WelcomeOnboardingScreen extends StatelessWidget {
                 color: AppUi.darkPageBg,
               ),
             ),
-            // Tuned multi-stop gradient for high legibility while retaining photographic depth
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppUi.darkPageBg.withValues(alpha: 0.65),
-                    AppUi.darkPageBg.withValues(alpha: 0.88),
-                    AppUi.darkPageBg.withValues(alpha: 0.98),
-                  ],
-                  stops: const [0.0, 0.45, 0.85],
-                ),
-              ),
-            ),
+            // Flat scrim (surfaces stay gradient-free, see MASTER.md): dark
+            // enough for legible text, light enough to keep the photo.
+            ColoredBox(color: AppUi.darkPageBg.withValues(alpha: 0.85)),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
