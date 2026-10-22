@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:erefill/core/services/local_data_cache.dart';
 import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/sync/sync_resources.dart';
 import 'package:erefill/core/sync/sync_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -286,5 +287,14 @@ void main() {
     );
     // PostgresChangeEvent is re-exported for screens that inspect payloads.
     expect(PostgresChangeEvent.values, isNotEmpty);
+  });
+
+  test('SyncResources.riderDashboard watches both assigned_rider_id and rider_id', () {
+    final spec = SyncResources.riderDashboard('rider_xyz');
+    final keys = spec.watches.map((w) => w.key).toSet();
+
+    expect(keys, contains('orders:assigned_rider_id=rider_xyz'));
+    expect(keys, contains('orders:rider_id=rider_xyz'));
+    expect(keys, contains('profiles:id=rider_xyz'));
   });
 }

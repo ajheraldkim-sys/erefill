@@ -416,7 +416,7 @@ abstract final class AdminSync {
       for (final e in (json as Map).entries)
         e.key.toString(): (e.value as num).toInt(),
     },
-    watches: const [_profiles],
+    watches: const [_profiles, TableWatch(WaterTypes.table)],
     debounce: _debounce,
     tags: const {tagCatalog},
   );

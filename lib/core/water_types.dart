@@ -277,6 +277,16 @@ class WaterTypes {
     return stripped.isNotEmpty ? stripped : trimmed;
   }
 
+  /// Resolves a water type by its ID first, then falls back to matching by name.
+  static WaterTypeInfo byIdOrName(String? id, String? name) {
+    if (id != null && id.isNotEmpty) {
+      for (final type in catalog.value) {
+        if (type.id == id) return type;
+      }
+    }
+    return byName(name);
+  }
+
   /// Resolves a stored water type name (or product category/name) to its
   /// catalog entry. Unknown values get a plain entry carrying that name.
   static WaterTypeInfo byName(String? value) {

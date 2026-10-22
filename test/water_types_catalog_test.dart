@@ -83,6 +83,22 @@ void main() {
       expect(WaterTypes.byName('').shortName, 'Refill');
     });
 
+    test('byIdOrName resolves by ID first, then falls back to matching by name', () {
+      const custom = WaterTypeInfo(
+        id: 'wt-special-1',
+        name: 'Spring Water Extra',
+        shortName: 'Spring Extra',
+      );
+      WaterTypes.setCatalog([...testWaterTypes, custom]);
+
+      // Resolves by ID even if name is different or renamed
+      expect(WaterTypes.byIdOrName('wt-special-1', 'Renamed Spring'), same(custom));
+
+      // Falls back to name when ID is null or missing
+      expect(WaterTypes.byIdOrName(null, 'Mineral Water'), same(testMineral));
+      expect(WaterTypes.byIdOrName('unknown-id', 'alkaline'), same(testAlkaline));
+    });
+
     testWidgets('WaterTypeThumb updates in real time when catalog changes',
         (tester) async {
       await tester.pumpWidget(

@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:erefill/core/routing/app_routes.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 import '../models/fee_wallet_models.dart';
 import '../services/fee_wallet_service.dart';
@@ -18,11 +21,25 @@ class FeeWalletDashboardCard extends StatefulWidget {
 
 class _FeeWalletDashboardCardState extends State<FeeWalletDashboardCard> {
   FeeWalletSummary? _summary;
+  StreamSubscription<RealtimeEvent>? _walletSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    final ownerId = Supabase.instance.client.auth.currentUser?.id;
+    if (ownerId != null) {
+      _walletSub = RealtimeHub.instance.listen(
+        TableWatch('station_fee_wallets', column: 'owner_id', value: ownerId),
+        (_) => _load(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _walletSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

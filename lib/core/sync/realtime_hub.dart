@@ -138,6 +138,12 @@ class _HubChannel {
               value: value,
             ),
       callback: (payload) {
+        if (kDebugMode) {
+          debugPrint(
+            '[RealtimeHub] Event on ${watch.key}: ${payload.eventType} '
+            'table=${payload.table}',
+          );
+        }
         if (!_controller.isClosed) {
           _controller.add(RealtimeEvent(watch, payload));
         }
@@ -145,6 +151,12 @@ class _HubChannel {
     );
     _channel = channel;
     channel.subscribe((status, [error]) {
+      if (kDebugMode) {
+        debugPrint(
+          '[RealtimeHub] Channel ${watch.key} status: $status'
+          '${error != null ? " error=$error" : ""}',
+        );
+      }
       if (_closed || !identical(channel, _channel)) return;
       switch (status) {
         case RealtimeSubscribeStatus.subscribed:

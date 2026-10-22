@@ -325,38 +325,53 @@ class _RiderDashboardState extends State<RiderDashboard>
   }
 
   void _listenForNewJobs(String myId) {
-    // Shares the dashboard resource's realtime channel; the resource
-    // refetches on its own, this only raises the new-job alert.
+    void handleOrderEvent(RealtimeEvent event) {
+      final payload = event.payload;
+      if (payload == null) {
+        _dash?.refresh();
+        return;
+      }
+      if (payload.eventType == PostgresChangeEvent.delete) {
+        _dash?.refresh();
+        return;
+      }
+      final newRecord = payload.newRecord;
+      final oldRecord = payload.oldRecord;
+      final newStatus = (newRecord['status'] ?? '').toString();
+      final oldStatus = (oldRecord['status'] ?? '').toString();
+
+      final oldAssigned =
+          oldRecord['assigned_rider_id'] ?? oldRecord['rider_id'];
+      final newAssigned =
+          newRecord['assigned_rider_id'] ?? newRecord['rider_id'];
+
+      // 1. Assignment Detection (Newly assigned to current rider)
+      final isNewlyAssigned =
+          (oldAssigned == null || oldAssigned != myId) && newAssigned == myId;
+
+      // 2. Explicit assignment status raised by the owner workflow.
+      final isStatusAssigned =
+          (payload.eventType == PostgresChangeEvent.update &&
+          newStatus == 'assigned_to_rider' &&
+          oldStatus != 'assigned_to_rider' &&
+          newAssigned == myId);
+
+      if (isNewlyAssigned || isStatusAssigned) {
+        AppHaptics.orderAlert();
+        _showNewJobAlert(newRecord);
+      }
+
+      // Automatically refresh dashboard orders and earnings on any state transition
+      _dash?.refresh();
+    }
+
     watchTable(
       TableWatch('orders', column: 'assigned_rider_id', value: myId),
-      (event) {
-        final payload = event.payload;
-        if (payload == null ||
-            payload.eventType == PostgresChangeEvent.delete) {
-          return;
-        }
-        final newRecord = payload.newRecord;
-        final oldRecord = payload.oldRecord;
-        final newStatus = (newRecord['status'] ?? '').toString();
-        final oldStatus = (oldRecord['status'] ?? '').toString();
-
-        // 1. Assignment Detection (Newly assigned to current rider)
-        final isNewlyAssigned =
-            (oldRecord['assigned_rider_id'] == null ||
-                oldRecord['assigned_rider_id'] != myId) &&
-            newRecord['assigned_rider_id'] == myId;
-
-        // 2. Explicit assignment status raised by the owner workflow.
-        final isStatusAssigned =
-            (payload.eventType == PostgresChangeEvent.update &&
-            newStatus == 'assigned_to_rider' &&
-            oldStatus != 'assigned_to_rider');
-
-        if (isNewlyAssigned || isStatusAssigned) {
-          AppHaptics.orderAlert();
-          _showNewJobAlert(newRecord);
-        }
-      },
+      handleOrderEvent,
+    );
+    watchTable(
+      TableWatch('orders', column: 'rider_id', value: myId),
+      handleOrderEvent,
     );
   }
 

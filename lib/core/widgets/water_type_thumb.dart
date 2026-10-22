@@ -29,7 +29,7 @@ class WaterTypeThumb extends StatelessWidget {
     return ValueListenableBuilder<List<WaterTypeInfo>>(
       valueListenable: WaterTypes.catalog,
       builder: (context, _, _) {
-        final currentType = WaterTypes.byName(type?.name ?? typeName);
+        final currentType = WaterTypes.byIdOrName(type?.id, type?.name ?? typeName);
         final photoUrl = currentType.photoUrl;
         final borderRadius = BorderRadius.circular(radius);
         if (photoUrl != null) {

@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/services/payment_launch_service.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/widgets/app_ui_kit.dart';
 
@@ -31,12 +34,45 @@ class _FeeWalletScreenState extends State<FeeWalletScreen> {
   String? _error;
   bool _loading = true;
   String? _pendingTopupId;
+  StreamSubscription<RealtimeEvent>? _walletSub;
+  StreamSubscription<RealtimeEvent>? _entriesSub;
 
   @override
   void initState() {
     super.initState();
     _pendingTopupId = widget.verifyTopupId;
     _load(verify: widget.verifyTopupId != null);
+
+    final ownerId = Supabase.instance.client.auth.currentUser?.id;
+    if (ownerId != null) {
+      _walletSub = RealtimeHub.instance.listen(
+        TableWatch('station_fee_wallets', column: 'owner_id', value: ownerId),
+        (_) => _silentRefresh(),
+      );
+      _entriesSub = RealtimeHub.instance.listen(
+        TableWatch('station_fee_wallet_entries', column: 'owner_id', value: ownerId),
+        (_) => _silentRefresh(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _walletSub?.cancel();
+    _entriesSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _silentRefresh() async {
+    try {
+      final summary = await _service.load();
+      final entries = await _service.history();
+      if (!mounted) return;
+      setState(() {
+        _summary = summary;
+        _entries = entries;
+      });
+    } catch (_) {}
   }
 
   Future<void> _load({bool verify = false}) async {

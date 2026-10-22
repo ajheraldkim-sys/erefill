@@ -39,6 +39,7 @@ class AppCachedImage extends StatelessWidget {
     if (clean != null && clean.isNotEmpty) {
       try {
         await CachedNetworkImage.evictFromCache(clean);
+        PaintingBinding.instance.imageCache.evict(NetworkImage(clean));
       } catch (_) {}
     }
   }

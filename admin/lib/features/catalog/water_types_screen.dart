@@ -134,30 +134,32 @@ class _WaterTypesScreenState extends State<WaterTypesScreen> with SyncedState {
   }
 
   Widget _buildBody(BuildContext context) {
-    if (WaterTypes.catalog.value.isEmpty) {
-      final placeholder = adminSyncPlaceholder([_counts]);
-      if (placeholder != null) return placeholder;
-    }
-    final types = WaterTypes.catalog.value;
-    if (types.isEmpty) {
-      return const AdminEmptyState(
-        message: 'No water types yet. Add one so stations can register.',
-      );
-    }
-    return Column(
-      children: [
-        for (final type in types)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _WaterTypeRow(
-              type: type,
-              stationCount: _stationCounts[type.name] ?? 0,
-              onEdit: () => _edit(type),
-              onToggleActive: () => _toggleActive(type),
-              onDelete: () => _delete(type),
-            ),
-          ),
-      ],
+    return ValueListenableBuilder<List<WaterTypeInfo>>(
+      valueListenable: WaterTypes.catalog,
+      builder: (context, types, _) {
+        if (types.isEmpty) {
+          final placeholder = adminSyncPlaceholder([_counts]);
+          if (placeholder != null) return placeholder;
+          return const AdminEmptyState(
+            message: 'No water types yet. Add one so stations can register.',
+          );
+        }
+        return Column(
+          children: [
+            for (final type in types)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _WaterTypeRow(
+                  type: type,
+                  stationCount: _stationCounts[type.name] ?? 0,
+                  onEdit: () => _edit(type),
+                  onToggleActive: () => _toggleActive(type),
+                  onDelete: () => _delete(type),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

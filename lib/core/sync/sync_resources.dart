@@ -255,6 +255,7 @@ abstract final class SyncResources {
         tags: const {ordersTag},
         watches: [
           TableWatch('orders', column: 'assigned_rider_id', value: riderId),
+          TableWatch('orders', column: 'rider_id', value: riderId),
           TableWatch('profiles', column: 'id', value: riderId),
         ],
         pollInterval: const Duration(seconds: 30),
