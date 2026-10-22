@@ -85,7 +85,7 @@ class PaymentBrandMark extends StatelessWidget {
         width: height,
         height: height,
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF1D6),
+          color: AppUi.warningBg,
           borderRadius: BorderRadius.circular(AppUi.radiusSm),
         ),
         alignment: Alignment.center,

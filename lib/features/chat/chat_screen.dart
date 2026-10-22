@@ -393,7 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Text(
           text,
           style: TextStyle(
-            color: isCustom ? AppUi.brandOf(context) : const Color(0xFF334155),
+            color: isCustom ? AppUi.brandOf(context) : AppUi.textPrimaryOf(context),
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),

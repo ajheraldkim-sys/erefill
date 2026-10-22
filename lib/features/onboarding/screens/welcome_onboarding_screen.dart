@@ -367,7 +367,7 @@ class _SwipeToStartButtonState extends State<SwipeToStartButton> {
                         ),
                         child: const Icon(
                           Icons.arrow_forward_rounded,
-                          color: Color(0xFF0F172A),
+                          color: AppUi.deepBlue,
                           size: 22,
                         ),
                       ),

@@ -425,10 +425,10 @@ class _SplashScreenState extends State<_SplashScreen>
                   opacity: _textFade,
                   child: SlideTransition(
                     position: _textSlide,
-                    child: const Text(
+                    child: Text(
                       BrandColors.tagline,
                       style: TextStyle(
-                        color: Color(0xFFB7C4DC),
+                        color: Colors.white.withValues(alpha: 0.72),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 3,
