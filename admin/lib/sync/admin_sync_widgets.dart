@@ -48,7 +48,10 @@ Widget? adminSyncPlaceholder(Iterable<SyncedResource<dynamic>> resources) {
           ? 'You are offline and this page has not been saved yet. '
                 'It will load when you reconnect.'
           : FriendlyErrors.message(error),
-      onRetry: () => r.refresh(),
+      onRetry: () async {
+        await ConnectivityProvider().probe();
+        await r.refresh();
+      },
     );
   }
   return null;
@@ -85,7 +88,8 @@ class AdminSyncedFrame extends StatelessWidget {
           offline: offline,
           syncedAt: oldest,
           retrying: retrying,
-          onRetry: () {
+          onRetry: () async {
+            await ConnectivityProvider().probe();
             for (final r in stale) {
               r.refresh();
             }
@@ -189,39 +193,46 @@ class AdminSyncStatusPill extends StatelessWidget {
             : AppUi.accentGreen;
         return Tooltip(
           message: offline
-              ? 'Showing saved data. Changes cannot be saved until you reconnect.'
+              ? 'Offline. Click to retry connection.'
               : 'Connected. Screens update automatically.',
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-              border: Border.all(color: color.withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (offline)
-                  Icon(LucideIcons.wifiOff, size: 12, color: color)
-                else
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
+          child: InkWell(
+            onTap: () async {
+              await connectivity.probe();
+              await SyncStore.instance.refreshAll();
+            },
+            borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+                border: Border.all(color: color.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (offline)
+                    Icon(LucideIcons.wifiOff, size: 12, color: color)
+                  else
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  const SizedBox(width: 6),
+                  Text(
+                    offline ? 'Offline' : 'Live',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: color,
-                      shape: BoxShape.circle,
                     ),
                   ),
-                const SizedBox(width: 6),
-                Text(
-                  offline ? 'Offline' : 'Live',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

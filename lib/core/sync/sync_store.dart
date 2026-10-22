@@ -226,7 +226,9 @@ class SyncedResource<T> extends ChangeNotifier {
 
   Future<void> _run() async {
     final generation = _generation;
-    if (!_env.isOnline()) {
+    // If the provider claims offline, but we have no data yet, attempt the fetch
+    // so false-positive OS network flags don't permanently brick the UI.
+    if (!_env.isOnline() && _data != null) {
       _settled = true;
       _lastAttemptFailed = true;
       _notify();
@@ -241,6 +243,7 @@ class SyncedResource<T> extends ChangeNotifier {
       _lastSyncedAt = DateTime.now();
       _error = null;
       _lastAttemptFailed = false;
+      ConnectivityProvider().markOnline();
       unawaited(_persist(value));
     } catch (e) {
       if (_disposed || generation != _generation) return;

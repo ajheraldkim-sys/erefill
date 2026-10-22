@@ -1,4 +1,5 @@
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/providers/connectivity_provider.dart';
 import 'package:erefill/core/widgets/brand/erefill_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -181,6 +182,7 @@ class _AdminShellState extends State<AdminShell> with SyncedState {
   /// Syncs every screen's data in place; filters, selection and scroll
   /// position are kept.
   Future<void> _refreshCurrent() async {
+    await ConnectivityProvider().probe();
     await SyncStore.instance.refreshAll();
   }
 

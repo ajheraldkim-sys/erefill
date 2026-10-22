@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -47,8 +48,30 @@ class ConnectivityProvider extends ChangeNotifier {
     refreshPendingCount();
   }
 
-  void _handleConnectivityChange(List<ConnectivityResult> results) {
-    final offline = results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+  Future<void> _handleConnectivityChange(List<ConnectivityResult> results) async {
+    var offline = results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+
+    // Desktop platforms (Windows, Linux, macOS) frequently report ConnectivityResult.none
+    // even with active internet access when behind VPNs, corporate firewalls, or unidentified networks.
+    // Verify reachability before declaring the app offline.
+    if (offline && !kIsWeb) {
+      try {
+        final lookup = await InternetAddress.lookup('google.com')
+            .timeout(const Duration(seconds: 2));
+        if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+          offline = false;
+        }
+      } catch (_) {
+        try {
+          final lookup = await InternetAddress.lookup('1.1.1.1')
+              .timeout(const Duration(seconds: 2));
+          if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+            offline = false;
+          }
+        } catch (_) {}
+      }
+    }
+
     final transitionedToOnline = _isOffline && !offline;
 
     _isOffline = offline;
@@ -62,6 +85,34 @@ class ConnectivityProvider extends ChangeNotifier {
     } else {
       refreshPendingCount();
     }
+  }
+
+  /// Manually marks the connection as online when any real API call succeeds.
+  void markOnline() {
+    if (_isOffline) {
+      _isOffline = false;
+      notifyListeners();
+      if (!_reconnected.isClosed) _reconnected.add(null);
+    }
+  }
+
+  /// Re-probes connectivity directly (e.g. when user clicks Refresh or Retry).
+  Future<bool> probe() async {
+    if (!kIsWeb) {
+      try {
+        final lookup = await InternetAddress.lookup('google.com')
+            .timeout(const Duration(seconds: 2));
+        if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+          markOnline();
+          return true;
+        }
+      } catch (_) {}
+    }
+    final results = await Connectivity()
+        .checkConnectivity()
+        .catchError((_) => <ConnectivityResult>[]);
+    await _handleConnectivityChange(results);
+    return isOnline;
   }
 
   /// Calculates total pending sync items across customer orders, rider deliveries, and owner/system actions
