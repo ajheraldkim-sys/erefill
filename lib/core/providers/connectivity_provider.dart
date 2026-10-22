@@ -20,8 +20,56 @@ class ConnectivityProvider extends ChangeNotifier {
   int _pendingSyncCount = 0;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   StreamSubscription<int>? _orderCountSub;
+  Timer? _heartbeatTimer;
   final StreamController<void> _reconnected =
       StreamController<void>.broadcast();
+
+  static bool get isDesktop =>
+      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+  static bool get isTest =>
+      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Performs deep reachability check via DNS and low-level TCP socket.
+  static Future<bool> checkInternetReachability() async {
+    if (kIsWeb || isTest) return true;
+    // 1. Primary DNS lookup (Google)
+    try {
+      final lookup = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 2));
+      if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 2. Secondary DNS lookup (Cloudflare)
+    try {
+      final lookup = await InternetAddress.lookup('cloudflare.com')
+          .timeout(const Duration(seconds: 2));
+      if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 3. Direct socket ping to public DNS servers (handles custom/broken DNS setups)
+    try {
+      final socket = await Socket.connect('1.1.1.1', 53,
+          timeout: const Duration(seconds: 2));
+      await socket.close();
+      socket.destroy();
+      return true;
+    } catch (_) {}
+
+    try {
+      final socket = await Socket.connect('8.8.8.8', 53,
+          timeout: const Duration(seconds: 2));
+      await socket.close();
+      socket.destroy();
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
 
   bool get isOffline => _isOffline;
   bool get isOnline => !_isOffline;
@@ -36,9 +84,30 @@ class ConnectivityProvider extends ChangeNotifier {
     // Initial connectivity check
     Connectivity().checkConnectivity().then(_handleConnectivityChange).catchError((e) {
       debugPrint('Initial connectivity check error: $e');
+      if (isDesktop) {
+        _probeReachability();
+      }
     });
 
-    _connSub = Connectivity().onConnectivityChanged.listen(_handleConnectivityChange);
+    try {
+      _connSub = Connectivity().onConnectivityChanged.listen(
+        _handleConnectivityChange,
+        onError: (Object error, StackTrace stack) {
+          debugPrint('Connectivity stream error (falling back to heartbeat): $error');
+          _ensureHeartbeat();
+        },
+        cancelOnError: false,
+      );
+    } catch (e) {
+      debugPrint('Connectivity stream initialization error: $e');
+      _ensureHeartbeat();
+    }
+
+    // On desktop OS (Windows, Linux, macOS), native NetworkManager/NLM event channels
+    // are notoriously flaky or throw PlatformExceptions. Run a silent background heartbeat.
+    if (isDesktop && !isTest) {
+      _ensureHeartbeat();
+    }
 
     // Listen to changes in offline orders queue
     _orderCountSub = OfflineOrderSyncService().onPendingCountChanged.listen((_) {
@@ -48,6 +117,23 @@ class ConnectivityProvider extends ChangeNotifier {
     refreshPendingCount();
   }
 
+  void _ensureHeartbeat() {
+    if (_heartbeatTimer != null || kIsWeb || isTest) return;
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      await _probeReachability();
+    });
+  }
+
+  Future<void> _probeReachability() async {
+    final reachable = await checkInternetReachability();
+    if (_isOffline && reachable) {
+      markOnline();
+    } else if (!_isOffline && !reachable) {
+      _isOffline = true;
+      notifyListeners();
+    }
+  }
+
   Future<void> _handleConnectivityChange(List<ConnectivityResult> results) async {
     var offline = results.isEmpty || results.every((r) => r == ConnectivityResult.none);
 
@@ -55,20 +141,9 @@ class ConnectivityProvider extends ChangeNotifier {
     // even with active internet access when behind VPNs, corporate firewalls, or unidentified networks.
     // Verify reachability before declaring the app offline.
     if (offline && !kIsWeb) {
-      try {
-        final lookup = await InternetAddress.lookup('google.com')
-            .timeout(const Duration(seconds: 2));
-        if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
-          offline = false;
-        }
-      } catch (_) {
-        try {
-          final lookup = await InternetAddress.lookup('1.1.1.1')
-              .timeout(const Duration(seconds: 2));
-          if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
-            offline = false;
-          }
-        } catch (_) {}
+      final reachable = await checkInternetReachability();
+      if (reachable) {
+        offline = false;
       }
     }
 
@@ -98,15 +173,10 @@ class ConnectivityProvider extends ChangeNotifier {
 
   /// Re-probes connectivity directly (e.g. when user clicks Refresh or Retry).
   Future<bool> probe() async {
-    if (!kIsWeb) {
-      try {
-        final lookup = await InternetAddress.lookup('google.com')
-            .timeout(const Duration(seconds: 2));
-        if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
-          markOnline();
-          return true;
-        }
-      } catch (_) {}
+    final reachable = await checkInternetReachability();
+    if (reachable) {
+      markOnline();
+      return true;
     }
     final results = await Connectivity()
         .checkConnectivity()
@@ -155,6 +225,7 @@ class ConnectivityProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
     _connSub?.cancel();
     _orderCountSub?.cancel();
     _reconnected.close();

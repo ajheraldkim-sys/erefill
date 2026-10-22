@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/providers/connectivity_provider.dart';
 import 'package:erefill/core/sync/sync_store.dart';
 import 'package:erefill/core/sync/synced_state.dart';
 
@@ -52,8 +53,10 @@ class _AppReleasesScreenState extends State<AppReleasesScreen>
     _res = useSynced(AdminSync.appReleases(context.read<AdminApiService>()));
   }
 
-  Future<void> _loadReleases() =>
-      SyncStore.instance.refreshTagged(AdminSync.tagReleases);
+  Future<void> _loadReleases() async {
+    await ConnectivityProvider().probe();
+    await SyncStore.instance.refreshTagged(AdminSync.tagReleases);
+  }
 
   List<Map<String, dynamic>> get _filteredReleases {
     return _releases.where((r) {

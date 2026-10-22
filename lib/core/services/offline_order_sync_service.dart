@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:erefill/core/providers/connectivity_provider.dart';
 import 'package:erefill/core/services/offline_queue_service.dart';
 import 'package:erefill/features/dashboard/rider/services/offline_delivery_queue_service.dart';
 
@@ -22,6 +23,7 @@ class OfflineOrderSyncService {
   OfflineOrderSyncService._internal();
 
   Database? _db;
+  StreamSubscription<void>? _reconnectSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isSyncing = false;
   final _uuid = const Uuid();
@@ -75,31 +77,49 @@ class OfflineOrderSyncService {
 
   /// Starts listening to global network changes to automatically trigger sync.
   void initializeConnectivityListener() {
-    _connectivitySubscription?.cancel();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      List<ConnectivityResult> results,
-    ) {
-      final hasConnection =
-          results.contains(ConnectivityResult.mobile) ||
-          results.contains(ConnectivityResult.wifi) ||
-          results.contains(ConnectivityResult.ethernet);
-
-      if (hasConnection && !_isSyncing) {
+    _reconnectSubscription?.cancel();
+    _reconnectSubscription = ConnectivityProvider().onReconnected.listen((_) {
+      if (!_isSyncing) {
         debugPrint(
           '🌐 Network connection active: Triggering offline order synchronization...',
         );
         syncPendingOrders();
-        // Also process owner/customer action queue and rider delivery queue
-        final client = Supabase.instance.client;
-        OfflineQueueService.processQueue(client).catchError((e) {
-          debugPrint('OfflineQueueService sync error: $e');
-        });
-        OfflineDeliveryQueueService().syncPendingDeliveries().catchError((e) {
-          debugPrint('OfflineDeliveryQueueService sync error: $e');
-          return 0;
-        });
       }
     });
+
+    _connectivitySubscription?.cancel();
+    try {
+      _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+        (List<ConnectivityResult> results) {
+          final hasConnection =
+              results.contains(ConnectivityResult.mobile) ||
+              results.contains(ConnectivityResult.wifi) ||
+              results.contains(ConnectivityResult.ethernet);
+
+          if (hasConnection && !_isSyncing) {
+            debugPrint(
+              '🌐 Network connection active: Triggering offline order synchronization...',
+            );
+            syncPendingOrders();
+            // Also process owner/customer action queue and rider delivery queue
+            final client = Supabase.instance.client;
+            OfflineQueueService.processQueue(client).catchError((e) {
+              debugPrint('OfflineQueueService sync error: $e');
+            });
+            OfflineDeliveryQueueService().syncPendingDeliveries().catchError((e) {
+              debugPrint('OfflineDeliveryQueueService sync error: $e');
+              return 0;
+            });
+          }
+        },
+        onError: (Object error) {
+          debugPrint('OfflineOrderSyncService connectivity listener error: $error');
+        },
+        cancelOnError: false,
+      );
+    } catch (e) {
+      debugPrint('OfflineOrderSyncService connectivity listener init error: $e');
+    }
   }
 
   /// Queues an order locally in SQLite with a unique client-side UUID.
@@ -326,6 +346,7 @@ class OfflineOrderSyncService {
   }
 
   void dispose() {
+    _reconnectSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _pendingCountController.close();
   }

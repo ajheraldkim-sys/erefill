@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../providers/connectivity_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/app_haptics.dart';
 import '../constants.dart';
@@ -24,42 +24,35 @@ class OfflineSyncStatusPill extends StatefulWidget {
 }
 
 class _OfflineSyncStatusPillState extends State<OfflineSyncStatusPill> {
-  bool _isOnline = true;
+  final ConnectivityProvider _conn = ConnectivityProvider();
   int _pendingCount = 0;
   bool _isSyncing = false;
-  StreamSubscription? _connectivitySub;
   Timer? _pollTimer;
+
+  bool get _isOnline => _conn.isOnline;
 
   @override
   void initState() {
     super.initState();
-    _checkStatus();
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final isNowOnline = !results.contains(ConnectivityResult.none);
-      if (mounted) {
-        setState(() => _isOnline = isNowOnline);
-        if (isNowOnline && _pendingCount > 0) {
-          _triggerSync();
-        }
-      }
-    });
-
+    _conn.addListener(_onConnectivityChanged);
+    _checkPendingQueue();
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _checkPendingQueue());
+  }
+
+  void _onConnectivityChanged() {
+    if (mounted) {
+      setState(() {});
+      if (_conn.isOnline && _pendingCount > 0) {
+        _triggerSync();
+      }
+    }
   }
 
   @override
   void dispose() {
-    _connectivitySub?.cancel();
+    _conn.removeListener(_onConnectivityChanged);
     _pollTimer?.cancel();
     super.dispose();
-  }
-
-  Future<void> _checkStatus() async {
-    final results = await Connectivity().checkConnectivity();
-    if (mounted) {
-      setState(() => _isOnline = !results.contains(ConnectivityResult.none));
-      _checkPendingQueue();
-    }
   }
 
   Future<void> _checkPendingQueue() async {
