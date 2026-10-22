@@ -35,6 +35,10 @@ import '../../chat/inbox_screen.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/sync/sync_resources.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
 import 'services/location_service.dart';
 import 'services/order_cache_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
@@ -90,14 +94,16 @@ class RiderDashboard extends StatefulWidget {
 }
 
 class _RiderDashboardState extends State<RiderDashboard>
-    with WidgetsBindingObserver {
+    with SyncedState {
   final supabase = Supabase.instance.client;
   final _locationService = LocationService();
   final _orderCache = OrderCacheService();
   bool _isSyncingOffline = false;
-  RealtimeChannel? _ordersChannel;
-  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
-  Timer? _riderPollingTimer;
+
+  /// Profile, open deliveries and stats, cache-first and kept live by the
+  /// sync layer (realtime, resume, reconnect, and a 30s safety-net poll).
+  SyncedResource<RiderDashboardData>? _dash;
+  int _dashApplyGeneration = 0;
 
   List<Map<String, dynamic>> _myActiveOrders = [];
   // Location mapping
@@ -141,8 +147,6 @@ class _RiderDashboardState extends State<RiderDashboard>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _startRiderPollingTimer();
     final myId = supabase.auth.currentUser?.id;
     final initialUser = context.read<UserProvider>().user;
     if (initialUser != null) {
@@ -185,94 +189,18 @@ class _RiderDashboardState extends State<RiderDashboard>
       _isLoading = false;
     }
 
-    _loadInitialCache();
-    _loadRiderData(); // START NETWORK FETCH
-    _setupProfileListener();
-    _listenForNewJobs();
-    _locationService.startTracking();
-  }
-
-  void _startRiderPollingTimer() {
-    _riderPollingTimer?.cancel();
-    _riderPollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) {
-        _loadRiderData();
-      }
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadRiderData();
-      _startRiderPollingTimer();
+    if (myId != null) {
+      _dash = useSynced(
+        SyncResources.riderDashboard(myId),
+        rebuild: false,
+      )..addListener(_onDashboardChanged);
+      _onDashboardChanged();
+      _listenForNewJobs(myId);
     } else {
-      _riderPollingTimer?.cancel();
-      _riderPollingTimer = null;
+      _isLoading = false;
     }
-  }
-
-  void _setupProfileListener() {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
-
-    _profileSubscription = SafeSupabase.listen(
-      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', myId),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          setState(() => _profile = data.first);
-        }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Rider profile stream error: $error');
-        debugPrint('Rider profile stream stack: $stackTrace');
-      },
-    );
-    _fetchCompletedStats();
-  }
-
-  Future<void> _fetchCompletedStats() async {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
-    try {
-      final deliveredData = await supabase
-          .from('orders')
-          .select('id, delivery_fee')
-          .eq('assigned_rider_id', myId)
-          .eq('status', 'delivered');
-
-      if (mounted) {
-        setState(() {
-          _completedDeliveries = deliveredData.length;
-          _totalEarnings = (deliveredData as List? ?? const []).fold<double>(
-            0,
-            (sum, o) {
-              final fee = _safeDouble((o is Map ? o['delivery_fee'] : null));
-              return sum + fee;
-            },
-          );
-        });
-        unawaited(
-          LocalDataCache.instance.set('rider_stats_$myId', {
-            'completed': _completedDeliveries,
-            'earnings': _totalEarnings,
-          }),
-        );
-      }
-    } catch (e) {
-      debugPrint("Error loading stats: $e");
-    }
-  }
-
-  Future<void> _loadInitialCache() async {
-    // 1. Load active tasks from cache instantly
-    final cachedActive = await _orderCache.getCachedActiveOrders();
-    if (cachedActive.isNotEmpty && mounted) {
-      setState(() {
-        _myActiveOrders = cachedActive;
-        _isLoading = false; // Hide if we have cache
-      });
-    }
+    unawaited(_syncOfflineQueue());
+    _locationService.startTracking();
   }
 
   Future<void> _checkOfflineQueue() async {
@@ -308,79 +236,27 @@ class _RiderDashboardState extends State<RiderDashboard>
     }
   }
 
+  /// Pull-to-refresh and post-action refresh: push any queued delivery
+  /// updates, then refetch from the server.
   Future<void> _loadRiderData() async {
     unawaited(_syncOfflineQueue());
+    await _dash?.refresh();
+  }
 
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) {
-      if (mounted) setState(() => _isLoading = false);
+  /// Applies the synced dashboard to screen state, overlaying delivery
+  /// updates still queued on this device so a delivery finished offline
+  /// does not reappear as open.
+  Future<void> _onDashboardChanged() async {
+    final dash = _dash;
+    final data = dash?.data;
+    if (dash == null || !mounted) return;
+    if (data == null) {
+      if (!dash.isLoading && _isLoading) setState(() => _isLoading = false);
       return;
     }
+    final generation = ++_dashApplyGeneration;
 
-    Map<String, dynamic>? profileResult;
-    List<Map<String, dynamic>> activeResult = [];
-    int completedCount = 0;
-    double earningsTotal = 0;
-
-    // Fetch Profile, Active Deliveries, and Earnings in parallel for super fast load
-    try {
-      final results = await Future.wait([
-        supabase
-            .from('profiles')
-            .select(
-              'full_name, first_name, last_name, mi, suffix, username, phone, town, barangay, vehicle_type, license_number, avatar_url, created_at',
-            )
-            .eq('id', myId)
-            .maybeSingle(),
-        supabase
-            .from('orders')
-            .select('''
-              id, status, created_at, customer_id, total_amount, items, subtotal, delivery_fee, station_name, payment_method, payment_status,
-              customer:profiles!orders_customer_id_fkey(full_name, complete_address, phone, barangay, latitude, longitude)
-            ''')
-            .eq('assigned_rider_id', myId)
-            .inFilter('status', [
-              'assigned_to_rider',
-              'out_for_delivery',
-              'ready_for_pickup',
-              'preparing',
-              'accepted',
-            ])
-            .order('created_at', ascending: false),
-        supabase
-            .from('orders')
-            .select('id, delivery_fee')
-            .eq('assigned_rider_id', myId)
-            .eq('status', 'delivered'),
-      ]);
-
-      profileResult = results[0] as Map<String, dynamic>? ?? _profile;
-      activeResult = List<Map<String, dynamic>>.from(
-        results[1] as List? ?? const [],
-      );
-      final deliveredData = results[2] as List? ?? const [];
-      completedCount = deliveredData.length;
-      earningsTotal = deliveredData.fold<double>(0, (sum, o) {
-        final fee = _safeDouble(o is Map ? o['delivery_fee'] : null);
-        return sum + fee;
-      });
-    } catch (e) {
-      debugPrint(
-        "Warning: Error loading rider data: $e. Checking offline caches...",
-      );
-      final cachedActive = await _orderCache.getCachedActiveOrders();
-      if (cachedActive.isNotEmpty) {
-        activeResult = cachedActive;
-      } else if (_myActiveOrders.isNotEmpty) {
-        activeResult = _myActiveOrders;
-      }
-      final cachedProfile = await LocalDataCache.instance
-          .get<Map<String, dynamic>>('rider_profile_$myId');
-      if (cachedProfile != null) {
-        profileResult = cachedProfile;
-      }
-    }
-
+    var activeResult = data.activeOrders;
     try {
       final queuedUpdates = await OfflineDeliveryQueueService()
           .getPendingDeliveries();
@@ -414,7 +290,11 @@ class _RiderDashboardState extends State<RiderDashboard>
       debugPrint('Could not reconcile queued rider updates: $error');
     }
 
-    if (!mounted) return;
+    // A newer dashboard arrived while the queue was being read.
+    if (!mounted || generation != _dashApplyGeneration) return;
+    final profileResult = data.profile == null
+        ? null
+        : Map<String, dynamic>.from(data.profile!);
     if (profileResult != null) {
       if ((profileResult['first_name'] == null ||
               profileResult['first_name'].toString().trim().isEmpty) &&
@@ -435,90 +315,49 @@ class _RiderDashboardState extends State<RiderDashboard>
     setState(() {
       if (profileResult != null) _profile = profileResult;
       _myActiveOrders = activeResult;
-      _completedDeliveries = completedCount;
-      _totalEarnings = earningsTotal;
+      _completedDeliveries = data.completedDeliveries;
+      _totalEarnings = data.totalEarnings;
       _isLoading = false;
     });
 
-    // Cache updated data for offline/instant-load
-    if (activeResult.isNotEmpty) {
-      _orderCache.cacheActiveOrders(activeResult);
-    }
-    if (profileResult != null) {
-      unawaited(
-        LocalDataCache.instance.set('rider_profile_$myId', profileResult),
-      );
-    }
-    unawaited(
-      LocalDataCache.instance.set('rider_stats_$myId', {
-        'completed': completedCount,
-        'earnings': earningsTotal,
-      }),
-    );
+    // Other rider screens read active orders from this cache.
+    unawaited(_orderCache.cacheActiveOrders(activeResult));
   }
 
-  void _listenForNewJobs() {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
+  void _listenForNewJobs(String myId) {
+    // Shares the dashboard resource's realtime channel; the resource
+    // refetches on its own, this only raises the new-job alert.
+    watchTable(
+      TableWatch('orders', column: 'assigned_rider_id', value: myId),
+      (event) {
+        final payload = event.payload;
+        if (payload == null ||
+            payload.eventType == PostgresChangeEvent.delete) {
+          return;
+        }
+        final newRecord = payload.newRecord;
+        final oldRecord = payload.oldRecord;
+        final newStatus = (newRecord['status'] ?? '').toString();
+        final oldStatus = (oldRecord['status'] ?? '').toString();
 
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
-    }
+        // 1. Assignment Detection (Newly assigned to current rider)
+        final isNewlyAssigned =
+            (oldRecord['assigned_rider_id'] == null ||
+                oldRecord['assigned_rider_id'] != myId) &&
+            newRecord['assigned_rider_id'] == myId;
 
-    _ordersChannel = supabase
-        .channel('public:orders:rider:$myId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'assigned_rider_id',
-            value: myId,
-          ),
-          callback: (payload) {
-            final newRecord = payload.newRecord;
-            final oldRecord = payload.oldRecord;
+        // 2. Explicit assignment status raised by the owner workflow.
+        final isStatusAssigned =
+            (payload.eventType == PostgresChangeEvent.update &&
+            newStatus == 'assigned_to_rider' &&
+            oldStatus != 'assigned_to_rider');
 
-            if (payload.eventType == PostgresChangeEvent.delete) {
-              // Handle Delete or Unassignment
-              _loadRiderData();
-              return;
-            }
-
-            final newStatus = (newRecord['status'] ?? '').toString();
-            final oldStatus = (oldRecord['status'] ?? '').toString();
-
-            // 1. Assignment Detection (Newly assigned to current rider)
-            final isNewlyAssigned =
-                (oldRecord['assigned_rider_id'] == null ||
-                    oldRecord['assigned_rider_id'] != myId) &&
-                newRecord['assigned_rider_id'] == myId;
-
-            // 2. Explicit assignment status raised by the owner workflow.
-            final isStatusAssigned =
-                (payload.eventType == PostgresChangeEvent.update &&
-                newStatus == 'assigned_to_rider' &&
-                oldStatus != 'assigned_to_rider');
-
-            if (isNewlyAssigned || isStatusAssigned) {
-              AppHaptics.orderAlert();
-              _showNewJobAlert(newRecord);
-            }
-
-            // 3. Refresh ALL Data for accuracy
-            _loadRiderData();
-          },
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _listenForNewJobs();
-            });
-          }
-        });
+        if (isNewlyAssigned || isStatusAssigned) {
+          AppHaptics.orderAlert();
+          _showNewJobAlert(newRecord);
+        }
+      },
+    );
   }
 
   void _showNewJobAlert(Map<String, dynamic> rawOrder) {
@@ -1201,12 +1040,7 @@ class _RiderDashboardState extends State<RiderDashboard>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _riderPollingTimer?.cancel();
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-    }
-    _profileSubscription?.cancel();
+    _dash?.removeListener(_onDashboardChanged);
     _locationService.stopTracking();
     super.dispose();
   }

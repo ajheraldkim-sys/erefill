@@ -20,6 +20,8 @@ import '../../../core/services/payment_launch_service.dart';
 import '../../../core/services/payment_checkout_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/services/offline_order_sync_service.dart';
+import '../../../core/sync/realtime_hub.dart';
+import '../../../core/sync/synced_state.dart';
 
 import 'package:erefill/core/utils/money.dart';
 class OrderDetailScreen extends StatefulWidget {
@@ -34,12 +36,11 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SyncedState {
   final supabase = Supabase.instance.client;
   final _chatService = ChatService();
-  RealtimeChannel? _orderChannel;
+  StreamSubscription<RealtimeEvent>? _orderWatch;
   Timer? _orderPollingTimer;
-  Timer? _reconnectTimer;
   Map<String, dynamic>? _currentOrder;
   Map<String, dynamic>? _riderProfile;
   List<Map<String, dynamic>>? _orderItems;
@@ -239,36 +240,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       return;
     }
 
-    if (_orderChannel != null) {
-      supabase.removeChannel(_orderChannel!);
-      _orderChannel = null;
-    }
-    _reconnectTimer?.cancel();
-
-    _orderChannel = supabase
-        .channel('public:orders:$orderId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: orderId,
-          ),
-          callback: (payload) {
-            _refreshOrderState();
-          },
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            _reconnectTimer?.cancel();
-            _reconnectTimer = Timer(const Duration(seconds: 3), () {
-              if (mounted && _isAppForeground) _subscribeToOrderUpdates();
-            });
-          }
-        });
+    // The shared hub handles retry and reconnect; resume and reconnect
+    // refreshes arrive through [onResync].
+    _orderWatch ??= watchTable(
+      TableWatch('orders', column: 'id', value: orderId),
+      (_) => _refreshOrderState(),
+    );
 
     if (_isAppForeground) _startOrderPollingTimer();
   }
@@ -378,15 +355,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _isAppForeground = state == AppLifecycleState.resumed;
     if (_isAppForeground) {
-      _refreshOrderState();
-      _subscribeToOrderUpdates();
+      _startOrderPollingTimer();
     } else {
       _orderPollingTimer?.cancel();
       _orderPollingTimer = null;
-      _reconnectTimer?.cancel();
-      _reconnectTimer = null;
     }
   }
+
+  @override
+  Future<void> onResync() => _refreshOrderState();
 
   void _showStatusNotification(String status) {
     String message;
@@ -455,10 +432,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _orderPollingTimer?.cancel();
-    _reconnectTimer?.cancel();
-    if (_orderChannel != null) {
-      supabase.removeChannel(_orderChannel!);
-    }
     super.dispose();
   }
 

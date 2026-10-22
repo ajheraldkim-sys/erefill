@@ -31,6 +31,7 @@ import 'core/services/offline_order_sync_service.dart';
 import 'core/providers/connectivity_provider.dart';
 import 'core/widgets/offline_banner.dart';
 import 'core/services/local_data_cache.dart';
+import 'core/sync/sync_store.dart';
 import 'core/services/app_update_service.dart';
 import 'core/water_types.dart';
 import 'core/localization/app_strings.dart';
@@ -60,8 +61,15 @@ void main() async {
       anonKey: AppConstants.supabaseAnonKey,
     );
 
+    // Load the offline cache before the first frame so every screen can show
+    // saved data immediately. Bounded so a slow disk never blocks startup;
+    // screens fall back to an async cache read if it is still loading.
+    await LocalDataCache.instance.init().timeout(
+      const Duration(milliseconds: 800),
+      onTimeout: () => debugPrint('startup.cache_init_timed_out'),
+    );
     runApp(const ERefillApp());
-    unawaited(LocalDataCache.instance.init());
+    SyncStore.instance.start();
     unawaited(WaterTypes.load());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(NotificationService.instance.initialize());

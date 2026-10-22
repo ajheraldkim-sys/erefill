@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../services/local_data_cache.dart';
+import '../sync/sync_resources.dart';
+import '../sync/sync_store.dart';
 
 /// Safe Supabase helper with proper null safety and error handling
 class SafeSupabase {
@@ -184,6 +186,9 @@ class SafeSupabase {
     unawaited(LocalDataCache.instance.invalidatePattern('customer_home_'));
     unawaited(LocalDataCache.instance.invalidatePattern('customer_orders_'));
     unawaited(LocalDataCache.instance.invalidatePattern('rider_stats_'));
+    // Synced resources keep their saved copy (it is the offline fallback)
+    // and refetch instead.
+    unawaited(SyncStore.instance.refreshTagged(SyncResources.ordersTag));
 
     return result;
   }
@@ -204,6 +209,7 @@ class SafeSupabase {
     unawaited(LocalDataCache.instance.invalidatePattern('owner_orders_'));
     unawaited(LocalDataCache.instance.invalidatePattern('customer_home_'));
     unawaited(LocalDataCache.instance.invalidatePattern('customer_orders_'));
+    unawaited(SyncStore.instance.refreshTagged(SyncResources.ordersTag));
     return result;
   }
 

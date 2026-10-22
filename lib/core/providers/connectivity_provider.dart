@@ -19,11 +19,17 @@ class ConnectivityProvider extends ChangeNotifier {
   int _pendingSyncCount = 0;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   StreamSubscription<int>? _orderCountSub;
+  final StreamController<void> _reconnected =
+      StreamController<void>.broadcast();
 
   bool get isOffline => _isOffline;
   bool get isOnline => !_isOffline;
   bool get isSyncing => _isSyncing;
   int get pendingSyncCount => _pendingSyncCount;
+
+  /// Fires when the device comes back online, after queued offline writes
+  /// have been pushed, so read-side refreshes include the user's own changes.
+  Stream<void> get onReconnected => _reconnected.stream;
 
   void _init() {
     // Initial connectivity check
@@ -50,7 +56,9 @@ class ConnectivityProvider extends ChangeNotifier {
 
     if (transitionedToOnline) {
       debugPrint('Connectivity restored! Triggering global offline queues synchronization...');
-      syncAll();
+      syncAll().whenComplete(() {
+        if (!_isOffline && !_reconnected.isClosed) _reconnected.add(null);
+      });
     } else {
       refreshPendingCount();
     }
@@ -98,6 +106,7 @@ class ConnectivityProvider extends ChangeNotifier {
   void dispose() {
     _connSub?.cancel();
     _orderCountSub?.cancel();
+    _reconnected.close();
     super.dispose();
   }
 }
