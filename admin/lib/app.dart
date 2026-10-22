@@ -152,7 +152,7 @@ class _AdminRoot extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AdminAuthProvider>(
       builder: (context, auth, _) {
-        if (auth.loading) {
+        if (auth.initializing) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
