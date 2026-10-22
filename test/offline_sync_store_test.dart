@@ -96,6 +96,28 @@ void main() {
     expect(reopened.data, ['a', 'b']);
   });
 
+  test('persist: false neither reads nor writes the local cache', () async {
+    LocalDataCache.instance.setMemory('sync_v1:$key', {
+      'data': ['saved'],
+    });
+    final resource = store.acquire(
+      SyncSpec<List<String>>(
+        key: key,
+        fetch: () async => ['live'],
+        decode: (json) => List<String>.from(json as List),
+        persist: false,
+      ),
+    );
+    expect(resource.data, isNull);
+
+    await _settle();
+    expect(resource.data, ['live']);
+    final saved = await LocalDataCache.instance.get<Map<String, dynamic>>(
+      'sync_v1:$key',
+    );
+    expect(saved!['data'], ['saved']);
+  });
+
   test('offline: keeps saved data, skips the network, marks stale', () async {
     LocalDataCache.instance.setMemory('sync_v1:$key', {
       'data': ['saved'],

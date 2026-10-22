@@ -21,6 +21,7 @@ class SyncSpec<T> {
     this.pollInterval,
     this.debounce = const Duration(milliseconds: 350),
     this.timeout = const Duration(seconds: 20),
+    this.persist = true,
   });
 
   /// Unique cache key. Include the user or record id.
@@ -50,6 +51,11 @@ class SyncSpec<T> {
   final Duration debounce;
 
   final Duration timeout;
+
+  /// Whether the value is saved to the local cache. Turn off for transient
+  /// views such as search results or later pages, so the cache does not fill
+  /// with one entry per query typed; they still sync live while on screen.
+  final bool persist;
 }
 
 /// Dependencies of the sync layer, swappable in tests.
@@ -139,12 +145,13 @@ class SyncedResource<T> extends ChangeNotifier {
   Stream<RealtimeEvent> get changes => _changes.stream;
 
   void _hydrateSync() {
+    if (!spec.persist) return;
     final cached = _env.cache.getMemory<Map<String, dynamic>>(_cacheKey);
     if (cached != null) _applyCached(cached);
   }
 
   Future<void> _hydrateAsync() async {
-    if (_data != null) return;
+    if (_data != null || !spec.persist) return;
     final generation = _generation;
     final cached = await _env.cache.get<Map<String, dynamic>>(_cacheKey);
     if (cached == null || _disposed || generation != _generation) return;
@@ -250,6 +257,7 @@ class SyncedResource<T> extends ChangeNotifier {
   }
 
   Future<void> _persist(T value) {
+    if (!spec.persist) return Future.value();
     final encode = spec.encode;
     return _env.cache.set(_cacheKey, {
       'data': encode == null ? value : encode(value),

@@ -35,6 +35,20 @@ mixin SyncedState<W extends StatefulWidget> on State<W> {
     return resource;
   }
 
+  /// Switches [current] to [spec], e.g. after a filter or search changes.
+  /// Returns [current] untouched when the key is the same. The new resource
+  /// is acquired before the old one is released, so shared data is not
+  /// dropped and refetched in between.
+  SyncedResource<T> rebindSynced<T>(
+    SyncedResource<T>? current,
+    SyncSpec<T> spec,
+  ) {
+    if (current != null && current.spec.key == spec.key) return current;
+    final next = useSynced(spec);
+    if (current != null) releaseSynced(current);
+    return next;
+  }
+
   /// Releases a resource early, e.g. when the screen switches to another
   /// record.
   void releaseSynced(SyncedResource<dynamic> resource) {
