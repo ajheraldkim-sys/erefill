@@ -23,6 +23,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/utils/station_orderability.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
@@ -43,8 +44,9 @@ class _StationListScreenState extends State<StationListScreen> {
   final supabase = Supabase.instance.client;
   late final StreamController<List<Map<String, dynamic>>> _stationsController;
   late final Stream<List<Map<String, dynamic>>> _stationsStream;
-  RealtimeChannel? _pricingChannel;
-  RealtimeChannel? _favoritesChannel;
+  StreamSubscription? _productsSub;
+  StreamSubscription? _settingsSub;
+  StreamSubscription? _favoritesSub;
   bool _isLoading = true;
   List<Map<String, dynamic>> _cachedStations = [];
   String? _userTown;
@@ -145,54 +147,36 @@ class _StationListScreenState extends State<StationListScreen> {
   }
 
   void _subscribeToStationPricing() {
-    _pricingChannel = supabase
-        .channel('station_pricing_updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'products',
-          callback: (_) => _loadStationPricing(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'owner_settings',
-          callback: (_) => _loadStationPricing(),
-        )
-        .subscribe();
+    _productsSub?.cancel();
+    _productsSub = RealtimeHub.instance.listen(
+      const TableWatch('products'),
+      (_) => _loadStationPricing(),
+    );
+
+    _settingsSub?.cancel();
+    _settingsSub = RealtimeHub.instance.listen(
+      const TableWatch('owner_settings'),
+      (_) => _loadStationPricing(),
+    );
   }
 
   void _subscribeToFavorites() {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    _favoritesChannel = supabase
-        .channel('station-list:favorites:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'favorites',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (_) => _fetchFavorites(),
-        )
-        .subscribe();
+    _favoritesSub?.cancel();
+    _favoritesSub = RealtimeHub.instance.listen(
+      TableWatch('favorites', column: 'user_id', value: userId),
+      (_) => _fetchFavorites(),
+    );
   }
 
   @override
   void dispose() {
     _stationsController.close();
-    final channel = _pricingChannel;
-    if (channel != null) {
-      supabase.removeChannel(channel);
-    }
-    final favoritesChannel = _favoritesChannel;
-    if (favoritesChannel != null) {
-      supabase.removeChannel(favoritesChannel);
-    }
+    _productsSub?.cancel();
+    _settingsSub?.cancel();
+    _favoritesSub?.cancel();
     super.dispose();
   }
 

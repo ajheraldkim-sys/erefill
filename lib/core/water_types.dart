@@ -164,6 +164,25 @@ class WaterTypes {
 
   static StreamSubscription<RealtimeEvent>? _realtimeSub;
 
+  /// First retry delay after a failed fetch; doubles per attempt up to 16x.
+  /// Without retries a failed startup fetch would leave the device cache on
+  /// screen until a realtime event arrives, which never happens while the
+  /// database is timing out.
+  @visibleForTesting
+  static Duration retryDelay = const Duration(seconds: 15);
+  static Timer? _retryTimer;
+  static int _retryAttempt = 0;
+
+  @visibleForTesting
+  static bool get hasPendingRetry => _retryTimer?.isActive ?? false;
+
+  @visibleForTesting
+  static void cancelRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryAttempt = 0;
+  }
+
   /// Loads the catalog. Concurrent callers share one request; failures keep
   /// the cached catalog. Subscribes to Supabase Realtime so admin updates
   /// propagate to listeners immediately.
@@ -171,7 +190,8 @@ class WaterTypes {
     SupabaseClient? client,
     bool force = false,
   }) {
-    _ensureRealtimeSub();
+    // Realtime listens on the global client, so only it gets a subscription.
+    if (client == null) _ensureRealtimeSub();
     if (!force && catalog.value.isNotEmpty && _inFlight == null) {
       return Future.value(catalog.value);
     }
@@ -225,10 +245,22 @@ class WaterTypes {
 
       catalog.value = List.unmodifiable(types);
       unawaited(_saveCache(types));
+      cancelRetry();
     } catch (e) {
       debugPrint('WaterTypes.load error: $e');
+      _scheduleRetry(client);
     }
     return catalog.value;
+  }
+
+  static void _scheduleRetry(SupabaseClient? client) {
+    if (hasPendingRetry) return;
+    final delay = retryDelay * (1 << _retryAttempt.clamp(0, 4));
+    _retryAttempt++;
+    _retryTimer = Timer(delay, () {
+      _retryTimer = null;
+      unawaited(load(client: client, force: true));
+    });
   }
 
   static Future<void> _restoreCache() async {

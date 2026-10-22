@@ -71,6 +71,9 @@ void main() async {
     runApp(const ERefillApp());
     SyncStore.instance.start();
     unawaited(WaterTypes.load());
+    // Realtime events are lost while a channel is down, so re-read the
+    // catalog whenever the app returns to the foreground or reconnects.
+    SyncStore.instance.addResyncListener(() => WaterTypes.load(force: true));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(NotificationService.instance.initialize());
       unawaited(AppUpdateService.instance.initialize());

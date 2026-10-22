@@ -184,7 +184,12 @@ class _HubChannel {
     _stableTimer?.cancel();
     if (_closed || (_retryTimer?.isActive ?? false)) return;
     _attempt++;
-    final seconds = math.min(30, 2 << math.min(_attempt, 4));
+    final errorStr = error?.toString() ?? '';
+    final isDbTimeout = errorStr.contains('Too many database timeouts') ||
+        errorStr.contains('504') ||
+        errorStr.contains('Gateway Timeout');
+    final baseSeconds = isDbTimeout ? 6 : 2;
+    final seconds = math.min(60, baseSeconds << math.min(_attempt, 4));
     if (kDebugMode) {
       debugPrint(
         'RealtimeHub ${watch.key} dropped (${error ?? 'no error'}); '

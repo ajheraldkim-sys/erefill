@@ -29,6 +29,7 @@ import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'package:erefill/core/sync/sync_resources.dart';
 import 'package:erefill/core/sync/sync_store.dart';
 import 'package:erefill/core/sync/synced_state.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 import 'package:erefill/core/services/observability_service.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import '../../subscriptions/services/subscription_service.dart';
@@ -103,12 +104,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       context.read<CreditProvider>().initialize(user.id);
     }
 
-    _profileSub = SafeSupabase.listen(
-      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _fetchOwnerProfileRest(user.id);
+          return;
+        }
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
           setState(() {
-            ownerProfile = data.first;
+            ownerProfile = Map<String, dynamic>.from(record);
             _isOpen = ownerProfile?['is_open'] ?? true;
             _availability =
                 ownerProfile?['station_availability']?.toString() ??
@@ -118,20 +126,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           _loadOwnerSetupStatus();
         }
       },
-      onError: (error, stackTrace) {
-        debugPrint('Owner profile stream error: $error');
-        debugPrint('Owner profile stream stack: $stackTrace');
-      },
     );
 
-    _settingsSub = SafeSupabase.listen(
-      supabase
-          .from('owner_settings')
-          .stream(primaryKey: ['id'])
-          .eq('owner_id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          final settings = data.first;
+    _settingsSub?.cancel();
+    _settingsSub = RealtimeHub.instance.listen(
+      TableWatch('owner_settings', column: 'owner_id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _fetchOwnerSettingsRest(user.id);
+          return;
+        }
+        final settings = event.payload?.newRecord;
+        if (settings != null && settings.isNotEmpty) {
           setState(() {
             _baseDeliveryFee =
                 (settings['base_delivery_fee'] as num?)?.toDouble() ??
@@ -143,10 +150,49 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           _loadOwnerSetupStatus();
         }
       },
-      onError: (error, stackTrace) {
-        debugPrint('Owner settings stream error: $error');
-      },
     );
+  }
+
+  Future<void> _fetchOwnerProfileRest(String userId) async {
+    try {
+      final res = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (res != null && mounted) {
+        setState(() {
+          ownerProfile = Map<String, dynamic>.from(res);
+          _isOpen = ownerProfile?['is_open'] ?? true;
+          _availability =
+              ownerProfile?['station_availability']?.toString() ??
+              (_isOpen ? 'open' : 'closed');
+          _isLoading = false;
+        });
+        _loadOwnerSetupStatus();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchOwnerSettingsRest(String userId) async {
+    try {
+      final res = await supabase
+          .from('owner_settings')
+          .select()
+          .eq('owner_id', userId)
+          .maybeSingle();
+      if (res != null && mounted) {
+        setState(() {
+          _baseDeliveryFee =
+              (res['base_delivery_fee'] as num?)?.toDouble() ??
+              _baseDeliveryFee;
+          _pricePerGallon =
+              (res['price_per_gallon'] as num?)?.toDouble() ??
+              _pricePerGallon;
+        });
+        _loadOwnerSetupStatus();
+      }
+    } catch (_) {}
   }
 
   void _changeTab(int index) {

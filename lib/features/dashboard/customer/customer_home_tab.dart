@@ -27,6 +27,7 @@ import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/utils/app_haptics.dart';
 import '../../../core/widgets/live_order_progress_tracker.dart';
 import '../../../core/widgets/offline_sync_status_pill.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/money.dart';
@@ -66,9 +67,11 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   Timer? _activeOrderPollTimer;
   String _selectedCategory = 'All';
 
-  RealtimeChannel? _ordersChannel;
-  RealtimeChannel? _favoritesChannel;
-  RealtimeChannel? _stationsChannel;
+  StreamSubscription? _ordersSub;
+  StreamSubscription? _favoritesSub;
+  StreamSubscription? _profileSub;
+  StreamSubscription? _ownerSettingsSub;
+  Timer? _fetchDebounceTimer;
 
   @override
   bool get wantKeepAlive => true;
@@ -208,10 +211,12 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     WidgetsBinding.instance.removeObserver(this);
     _homeBannerTimer?.cancel();
     _activeOrderPollTimer?.cancel();
+    _fetchDebounceTimer?.cancel();
     _homeBannerController.dispose();
-    if (_ordersChannel != null) supabase.removeChannel(_ordersChannel!);
-    if (_favoritesChannel != null) supabase.removeChannel(_favoritesChannel!);
-    if (_stationsChannel != null) supabase.removeChannel(_stationsChannel!);
+    _ordersSub?.cancel();
+    _favoritesSub?.cancel();
+    _profileSub?.cancel();
+    _ownerSettingsSub?.cancel();
     super.dispose();
   }
 
@@ -507,53 +512,34 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
+  void _debouncedFetchData() {
+    _fetchDebounceTimer?.cancel();
+    _fetchDebounceTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) _fetchData();
+    });
+  }
+
   void _subscribeToOrders() {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
-    }
+    _ordersSub?.cancel();
+    _ordersSub = RealtimeHub.instance.listen(
+      TableWatch('orders', column: 'customer_id', value: userId),
+      (_) => _debouncedFetchData(),
+    );
 
-    _ordersChannel = supabase
-        .channel('home:updates:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'customer_id',
-            value: userId,
-          ),
-          callback: (_) => _fetchData(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'profiles',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: userId,
-          ),
-          callback: (_) => _handleCustomerProfileChange(userId),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'owner_settings',
-          callback: (_) => _fetchData(),
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _subscribeToOrders();
-            });
-          }
-        });
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: userId),
+      (_) => _handleCustomerProfileChange(userId),
+    );
+
+    _ownerSettingsSub?.cancel();
+    _ownerSettingsSub = RealtimeHub.instance.listen(
+      const TableWatch('owner_settings'),
+      (_) => _debouncedFetchData(),
+    );
   }
 
   Future<void> _handleCustomerProfileChange(String userId) async {
@@ -599,35 +585,15 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    _favoritesChannel = supabase
-        .channel('home:favorites:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'favorites',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (_) => _refreshFavoriteStations(userId),
-        )
-        .subscribe();
+    _favoritesSub?.cancel();
+    _favoritesSub = RealtimeHub.instance.listen(
+      TableWatch('favorites', column: 'user_id', value: userId),
+      (_) => _refreshFavoriteStations(userId),
+    );
   }
 
   void _subscribeToStations() {
-    _stationsChannel = supabase
-        .channel('home:station-updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'profiles',
-          callback: (payload) {
-            final record = payload.newRecord;
-            if (record['role']?.toString() == 'owner') _fetchData();
-          },
-        )
-        .subscribe();
+    // Shared owner_settings watch in _subscribeToOrders already captures station pricing & availability changes.
   }
 
   Future<void> _refreshFavoriteStations(String userId) async {

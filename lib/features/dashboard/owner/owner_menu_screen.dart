@@ -19,13 +19,13 @@ import 'package:erefill/core/widgets/account/account_ui.dart';
 import 'package:erefill/core/widgets/app_cached_image.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/providers/user_provider.dart';
-import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/profile_query_helpers.dart';
 import 'package:erefill/features/settings/payment_account_models.dart';
 import 'package:erefill/features/settings/payment_settings_service.dart';
 import 'package:erefill/features/settings/owner/owner_settings_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 import 'package:go_router/go_router.dart';
 import 'package:erefill/core/routing/app_routes.dart';
 import 'service_catalog_screen.dart';
@@ -170,31 +170,35 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
 
-    _profileSub = SafeSupabase.listen(
-      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          _updateProfileFromData(data.first);
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _loadAllData();
+          return;
         }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Owner menu profile stream error: $error');
-        debugPrint('Owner menu profile stream stack: $stackTrace');
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
+          _updateProfileFromData(Map<String, dynamic>.from(record));
+        }
       },
     );
 
-    _settingsSub = SafeSupabase.listen(
-      supabase
-          .from('owner_settings')
-          .stream(primaryKey: ['id'])
-          .eq('owner_id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          _updateSettingsFromData(data.first);
+    _settingsSub?.cancel();
+    _settingsSub = RealtimeHub.instance.listen(
+      TableWatch('owner_settings', column: 'owner_id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _loadAllData();
+          return;
         }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Owner menu settings stream error: $error');
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
+          _updateSettingsFromData(Map<String, dynamic>.from(record));
+        }
       },
     );
   }

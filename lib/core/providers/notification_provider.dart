@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/features/chat/models/system_notification.dart';
 import 'package:erefill/core/services/notification_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -13,8 +13,10 @@ class NotificationProvider extends ChangeNotifier {
   bool _isLoading = true;
   StreamSubscription? _notifSub;
   StreamSubscription<AuthState>? _authSub;
-  RealtimeChannel? _messagesChannel;
-  RealtimeChannel? _ordersChannel;
+  StreamSubscription? _messagesSub;
+  StreamSubscription? _ordersSub;
+  Timer? _countDebounceTimer;
+  DateTime? _lastRestFetchTime;
   final Set<String> _knownIds = {};
   bool _initialLoadCompleted = false;
   int _listenGeneration = 0;
@@ -65,14 +67,18 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   void _cleanupChannels() {
-    if (_messagesChannel != null) {
-      _supabase.removeChannel(_messagesChannel!);
-      _messagesChannel = null;
-    }
-    if (_ordersChannel != null) {
-      _supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
-    }
+    _countDebounceTimer?.cancel();
+    _messagesSub?.cancel();
+    _messagesSub = null;
+    _ordersSub?.cancel();
+    _ordersSub = null;
+  }
+
+  void _debouncedFetchCounts(String userId, int generation) {
+    _countDebounceTimer?.cancel();
+    _countDebounceTimer = Timer(const Duration(milliseconds: 1500), () {
+      _fetchNotificationCounts(userId, generation);
+    });
   }
 
   Future<void> _fetchAndListen(String userId) async {
@@ -113,136 +119,119 @@ class NotificationProvider extends ChangeNotifier {
       }
     }
 
-    // Subscribe to system notifications stream
-    try {
-      _notifSub = SafeSupabase.listen(
-        _supabase
-            .from('system_notifications')
-            .stream(primaryKey: ['id'])
-            .eq('user_id', userId),
-        (data) async {
-          if (generation != _listenGeneration) return;
+    // Subscribe to system notifications via shared RealtimeHub
+    _notifSub = RealtimeHub.instance.listen(
+      TableWatch('system_notifications', column: 'user_id', value: userId),
+      (event) async {
+        if (generation != _listenGeneration) return;
+        if (event.isResync) {
+          _fetchNotificationsRest(userId, generation);
+          _debouncedFetchCounts(userId, generation);
+          return;
+        }
 
-          final incoming = data
-              .map((json) => SystemNotification.fromJson(json))
-              .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final newRecord = event.payload?.newRecord;
+        if (newRecord == null || newRecord.isEmpty) return;
 
-          bool hasNewMessages = false;
-          bool hasNewOrders = false;
+        final notification = SystemNotification.fromJson(newRecord);
+        final eventType = event.payload?.eventType;
 
-          if (_initialLoadCompleted) {
-            for (final notification in incoming) {
-              if (!_knownIds.contains(notification.id) &&
-                  !notification.isRead) {
-                final roomId = notification.metadata['room_id']?.toString() ??
-                    notification.metadata['chat_room_id']?.toString();
+        if (eventType == PostgresChangeEvent.insert) {
+          if (!_knownIds.contains(notification.id)) {
+            _knownIds.add(notification.id);
+            _notifications.insert(0, notification);
+            _notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            _isLoading = false;
+            notifyListeners();
 
-                final isActiveChat =
-                    notification.type == NotificationType.newMessage &&
-                        roomId != null &&
-                        NotificationService.instance.activeChatRoomId == roomId;
+            final roomId = notification.metadata['room_id']?.toString() ??
+                notification.metadata['chat_room_id']?.toString();
 
-                final payloadJson = jsonEncode({
-                  'notification_id': notification.id,
-                  'order_id': notification.metadata['order_id'],
-                  'room_id': roomId,
-                  'route': notification.actionUrl,
-                });
+            final isActiveChat =
+                notification.type == NotificationType.newMessage &&
+                    roomId != null &&
+                    NotificationService.instance.activeChatRoomId == roomId;
 
-                if (!isActiveChat) {
-                  await NotificationService.instance.show(
-                    title: notification.title,
-                    body: notification.content,
-                    type: notification.type,
-                    priority: notification.priority,
-                    payload: payloadJson,
-                  );
-                }
+            final payloadJson = jsonEncode({
+              'notification_id': notification.id,
+              'order_id': notification.metadata['order_id'],
+              'room_id': roomId,
+              'route': notification.actionUrl,
+            });
 
-                if (notification.type == NotificationType.newMessage) {
-                  hasNewMessages = true;
-                }
-                if (notification.type == NotificationType.orderAssigned) {
-                  hasNewOrders = true;
-                }
-              }
+            if (_initialLoadCompleted && !isActiveChat && !notification.isRead) {
+              await NotificationService.instance.show(
+                title: notification.title,
+                body: notification.content,
+                type: notification.type,
+                priority: notification.priority,
+                payload: payloadJson,
+              );
             }
+
+            unawaited(
+              LocalDataCache.instance.set(
+                cacheKey,
+                _notifications.map((n) => n.toJson()).toList(),
+              ),
+            );
+
+            _debouncedFetchCounts(userId, generation);
           }
-
-          _knownIds
-            ..clear()
-            ..addAll(incoming.map((notification) => notification.id));
-          _notifications = incoming;
-          _initialLoadCompleted = true;
-          _isLoading = false;
+        } else if (eventType == PostgresChangeEvent.update) {
+          final idx = _notifications.indexWhere((n) => n.id == notification.id);
+          if (idx != -1) {
+            _notifications[idx] = notification;
+          } else {
+            _notifications.insert(0, notification);
+          }
+          _notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           notifyListeners();
-
           unawaited(
             LocalDataCache.instance.set(
               cacheKey,
-              incoming.map((n) => n.toJson()).toList(),
+              _notifications.map((n) => n.toJson()).toList(),
             ),
           );
+        } else if (eventType == PostgresChangeEvent.delete) {
+          _notifications.removeWhere((n) => n.id == notification.id);
+          _knownIds.remove(notification.id);
+          notifyListeners();
+          unawaited(
+            LocalDataCache.instance.set(
+              cacheKey,
+              _notifications.map((n) => n.toJson()).toList(),
+            ),
+          );
+        }
+      },
+    );
 
-          if (hasNewMessages || hasNewOrders) {
-            _fetchNotificationCounts(userId, generation);
-          }
-        },
-        onError: (error, stackTrace) {
-          debugPrint('Notification stream error: $error (resilient REST fallback active)');
-          if (generation == _listenGeneration) {
-            _isLoading = false;
-            notifyListeners();
-            _fetchNotificationsRest(userId, generation);
-          }
-        },
-      );
-
-      _fetchNotificationsRest(userId, generation);
-      _fetchNotificationCounts(userId, generation);
-      _setupRealtimeChannels(userId, generation);
-    } catch (e) {
-      debugPrint('Error in NotificationProvider: $e');
-      _isLoading = false;
-      notifyListeners();
-      _fetchNotificationsRest(userId, generation);
-      _fetchNotificationCounts(userId, generation);
-    }
+    _fetchNotificationsRest(userId, generation);
+    _fetchNotificationCounts(userId, generation);
+    _setupRealtimeChannels(userId, generation);
   }
 
   void _setupRealtimeChannels(String userId, int generation) {
-    try {
-      _messagesChannel = _supabase
-          .channel('rt_messages_$userId')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'messages',
-            callback: (payload) {
-              if (generation == _listenGeneration) {
-                _fetchNotificationCounts(userId, generation);
-              }
-            },
-          )
-          .subscribe();
+    _messagesSub?.cancel();
+    _messagesSub = RealtimeHub.instance.listen(
+      const TableWatch('messages'),
+      (event) {
+        if (generation == _listenGeneration) {
+          _debouncedFetchCounts(userId, generation);
+        }
+      },
+    );
 
-      _ordersChannel = _supabase
-          .channel('rt_orders_$userId')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'orders',
-            callback: (payload) {
-              if (generation == _listenGeneration) {
-                _fetchNotificationCounts(userId, generation);
-              }
-            },
-          )
-          .subscribe();
-    } catch (e) {
-      debugPrint('Error setting up notification realtime channels: $e');
-    }
+    _ordersSub?.cancel();
+    _ordersSub = RealtimeHub.instance.listen(
+      const TableWatch('orders'),
+      (event) {
+        if (generation == _listenGeneration) {
+          _debouncedFetchCounts(userId, generation);
+        }
+      },
+    );
   }
 
   Future<void> refreshCounts() async {
@@ -353,7 +342,14 @@ class NotificationProvider extends ChangeNotifier {
     _fetchNotificationCounts(userId, _listenGeneration);
   }
 
-  Future<void> _fetchNotificationsRest(String userId, int generation) async {
+  Future<void> _fetchNotificationsRest(String userId, int generation, {bool force = false}) async {
+    final now = DateTime.now();
+    if (!force &&
+        _lastRestFetchTime != null &&
+        now.difference(_lastRestFetchTime!).inSeconds < 10) {
+      return;
+    }
+    _lastRestFetchTime = now;
     try {
       final res = await _supabase
           .from('system_notifications')
@@ -380,6 +376,10 @@ class NotificationProvider extends ChangeNotifier {
       );
     } catch (e) {
       debugPrint('Error fetching notifications via REST: $e');
+      if (generation == _listenGeneration) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 

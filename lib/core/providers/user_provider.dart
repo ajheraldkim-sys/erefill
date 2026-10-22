@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/models/user_model.dart';
-import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/profile_query_helpers.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 class UserProvider extends ChangeNotifier {
   static const _profileColumns =
@@ -19,7 +19,7 @@ class UserProvider extends ChangeNotifier {
   UserModel? _user;
   bool _isLoading = true;
   StreamSubscription<AuthState>? _authSub;
-  StreamSubscription<List<Map<String, dynamic>>>? _profileSub;
+  StreamSubscription? _profileSub;
   String? _profileUserId;
   int _profileLoadGeneration = 0;
   bool _disposed = false;
@@ -238,18 +238,21 @@ class UserProvider extends ChangeNotifier {
   }
 
   void _attachProfileStream(String userId) {
-    _profileSub ??= SafeSupabase.listen(
-      _supabase.from('profiles').stream(primaryKey: ['id']).eq('id', userId),
-      (data) {
-        if (data.isNotEmpty && _profileUserId == userId && !_disposed) {
-          _user = UserModel.fromJson(data.first);
-          _cache.set('user_profile_$userId', data.first);
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: userId),
+      (event) {
+        if (_disposed || _profileUserId != userId) return;
+        if (event.isResync) {
+          refreshProfile();
+          return;
+        }
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
+          _user = UserModel.fromJson(record);
+          _cache.set('user_profile_$userId', record);
           notifyListeners();
         }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('User profile stream error: $error');
-        debugPrint('User profile stream stack: $stackTrace');
       },
     );
   }

@@ -332,13 +332,19 @@ class SafeSupabase {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
+    DateTime? lastErrorFired;
     return stream.listen(
       (data) async {
         await onData(data);
       },
       onError: (Object error, StackTrace stackTrace) {
         _logStreamError(error);
-        onError?.call(error, stackTrace);
+        final now = DateTime.now();
+        if (lastErrorFired == null ||
+            now.difference(lastErrorFired!).inSeconds >= 10) {
+          lastErrorFired = now;
+          onError?.call(error, stackTrace);
+        }
       },
       onDone: onDone,
       cancelOnError: cancelOnError,
