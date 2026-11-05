@@ -53,6 +53,8 @@ import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'widgets/rider_home_overview.dart';
 import 'widgets/rider_swipe_to_accept_slider.dart';
+import 'package:latlong2/latlong.dart';
+import 'widgets/route_plan_sheet.dart';
 export 'rider_history_screen.dart';
 
 double _safeDouble(dynamic value, {double fallback = 0}) {
@@ -1159,6 +1161,22 @@ class _RiderDashboardState extends State<RiderDashboard>
 
   // ── Dispatch Tab ─────────────────────────────────────────────────────────────
 
+  Future<void> _openRoutePlan(List<Map<String, dynamic>> orders) async {
+    final stops = RoutePlanSheet.stopsFromOrders(orders);
+    if (stops.isEmpty) return;
+    final pos = await _locationService.getCurrentPosition();
+    if (!mounted) return;
+    final start = pos != null
+        ? LatLng(pos.latitude, pos.longitude)
+        : stops.first.point;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => RoutePlanSheet(orders: orders, start: start),
+    );
+  }
+
   Widget _buildDispatchTab() {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return const Center(child: Text("Not authenticated"));
@@ -1183,6 +1201,15 @@ class _RiderDashboardState extends State<RiderDashboard>
             title: 'Dispatch',
             subtitle: '$count active jobs · Online',
             actions: [
+              if (count >= 2)
+                IconButton(
+                  onPressed: () => _openRoutePlan(activeOrders),
+                  icon: Icon(
+                    Icons.alt_route_rounded,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                  tooltip: 'Optimize route',
+                ),
               IconButton(
                 onPressed: _loadRiderData,
                 icon: Icon(
