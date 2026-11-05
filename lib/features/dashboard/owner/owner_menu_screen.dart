@@ -35,6 +35,7 @@ import 'services/station_setup_service.dart';
 import 'package:erefill/core/localization/app_strings.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+import 'delivery_coverage_screen.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -497,11 +498,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
   double get _currentPricePerGallon =>
       double.tryParse(_priceController.text.trim()) ?? 15.0;
-  double get _currentBaseFee =>
-      double.tryParse(_deliveryFeeController.text.trim()) ?? 25.0;
-
-  String get _pricingSummary =>
-      '${formatPeso(_currentPricePerGallon)}/gal · ${formatPeso(_currentBaseFee)} delivery';
+  String get _pricingSummary => '${formatPeso(_currentPricePerGallon)}/gal';
 
   String get _paymentMethodsSummary {
     if (_enabledPaymentMethods.isEmpty) return 'None enabled';
@@ -2609,6 +2606,23 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openStationDetailsSheet,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.local_shipping_outlined,
+                            title: 'Delivery coverage',
+                            subtitle: 'Free-delivery zone and barangays',
+                            onTap: () {
+                              final uid = supabase.auth.currentUser?.id;
+                              if (uid == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => DeliveryCoverageScreen(
+                                    ownerId: uid,
+                                    town: _selectedTown,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           AccountNavTile(
                             icon: Icons.schedule_outlined,

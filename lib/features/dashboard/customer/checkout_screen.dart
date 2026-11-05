@@ -71,6 +71,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _selectedAddressId;
   double _deliveryFee = 20.0;
   double _deliveryDistanceKm = 1.0;
+  // Free-delivery zone of this station and the latest quote (server when
+  // online, device estimate otherwise).
+  double _freeRadiusKm = 1.0;
+  List<String> _freeBarangays = const [];
+  int? _freeMinGallons;
+  DeliveryQuote? _deliveryQuote;
+  int _quoteRequest = 0;
   double _deliveryRatePerKm = 10.0;
   double _deliveryMinFee = 20.0;
   double _deliveryMinDistance = 1.0;
@@ -361,6 +368,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               .select('opening_time, closing_time, operating_days')
               .eq('owner_id', ownerId)
               .maybeSingle();
+          // Free-delivery zone (separate read so older schemas still load hours).
+          try {
+            final zone = await supabase
+                .from('owner_settings')
+                .select(
+                  'free_delivery_radius_km, free_delivery_barangays, free_delivery_min_gallons',
+                )
+                .eq('owner_id', ownerId)
+                .maybeSingle();
+            if (zone != null && mounted) {
+              _freeRadiusKm =
+                  (zone['free_delivery_radius_km'] as num?)?.toDouble() ?? 1.0;
+              _freeBarangays = [
+                for (final b in (zone['free_delivery_barangays'] as List? ?? []))
+                  b.toString(),
+              ];
+              _freeMinGallons =
+                  (zone['free_delivery_min_gallons'] as num?)?.toInt();
+              _recalculateDeliveryFee();
+            }
+          } catch (_) {}
           if (sett != null && mounted) {
             _stationOpeningTime = sett['opening_time']?.toString();
             _stationClosingTime = sett['closing_time']?.toString();
@@ -439,7 +467,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         (widget.station['longitude'] as num?)?.toDouble() ??
         (widget.station['lng'] as num?)?.toDouble();
 
-    double distance = _deliveryDistanceKm;
+    double? straightKm;
     if (customerLat != null &&
         customerLng != null &&
         stationLat != null &&
@@ -448,19 +476,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         customerLng != 0 &&
         stationLat != 0 &&
         stationLng != 0) {
-      final meters = Geolocator.distanceBetween(
-        stationLat,
-        stationLng,
-        customerLat,
-        customerLng,
-      );
-      distance = meters / 1000.0;
-      distance = (distance * 100).roundToDouble() / 100.0;
-      if (distance < 0.1) distance = 0.1;
+      straightKm = Geolocator.distanceBetween(
+            stationLat,
+            stationLng,
+            customerLat,
+            customerLng,
+          ) /
+          1000.0;
     }
 
-    final calculated = CheckoutRules.calculateDeliveryFee(
-      distanceKm: distance,
+    final cart = context.read<CartProvider>();
+    final barangay = _customerProfile?['barangay']?.toString();
+    final local = CheckoutRules.quoteDelivery(
+      straightLineKm: straightKm,
+      freeRadiusKm: _freeRadiusKm,
+      freeBarangays: _freeBarangays,
+      customerBarangay: barangay,
+      freeMinGallons: _freeMinGallons,
+      gallons: cart.totalItems,
       enabled: _deliveryFeeEnabled,
       ratePerKm: _deliveryRatePerKm,
       minimumFee: _deliveryMinFee,
@@ -470,9 +503,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (mounted) {
       setState(() {
-        _deliveryDistanceKm = distance;
-        _deliveryFee = calculated;
+        _deliveryQuote = local;
+        _deliveryDistanceKm = local.distanceKm ?? _deliveryDistanceKm;
+        _deliveryFee = local.fee;
       });
+    }
+    _refreshServerQuote(customerLat, customerLng, barangay, cart.totalItems);
+  }
+
+  /// Replaces the device estimate with the server quote, which is what the
+  /// order will actually be charged.
+  Future<void> _refreshServerQuote(
+    double? lat,
+    double? lng,
+    String? barangay,
+    int gallons,
+  ) async {
+    final ownerId = widget.station['id']?.toString();
+    if (ownerId == null) return;
+    final request = ++_quoteRequest;
+    try {
+      final res = await supabase.rpc(
+        'compute_delivery_quote',
+        params: {
+          'p_station_id': ownerId,
+          'p_lat': lat,
+          'p_lng': lng,
+          'p_barangay': barangay,
+          'p_gallons': gallons,
+        },
+      );
+      if (!mounted || request != _quoteRequest || res is! Map) return;
+      final q = DeliveryQuote.fromServer(Map<String, dynamic>.from(res));
+      setState(() {
+        _deliveryQuote = q;
+        _deliveryFee = q.fee;
+        if (q.distanceKm != null) _deliveryDistanceKm = q.distanceKm!;
+      });
+    } catch (e) {
+      debugPrint('compute_delivery_quote unavailable, using estimate: $e');
     }
   }
 
@@ -2625,6 +2694,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             value: isFreeDelivery ? 'Free' : formatPeso(_deliveryFee),
             valueColor: isFreeDelivery ? AppColors.uiSuccess : null,
           ),
+          if (_deliveryQuote != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                _deliveryQuote!.isEstimate
+                    ? '${_deliveryQuote!.label} (estimate)'
+                    : _deliveryQuote!.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _deliveryQuote!.isFree
+                      ? AppColors.uiSuccess
+                      : AppUi.textSecondaryOf(context),
+                ),
+              ),
+            ),
           TextButton.icon(
             onPressed: () => setState(
               () => _isFeeBreakdownExpanded = !_isFeeBreakdownExpanded,

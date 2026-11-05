@@ -29,6 +29,7 @@ import '../../subscriptions/models/subscription_model.dart';
 import '../../subscriptions/services/subscription_service.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+import 'widgets/delivery_coverage_card.dart';
 
 class StationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> station;
@@ -2212,6 +2213,13 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                   const SizedBox(height: 8),
                   Reveal(child: _buildWaterCard(context)),
                   const SizedBox(height: 12),
+
+                  if (widget.station['id'] != null) ...[
+                    DeliveryCoverageCard(
+                      stationId: widget.station['id'].toString(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // 3. Reach the station
                   Reveal(
