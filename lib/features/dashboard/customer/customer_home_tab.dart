@@ -36,6 +36,7 @@ import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
 import 'package:erefill/core/utils/station_ranking.dart';
 import 'widgets/refill_reminder_banner.dart';
+import 'package:erefill/features/assistant/order_assistant.dart';
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
 
@@ -1505,6 +1506,22 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                           AppUi.vGapMd,
                         ],
                         _buildQuickOrderButton(context),
+                        AppUi.vGapMd,
+                        OutlinedButton.icon(
+                          onPressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            showDragHandle: true,
+                            builder: (sheetContext) => AskErefillSheet(
+                              onCheckout: (_) {
+                                Navigator.of(sheetContext).pop();
+                                context.openCart();
+                              },
+                            ),
+                          ),
+                          icon: const Icon(Icons.auto_awesome_rounded),
+                          label: const Text('Ask eRefill to order for me'),
+                        ),
                         AppUi.vGapMd,
                         ValueListenableBuilder<List<WaterTypeInfo>>(
                           valueListenable: WaterTypes.catalog,
