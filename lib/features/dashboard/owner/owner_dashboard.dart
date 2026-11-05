@@ -37,6 +37,7 @@ import '../../payouts/widgets/owner_wallet_sheet.dart';
 import 'widgets/new_order_alert_sheet.dart';
 import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import '../../delivery_mgmt/providers/credit_provider.dart';
+import 'forecast/owner_forecast_section.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -1124,6 +1125,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                     ?setup,
                     const FeeWalletDashboardCard(),
                     _buildInventoryCard(),
+                    OwnerForecastSection(stock: _inventory?.filledGallons),
                     _buildQuickActions(),
                   ];
                   final phone = <Widget>[
@@ -1134,6 +1136,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                     _buildPipelineCard(),
                     const FeeWalletDashboardCard(),
                     _buildInventoryCard(),
+                    OwnerForecastSection(stock: _inventory?.filledGallons),
                     _buildQuickActions(),
                     _buildRecentOrders(),
                   ];
