@@ -7,10 +7,13 @@
 --   * Delivery fee comes from compute_delivery_quote() (free zone or per-km),
 --     never from the client and no longer from owner_settings.base_delivery_fee.
 --   * Writes delivery_distance_km, delivery_rate_per_km, delivery_free_reason.
+--   * Accessories (products.kind = 'accessory') are sold alongside water;
+--     only water gallons count toward the free-delivery gallon threshold.
 -- This is the single place later features (accessories, tips, verification
 -- gates) extend create_order_atomic. Do not redefine it in other scripts.
 --
--- Run after: delivery_coverage.sql. Test: supabase/tests/delivery_quote_test.sql
+-- Run order: delivery_coverage.sql -> station_accessories.sql -> this file.
+-- Tests: supabase/tests/delivery_quote_test.sql, accessories_test.sql
 -- ==============================================================================
 BEGIN;
 
@@ -147,7 +150,10 @@ BEGIN
 
     v_computed_subtotal :=
       v_computed_subtotal + (v_product.price * v_item.quantity);
-    v_gallons := v_gallons + v_item.quantity;
+    -- Only water counts toward the free-delivery gallon threshold.
+    IF v_product.kind = 'water' THEN
+      v_gallons := v_gallons + v_item.quantity;
+    END IF;
   END LOOP;
 
   IF v_computed_subtotal <= 0 THEN

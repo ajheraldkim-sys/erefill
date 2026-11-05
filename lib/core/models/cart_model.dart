@@ -10,12 +10,18 @@ class CartItem {
   final String? imageUrl;
   int quantity;
 
+  /// 'water' (counts as gallons) or 'accessory' (caps, seals, dispensers…).
+  final String kind;
+
+  bool get isWater => kind != 'accessory';
+
   CartItem({
     required this.id,
     required this.name,
     required this.price,
     this.imageUrl,
     this.quantity = 1,
+    this.kind = 'water',
   });
 
   Map<String, dynamic> toJson() => {
@@ -24,6 +30,7 @@ class CartItem {
         'price': price,
         'imageUrl': imageUrl,
         'quantity': quantity,
+        'kind': kind,
       };
 
   factory CartItem.fromJson(Map<String, dynamic> json) => CartItem(
@@ -32,6 +39,7 @@ class CartItem {
         price: (json['price'] as num).toDouble(),
         imageUrl: json['imageUrl'] as String?,
         quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        kind: json['kind'] as String? ?? 'water',
       );
 }
 
@@ -61,13 +69,24 @@ class CartProvider extends ChangeNotifier {
   int get totalItems =>
       _items.values.fold(0, (sum, item) => sum + item.quantity);
 
+  /// Water gallons only (accessories excluded), for free-delivery rules.
+  int get waterGallons => _items.values
+      .where((item) => item.isWater)
+      .fold(0, (sum, item) => sum + item.quantity);
+
   double get totalAmount => _items.values.fold(
         0.0,
         (sum, item) => sum + (item.price * item.quantity),
       );
 
   /// Optimistic, instant addition to cart.
-  void addItem(String id, String name, double price, {String? imageUrl}) {
+  void addItem(
+    String id,
+    String name,
+    double price, {
+    String? imageUrl,
+    String? kind,
+  }) {
     if (_items.containsKey(id)) {
       _items.update(
         id,
@@ -77,6 +96,7 @@ class CartProvider extends ChangeNotifier {
           price: price,
           imageUrl: imageUrl ?? existing.imageUrl,
           quantity: existing.quantity + 1,
+          kind: kind ?? existing.kind,
         ),
       );
     } else {
@@ -87,6 +107,7 @@ class CartProvider extends ChangeNotifier {
           name: name,
           price: price,
           imageUrl: imageUrl,
+          kind: kind ?? 'water',
         ),
       );
     }
@@ -118,6 +139,7 @@ class CartProvider extends ChangeNotifier {
           price: existing.price,
           imageUrl: existing.imageUrl,
           quantity: quantity,
+          kind: existing.kind,
         ),
       );
       notifyListeners();

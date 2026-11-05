@@ -36,6 +36,7 @@ import 'package:erefill/core/localization/app_strings.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'delivery_coverage_screen.dart';
+import 'accessories_screen.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -2606,6 +2607,21 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openStationDetailsSheet,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.inventory_2_outlined,
+                            title: 'Accessories',
+                            subtitle: 'Gallons, caps, seals, dispensers',
+                            onTap: () {
+                              final uid = supabase.auth.currentUser?.id;
+                              if (uid == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      AccessoriesScreen(ownerId: uid),
+                                ),
+                              );
+                            },
                           ),
                           AccountNavTile(
                             icon: Icons.local_shipping_outlined,

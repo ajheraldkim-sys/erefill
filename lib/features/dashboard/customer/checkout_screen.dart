@@ -493,7 +493,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       freeBarangays: _freeBarangays,
       customerBarangay: barangay,
       freeMinGallons: _freeMinGallons,
-      gallons: cart.totalItems,
+      gallons: cart.waterGallons,
       enabled: _deliveryFeeEnabled,
       ratePerKm: _deliveryRatePerKm,
       minimumFee: _deliveryMinFee,
@@ -508,7 +508,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _deliveryFee = local.fee;
       });
     }
-    _refreshServerQuote(customerLat, customerLng, barangay, cart.totalItems);
+    _refreshServerQuote(customerLat, customerLng, barangay, cart.waterGallons);
   }
 
   /// Replaces the device estimate with the server quote, which is what the

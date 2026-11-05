@@ -38,6 +38,7 @@ abstract final class OrderProductHelpers {
   static const _nonWaterCategories = {'accessories', 'products', 'containers'};
 
   static bool isNonWaterProduct(Map<String, dynamic>? product) {
+    if (product?['kind']?.toString() == 'accessory') return true;
     final category = product?['category']?.toString().trim().toLowerCase();
     return category != null && _nonWaterCategories.contains(category);
   }
