@@ -16,6 +16,7 @@ import '../../chat/services/chat_service.dart';
 import '../../chat/models/chat_room.dart';
 
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/utils/tracking_eta.dart';
 
 class OrderTrackingMap extends StatefulWidget {
   final String orderId;
@@ -518,6 +519,15 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                       color: AppUi.textPrimaryOf(context),
                     ),
                   ),
+                  if (_routePoints.length > 1)
+                    Text(
+                      TrackingEta.label(TrackingEta.routeKm(_routePoints)),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppUi.brandOf(context),
+                      ),
+                    ),
                   Text(
                     'Order ID: #${(widget.orderId.length >= 8 ? widget.orderId.substring(0, 8) : widget.orderId).toUpperCase()}',
                     style: TextStyle(
