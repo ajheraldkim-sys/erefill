@@ -1063,7 +1063,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 Text(
                   'DELIVERY TO',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textSecondaryOf(context),
                     letterSpacing: 0.8,
@@ -1085,7 +1085,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppUi.textSecondaryOf(context),
                   ),
@@ -1467,7 +1467,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                             child: const Text(
                               'Nearby',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: AppUi.warningFg,
                               ),
@@ -1621,7 +1621,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: AppColors.statusCompleted,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1745,7 +1745,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 'Order ID',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: AppUi.textSecondaryOf(context),
                                   letterSpacing: 1.2,
@@ -1774,7 +1774,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 'Delivery date',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: AppUi.textSecondaryOf(context),
                                   letterSpacing: 1.2,
@@ -1807,7 +1807,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     Text(
                       'Delivery address',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                         letterSpacing: 1.5,
@@ -1839,7 +1839,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 '${order['customer_barangay'] ?? ''}, ${order['customer_municipality'] ?? ''}',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: AppUi.textSecondaryOf(context),
                                   fontWeight: FontWeight.w400,
                                 ),
@@ -1855,7 +1855,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     Text(
                       'Water refill details',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                         letterSpacing: 1.5,
@@ -2068,7 +2068,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                       Text(
                         'Notes',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppUi.textSecondaryOf(context),
                           letterSpacing: 1.5,
@@ -2124,7 +2124,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                 .toString()
                                 .toUpperCase(),
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: AppUi.textSecondaryOf(context),
                             ),

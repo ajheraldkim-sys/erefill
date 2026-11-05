@@ -475,7 +475,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                                   rider['is_suspended'] == true
                                                   ? AppColors.uiError
                                                   : AppColors.uiSuccess,
-                                              fontSize: 11,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 0.5,
                                             ),

@@ -205,7 +205,7 @@ class _HeroIconButton extends StatelessWidget {
                   badge > 9 ? '9+' : '$badge',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

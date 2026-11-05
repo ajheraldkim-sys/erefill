@@ -388,7 +388,7 @@ class _InboxScreenState extends State<InboxScreen> {
                             color: hasUnread
                                 ? AppUi.brandOf(context)
                                 : AppUi.textSecondaryOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: hasUnread
                                 ? FontWeight.w700
                                 : FontWeight.w600,

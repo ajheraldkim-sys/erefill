@@ -515,7 +515,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                               _formatTime(createdAt),
                                               style: TextStyle(
                                                 color: AppUi.textSecondaryOf(context),
-                                                fontSize: 11,
+                                                fontSize: 12,
                                               ),
                                             ),
                                           ],

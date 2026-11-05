@@ -979,7 +979,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             shortOrderId(orderId),
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
-                              fontSize: 11,
+                              fontSize: 12,
                               color: Colors.white,
                               letterSpacing: 0.5,
                             ),
@@ -1009,7 +1009,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                   '${minutesAgo}m',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -1148,7 +1148,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 landmark,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   fontStyle: FontStyle.italic,
                                 ),
@@ -1296,7 +1296,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: color,
                 ),
@@ -1776,7 +1776,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             child: Text(
                               '${stageOrders.length}',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: color,
                               ),
@@ -1906,7 +1906,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         Text(
                           stage['title'] as String,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight:
                                 isSelected ? FontWeight.w700 : FontWeight.w600,
                             color: isSelected
@@ -1931,7 +1931,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           child: Text(
                             '$count',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: isSelected ? Colors.white : color,
                             ),

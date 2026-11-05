@@ -6,11 +6,21 @@ import '../theme/app_theme.dart';
 class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
   static const _themeModeKey = 'theme_mode';
   static const _outdoorModeKey = 'is_outdoor_mode';
+  static const _textScaleKey = 'text_scale';
+
+  /// App text size range offered by the settings slider.
+  static const double minTextScale = 0.85;
+  static const double maxTextScale = 1.5;
+
+  /// Combined OS x app scale is capped so layouts stay usable.
+  static double combinedScale(double osScale, double appScale) =>
+      (osScale * appScale).clamp(minTextScale, 1.8).toDouble();
 
   /// Fresh installs follow the system theme; users can switch in settings.
   ThemeMode _themeMode = ThemeMode.system;
   bool _isOutdoorMode = false;
   bool _isLoading = true;
+  double _textScale = 1.0;
 
   ThemeProvider() {
     WidgetsBinding.instance.addObserver(this);
@@ -20,6 +30,9 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
   ThemeMode get themeMode => _themeMode;
   bool get isOutdoorMode => _isOutdoorMode;
   bool get isLoading => _isLoading;
+
+  /// User-chosen text size multiplier (1.0 = default).
+  double get textScale => _textScale;
   bool get isDarkMode =>
       !_isOutdoorMode &&
       (_themeMode == ThemeMode.dark ||
@@ -41,6 +54,9 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final savedMode = prefs.getString(_themeModeKey);
     _isOutdoorMode = prefs.getBool(_outdoorModeKey) ?? false;
+    _textScale = (prefs.getDouble(_textScaleKey) ?? 1.0)
+        .clamp(minTextScale, maxTextScale)
+        .toDouble();
 
     _themeMode = switch (savedMode) {
       'dark' => ThemeMode.dark,
@@ -77,6 +93,15 @@ class ThemeProvider extends ChangeNotifier with WidgetsBindingObserver {
           : AppTheme.baseOverlayStyle(isDarkMode),
     );
     notifyListeners();
+  }
+
+  Future<void> setTextScale(double scale) async {
+    final next = scale.clamp(minTextScale, maxTextScale).toDouble();
+    if (next == _textScale) return;
+    _textScale = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_textScaleKey, next);
   }
 
   Future<void> toggleOutdoorMode() => setOutdoorMode(!_isOutdoorMode);

@@ -240,7 +240,7 @@ class _NotificationPreviewTile extends StatelessWidget {
                       notification.formattedTime,
                       style: TextStyle(
                         color: AppUi.textMutedOf(context),
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

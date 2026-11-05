@@ -836,7 +836,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.8,
                                 ),
@@ -1222,7 +1222,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                           isReorder ? 'REPEAT LAST ORDER' : 'QUICK REFILL',
                           style: TextStyle(
                             color: AppUi.brandOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
                           ),
@@ -1232,7 +1232,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                             ' · ${formatPeso(totalAmount, whole: true)}',
                             style: TextStyle(
                               color: AppUi.textSecondaryOf(context),
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

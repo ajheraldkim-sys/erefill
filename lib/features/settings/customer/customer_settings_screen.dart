@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants.dart';
@@ -223,6 +224,8 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   icon: Icons.tune_rounded,
                   children: [
                     const ThemeModePicker(),
+                    const SizedBox(height: 16),
+                    const TextSizeSlider(),
                     const SizedBox(height: 12),
                     _buildToggle(
                       title: 'Outdoor mode (High Contrast)',

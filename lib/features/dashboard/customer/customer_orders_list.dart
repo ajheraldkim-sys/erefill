@@ -383,7 +383,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                         color: selected
                             ? AppUi.brandOf(context)
                             : (isDark ? Colors.white70 : AppUi.textSecondary),
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

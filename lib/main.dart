@@ -212,7 +212,18 @@ class _ERefillAppState extends State<ERefillApp> {
                 shadcn.ShadcnLocalizations.delegate,
               ],
               builder: (context, child) {
-                return shadcn.ShadcnLayer(
+                final mq = MediaQuery.of(context);
+                // App text size (settings slider) stacks on the OS text size.
+                return MediaQuery(
+                  data: mq.copyWith(
+                    textScaler: TextScaler.linear(
+                      ThemeProvider.combinedScale(
+                        mq.textScaler.scale(1),
+                        themeProvider.textScale,
+                      ),
+                    ),
+                  ),
+                  child: shadcn.ShadcnLayer(
                   theme: const shadcn.ThemeData(
                     colorScheme: shadcn.ColorSchemes.lightZinc,
                     radius: 0.5,
@@ -243,7 +254,7 @@ class _ERefillAppState extends State<ERefillApp> {
                       ),
                     ],
                   ),
-                );
+                ));
               },
             ),
           );

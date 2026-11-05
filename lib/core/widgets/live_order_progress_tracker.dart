@@ -289,7 +289,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                             Text(
                               step.title,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: isCurrent
                                     ? FontWeight.w700
                                     : FontWeight.w600,
@@ -356,7 +356,7 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                 Text(
                   'Your delivery rider',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppUi.textMutedOf(context),
                     fontWeight: FontWeight.w600,
                   ),

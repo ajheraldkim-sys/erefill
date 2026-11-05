@@ -133,7 +133,7 @@ class _NavIcon extends StatelessWidget {
             badgeText,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               height: 1.1,
             ),

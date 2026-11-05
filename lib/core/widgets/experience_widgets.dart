@@ -132,7 +132,7 @@ class FriendlyHeroCard extends StatelessWidget {
                     eyebrow.toUpperCase(),
                     style: TextStyle(
                       color: roleColor,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.6,
                     ),

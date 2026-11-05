@@ -521,7 +521,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                   Text(
                     'Order ID: #${(widget.orderId.length >= 8 ? widget.orderId.substring(0, 8) : widget.orderId).toUpperCase()}',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppUi.textMutedOf(context),
                     ),

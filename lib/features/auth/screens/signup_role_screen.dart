@@ -311,7 +311,7 @@ class _RoleCard extends StatelessWidget {
                               child: Text(
                                 badge!,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: AppUi.onBrandSoftOf(context),
                                 ),

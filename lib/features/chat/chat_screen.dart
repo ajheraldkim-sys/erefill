@@ -845,7 +845,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Text(
           msg.content,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             color: AppUi.textSecondaryOf(context),
             fontWeight: FontWeight.w700,
             letterSpacing: 0.5,
@@ -908,7 +908,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Text(
                   senderDisplayName,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textSecondaryOf(context),
                   ),
@@ -1050,7 +1050,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   _formatTime(msg.createdAt),
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppUi.textMutedOf(context),
                     fontWeight: FontWeight.w700,
                   ),
@@ -1131,7 +1131,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Text(
                   _orderContext?['station_name'] ?? 'Loading...',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppUi.textSecondaryOf(context),
                     fontWeight: FontWeight.w600,
                   ),
@@ -1145,7 +1145,7 @@ class _ChatScreenState extends State<ChatScreen> {
               icon: const Icon(Icons.map_rounded, size: 16),
               label: const Text(
                 'TRACK',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
               ),
               style: TextButton.styleFrom(
                 foregroundColor: AppUi.brandOf(context),

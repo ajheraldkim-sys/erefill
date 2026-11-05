@@ -1,5 +1,6 @@
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1035,7 +1036,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       Text(
                         'Email address',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppUi.textSecondaryOf(context),
                         ),
@@ -1747,7 +1748,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             'Centralized',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -2247,7 +2248,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                       child: Text(
                                         'PRIMARY',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.w700,
                                           color: AppUi.brandOf(context),
                                         ),
@@ -2721,7 +2722,13 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                           ),
                           const Padding(
                               padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
-                              child: ThemeModePicker(),
+                              child: Column(
+                                children: [
+                                  ThemeModePicker(),
+                                  SizedBox(height: 16),
+                                  TextSizeSlider(),
+                                ],
+                              ),
                             ),
                           AccountToggleTile(
                             icon: Icons.wb_sunny_outlined,
@@ -3025,7 +3032,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 Text(
                                   'Station storefront photo',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: AppUi.textSecondaryOf(context),
                                   ),

@@ -151,7 +151,7 @@ class QuickTipCard extends StatelessWidget {
                     Text(
                       'Quick tip',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.brandOf(context),
                         letterSpacing: 0.3,

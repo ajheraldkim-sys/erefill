@@ -171,7 +171,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             'Receipt ${snapshot['receipt_number'] ?? ''}  |  ${snapshot['rider_name'] ?? 'Rider'}',
             style: TextStyle(
               color: AppUi.textSecondaryOf(context),
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -192,7 +192,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             label,
             style: TextStyle(
               color: AppUi.textSecondaryOf(context),
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -222,7 +222,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
           label,
           style: TextStyle(
             color: AppUi.textSecondaryOf(context),
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
         ),

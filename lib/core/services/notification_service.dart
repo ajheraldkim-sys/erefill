@@ -481,7 +481,7 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                                 Text(
                                   'Just now',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 12,
                                     color: isDark
                                         ? const Color(0xFF94A3B8)
                                         : AppUi.textSecondary,

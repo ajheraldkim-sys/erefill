@@ -492,7 +492,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
               child: Text(
                 "Slide map to point the exact station location",
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppUi.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
@@ -541,7 +541,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
                 ].where((s) => s.isNotEmpty).join('\n\n'),
                 style: TextStyle(
                   color: AppUi.textSecondaryOf(context),
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),

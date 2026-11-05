@@ -170,7 +170,7 @@ class PaymentMethodSelector extends StatelessWidget {
                     color: isAvailable
                         ? AppUi.textSecondaryOf(context)
                         : AppUi.textMutedOf(context),
-                    fontSize: 11,
+                    fontSize: 12,
                     height: 1.25,
                   ),
                 ),

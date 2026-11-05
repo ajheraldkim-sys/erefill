@@ -108,7 +108,7 @@ Future<void> showNotificationDetailDialog(
                                 child: Text(
                                   type.displayName,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                     color: typeColor,
                                   ),
@@ -134,7 +134,7 @@ Future<void> showNotificationDetailDialog(
                                   child: Text(
                                     notification.priority.value.toUpperCase(),
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                       color: notification.priority.color,
                                     ),
@@ -147,7 +147,7 @@ Future<void> showNotificationDetailDialog(
                           Text(
                             '$formattedDate ($timeAgo)',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppUi.textMutedOf(context),
                               fontWeight: FontWeight.w600,
                             ),

@@ -337,7 +337,7 @@ class ERefillHeader extends StatelessWidget implements PreferredSizeWidget {
                       count > 9 ? '9+' : '$count',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

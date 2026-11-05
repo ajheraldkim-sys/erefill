@@ -45,7 +45,7 @@ class OfflineBanner extends StatelessWidget {
                 Text(
                   message,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.uiWarning,
                   ),
@@ -98,7 +98,7 @@ class OfflineBanner extends StatelessWidget {
                           'Retry',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             decoration: TextDecoration.underline,
                           ),

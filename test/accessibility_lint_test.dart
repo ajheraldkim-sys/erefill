@@ -106,4 +106,27 @@ void main() {
     ];
     expect(offenders, isEmpty, reason: 'Use an Icon instead of a glyph');
   });
+
+  test('no UI text smaller than 12 logical pixels', () {
+    // Readability for users of all ages. PDF/receipt generators print on
+    // paper and are exempt.
+    const exempt = {
+      'lib/core/services/receipt_service.dart',
+      'lib/core/services/report_export_service.dart',
+    };
+    final tiny = RegExp(r'fontSize:\s*(\d+(\.\d+)?)');
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = file.path.replaceAll(r'\', '/');
+      if (exempt.contains(path)) continue;
+      final lines = file.readAsLinesSync();
+      for (var i = 0; i < lines.length; i++) {
+        for (final m in tiny.allMatches(lines[i])) {
+          if (double.parse(m.group(1)!) < 12) offenders.add('$path:${i + 1}');
+        }
+      }
+    }
+    expect(offenders, isEmpty,
+        reason: 'Use fontSize >= 12:\n${offenders.join('\n')}');
+  });
 }

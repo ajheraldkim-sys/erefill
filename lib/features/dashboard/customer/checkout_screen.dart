@@ -670,7 +670,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           subtitle: Text(
                             v.description,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppUi.textMutedOf(context),
                             ),
                           ),
@@ -1917,7 +1917,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             '${item.quantity}x',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -2140,7 +2140,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     Text(
                       'Do you have empty bottles to swap?',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: isDark
                             ? Colors.grey[400]
                             : AppUi.textMutedOf(context),
@@ -2216,7 +2216,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           'Hand over your empty gallon, no deposit',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: isDark
                                 ? Colors.grey[400]
                                 : AppUi.textMutedOf(context),
@@ -2290,7 +2290,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           'Buy or deposit new container',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: isDark
                                 ? Colors.grey[400]
                                 : AppUi.textMutedOf(context),
@@ -2369,7 +2369,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const Text(
                         'Voucher',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.uiSuccess,
                         ),
@@ -2576,7 +2576,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: Text(
                           'Secure checkout powered by PayMongo Philippines',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppUi.brandOf(context),
                           ),

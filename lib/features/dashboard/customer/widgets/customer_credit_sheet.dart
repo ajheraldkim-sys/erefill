@@ -245,7 +245,7 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
                         Text(
                           'TOTAL OUTSTANDING BALANCE',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
                             color: _totalDebt > 0
@@ -391,7 +391,7 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
                                             Text(
                                               '$formattedDate · Total ${formatPeso(amt)}${paid > 0 ? ' (Paid ${formatPeso(paid)})' : ''}',
                                               style: TextStyle(
-                                                fontSize: 11,
+                                                fontSize: 12,
                                                 color: AppUi.textSecondaryOf(context),
                                               ),
                                             ),
@@ -420,7 +420,7 @@ class _CustomerCreditSheetState extends State<CustomerCreditSheet> {
                                                 ? 'Settled'
                                                 : (isPartial ? 'Partial' : 'Unpaid'),
                                             style: TextStyle(
-                                              fontSize: 11,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               color: isSettled
                                                   ? AppColors.uiSuccess

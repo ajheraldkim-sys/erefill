@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:latlong2/latlong.dart';
@@ -816,7 +817,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             Text(
               'CONTACT INFORMATION',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: AppUi.textSecondaryOf(ctx),
@@ -860,7 +861,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       Text(
                         '7 AM - 6 PM',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppUi.textSecondaryOf(ctx),
                         ),
                       ),
@@ -905,7 +906,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             Text(
               'QUICK FAQS',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: AppUi.textSecondaryOf(ctx),
@@ -959,7 +960,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               child: Text(
                 'eRefill v1.0.0 • Cantilan & Madrid Service',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppUi.textMutedOf(context),
                 ),
@@ -1257,7 +1258,13 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                             ),
                             const Padding(
                               padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
-                              child: ThemeModePicker(),
+                              child: Column(
+                                children: [
+                                  ThemeModePicker(),
+                                  SizedBox(height: 16),
+                                  TextSizeSlider(),
+                                ],
+                              ),
                             ),
                           ],
                         ),

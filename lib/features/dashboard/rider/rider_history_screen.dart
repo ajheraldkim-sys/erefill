@@ -186,7 +186,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                             'ORDER #$id',
                                             style: TextStyle(
                                               color: AppUi.textMutedOf(context),
-                                              fontSize: 11,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 0.5,
                                             ),
@@ -215,7 +215,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                               'Earnings',
                                               style: TextStyle(
                                                 color: AppUi.textMutedOf(context),
-                                                fontSize: 11,
+                                                fontSize: 12,
                                                 fontWeight: FontWeight.w700,
                                                 letterSpacing: 0,
                                               ),
@@ -246,7 +246,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                             'Total',
                                             style: TextStyle(
                                               color: AppUi.textMutedOf(context),
-                                              fontSize: 11,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 1,
                                             ),
@@ -365,7 +365,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
                                 'RECEIPT #ID: #${order['id'].toString().toUpperCase()}',
                                 style: const TextStyle(
                                   color: AppColors.statusCompleted,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 1.5,
                                 ),
@@ -642,7 +642,7 @@ class _RiderHistoryScreenState extends State<RiderHistoryScreen> {
           title,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            fontSize: 11,
+            fontSize: 12,
             color: AppUi.textSecondaryOf(context),
             letterSpacing: 1.5,
           ),

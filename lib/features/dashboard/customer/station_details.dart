@@ -594,7 +594,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             Text(
                               '${formatPeso(selectedPrice, whole: true)} / gallon',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: AppUi.textSecondaryOf(ctx),
                               ),
                             ),
@@ -1711,7 +1711,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                           Text(
                             '· $formattedDate',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppUi.textSecondaryOf(context),
                               fontWeight: FontWeight.w500,
                             ),
@@ -1740,7 +1740,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                     Text(
                       'Verified',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.uiSuccess,
                       ),
@@ -1901,7 +1901,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                             '$stars',
                             style: TextStyle(
                               color: AppUi.textSecondaryOf(context),
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -2090,7 +2090,7 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                                 '${cart.totalItems}',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

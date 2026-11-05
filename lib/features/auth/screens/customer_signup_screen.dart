@@ -739,7 +739,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               child: Text(
                 "Slide map to point the exact location",
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppUi.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),

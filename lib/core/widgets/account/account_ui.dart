@@ -33,7 +33,7 @@ class AccountSectionLabel extends StatelessWidget {
         label.toUpperCase(),
         textAlign: textAlign,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
           color: AppUi.textSecondaryOf(context),
@@ -163,7 +163,7 @@ class AccountNavTile extends StatelessWidget {
                   child: Text(
                     badgeText!,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: badgeColor ?? AppUi.brandOf(context),
                       letterSpacing: 0.2,
@@ -423,7 +423,7 @@ class _StatCell extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: AppUi.textSecondaryOf(context),
           ),

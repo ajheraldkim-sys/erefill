@@ -245,7 +245,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                           'Tap below to immediately trigger your scheduled orders.',
                           style: TextStyle(
                             color: AppColors.uiWarning,
-                            fontSize: 11,
+                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -420,7 +420,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
               Text(
                 sub.preferredTimeSlot.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppUi.textMutedOf(context),
                 ),
@@ -451,7 +451,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                       ? 'Next Delivery: ${_formatDate(sub.nextDeliveryDate)}'
                       : 'Schedule Paused',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: sub.isActive
                         ? AppColors.uiSuccess
@@ -503,7 +503,7 @@ class _CustomerSubscriptionsTabState extends State<CustomerSubscriptionsTab> {
                     child: Text(
                       'Cancel',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.uiError,
                         fontWeight: FontWeight.w700,
                       ),

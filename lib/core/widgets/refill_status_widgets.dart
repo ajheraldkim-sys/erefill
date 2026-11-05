@@ -183,7 +183,7 @@ class DashboardMetricCard extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppUi.textSecondaryOf(context),
                 ),
@@ -281,7 +281,7 @@ class WaterTypeCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(context),
           ),
@@ -292,7 +292,7 @@ class WaterTypeCard extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             height: 1.25,
             color: AppUi.textSecondaryOf(context),
           ),
@@ -384,7 +384,7 @@ class WaterTypeCard extends StatelessWidget {
                     Text(
                       b,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                       ),
@@ -403,7 +403,7 @@ class WaterTypeCard extends StatelessWidget {
                 'Ready in ~$preparationMinutes min',
             ].join(' · '),
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: AppUi.textMutedOf(context),
               fontWeight: FontWeight.w700,
             ),
@@ -431,7 +431,7 @@ class _TypeBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           color: AppUi.accentTextOf(
             context,
@@ -595,7 +595,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: AppUi.textSecondaryOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             height: 1.2,
                           ),
                         ),
@@ -701,7 +701,7 @@ class _ProgressMilestone extends StatelessWidget {
           style: TextStyle(
             color: isCurrent ? statusColor : AppUi.textSecondaryOf(context),
             fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-            fontSize: 11,
+            fontSize: 12,
           ),
         ),
       ],

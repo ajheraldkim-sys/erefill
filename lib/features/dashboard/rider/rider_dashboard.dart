@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1374,7 +1375,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'CASH ON DELIVERY'
                             : 'AWAITING PAYMENT (${paymentLabel.toUpperCase()})',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: isPaid
                               ? AppColors.uiSuccess
@@ -1451,7 +1452,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                     child: Text(
                       'Landmark: ${order['customer_landmark']}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: AppUi.textMutedOf(context),
                       ),
@@ -1502,7 +1503,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'Online payment confirmed'
                             : 'Check payment status',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: isCod
                               ? AppUi.warningFg
@@ -1544,7 +1545,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'COLLECT CASH'
                             : 'VERIFY PAYMENT',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: isPaid
                               ? AppUi.successFg
@@ -1780,7 +1781,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                     steps[i]['title'] as String,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: i == currentStep
                           ? FontWeight.w700
                           : FontWeight.w600,
@@ -2362,7 +2363,13 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ),
                             const Padding(
                               padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
-                              child: ThemeModePicker(),
+                              child: Column(
+                                children: [
+                                  ThemeModePicker(),
+                                  SizedBox(height: 16),
+                                  TextSizeSlider(),
+                                ],
+                              ),
                             ),
                           ],
                         ),

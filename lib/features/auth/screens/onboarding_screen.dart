@@ -489,7 +489,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const Text(
             'Pin Precise Location',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: OnboardingPalette.textMuted,
               letterSpacing: 1.5,

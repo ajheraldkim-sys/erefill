@@ -625,7 +625,7 @@ class StationAvailabilityBadge extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: fg,
             ),
@@ -804,7 +804,7 @@ class DashboardStatCard extends StatelessWidget {
                             child: Text(
                               delta!,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: isPositive
                                     ? AppUi.accentGreen
@@ -1132,7 +1132,7 @@ class ActiveOrderCard extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: isDone ? FontWeight.w700 : FontWeight.w500,
             color: isDone ? AppUi.textPrimaryOf(context) : AppUi.textMutedOf(context),
           ),

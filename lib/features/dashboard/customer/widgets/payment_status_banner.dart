@@ -99,7 +99,7 @@ class PaymentStatusBanner extends StatelessWidget {
                   style: TextStyle(
                     color: AppUi.textSecondaryOf(context),
                     fontWeight: FontWeight.w600,
-                    fontSize: 11,
+                    fontSize: 12,
                   ),
                 ),
               ],

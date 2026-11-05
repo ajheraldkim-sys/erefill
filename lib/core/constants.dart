@@ -315,12 +315,12 @@ class AppUi {
     letterSpacing: 0,
   );
   static const TextStyle bodyText = TextStyle(
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w500,
     height: 1.5,
   );
   static const TextStyle captionText = TextStyle(
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w600,
   );
 

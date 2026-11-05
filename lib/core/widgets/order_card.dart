@@ -210,7 +210,7 @@ class OrderCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: style.cardSecondaryText,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -378,7 +378,7 @@ class OrderCard extends StatelessWidget {
                             '$subtitle · $dateStr',
                             style: TextStyle(
                               color: AppUi.textSecondaryOf(context),
-                              fontSize: 11,
+                              fontSize: 12,
                             ),
                           ),
                         ],

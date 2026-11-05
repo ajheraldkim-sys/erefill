@@ -353,7 +353,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                       'Member Tier',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -452,7 +452,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
             'Share your unique code with family or neighbors. When they enter it, both of you receive +50 points!',
             style: TextStyle(
               color: AppUi.successFg,
-              fontSize: 11,
+              fontSize: 12,
               height: 1.35,
             ),
           ),
@@ -596,7 +596,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                 child: Text(
                   _codeRedemptionMsg!,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: _codeRedemptionMsg!.contains('Success')
                         ? AppColors.uiSuccess
                         : AppColors.uiError,
@@ -665,7 +665,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                     Text(
                       reward.description,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppUi.textMutedOf(context),
                       ),
                     ),
@@ -784,7 +784,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                     child: const Text(
                       'Ready to Use',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppColors.uiSuccess,
                         fontWeight: FontWeight.w700,
                       ),
@@ -811,7 +811,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
                   ),
                   Text(
                     'Expires: ${v.expiresAt.month}/${v.expiresAt.day}/${v.expiresAt.year}',
-                    style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
+                    style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
                   ),
                 ],
               ),
@@ -858,7 +858,7 @@ class _LoyaltyRewardsSheetState extends State<LoyaltyRewardsSheet>
           ),
           subtitle: Text(
             '${tx.createdAt.month}/${tx.createdAt.day}/${tx.createdAt.year} · ${tx.createdAt.hour}:${tx.createdAt.minute.toString().padLeft(2, '0')}',
-            style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
+            style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
           ),
           trailing: Text(
             '${isPositive ? '+' : ''}${tx.points} pts',

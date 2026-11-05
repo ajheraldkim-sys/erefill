@@ -278,7 +278,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppUi.textMutedOf(context),
                 ),
@@ -362,7 +362,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
                     Text(
                       statusLabel,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: statusColor,
                       ),
@@ -404,7 +404,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             const SizedBox(height: 4),
             Text(
               'Ref #: ${req.referenceNumber}',
-              style: const TextStyle(fontSize: 11, color: AppColors.uiSuccess),
+              style: const TextStyle(fontSize: 12, color: AppColors.uiSuccess),
             ),
           ],
           if (req.rejectionReason != null &&
@@ -412,7 +412,7 @@ class _RiderPayoutSheetState extends State<RiderPayoutSheet> {
             const SizedBox(height: 4),
             Text(
               'Reason: ${req.rejectionReason}',
-              style: const TextStyle(fontSize: 11, color: AppColors.uiError),
+              style: const TextStyle(fontSize: 12, color: AppColors.uiError),
             ),
           ],
         ],

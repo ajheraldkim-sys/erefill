@@ -258,7 +258,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                       'Orders paid with GCash, Maya, or Card will appear here automatically.',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         color: AppUi.textMutedOf(context),
                                       ),
                                     ),
@@ -316,7 +316,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                             Text(
                                               '$status • $dateStr',
                                               style: TextStyle(
-                                                fontSize: 11,
+                                                fontSize: 12,
                                                 color: AppUi.textMutedOf(context),
                                               ),
                                             ),
@@ -383,7 +383,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                 ),
                 child: const Text(
                   'Auto-Calculated',
-                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -403,7 +403,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
             'Net digital revenue after deducting rider payouts',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -439,7 +439,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppUi.textMutedOf(context),
                   ),
@@ -461,7 +461,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: AppUi.textSecondaryOf(context),
             ),
           ),

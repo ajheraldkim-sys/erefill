@@ -1196,7 +1196,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                         child: Text(
                                           'DEFAULT',
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w700,
                                             color: AppUi.brandOf(context),
                                             letterSpacing: 0.5,
@@ -1291,7 +1291,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                                         Text(
                                           'Tap to set as default address',
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w600,
                                             color: AppUi.brandOf(context),
                                           ),
