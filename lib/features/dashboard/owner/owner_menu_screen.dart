@@ -39,6 +39,7 @@ import 'delivery_coverage_screen.dart';
 import 'accessories_screen.dart';
 import 'package:erefill/features/account/verification/verification_screen.dart';
 import 'package:erefill/features/quality/station_certificates.dart';
+import 'package:erefill/features/disputes/disputes.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -2617,6 +2618,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (_) => const VerificationScreen(),
+                              ),
+                            ),
+                          ),
+                          AccountNavTile(
+                            icon: Icons.support_agent_outlined,
+                            title: 'Customer reports',
+                            subtitle: 'Reply to problems and refunds',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const OwnerDisputesScreen(),
                               ),
                             ),
                           ),

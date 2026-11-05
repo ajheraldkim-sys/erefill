@@ -24,6 +24,7 @@ import '../../../core/sync/realtime_hub.dart';
 import '../../../core/sync/synced_state.dart';
 
 import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/features/disputes/disputes.dart';
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? order;
   final String? orderId;
@@ -820,6 +821,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             if (status == 'delivered') ...[
               _buildDeliveryCompleteCompact(),
               const SizedBox(height: 10),
+              if (Dispute.canReport(
+                status: status,
+                deliveredAt: DateTime.tryParse(
+                  (order['actual_completion_at'] ?? order['updated_at'] ?? '')
+                      .toString(),
+                )?.toLocal(),
+                now: DateTime.now(),
+              ))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => showModalBottomSheet<bool>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => ReportProblemSheet(
+                        orderId: order['id'].toString(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.report_gmailerrorred_outlined),
+                    label: const Text('Report a problem'),
+                  ),
+                ),
             ],
 
             // 5. Offline sync & payment notices
