@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +17,6 @@ import 'package:erefill/core/providers/user_provider.dart';
 import 'package:erefill/core/widgets/app_cached_image.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
-import 'package:erefill/core/providers/theme_provider.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
@@ -2360,14 +2360,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                               onChanged: (v) =>
                                   setState(() => _soundAlertsEnabled = v),
                             ),
-                            AccountToggleTile(
-                              icon: Icons.dark_mode_outlined,
-                              title: 'Dark mode',
-                              value: context.select<ThemeProvider, bool>(
-                                (t) => t.isDarkMode,
-                              ),
-                              onChanged: (v) =>
-                                  context.read<ThemeProvider>().setDarkMode(v),
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
+                              child: ThemeModePicker(),
                             ),
                           ],
                         ),

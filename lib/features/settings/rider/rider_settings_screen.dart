@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -261,6 +262,8 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
                         title: 'Display & Sunlight',
                         icon: Icons.wb_sunny_outlined,
                         children: [
+                          const ThemeModePicker(),
+                          const Divider(height: 20),
                           Material(
                             color: Colors.transparent,
                             child: SwitchListTile.adaptive(

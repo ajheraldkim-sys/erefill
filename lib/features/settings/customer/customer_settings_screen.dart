@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants.dart';
@@ -221,15 +222,8 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   title: 'App preferences',
                   icon: Icons.tune_rounded,
                   children: [
-                    _buildToggle(
-                      title: 'Dark mode',
-                      subtitle: 'Use the dark app theme',
-                      value: context.select<ThemeProvider, bool>(
-                        (p) => p.isDarkMode,
-                      ),
-                      onChanged: (v) =>
-                          context.read<ThemeProvider>().setDarkMode(v),
-                    ),
+                    const ThemeModePicker(),
+                    const SizedBox(height: 12),
                     _buildToggle(
                       title: 'Outdoor mode (High Contrast)',
                       subtitle: 'Pure white background and pitch-black text for direct sunlight',

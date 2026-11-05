@@ -1,12 +1,12 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/water_types.dart';
-import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/account/account_ui.dart';
 import '../../../core/widgets/brand/hero_header.dart';
@@ -1255,15 +1255,9 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                       () => _notificationsEnabled = v,
                                     ),
                             ),
-                            AccountToggleTile(
-                              icon: Icons.dark_mode_outlined,
-                              title: 'Dark mode',
-                              value: context.select<ThemeProvider, bool>(
-                                (t) => t.isDarkMode,
-                              ),
-                                    onChanged: (v) => context
-                                        .read<ThemeProvider>()
-                                        .setDarkMode(v),
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
+                              child: ThemeModePicker(),
                             ),
                           ],
                         ),

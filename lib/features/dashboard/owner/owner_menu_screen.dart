@@ -1,4 +1,5 @@
 import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2718,15 +2719,10 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             onChanged: (v) =>
                                 setState(() => _notificationsEnabled = v),
                           ),
-                          AccountToggleTile(
-                            icon: Icons.dark_mode_outlined,
-                            title: 'Dark mode',
-                            value: context.select<ThemeProvider, bool>(
-                              (t) => t.isDarkMode,
+                          const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
+                              child: ThemeModePicker(),
                             ),
-                            onChanged: (v) =>
-                                context.read<ThemeProvider>().setDarkMode(v),
-                          ),
                           AccountToggleTile(
                             icon: Icons.wb_sunny_outlined,
                             title: 'Outdoor high-contrast theme',
