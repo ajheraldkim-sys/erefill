@@ -3,7 +3,7 @@ abstract final class StationQueryHelpers {
   /// Columns safe to request on owner profiles across schema versions.
   static const ownerStationFields =
       'id, station_name, full_name, town, barangay, complete_address, '
-      'average_rating, is_open, station_photo_url, station_logo_url, avatar_url, '
+      'average_rating, review_count, is_open, station_photo_url, station_logo_url, avatar_url, '
       'primary_water_type, price_per_gallon, latitude, longitude, lat, lng';
 
   static Map<String, dynamic> withAvailability(Map<String, dynamic> row) {

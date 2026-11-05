@@ -28,6 +28,7 @@ import 'package:erefill/core/sync/realtime_hub.dart';
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
+import 'package:erefill/core/utils/station_ranking.dart';
 
 class StationListScreen extends StatefulWidget {
   const StationListScreen({super.key, this.initialFilter});
@@ -432,6 +433,15 @@ class _StationListScreenState extends State<StationListScreen> {
 
       return matchesSearch && matchesFilter;
     }).toList();
+
+    if (_selectedFilter != 'Nearest') {
+      // Recommended order: weighted rating, nearer stations win near-ties.
+      filtered = StationRanking.rank(
+        filtered.cast<Map<String, dynamic>>(),
+        customerLat: _currentPosition?.latitude,
+        customerLng: _currentPosition?.longitude,
+      );
+    }
 
     if (_selectedFilter == 'Nearest' && _currentPosition != null) {
       filtered.sort((a, b) {

@@ -34,6 +34,7 @@ import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
+import 'package:erefill/core/utils/station_ranking.dart';
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
 
@@ -425,8 +426,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         if (inTown.isNotEmpty) {
           stations = StationQueryHelpers.withAvailabilityAll(inTown)
               .map(enrichStation)
-              .take(6)
               .toList();
+          stations = StationRanking.rank(stations).take(6).toList();
         }
       }
 
@@ -437,8 +438,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   List<Map<String, dynamic>>.from(ownerRows),
                 )
                 .map(enrichStation)
-                .take(6)
                 .toList();
+        stations = StationRanking.rank(stations).take(6).toList();
       }
 
       // Map favorites from batch
@@ -1132,7 +1133,13 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       }).toList();
     }
 
-    // Sort: open stations first, closed stations moved to the bottom
+    // Recommended order (weighted rating), then open stations first.
+    final rankOf = <Object, int>{
+      for (final (i, s) in StationRanking.rank(
+        base.cast<Map<String, dynamic>>(),
+      ).indexed)
+        s: i,
+    };
     base.sort((a, b) {
       final aAvail = (a['station_availability'] ?? (a['is_open'] == false ? 'closed' : 'open')).toString().toLowerCase();
       final bAvail = (b['station_availability'] ?? (b['is_open'] == false ? 'closed' : 'open')).toString().toLowerCase();
@@ -1140,7 +1147,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final bClosed = bAvail == 'closed';
       if (aClosed && !bClosed) return 1;
       if (!aClosed && bClosed) return -1;
-      return 0;
+      return (rankOf[a] ?? 0).compareTo(rankOf[b] ?? 0);
     });
 
     return base;

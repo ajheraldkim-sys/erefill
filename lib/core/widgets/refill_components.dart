@@ -9,6 +9,7 @@ import 'press_bounce.dart';
 import 'refill_status_widgets.dart';
 
 import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/station_ranking.dart';
 /// Full-width search field for finding nearby water stations.
 class RefillSearchBar extends StatelessWidget {
   final String hint;
@@ -411,7 +412,9 @@ class StationCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 3),
                     Text(
-                      rating > 0 ? rating.toStringAsFixed(1) : 'New',
+                      StationRanking.isNew(station)
+                          ? 'New'
+                          : rating.toStringAsFixed(1),
                       style: AppUi.captionText.copyWith(
                         color: AppUi.textSecondaryOf(context),
                       ),
@@ -497,7 +500,7 @@ class StationCard extends StatelessWidget {
                         ),
                       _StationCardMeta(
                         icon: Icons.star_rounded,
-                        label: reviewCount > 0
+                        label: !StationRanking.isNew(station)
                             ? '${rating.toStringAsFixed(1)} · $reviewCount reviews'
                             : 'New station',
                         iconColor: AppColors.uiWarning,
