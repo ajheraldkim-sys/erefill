@@ -1543,6 +1543,41 @@ class AdminApiService {
     }
   }
 
+  // ── ID verification ───────────────────────────────────────────────────
+
+  /// Pending ID verifications, oldest first, with the submitter's name.
+  Future<List<Map<String, dynamic>>> listPendingVerifications() async {
+    final rows = await _client
+        .from('identity_verifications')
+        .select(
+          'id, user_id, role, id_type, id_number_last4, front_path, back_path, '
+          'selfie_path, business_permit_path, created_at, '
+          'profile:profiles!identity_verifications_user_id_fkey(full_name, station_name, phone, town, barangay)',
+        )
+        .eq('status', 'pending')
+        .order('created_at');
+    return [for (final r in rows) Map<String, dynamic>.from(r)];
+  }
+
+  /// Short-lived link to a private verification document.
+  Future<String?> verificationDocUrl(String? path) async {
+    if (path == null || path.isEmpty) return null;
+    return _client.storage
+        .from('verification_docs')
+        .createSignedUrl(path, 600);
+  }
+
+  Future<void> reviewVerification(
+    String id, {
+    required bool approve,
+    String? reason,
+  }) =>
+      _client.rpc('admin_review_identity_verification', params: {
+        'p_verification_id': id,
+        'p_approve': approve,
+        'p_reason': reason,
+      });
+
   Future<void> deleteReview(String reviewId, {String? reason}) async {
     try {
       await _client.rpc(

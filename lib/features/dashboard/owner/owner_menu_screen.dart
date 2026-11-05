@@ -37,6 +37,7 @@ import 'package:erefill/core/localization/app_strings.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'delivery_coverage_screen.dart';
 import 'accessories_screen.dart';
+import 'package:erefill/features/account/verification/verification_screen.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -2607,6 +2608,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openStationDetailsSheet,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.verified_user_outlined,
+                            title: 'ID verification',
+                            subtitle: 'Verify your ID to build trust and prevent scams',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const VerificationScreen(),
+                              ),
+                            ),
                           ),
                           AccountNavTile(
                             icon: Icons.inventory_2_outlined,

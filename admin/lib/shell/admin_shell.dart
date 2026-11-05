@@ -26,6 +26,7 @@ import '../features/users/users_screen.dart';
 import '../providers/admin_auth_provider.dart';
 import '../sync/admin_sync_widgets.dart';
 import '../widgets/admin_ui.dart';
+import '../features/verification/verification_queue_screen.dart';
 
 enum AdminSection {
   dashboard,
@@ -39,6 +40,7 @@ enum AdminSection {
   settings,
   ridersMap,
   moderation,
+  verifications,
   paymentFailures,
   auditLog,
   systemConfig,
@@ -209,6 +211,7 @@ class _AdminShellState extends State<AdminShell> with SyncedState {
       AdminSection.settings => const PlatformFeesScreen(),
       AdminSection.ridersMap => const RidersMapScreen(),
       AdminSection.moderation => const ModerationScreen(),
+      AdminSection.verifications => const VerificationQueueScreen(),
       AdminSection.paymentFailures => const PaymentFailuresScreen(),
       AdminSection.auditLog => const AuditLogScreen(),
       AdminSection.systemConfig => const SystemConfigScreen(),
@@ -257,6 +260,11 @@ class _AdminSidebar extends StatelessWidget {
           AdminSection.moderation,
           LucideIcons.shieldAlert,
           'Trust & Moderation',
+        ),
+        _NavItem(
+          AdminSection.verifications,
+          LucideIcons.badgeCheck,
+          'ID Verification',
         ),
       ],
     ),
@@ -609,6 +617,7 @@ class _AdminTopBar extends StatelessWidget {
     AdminSection.settings => 'System Settings',
     AdminSection.ridersMap => 'Live Riders',
     AdminSection.moderation => 'Trust & Moderation',
+    AdminSection.verifications => 'ID Verification',
     AdminSection.paymentFailures => 'Payment Failures',
     AdminSection.auditLog => 'Audit Trail',
     AdminSection.systemConfig => 'Feature Toggles',

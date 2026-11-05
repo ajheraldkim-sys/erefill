@@ -1,4 +1,7 @@
--- Run: bash build.sh ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/rider_tips.sql ../scripts/order_pricing_v3.sql -- delivery_quote_test.sql
+-- Run: bash build.sh ../scripts/harden_signup_and_protected_columns.sql ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/rider_tips.sql ../scripts/identity_verification.sql ../scripts/order_pricing_v3.sql -- delivery_quote_test.sql
+
+-- Fixture station must be verified to take orders (identity_verification.sql).
+UPDATE public.profiles SET verification_status = 'approved' WHERE id = '00000000-0000-4000-8000-0000000000a1';
 -- Owner a1 is at (14.60, 121.00). Config below: ₱10/km, ₱20 minimum, 1 km minimum billable, exact distance, whole-peso fee.
 
 UPDATE public.system_config

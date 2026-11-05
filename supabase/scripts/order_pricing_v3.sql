@@ -10,10 +10,13 @@
 --   * Accessories (products.kind = 'accessory') are sold alongside water;
 --     only water gallons count toward the free-delivery gallon threshold.
 --   * Optional rider tip (tip_amount, ₱0–₱500) added to the total.
+--   * ID verification gates: approved stations only; COD limits for
+--     unverified customers.
 -- This is the single place later features (accessories, tips, verification
 -- gates) extend create_order_atomic. Do not redefine it in other scripts.
 --
--- Run order: delivery_coverage.sql -> station_accessories.sql -> rider_tips.sql -> this file.
+-- Run order: harden_signup_and_protected_columns.sql -> delivery_coverage.sql ->
+--   station_accessories.sql -> rider_tips.sql -> identity_verification.sql -> this file.
 -- Tests: supabase/tests/delivery_quote_test.sql, accessories_test.sql
 -- ==============================================================================
 BEGIN;
@@ -221,6 +224,11 @@ BEGIN
     v_computed_subtotal + v_delivery_fee + v_platform_fee - v_discount,
     0
   ) + v_tip;
+
+  -- ID verification gates (identity_verification.sql).
+  PERFORM public.assert_order_allowed_by_verification(
+    v_customer_id, v_owner_id, v_payment_method, v_total_amount
+  );
 
   INSERT INTO public.orders (
     id,

@@ -24,6 +24,7 @@ import 'widgets/customer_credit_sheet.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/features/account/verification/verification_screen.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
@@ -1191,6 +1192,16 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         const AccountSectionLabel('Delivery'),
                         AccountGroup(
                           children: [
+                            AccountNavTile(
+                              icon: Icons.verified_user_outlined,
+                              title: 'ID verification',
+                              subtitle: 'Verify your ID to build trust and prevent scams',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const VerificationScreen(),
+                                ),
+                              ),
+                            ),
                             AccountNavTile(
                               icon: Icons.location_on_outlined,
                               title: 'Saved addresses',

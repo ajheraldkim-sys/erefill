@@ -36,12 +36,20 @@ abstract final class StationOrderability {
     return (station['is_open'] as bool?) ?? true;
   }
 
+  /// Stations must pass ID verification to take orders. Rows from a
+  /// database without the column (null) are treated as verified.
+  static bool isVerified(Map<String, dynamic> station) {
+    final status = station['verification_status']?.toString();
+    return status == null || status == 'approved';
+  }
+
   static bool isOrderable(
     Map<String, dynamic> station, {
     Map<String, double>? ownerSettingsPrices,
     Map<String, double>? productPrices,
     bool requireProduct = false,
   }) {
+    if (!isVerified(station)) return false;
     if (!hasLocation(station)) return false;
     if (!isOpenForOrders(station)) return false;
 

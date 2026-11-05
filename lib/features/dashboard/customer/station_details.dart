@@ -1970,8 +1970,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
               ) /
               _reviews.length)
         : ((station['average_rating'] as num?)?.toDouble() ?? 0.0);
-    final isVerified =
-        station['is_verified'] == true || station['verified'] == true;
+    final isVerified = station['verification_status'] == 'approved' ||
+        station['is_verified'] == true ||
+        station['verified'] == true;
     final photoUrl = (station['station_photo_url'] ??
             station['station_logo_url'] ??
             station['avatar_url'] ??
