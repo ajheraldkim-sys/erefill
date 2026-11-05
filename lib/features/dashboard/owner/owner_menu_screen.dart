@@ -38,6 +38,7 @@ import 'package:erefill/core/theme/app_colors.dart';
 import 'delivery_coverage_screen.dart';
 import 'accessories_screen.dart';
 import 'package:erefill/features/account/verification/verification_screen.dart';
+import 'package:erefill/features/quality/station_certificates.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -2618,6 +2619,21 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 builder: (_) => const VerificationScreen(),
                               ),
                             ),
+                          ),
+                          AccountNavTile(
+                            icon: Icons.science_outlined,
+                            title: 'Water quality certificates',
+                            subtitle: 'Lab tests and permits for your badge',
+                            onTap: () {
+                              final uid = supabase.auth.currentUser?.id;
+                              if (uid == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      CertificatesScreen(ownerId: uid),
+                                ),
+                              );
+                            },
                           ),
                           AccountNavTile(
                             icon: Icons.inventory_2_outlined,

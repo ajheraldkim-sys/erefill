@@ -117,7 +117,30 @@ class _StationListScreenState extends State<StationListScreen> {
     await _fetchStations();
   }
 
+  /// Stations with a valid approved lab test get a small ranking boost.
+  Set<String> _waterTestedIds = const {};
+
+  Future<void> _loadWaterTested() async {
+    try {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final rows = await supabase
+          .from('station_certifications')
+          .select('owner_id')
+          .eq('status', 'approved')
+          .inFilter('cert_type', ['bacteriological', 'physical_chemical'])
+          .gt('expires_on', today);
+      if (mounted) {
+        setState(() => _waterTestedIds = {
+              for (final r in rows) r['owner_id'].toString(),
+            });
+      }
+    } catch (_) {
+      // Older database without certificates: no boost.
+    }
+  }
+
   Future<void> _fetchStations({bool isRefresh = false}) async {
+    unawaited(_loadWaterTested());
     try {
       final res = await supabase
           .from('profiles')
@@ -440,6 +463,7 @@ class _StationListScreenState extends State<StationListScreen> {
         filtered.cast<Map<String, dynamic>>(),
         customerLat: _currentPosition?.latitude,
         customerLng: _currentPosition?.longitude,
+        bonus: (s) => _waterTestedIds.contains(s['id']?.toString()) ? 0.15 : 0,
       );
     }
 

@@ -31,6 +31,7 @@ import '../../subscriptions/services/subscription_service.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'widgets/delivery_coverage_card.dart';
 import 'widgets/station_accessories_section.dart';
+import 'package:erefill/features/quality/station_certificates.dart';
 
 class StationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> station;
@@ -2228,6 +2229,9 @@ class _StationDetailsScreenState extends State<StationDetailsScreen> {
                       stationId: widget.station['id'].toString(),
                     ),
                     const SizedBox(height: 12),
+                    StationQualitySection(
+                      stationId: widget.station['id'].toString(),
+                    ),
                   ],
 
                   // 3. Reach the station

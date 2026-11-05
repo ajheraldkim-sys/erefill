@@ -1559,6 +1559,30 @@ class AdminApiService {
     return [for (final r in rows) Map<String, dynamic>.from(r)];
   }
 
+  /// Pending water-quality certificates with the station name.
+  Future<List<Map<String, dynamic>>> listPendingCertificates() async {
+    final rows = await _client
+        .from('station_certifications')
+        .select(
+          'id, owner_id, cert_type, issued_on, expires_on, file_path, created_at, '
+          'profile:profiles!station_certifications_owner_id_fkey(station_name, full_name)',
+        )
+        .eq('status', 'pending')
+        .order('created_at');
+    return [for (final r in rows) Map<String, dynamic>.from(r)];
+  }
+
+  Future<void> reviewCertificate(
+    String id, {
+    required bool approve,
+    String? reason,
+  }) =>
+      _client.rpc('admin_review_station_certification', params: {
+        'p_cert_id': id,
+        'p_approve': approve,
+        'p_reason': reason,
+      });
+
   /// Short-lived link to a private verification document.
   Future<String?> verificationDocUrl(String? path) async {
     if (path == null || path.isEmpty) return null;

@@ -14,6 +14,7 @@ class VerificationQueueScreen extends StatefulWidget {
 
 class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
   List<Map<String, dynamic>>? _rows;
+  List<Map<String, dynamic>> _certs = const [];
   String? _error;
 
   @override
@@ -24,11 +25,16 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
 
   Future<void> _load() async {
     try {
-      final rows =
-          await context.read<AdminApiService>().listPendingVerifications();
+      final api = context.read<AdminApiService>();
+      final rows = await api.listPendingVerifications();
+      List<Map<String, dynamic>> certs = const [];
+      try {
+        certs = await api.listPendingCertificates();
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _rows = rows;
+          _certs = certs;
           _error = null;
         });
       }
@@ -37,10 +43,46 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
     }
   }
 
+  static const _idDocs = {
+    'front_path': 'ID front',
+    'back_path': 'ID back',
+    'selfie_path': 'Selfie with ID',
+    'business_permit_path': 'Business / sanitary permit',
+  };
+
   Future<void> _open(Map<String, dynamic> row) async {
+    final api = context.read<AdminApiService>();
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => _ReviewDialog(row: row),
+      builder: (_) => _ReviewDialog(
+        title: 'Review ID',
+        docs: {
+          for (final e in _idDocs.entries)
+            if (row[e.key] != null) e.value: row[e.key].toString(),
+        },
+        decide: (approve, reason) => api.reviewVerification(
+          row['id'].toString(),
+          approve: approve,
+          reason: reason,
+        ),
+      ),
+    );
+    if (changed == true) _load();
+  }
+
+  Future<void> _openCert(Map<String, dynamic> row) async {
+    final api = context.read<AdminApiService>();
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ReviewDialog(
+        title: 'Review certificate',
+        docs: {row['cert_type'].toString(): row['file_path'].toString()},
+        decide: (approve, reason) => api.reviewCertificate(
+          row['id'].toString(),
+          approve: approve,
+          reason: reason,
+        ),
+      ),
     );
     if (changed == true) _load();
   }
@@ -50,16 +92,33 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
     final rows = _rows;
     if (_error != null) return Center(child: Text(_error!));
     if (rows == null) return const Center(child: CircularProgressIndicator());
-    if (rows.isEmpty) {
-      return const Center(child: Text('No IDs waiting for review.'));
+    if (rows.isEmpty && _certs.isEmpty) {
+      return const Center(child: Text('Nothing waiting for review.'));
     }
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
         padding: const EdgeInsets.all(24),
-        itemCount: rows.length,
+        itemCount: rows.length + _certs.length,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (_, i) {
+          if (i >= rows.length) {
+            final c = _certs[i - rows.length];
+            final p = (c['profile'] as Map?) ?? const {};
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.science_outlined),
+                title: Text(
+                  '${p['station_name'] ?? 'Station'} · water quality',
+                ),
+                subtitle: Text(
+                  '${c['cert_type']} · issued ${c['issued_on']} · expires ${c['expires_on']}',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _openCert(c),
+              ),
+            );
+          }
           final r = rows[i];
           final p = (r['profile'] as Map?) ?? const {};
           final isOwner = r['role'] == 'owner';
@@ -88,8 +147,17 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
 }
 
 class _ReviewDialog extends StatefulWidget {
-  const _ReviewDialog({required this.row});
-  final Map<String, dynamic> row;
+  const _ReviewDialog({
+    required this.title,
+    required this.docs,
+    required this.decide,
+  });
+
+  final String title;
+
+  /// Label -> storage path in verification_docs.
+  final Map<String, String> docs;
+  final Future<void> Function(bool approve, String? reason) decide;
 
   @override
   State<_ReviewDialog> createState() => _ReviewDialogState();
@@ -100,13 +168,6 @@ class _ReviewDialogState extends State<_ReviewDialog> {
   Map<String, String?> _urls = const {};
   bool _busy = false;
   String? _error;
-
-  static const _docs = {
-    'front_path': 'ID front',
-    'back_path': 'ID back',
-    'selfie_path': 'Selfie with ID',
-    'business_permit_path': 'Business / sanitary permit',
-  };
 
   @override
   void initState() {
@@ -123,11 +184,11 @@ class _ReviewDialogState extends State<_ReviewDialog> {
   Future<void> _loadUrls() async {
     final api = context.read<AdminApiService>();
     final urls = <String, String?>{};
-    for (final key in _docs.keys) {
+    for (final e in widget.docs.entries) {
       try {
-        urls[key] = await api.verificationDocUrl(widget.row[key]?.toString());
+        urls[e.key] = await api.verificationDocUrl(e.value);
       } catch (_) {
-        urls[key] = null;
+        urls[e.key] = null;
       }
     }
     if (mounted) setState(() => _urls = urls);
@@ -140,11 +201,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
     }
     setState(() => _busy = true);
     try {
-      await context.read<AdminApiService>().reviewVerification(
-            widget.row['id'].toString(),
-            approve: approve,
-            reason: approve ? null : _reason.text.trim(),
-          );
+      await widget.decide(approve, approve ? null : _reason.text.trim());
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -159,7 +216,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Review ID'),
+      title: Text(widget.title),
       content: SizedBox(
         width: 760,
         child: SingleChildScrollView(
@@ -170,36 +227,39 @@ class _ReviewDialogState extends State<_ReviewDialog> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  for (final e in _docs.entries)
-                    if (widget.row[e.key] != null)
-                      SizedBox(
-                        width: 360,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(e.value,
-                                style: Theme.of(context).textTheme.titleSmall),
-                            const SizedBox(height: 4),
-                            AspectRatio(
-                              aspectRatio: 4 / 3,
-                              child: _urls[e.key] == null
-                                  ? const ColoredBox(
-                                      color: Colors.black12,
-                                      child: Center(
-                                        child: Text('Loading or not an image'),
-                                      ),
-                                    )
-                                  : Image.network(
-                                      _urls[e.key]!,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, _, _) => const Center(
-                                        child: Text('PDF or unreadable file'),
-                                      ),
+                  for (final e in {
+                    for (final l in widget.docs.keys) l: l,
+                  }.entries)
+                    SizedBox(
+                      width: 360,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            e.value,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 4),
+                          AspectRatio(
+                            aspectRatio: 4 / 3,
+                            child: _urls[e.key] == null
+                                ? const ColoredBox(
+                                    color: Colors.black12,
+                                    child: Center(
+                                      child: Text('Loading or not an image'),
                                     ),
-                            ),
-                          ],
-                        ),
+                                  )
+                                : Image.network(
+                                    _urls[e.key]!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, _, _) => const Center(
+                                      child: Text('PDF or unreadable file'),
+                                    ),
+                                  ),
+                          ),
+                        ],
                       ),
+                    ),
                 ],
               ),
               const SizedBox(height: 16),
