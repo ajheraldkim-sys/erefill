@@ -35,6 +35,7 @@ import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/core/widgets/motion/motion.dart';
 import 'package:erefill/core/utils/station_ranking.dart';
+import 'widgets/refill_reminder_banner.dart';
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
 
@@ -61,6 +62,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   Map<String, dynamic>? _lastCompletedOrder;
   bool _isProcessingQuickOrder = false;
   bool _quickStationIsLastOrder = false;
+  // Server-computed refill rhythm for the 'Time for a refill?' banner.
+  Map<String, dynamic>? _refillRhythm;
   bool _isLoading = true;
   int _homeBannerIndex = 0;
   int _homeCacheGeneration = 0;
@@ -283,7 +286,19 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
+  Future<void> _loadRefillRhythm() async {
+    try {
+      final r = await supabase.rpc('customer_refill_rhythm');
+      if (mounted && r is Map) {
+        setState(() => _refillRhythm = Map<String, dynamic>.from(r));
+      }
+    } catch (_) {
+      // Older database without the RPC: no banner.
+    }
+  }
+
   Future<void> _fetchData() async {
+    unawaited(_loadRefillRhythm());
     final user = supabase.auth.currentUser;
     if (user == null) {
       if (mounted) setState(() => _isLoading = false);
@@ -1477,6 +1492,18 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         ],
                         _buildHomeBanner(context),
                         AppUi.vGapMd,
+                        if (_activeOrder == null &&
+                            _quickOrderStation != null &&
+                            RefillReminderBanner.shouldShow(_refillRhythm)) ...[
+                          RefillReminderBanner(
+                            rhythm: _refillRhythm!,
+                            onReorder: () => _handleQuickOrder(
+                              _quickOrderStation!,
+                              order: _lastCompletedOrder,
+                            ),
+                          ),
+                          AppUi.vGapMd,
+                        ],
                         _buildQuickOrderButton(context),
                         AppUi.vGapMd,
                         ValueListenableBuilder<List<WaterTypeInfo>>(

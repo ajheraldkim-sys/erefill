@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'refill_reminder_toggle.dart';
 import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'package:provider/provider.dart';
 
@@ -223,6 +224,8 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   title: 'App preferences',
                   icon: Icons.tune_rounded,
                   children: [
+                    const RefillReminderToggle(),
+                    const Divider(height: 24),
                     const ThemeModePicker(),
                     const SizedBox(height: 16),
                     const TextSizeSlider(),
