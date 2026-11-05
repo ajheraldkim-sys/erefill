@@ -1,4 +1,4 @@
--- Run: bash build.sh ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/order_pricing_v3.sql -- delivery_quote_test.sql
+-- Run: bash build.sh ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/rider_tips.sql ../scripts/order_pricing_v3.sql -- delivery_quote_test.sql
 -- Owner a1 is at (14.60, 121.00). Config below: ₱10/km, ₱20 minimum, 1 km minimum billable, exact distance, whole-peso fee.
 
 UPDATE public.system_config

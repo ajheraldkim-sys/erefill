@@ -9,10 +9,11 @@
 --   * Writes delivery_distance_km, delivery_rate_per_km, delivery_free_reason.
 --   * Accessories (products.kind = 'accessory') are sold alongside water;
 --     only water gallons count toward the free-delivery gallon threshold.
+--   * Optional rider tip (tip_amount, ₱0–₱500) added to the total.
 -- This is the single place later features (accessories, tips, verification
 -- gates) extend create_order_atomic. Do not redefine it in other scripts.
 --
--- Run order: delivery_coverage.sql -> station_accessories.sql -> this file.
+-- Run order: delivery_coverage.sql -> station_accessories.sql -> rider_tips.sql -> this file.
 -- Tests: supabase/tests/delivery_quote_test.sql, accessories_test.sql
 -- ==============================================================================
 BEGIN;
@@ -48,6 +49,7 @@ DECLARE
   v_owner_suspended boolean := false;
   v_gallons integer := 0;
   v_quote jsonb;
+  v_tip numeric(10,2) := 0;
 BEGIN
   SELECT value INTO v_maintenance
   FROM public.system_config
@@ -209,10 +211,16 @@ BEGIN
     END IF;
   END IF;
 
+  -- Optional rider tip: whole pesos, ₱0–₱500, paid on top (no fees, no voucher).
+  v_tip := round(coalesce(NULLIF(p_order_data->>'tip_amount', '')::numeric, 0));
+  IF v_tip < 0 OR v_tip > 500 THEN
+    RAISE EXCEPTION 'Tip must be between PHP 0 and PHP 500.';
+  END IF;
+
   v_total_amount := greatest(
     v_computed_subtotal + v_delivery_fee + v_platform_fee - v_discount,
     0
-  );
+  ) + v_tip;
 
   INSERT INTO public.orders (
     id,
@@ -243,6 +251,7 @@ BEGIN
     delivery_distance_km,
     delivery_rate_per_km,
     delivery_free_reason,
+    tip_amount,
     items,
     status
   ) VALUES (
@@ -277,6 +286,7 @@ BEGIN
     (v_quote->>'distance_km')::numeric,
     (v_quote->>'rate_per_km')::numeric,
     v_quote->>'free_reason',
+    v_tip,
     coalesce(p_items_data, '[]'::jsonb),
     'pending'
   )
@@ -374,6 +384,7 @@ BEGIN
     'delivery_free_reason', v_quote->>'free_reason',
     'platform_fee', v_platform_fee,
     'discount_amount', v_discount,
+    'tip_amount', v_tip,
     'total_amount', v_total_amount,
     'status', 'pending'
   );

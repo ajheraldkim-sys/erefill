@@ -27,6 +27,7 @@ import 'widgets/payment_brand_mark.dart';
 import 'widgets/test_mode_label.dart';
 import 'package:erefill/core/models/cart_model.dart';
 import 'checkout_rules.dart';
+import 'widgets/tip_selector.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../account/saved_addresses_screen.dart';
@@ -78,6 +79,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int? _freeMinGallons;
   DeliveryQuote? _deliveryQuote;
   int _quoteRequest = 0;
+  // Optional rider tip (whole pesos), 100% to the rider.
+  double _tip = 0;
   double _deliveryRatePerKm = 10.0;
   double _deliveryMinFee = 20.0;
   double _deliveryMinDistance = 1.0;
@@ -1015,6 +1018,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       deliveryFee: _deliveryFee,
       platformFee: _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount)),
       voucherDiscount: voucherDiscount,
+      tip: _tip,
     );
 
     final paymentMethod = _paymentMethod;
@@ -1043,6 +1047,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       scheduleForNextOpen: _isOutsideHours && _scheduleForNextOpen,
       stationOpeningTime: _stationOpeningTime,
       userNotes: _notesController.text,
+      tipAmount: _tip,
     );
     final itemsData = request.itemsData;
     final completeAddress = request.address;
@@ -1411,6 +1416,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       deliveryFee: _deliveryFee,
       platformFee: platformFee,
       voucherDiscount: voucherDiscount,
+      tip: _tip,
     );
     final textTheme = Theme.of(context).textTheme;
     final profileReady = CheckoutRules.isDeliveryProfileReady(_customerProfile);
@@ -2784,6 +2790,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               valueColor: AppColors.uiSuccess,
             ),
           ],
+          if (_tip > 0) ...[
+            const SizedBox(height: AppUi.spacingSm),
+            _summaryRow(context, 'Rider tip', formatPeso(_tip)),
+          ],
+          const SizedBox(height: AppUi.spacingMd),
+          TipSelector(
+            value: _tip,
+            onChanged: (v) => setState(() => _tip = v),
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: AppUi.spacingMd),
             child: Divider(height: 1),

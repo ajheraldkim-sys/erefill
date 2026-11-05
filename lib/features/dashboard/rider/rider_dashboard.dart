@@ -117,6 +117,7 @@ class _RiderDashboardState extends State<RiderDashboard>
   int _selectedIndex = 0;
   int _completedDeliveries = 0;
   double _totalEarnings = 0;
+  double _totalTips = 0;
   bool _soundAlertsEnabled = true;
 
   Future<void> _toggleOnlineStatus(bool value) async {
@@ -319,6 +320,7 @@ class _RiderDashboardState extends State<RiderDashboard>
       _myActiveOrders = activeResult;
       _completedDeliveries = data.completedDeliveries;
       _totalEarnings = data.totalEarnings;
+      _totalTips = data.totalTips;
       _isLoading = false;
     });
 
@@ -2339,7 +2341,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                               icon: Icons.account_balance_wallet_outlined,
                               title: 'Earnings breakdown',
                               subtitle:
-                                  '${formatPeso(_totalEarnings)} total payout earned',
+                                  '${formatPeso(_totalEarnings)} total payout earned'
+                                  '${_totalTips > 0 ? ' (incl. ${formatPeso(_totalTips, whole: true)} tips)' : ''}',
                               onTap: _showEarningsStatement,
                             ),
                           ],

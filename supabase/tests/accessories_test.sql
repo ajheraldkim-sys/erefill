@@ -1,4 +1,4 @@
--- Run: bash build.sh ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/order_pricing_v3.sql -- accessories_test.sql
+-- Run: bash build.sh ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/rider_tips.sql ../scripts/order_pricing_v3.sql -- accessories_test.sql
 -- Owner a1 has water product b1 (₱19.60).
 
 -- owner_can_add_an_accessory

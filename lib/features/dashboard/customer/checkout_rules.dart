@@ -267,16 +267,27 @@ class CheckoutRules {
     return fee <= 0 ? 0 : double.parse(fee.toStringAsFixed(2));
   }
 
+  /// Largest rider tip accepted (matches orders_tip_amount_check).
+  static const double maxTip = 500;
+
+  /// Tips are whole pesos between ₱0 and [maxTip].
+  static double normalizeTip(double tip) =>
+      tip.roundToDouble().clamp(0, maxTip).toDouble();
+
+  /// The rider tip is added after the voucher, so a voucher never reduces it.
+  /// Mirrors create_order_atomic.
   static double calculateOrderTotal({
     required double subtotal,
     required double deliveryFee,
     required double platformFee,
     required double voucherDiscount,
+    double tip = 0,
   }) {
     final discount = voucherDiscount <= 0 ? 0.0 : voucherDiscount.roundToDouble();
     return (subtotal + deliveryFee + platformFee - discount)
-        .clamp(0.0, double.infinity)
-        .toDouble();
+            .clamp(0.0, double.infinity)
+            .toDouble() +
+        normalizeTip(tip);
   }
 
   static CheckoutPreflightResult validate({

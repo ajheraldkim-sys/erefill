@@ -45,6 +45,7 @@ class CheckoutOrderRequest {
     required this.scheduleForNextOpen,
     required this.stationOpeningTime,
     required this.userNotes,
+    this.tipAmount = 0,
   });
 
   final String? customerId;
@@ -62,6 +63,9 @@ class CheckoutOrderRequest {
   final double? deliveryDistanceKm;
   final double? deliveryRatePerKm;
   final double totalAmount;
+
+  /// Optional rider tip (whole pesos, ₱0–₱500), included in [totalAmount].
+  final double tipAmount;
   final String? voucherId;
 
   /// `swap` (1-to-1 bottle exchange) or anything else (new container).
@@ -133,6 +137,7 @@ class CheckoutOrderRequest {
     'delivery_distance_km': deliveryDistanceKm,
     'delivery_rate_per_km': deliveryRatePerKm,
     'total_amount': totalAmount,
+    'tip_amount': tipAmount,
     'payment_method': paymentMethod,
     'payment_proof_url': null,
     'notes': combinedNotes,

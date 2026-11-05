@@ -286,6 +286,18 @@ abstract final class SyncResources {
                 .eq('status', 'delivered'),
           ]);
           final delivered = results[2] as List? ?? const [];
+          // Tips are read separately so the dashboard still loads on a
+          // database without the tip_amount column yet.
+          var tips = 0.0;
+          try {
+            final tipRows = await _db
+                .from('orders')
+                .select('tip_amount')
+                .eq('assigned_rider_id', riderId)
+                .eq('status', 'delivered')
+                .gt('tip_amount', 0);
+            tips = RiderDashboardData.sumAmounts(tipRows, 'tip_amount');
+          } catch (_) {}
           return RiderDashboardData(
             profile: results[0] == null
                 ? null
@@ -294,13 +306,9 @@ abstract final class SyncResources {
               results[1] as List? ?? const [],
             ),
             completedDeliveries: delivered.length,
-            totalEarnings: delivered.fold<double>(0, (sum, o) {
-              final fee = o is Map ? o['delivery_fee'] : null;
-              return sum +
-                  (fee is num
-                      ? fee.toDouble()
-                      : double.tryParse(fee?.toString() ?? '') ?? 0);
-            }),
+            totalEarnings:
+                RiderDashboardData.sumAmounts(delivered, 'delivery_fee') + tips,
+            totalTips: tips,
           );
         },
       );
@@ -360,12 +368,25 @@ class RiderDashboardData {
     required this.activeOrders,
     required this.completedDeliveries,
     required this.totalEarnings,
+    this.totalTips = 0,
   });
+
+  /// Sums [key] over rows from Supabase (num, numeric string or null).
+  static double sumAmounts(List<dynamic> rows, String key) =>
+      rows.fold<double>(0, (sum, row) {
+        final v = row is Map ? row[key] : null;
+        return sum +
+            (v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0);
+      });
 
   final Map<String, dynamic>? profile;
   final List<Map<String, dynamic>> activeOrders;
   final int completedDeliveries;
+  /// Earnings including tips.
   final double totalEarnings;
+
+  /// Customer tips on delivered orders (part of [totalEarnings]).
+  final double totalTips;
 
   factory RiderDashboardData.fromJson(Object? json) {
     final map = Map<String, dynamic>.from(json as Map);
@@ -375,6 +396,7 @@ class RiderDashboardData {
       activeOrders: SyncResources._rowList(map['active_orders'] ?? const []),
       completedDeliveries: (map['completed'] as num?)?.toInt() ?? 0,
       totalEarnings: (map['earnings'] as num?)?.toDouble() ?? 0,
+      totalTips: (map['tips'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -383,5 +405,6 @@ class RiderDashboardData {
     'active_orders': activeOrders,
     'completed': completedDeliveries,
     'earnings': totalEarnings,
+    'tips': totalTips,
   };
 }

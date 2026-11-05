@@ -131,6 +131,7 @@ void main() {
         'delivery_distance_km': 1.2,
         'delivery_rate_per_km': 4.0,
         'total_amount': 70.0,
+        'tip_amount': 0.0,
         'payment_method': 'cod',
         'payment_proof_url': null,
         'notes':
