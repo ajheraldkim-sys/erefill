@@ -38,6 +38,7 @@ import 'widgets/new_order_alert_sheet.dart';
 import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import '../../delivery_mgmt/providers/credit_provider.dart';
 import 'forecast/owner_forecast_section.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -66,9 +67,21 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   bool _setupStatusNeedsRefresh = false;
   int _stockCreditsTab = 0;
 
+  final _tourNavKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppTour.maybeShow(
+          context,
+          role: 'owner',
+          navBarKey: _tourNavKey,
+          tabCount: 5,
+        );
+      }
+    });
     final user = context.read<UserProvider>().user;
     if (user != null) {
       ownerProfile = {
@@ -387,7 +400,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           bottom: false,
           child: LazyIndexedStack(index: _selectedIndex, children: screens),
         ),
-        bottomNavigationBar: Consumer<NotificationProvider>(
+        bottomNavigationBar: KeyedSubtree(
+          key: _tourNavKey,
+          child: Consumer<NotificationProvider>(
           builder: (context, notif, _) {
             return RoleBottomNavBar(
               currentIndex: _selectedIndex,
@@ -422,6 +437,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               ],
             );
           },
+        ),
         ),
       ),
     );

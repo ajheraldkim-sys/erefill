@@ -25,6 +25,7 @@ import 'widgets/customer_credit_sheet.dart';
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:erefill/features/account/verification/verification_screen.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
@@ -1274,6 +1275,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                   ThemeModePicker(),
                                   SizedBox(height: 16),
                                   TextSizeSlider(),
+                                  ReplayTourButton(role: 'customer'),
                                 ],
                               ),
                             ),

@@ -55,6 +55,7 @@ import 'widgets/rider_home_overview.dart';
 import 'widgets/rider_swipe_to_accept_slider.dart';
 import 'package:latlong2/latlong.dart';
 import 'widgets/route_plan_sheet.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 export 'rider_history_screen.dart';
 
 double _safeDouble(dynamic value, {double fallback = 0}) {
@@ -149,9 +150,21 @@ class _RiderDashboardState extends State<RiderDashboard>
     }
   }
 
+  final _tourNavKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppTour.maybeShow(
+          context,
+          role: 'rider',
+          navBarKey: _tourNavKey,
+          tabCount: 5,
+        );
+      }
+    });
     final myId = supabase.auth.currentUser?.id;
     final initialUser = context.read<UserProvider>().user;
     if (initialUser != null) {
@@ -1118,7 +1131,9 @@ class _RiderDashboardState extends State<RiderDashboard>
               ? const LoadingStateCard(message: 'Preparing your rider dashboard...')
               : LazyIndexedStack(index: _selectedIndex, children: pages),
         ),
-        bottomNavigationBar: Consumer<NotificationProvider>(
+        bottomNavigationBar: KeyedSubtree(
+          key: _tourNavKey,
+          child: Consumer<NotificationProvider>(
           builder: (context, notif, _) {
             return RoleBottomNavBar(
               currentIndex: _selectedIndex,
@@ -1154,6 +1169,7 @@ class _RiderDashboardState extends State<RiderDashboard>
               ],
             );
           },
+        ),
         ),
       ),
     );
@@ -2398,6 +2414,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   ThemeModePicker(),
                                   SizedBox(height: 16),
                                   TextSizeSlider(),
+                                  ReplayTourButton(role: 'rider'),
                                 ],
                               ),
                             ),

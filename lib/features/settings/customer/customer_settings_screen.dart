@@ -10,6 +10,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import 'user_settings_service.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class CustomerSettingsScreen extends StatefulWidget {
   const CustomerSettingsScreen({super.key});
@@ -229,6 +230,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                     const ThemeModePicker(),
                     const SizedBox(height: 16),
                     const TextSizeSlider(),
+                    const ReplayTourButton(role: 'customer'),
                     const SizedBox(height: 12),
                     _buildToggle(
                       title: 'Outdoor mode (High Contrast)',

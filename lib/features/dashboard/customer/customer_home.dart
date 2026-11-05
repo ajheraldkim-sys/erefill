@@ -9,6 +9,7 @@ import 'package:erefill/features/dashboard/customer/station_list_screen.dart';
 import 'package:erefill/features/dashboard/customer/customer_profile_screen.dart';
 import 'package:erefill/features/dashboard/customer/customer_home_tab.dart';
 import 'package:erefill/features/chat/inbox_screen.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class CustomerHome extends StatefulWidget {
   const CustomerHome({super.key});
@@ -28,9 +29,21 @@ class _CustomerHomeState extends State<CustomerHome> {
 
   late final List<Widget> _pages;
 
+  final _tourNavKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppTour.maybeShow(
+          context,
+          role: 'customer',
+          navBarKey: _tourNavKey,
+          tabCount: 5,
+        );
+      }
+    });
     _pages = [
       CustomerHomeTab(onOpenStations: () => _changeTab(1)),
       const StationListScreen(),
@@ -58,7 +71,9 @@ class _CustomerHomeState extends State<CustomerHome> {
           bottom: false,
           child: LazyIndexedStack(index: _selectedIndex, children: _pages),
         ),
-        bottomNavigationBar: Selector<NotificationProvider, int>(
+        bottomNavigationBar: KeyedSubtree(
+          key: _tourNavKey,
+          child: Selector<NotificationProvider, int>(
           selector: (_, provider) => provider.unreadChatCount,
           builder: (context, unreadChatCount, _) {
             return RoleBottomNavBar(
@@ -94,6 +109,7 @@ class _CustomerHomeState extends State<CustomerHome> {
               ],
             );
           },
+        ),
         ),
       ),
     );

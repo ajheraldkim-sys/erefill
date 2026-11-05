@@ -40,6 +40,7 @@ import 'accessories_screen.dart';
 import 'package:erefill/features/account/verification/verification_screen.dart';
 import 'package:erefill/features/quality/station_certificates.dart';
 import 'package:erefill/features/disputes/disputes.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -2795,6 +2796,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                   ThemeModePicker(),
                                   SizedBox(height: 16),
                                   TextSizeSlider(),
+                                  ReplayTourButton(role: 'owner'),
                                 ],
                               ),
                             ),

@@ -11,6 +11,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/widgets/skeleton.dart';
 import 'rider_settings_service.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class RiderSettingsScreen extends StatefulWidget {
   const RiderSettingsScreen({super.key});
@@ -266,6 +267,7 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
                           const ThemeModePicker(),
                           const SizedBox(height: 16),
                           const TextSizeSlider(),
+                          const ReplayTourButton(role: 'rider'),
                           const Divider(height: 20),
                           Material(
                             color: Colors.transparent,
