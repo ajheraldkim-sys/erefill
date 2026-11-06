@@ -1,5 +1,11 @@
 -- Run: bash build.sh ../scripts/harden_signup_and_protected_columns.sql ../scripts/delivery_coverage.sql ../scripts/station_accessories.sql ../scripts/rider_tips.sql ../scripts/identity_verification.sql ../scripts/order_pricing_v3.sql -- rider_tips_test.sql
 
+-- COD is locked when the station's service-fee wallet is at or below zero
+-- (station_cod_locked); give the fixture station a funded wallet.
+INSERT INTO public.station_fee_wallets (owner_id, balance)
+VALUES ('00000000-0000-4000-8000-0000000000a1', 1000)
+ON CONFLICT (owner_id) DO UPDATE SET balance = 1000;
+
 -- Fixture station must be verified to take orders (identity_verification.sql).
 UPDATE public.profiles SET verification_status = 'approved' WHERE id = '00000000-0000-4000-8000-0000000000a1';
 
