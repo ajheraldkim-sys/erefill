@@ -94,10 +94,11 @@ class ReceiptService {
         ((order['total_amount'] as num?)?.toDouble() ?? 0) - ((order['delivery_fee'] as num?)?.toDouble() ?? 0);
     final deliveryFee = (order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
     final totalAmount = (order['total_amount'] as num?)?.toDouble() ?? (subtotal + deliveryFee);
+    final tipAmount = (order['tip_amount'] as num?)?.toDouble() ?? 0.0;
     final explicitFee = (order['platform_fee'] as num?)?.toDouble();
     final serviceFee = explicitFee ??
-        ((totalAmount - (subtotal + deliveryFee)) > 0.01
-            ? (totalAmount - (subtotal + deliveryFee))
+        ((totalAmount - (subtotal + deliveryFee + tipAmount)) > 0.01
+            ? (totalAmount - (subtotal + deliveryFee + tipAmount))
             : 0.0);
     final paymentMethod = (order['payment_method'] ?? 'COD').toString().toUpperCase();
     final paymentStatus = (order['payment_status'] ?? 'pending').toString().toUpperCase();
@@ -461,6 +462,16 @@ class ReceiptService {
                             ],
                           ),
                         ],
+                        if (tipAmount > 0) ...[
+                          pw.SizedBox(height: 4),
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text('Rider Tip:', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                              pw.Text('PHP ${formatAmount(tipAmount)}', style: const pw.TextStyle(fontSize: 10)),
+                            ],
+                          ),
+                        ],
                         pw.SizedBox(height: 6),
                         pw.Divider(color: PdfColors.grey400, thickness: 0.5),
                         pw.SizedBox(height: 4),
@@ -779,6 +790,17 @@ class ReceiptService {
                   pw.Text('P${formatAmount(deliveryFee)}', style: const pw.TextStyle(fontSize: 8)),
                 ],
               ),
+              if (((order['tip_amount'] as num?)?.toDouble() ?? 0) > 0)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('Rider Tip:', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text(
+                      'P${formatAmount((order['tip_amount'] as num).toDouble())}',
+                      style: const pw.TextStyle(fontSize: 8),
+                    ),
+                  ],
+                ),
               pw.SizedBox(height: 2),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -915,6 +937,12 @@ class ReceiptService {
 
     final delStr = 'P${formatAmount(deliveryFee)}';
     writeLine('Delivery:${' ' * (widthChars - 9 - delStr.length)}$delStr');
+
+    final tip = (order['tip_amount'] as num?)?.toDouble() ?? 0.0;
+    if (tip > 0) {
+      final tipStr = 'P${formatAmount(tip)}';
+      writeLine('Rider tip:${' ' * (widthChars - 10 - tipStr.length)}$tipStr');
+    }
 
     writeLine(divider);
 

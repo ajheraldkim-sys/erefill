@@ -40,7 +40,11 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
   StreamSubscription? _profileSub;
   List<LatLng> _routePoints = [];
   bool _fetchingRoute = false;
+  LatLng? _routeFrom;
+  DateTime? _routeAt;
 
+  /// Re-routes at most every 60 s, or sooner once the rider moves 150 m,
+  /// so live GPS points don't hammer the routing service.
   Future<void> _updateRoutePoints() async {
     final riderPos = _riderPosition;
     final custLat = (_order?['customer']?['latitude'] as num?)?.toDouble();
@@ -48,8 +52,15 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
 
     if (riderPos == null || custLat == null || custLng == null) return;
     if (_fetchingRoute) return;
+    if (_routeFrom != null && _routeAt != null && _routePoints.isNotEmpty) {
+      final moved = const Distance().as(LengthUnit.Meter, _routeFrom!, riderPos);
+      final age = DateTime.now().difference(_routeAt!);
+      if (moved < 150 && age < const Duration(seconds: 60)) return;
+    }
 
     _fetchingRoute = true;
+    _routeFrom = riderPos;
+    _routeAt = DateTime.now();
     try {
       final points = await RoadRoutingService.instance.getRoadRoute(
         start: riderPos,

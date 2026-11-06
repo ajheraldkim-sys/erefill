@@ -160,7 +160,7 @@ serve(async (req) => {
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, customer_id, owner_id, station_name, customer_name, customer_phone, total_amount, status, payment_status, payment_method, payment_checkout_id, payment_checkout_url")
+      .select("id, customer_id, owner_id, station_name, customer_name, customer_phone, total_amount, tip_amount, status, payment_status, payment_method, payment_checkout_id, payment_checkout_url")
       .eq("id", orderId)
       .eq("customer_id", userData.user.id)
       .single();
@@ -298,7 +298,9 @@ serve(async (req) => {
       body: JSON.stringify({
         data: {
           attributes: {
-            description: `eRefill order ${orderId}`,
+            description: Number(order.tip_amount ?? 0) > 0
+              ? `eRefill order ${orderId} (incl. ₱${Number(order.tip_amount)} rider tip)`
+              : `eRefill order ${orderId}`,
             reference_number: referenceNumber,
             line_items: [
               {
