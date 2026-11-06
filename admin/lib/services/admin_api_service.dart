@@ -1492,6 +1492,24 @@ class AdminApiService {
     return const AdminPagedResult(total: 0, rows: []);
   }
 
+  /// Resolves a dispute through `admin_resolve_dispute` (order_disputes.sql):
+  /// a refund > 0 books a REFUND ledger entry against the station, flags it,
+  /// marks fully refunded orders and notifies the customer; 0 dismisses.
+  Future<void> resolveDisputeWithRefund(
+    String disputeId,
+    double refundAmount,
+    String notes,
+  ) async {
+    await _client.rpc(
+      'admin_resolve_dispute',
+      params: {
+        'p_dispute_id': disputeId,
+        'p_refund_amount': refundAmount,
+        'p_notes': notes,
+      },
+    );
+  }
+
   Future<void> updateDispute(
     String disputeId,
     String status, {

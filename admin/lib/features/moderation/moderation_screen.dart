@@ -163,14 +163,23 @@ class _ModerationScreenState extends State<ModerationScreen>
           : DisputeDetailsView(
               dispute: _selectedDispute!,
               onClose: () => setState(() => _selectedDispute = null),
-              onResolve: (status, notes) async {
+              onResolve: (status, notes, refundAmount) async {
                 final d = _selectedDispute!;
+                final api = context.read<AdminApiService>();
                 try {
-                  await context.read<AdminApiService>().updateDispute(
-                    d['id'] as String,
-                    status,
-                    resolutionNotes: notes,
-                  );
+                  if (refundAmount > 0) {
+                    await api.resolveDisputeWithRefund(
+                      d['id'] as String,
+                      refundAmount,
+                      notes,
+                    );
+                  } else {
+                    await api.updateDispute(
+                      d['id'] as String,
+                      status,
+                      resolutionNotes: notes,
+                    );
+                  }
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
