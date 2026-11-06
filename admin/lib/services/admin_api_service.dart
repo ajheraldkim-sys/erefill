@@ -1565,16 +1565,26 @@ class AdminApiService {
 
   /// Pending ID verifications, oldest first, with the submitter's name.
   Future<List<Map<String, dynamic>>> listPendingVerifications() async {
-    final rows = await _client
-        .from('identity_verifications')
-        .select(
-          'id, user_id, role, id_type, id_number_last4, front_path, back_path, '
-          'selfie_path, business_permit_path, created_at, '
-          'profile:profiles!identity_verifications_user_id_fkey(full_name, station_name, phone, town, barangay)',
-        )
-        .eq('status', 'pending')
-        .order('created_at');
-    return [for (final r in rows) Map<String, dynamic>.from(r)];
+    const base =
+        'id, user_id, role, id_type, id_number_last4, front_path, back_path, '
+        'selfie_path, business_permit_path, created_at, '
+        'profile:profiles!identity_verifications_user_id_fkey(full_name, station_name, phone, town, barangay)';
+    Future<List<Map<String, dynamic>>> load(String fields) async {
+      final rows = await _client
+          .from('identity_verifications')
+          .select(fields)
+          .eq('status', 'pending')
+          .order('created_at');
+      return [for (final r in rows) Map<String, dynamic>.from(r)];
+    }
+
+    try {
+      return await load('$base, auto_checks');
+    } on PostgrestException catch (e) {
+      // auto_checks arrives with identity_verification_checks.sql.
+      if (e.code != '42703') rethrow;
+      return load(base);
+    }
   }
 
   /// Pending water-quality certificates with the station name.

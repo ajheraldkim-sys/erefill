@@ -1,3 +1,4 @@
+import 'package:erefill/features/account/verification/id_checks.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -56,6 +57,8 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
       context: context,
       builder: (_) => _ReviewDialog(
         title: 'Review ID',
+        checks: _checksOf(row),
+        idType: row['id_type']?.toString(),
         docs: {
           for (final e in _idDocs.entries)
             if (row[e.key] != null) e.value: row[e.key].toString(),
@@ -68,6 +71,16 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
       ),
     );
     if (changed == true) _load();
+  }
+
+  static IdCheckReport? _checksOf(Map<String, dynamic> row) {
+    final c = row['auto_checks'];
+    if (c is! Map || c['checked_on_device'] != true) return null;
+    try {
+      return IdCheckReport.fromJson(Map<String, dynamic>.from(c));
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _openCert(Map<String, dynamic> row) async {
@@ -136,7 +149,7 @@ class _VerificationQueueScreenState extends State<VerificationQueueScreen> {
                 '${[p['barangay'], p['town']].whereType<String>().join(', ')} · '
                 'submitted ${r['created_at'].toString().substring(0, 16).replaceFirst('T', ' ')}',
               ),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: _ChecksBadge(report: _checksOf(r)),
               onTap: () => _open(r),
             ),
           );
@@ -151,9 +164,15 @@ class _ReviewDialog extends StatefulWidget {
     required this.title,
     required this.docs,
     required this.decide,
+    this.checks,
+    this.idType,
   });
 
   final String title;
+
+  /// On-device screening from the user's phone, if the app sent it.
+  final IdCheckReport? checks;
+  final String? idType;
 
   /// Label -> storage path in verification_docs.
   final Map<String, String> docs;
@@ -223,6 +242,8 @@ class _ReviewDialogState extends State<_ReviewDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.title == 'Review ID')
+                _ChecksPanel(report: widget.checks, idType: widget.idType),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -297,4 +318,110 @@ class _ReviewDialogState extends State<_ReviewDialog> {
       ],
     );
   }
+}
+
+/// Small summary on each queue row: how many things to look at.
+class _ChecksBadge extends StatelessWidget {
+  const _ChecksBadge({required this.report});
+  final IdCheckReport? report;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = report;
+    if (r == null) return const Icon(Icons.chevron_right);
+    final n = r.flags.length;
+    final color = n == 0 ? Colors.green : Colors.orange;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Chip(
+          avatar: Icon(
+            n == 0 ? Icons.check_circle : Icons.flag_outlined,
+            size: 18,
+            color: color,
+          ),
+          label: Text(n == 0 ? 'Checks passed' : '$n to check'),
+          visualDensity: VisualDensity.compact,
+        ),
+        const Icon(Icons.chevron_right),
+      ],
+    );
+  }
+}
+
+/// Results of the free on-device checks, shown above the photos.
+class _ChecksPanel extends StatelessWidget {
+  const _ChecksPanel({required this.report, required this.idType});
+  final IdCheckReport? report;
+  final String? idType;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final r = report;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Phone checks', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            'Run on the user\'s phone (Google ML Kit). Use them to focus your '
+            'review; they can be faked by a modified app, so always look at '
+            'the photos yourself.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          if (r == null)
+            const Text(
+              'No phone checks: sent from an older app or the checks failed.',
+            )
+          else ...[
+            for (final f in r.flags)
+              _line(Icons.flag_outlined, Colors.orange, f),
+            for (final p in r.passes)
+              _line(Icons.check_circle_outline, Colors.green, p),
+            _line(
+              Icons.percent,
+              theme.colorScheme.onSurfaceVariant,
+              'Name parts found on the ID: ${(r.nameMatch * 100).round()}%',
+            ),
+            if (r.qrFound && r.qrSigned == true)
+              _line(
+                Icons.info_outline,
+                theme.colorScheme.onSurfaceVariant,
+                'National ID QR is signed by the PSA, but the app cannot check '
+                'the signature itself.',
+              ),
+          ],
+          if (idType == 'philsys')
+            _line(
+              Icons.open_in_new,
+              theme.colorScheme.primary,
+              'To confirm the card is genuine, scan its QR on the government\'s '
+              'eVerify site (National ID Check).',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _line(IconData icon, Color color, String text) => Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
 }
