@@ -1691,6 +1691,17 @@ class AdminApiService {
 
   // --- Products & Catalog ---
 
+  /// Removes an accessory (admin_delete_product, restore_missing_rpcs.sql).
+  /// Returns `{deleted: true}` or `{hidden: true}` when it is on past orders.
+  /// Water products are refused by the server.
+  Future<Map<String, dynamic>> removeAccessory(String productId, String reason) async {
+    final res = await _client.rpc(
+      'admin_delete_product',
+      params: {'p_product_id': productId, 'p_reason': reason},
+    );
+    return res is Map ? Map<String, dynamic>.from(res) : const {};
+  }
+
   Future<List<Map<String, dynamic>>> listStationProducts(String ownerId) async {
     try {
       final result = await _client.rpc(

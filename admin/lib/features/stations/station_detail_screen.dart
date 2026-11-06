@@ -15,6 +15,7 @@ import '../../widgets/admin_map.dart';
 import '../../widgets/admin_timeline.dart';
 import '../../widgets/admin_ui.dart';
 import '../users/user_manage_dialog.dart';
+import 'widgets/station_accessories_card.dart';
 
 class StationDetailScreen extends StatefulWidget {
   const StationDetailScreen({
@@ -43,8 +44,36 @@ class _StationDetailScreenState extends State<StationDetailScreen>
 
   AdminPage get _riders => AdminSync.pageOf(_snapshot['riders']);
   AdminPage get _customers => AdminSync.pageOf(_snapshot['customers']);
-  List<Map<String, dynamic>> get _products =>
+  List<Map<String, dynamic>> get _allProducts =>
       AdminSync.rowsOf(_snapshot['products']);
+
+  /// The station's water (one product); accessories are listed separately.
+  List<Map<String, dynamic>> get _products => [
+        for (final p in _allProducts)
+          if (p['kind'] != 'accessory') p,
+      ];
+  List<Map<String, dynamic>> get _accessories => [
+        for (final p in _allProducts)
+          if (p['kind'] == 'accessory') p,
+      ];
+
+  Future<void> _removeAccessory(String id, String reason) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final r = await context.read<AdminApiService>().removeAccessory(id, reason);
+      messenger.showSnackBar(SnackBar(
+        content: Text(r['hidden'] == true
+            ? 'Accessory hidden. It stays on past orders.'
+            : 'Accessory removed.'),
+      ));
+      await _load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Could not remove it: ${FriendlyErrors.message(e)}'),
+        backgroundColor: AppUi.error,
+      ));
+    }
+  }
   AdminPage get _ledger => AdminSync.pageOf(_snapshot['ledger']);
   List<Map<String, dynamic>> get _timeline =>
       AdminSync.rowsOf(_snapshot['timeline']);
@@ -628,6 +657,11 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                   ),
               ],
             ),
+          ),
+          AppUi.vGapLg,
+          StationAccessoriesCard(
+            rows: _accessories,
+            onRemove: _removeAccessory,
           ),
           AppUi.vGapLg,
           AdminCard(
