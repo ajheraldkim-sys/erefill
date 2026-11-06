@@ -9,9 +9,7 @@ import 'package:erefill/core/widgets/map_tiles.dart';
 Widget _buildTestApp(Widget child) {
   return MaterialApp(
     theme: AppTheme.lightTheme,
-    localizationsDelegates: const [
-      shadcn.ShadcnLocalizations.delegate,
-    ],
+    localizationsDelegates: const [shadcn.ShadcnLocalizations.delegate],
     builder: (context, child) => shadcn.ShadcnLayer(
       theme: const shadcn.ThemeData(
         colorScheme: shadcn.ColorSchemes.lightZinc,
@@ -19,15 +17,15 @@ Widget _buildTestApp(Widget child) {
       ),
       child: child,
     ),
-    home: Scaffold(
-      body: child,
-    ),
+    home: Scaffold(body: child),
   );
 }
 
 void main() {
   group('Shadcn UI Integration Tests', () {
-    testWidgets('ShadcnPrimaryButton renders and responds to tap', (tester) async {
+    testWidgets('ShadcnPrimaryButton renders and responds to tap', (
+      tester,
+    ) async {
       var tapped = false;
 
       await tester.pumpWidget(
@@ -45,25 +43,21 @@ void main() {
       expect(tapped, isTrue);
     });
 
-    testWidgets('ShadcnDestructiveButton renders delete action text', (tester) async {
+    testWidgets('ShadcnDestructiveButton renders delete action text', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _buildTestApp(
-          const ShadcnDestructiveButton(
-            text: 'Delete Account',
-          ),
-        ),
+        _buildTestApp(const ShadcnDestructiveButton(text: 'Delete Account')),
       );
 
       expect(find.text('Delete Account'), findsOneWidget);
     });
 
-    testWidgets('ShadcnCard renders with flat border container', (tester) async {
+    testWidgets('ShadcnCard renders with flat border container', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        _buildTestApp(
-          const ShadcnCard(
-            child: Text('Card Content'),
-          ),
-        ),
+        _buildTestApp(const ShadcnCard(child: Text('Card Content'))),
       );
 
       expect(find.text('Card Content'), findsOneWidget);
@@ -74,7 +68,10 @@ void main() {
         _buildTestApp(
           const Column(
             children: [
-              ShadcnBadge(label: 'Verified', variant: ShadcnBadgeVariant.success),
+              ShadcnBadge(
+                label: 'Verified',
+                variant: ShadcnBadgeVariant.success,
+              ),
               ShadcnBadge(label: 'Busy', variant: ShadcnBadgeVariant.warning),
             ],
           ),
@@ -93,55 +90,76 @@ void main() {
       expect(AppUi.borderDark, const Color(0xFF26334A));
     });
 
-    testWidgets('NavigationBar with NavigationDestination resolves MaterialLocalizations successfully', (tester) async {
-      await tester.pumpWidget(
-        _buildTestApp(
-          NavigationBar(
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
+    testWidgets(
+      'NavigationBar with NavigationDestination resolves MaterialLocalizations successfully',
+      (tester) async {
+        await tester.pumpWidget(
+          _buildTestApp(
+            NavigationBar(
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+                NavigationDestination(
+                  icon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Home'), findsOneWidget);
-      expect(find.text('Profile'), findsOneWidget);
-    });
+        expect(find.text('Home'), findsOneWidget);
+        expect(find.text('Profile'), findsOneWidget);
+      },
+    );
 
-    testWidgets('ShadcnOutlineButton renders with icon and text in tight width without RenderFlex overflow', (tester) async {
-      await tester.pumpWidget(
-        _buildTestApp(
-          const Center(
-            child: SizedBox(
-              width: 69,
-              height: 38,
-              child: ShadcnOutlineButton(
-                icon: Icons.store,
-                text: 'Station Fleet',
+    testWidgets(
+      'ShadcnOutlineButton renders with icon and text in tight width without RenderFlex overflow',
+      (tester) async {
+        await tester.pumpWidget(
+          _buildTestApp(
+            const Center(
+              child: SizedBox(
+                width: 69,
+                height: 38,
+                child: ShadcnOutlineButton(
+                  icon: Icons.store,
+                  text: 'Station Fleet',
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(tester.takeException(), isNull);
-      expect(find.text('Station Fleet'), findsOneWidget);
-    });
+        expect(tester.takeException(), isNull);
+        expect(find.text('Station Fleet'), findsOneWidget);
+      },
+    );
 
     test('AppMapTiles defaults to satellite mode across app and admin', () {
       expect(AppMapTiles.defaultStyle, AppMapStyle.satelliteHybrid);
-      final tileLayer = AppMapTiles.layer();
-      expect(tileLayer.urlTemplate?.contains('lyrs=y'), isTrue);
+      final tileLayer = AppMapTiles.baseLayer();
+      expect(tileLayer.urlTemplate, contains('World_Imagery'));
       expect(tileLayer.maxZoom, 20);
-      expect(tileLayer.maxNativeZoom, 19);
+      expect(tileLayer.maxNativeZoom, 18);
+      expect(AppMapTiles.overlays(), hasLength(2), reason: 'roads + labels');
+    });
+
+    test('no Google tiles; each style carries its required credit', () {
+      for (final style in AppMapStyle.values) {
+        final urls = [
+          AppMapTiles.baseLayer(style: style).urlTemplate!,
+          for (final o in AppMapTiles.overlays(style)) o.urlTemplate!,
+        ];
+        expect(urls.any((u) => u.contains('google')), isFalse);
+      }
+      expect(
+        AppMapTiles.attribution(AppMapStyle.streets),
+        contains('OpenStreetMap'),
+      );
+      expect(
+        AppMapTiles.attribution(AppMapStyle.satelliteHybrid),
+        contains('Esri'),
+      );
     });
   });
 }
-

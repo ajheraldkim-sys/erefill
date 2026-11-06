@@ -76,7 +76,7 @@ void main() {
               errorText = adminSemanticErrorColor(context);
               pendingStatus = adminStatusColor(context, 'pending');
               darkMapUsesDarkTileBuilder =
-                  AppMapTiles.layer(context: context).tileBuilder != null;
+                  AppMapTiles.baseLayer(context: context).tileBuilder != null;
               return const SizedBox.shrink();
             },
           ),

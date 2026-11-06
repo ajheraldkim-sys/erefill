@@ -1,89 +1,146 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Basemap style options supported by [AppMapTiles].
 enum AppMapStyle {
-  /// Satellite Hybrid basemap: real high-res satellite photography with roads,
-  /// highways, barangay borders, and street labels (Google Maps Hybrid).
+  /// Satellite photography with roads, borders and place labels on top
+  /// (Esri World Imagery + Esri reference layers).
   satelliteHybrid,
 
-  /// Pure satellite photography without roads or text overlays (ESRI World Imagery).
+  /// Satellite photography only (Esri World Imagery).
   satellitePure,
 
-  /// Standard vector streets basemap (OpenStreetMap).
+  /// Street map (OpenStreetMap, open data).
   streets,
 }
 
-/// Shared map tile configuration across all screens in the mobile app and admin console.
-/// Configured to default to Satellite Mode everywhere.
+/// Shared basemap for every map in the mobile app and the admin console.
+///
+/// Tiles come from public services that allow direct use with credit:
+/// Esri (satellite and labels) and OpenStreetMap (streets). The credit line
+/// they require is drawn on every map by [layer]. Google tile URLs are not
+/// used: loading them without a paid key is against Google's terms.
 abstract final class AppMapTiles {
-  /// Google Maps Hybrid Satellite tile template (satellite imagery + roads + labels).
-  static const String googleSatelliteHybridUrl =
-      'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
-  static const List<String> googleSatelliteSubdomains = ['0', '1', '2', '3'];
-
-  /// Esri World Imagery (ArcGIS satellite photography).
   static const String esriSatelliteUrl =
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  static const String esriRoadsUrl =
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}';
+  static const String esriLabelsUrl =
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 
-  /// Standard OpenStreetMap fallback.
+  /// OpenStreetMap standard tiles (no subdomains; a valid user agent and
+  /// visible credit are required by the OSM tile policy).
   static const String osmUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-  static const List<String> osmSubdomains = ['a', 'b', 'c'];
 
-  /// Active default basemap style: Satellite Hybrid mode.
+  /// Satellite look, as before, across the app and admin.
   static const AppMapStyle defaultStyle = AppMapStyle.satelliteHybrid;
 
   static const String userAgentPackageName = 'com.erefill.app';
 
-  /// URL template for the active satellite hybrid basemap.
-  static String get urlTemplate => googleSatelliteHybridUrl;
+  static const _esriCredit =
+      'Powered by Esri · Imagery: Maxar, Earthstar Geographics';
+  static const _osmCredit = '© OpenStreetMap contributors';
+  static final Uri _osmCopyright = Uri.parse(
+    'https://www.openstreetmap.org/copyright',
+  );
 
-  /// Subdomains for the active satellite hybrid basemap.
-  static List<String> get subdomains => googleSatelliteSubdomains;
+  /// The credit line [style] requires.
+  static String attribution([AppMapStyle style = defaultStyle]) =>
+      style == AppMapStyle.streets ? _osmCredit : _esriCredit;
 
-  /// Creates a [TileLayer] configured with satellite hybrid imagery.
-  ///
-  /// Defaults to satellite mode ([AppMapStyle.satelliteHybrid]).
-  static TileLayer layer({
+  /// Base imagery tiles for [style].
+  static TileLayer baseLayer({
     BuildContext? context,
-    AppMapStyle style = AppMapStyle.satelliteHybrid,
+    AppMapStyle style = defaultStyle,
   }) {
-    final useDarkTiles =
+    final dark =
         context != null && Theme.of(context).brightness == Brightness.dark;
+    return switch (style) {
+      AppMapStyle.streets => TileLayer(
+        urlTemplate: osmUrl,
+        userAgentPackageName: userAgentPackageName,
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        tileBuilder: dark ? darkModeTileBuilder : null,
+      ),
+      _ => TileLayer(
+        urlTemplate: esriSatelliteUrl,
+        userAgentPackageName: userAgentPackageName,
+        maxZoom: 20,
+        maxNativeZoom: 18,
+      ),
+    };
+  }
 
-    final String effectiveUrl;
-    final List<String> effectiveSubdomains;
-    final double maxZoom;
-    final int maxNativeZoom;
+  /// Road and label tiles drawn over the satellite photo.
+  static List<TileLayer> overlays([AppMapStyle style = defaultStyle]) =>
+      style == AppMapStyle.satelliteHybrid
+      ? [
+          for (final url in [esriRoadsUrl, esriLabelsUrl])
+            TileLayer(
+              urlTemplate: url,
+              userAgentPackageName: userAgentPackageName,
+              maxZoom: 20,
+              maxNativeZoom: 18,
+            ),
+        ]
+      : const [];
 
-    switch (style) {
-      case AppMapStyle.satelliteHybrid:
-        effectiveUrl = googleSatelliteHybridUrl;
-        effectiveSubdomains = googleSatelliteSubdomains;
-        maxZoom = 20.0;
-        maxNativeZoom = 19;
-      case AppMapStyle.satellitePure:
-        effectiveUrl = esriSatelliteUrl;
-        effectiveSubdomains = const [];
-        maxZoom = 19.0;
-        maxNativeZoom = 18;
-      case AppMapStyle.streets:
-        effectiveUrl = osmUrl;
-        effectiveSubdomains = osmSubdomains;
-        maxZoom = 19.0;
-        maxNativeZoom = 18;
-    }
+  /// The basemap for a `FlutterMap` children list: imagery, overlays and
+  /// the required credit line.
+  static Widget layer({
+    BuildContext? context,
+    AppMapStyle style = defaultStyle,
+  }) => _Basemap(
+    style: style,
+    base: baseLayer(context: context, style: style),
+  );
+}
 
-    return TileLayer(
-      urlTemplate: effectiveUrl,
-      subdomains: effectiveSubdomains,
-      userAgentPackageName: userAgentPackageName,
-      maxZoom: maxZoom,
-      maxNativeZoom: maxNativeZoom,
-      tileBuilder: useDarkTiles && style == AppMapStyle.streets
-          ? darkModeTileBuilder
-          : null,
-      retinaMode: false,
+class _Basemap extends StatelessWidget {
+  const _Basemap({required this.style, required this.base});
+
+  final AppMapStyle style;
+  final TileLayer base;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppMapTiles.attribution(style);
+    final isOsm = style == AppMapStyle.streets;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        base,
+        ...AppMapTiles.overlays(style),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: Semantics(
+            label: 'Map credit: $text',
+            button: isOsm,
+            child: GestureDetector(
+              onTap: isOsm
+                  ? () => launchUrl(
+                      AppMapTiles._osmCopyright,
+                      mode: LaunchMode.externalApplication,
+                    )
+                  : null,
+              child: Container(
+                margin: const EdgeInsets.all(2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                color: const Color(0xCCFFFFFF),
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
