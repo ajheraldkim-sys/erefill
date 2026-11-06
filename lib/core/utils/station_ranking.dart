@@ -23,6 +23,19 @@ class StationRanking {
   /// Fewer reviews than this shows a "New" badge instead of stars.
   static const int newStationThreshold = 3;
 
+  /// Added to the score while the station has a valid approved lab test
+  /// (profiles.water_tested_until, water_tested_badge.sql). Enough to break
+  /// near-ties, too small to lift a clearly worse-rated station.
+  static const double waterTestedBonus = 0.1;
+
+  /// True while [s]'s latest approved lab test has not expired on [today].
+  static bool isWaterTested(Map<String, dynamic> s, DateTime today) {
+    final until = DateTime.tryParse('${s['water_tested_until'] ?? ''}');
+    if (until == null) return false;
+    final d = DateTime(today.year, today.month, today.day);
+    return DateTime(until.year, until.month, until.day).isAfter(d);
+  }
+
   static const double _penaltyPerKm = 0.02;
   static const double _maxDistancePenalty = 0.3;
 
@@ -63,14 +76,17 @@ class StationRanking {
     double? customerLng,
     bool Function(Map<String, dynamic> station)? include,
     double Function(Map<String, dynamic> station)? bonus,
+    DateTime? today,
   }) {
     final pool = [
       for (final s in stations)
         if (include == null || include(s)) s,
     ];
     final mean = meanRating(pool);
+    final now = today ?? DateTime.now();
     double total(Map<String, dynamic> s) {
       var v = score(s, mean: mean) + (bonus?.call(s) ?? 0);
+      if (isWaterTested(s, now)) v += waterTestedBonus;
       final km = distanceKm(s, customerLat, customerLng);
       if (km != null) {
         v -= math.min(km * _penaltyPerKm, _maxDistancePenalty);
@@ -85,11 +101,7 @@ class StationRanking {
 
   /// Straight-line distance from the customer, or null if either point is
   /// unknown.
-  static double? distanceKm(
-    Map<String, dynamic> s,
-    double? lat,
-    double? lng,
-  ) {
+  static double? distanceKm(Map<String, dynamic> s, double? lat, double? lng) {
     final sLat = _num(s['latitude']) ?? _num(s['lat']);
     final sLng = _num(s['longitude']) ?? _num(s['lng']);
     if (lat == null || lng == null || sLat == null || sLng == null) {
@@ -99,7 +111,8 @@ class StationRanking {
     double rad(double d) => d * math.pi / 180;
     final dLat = rad(sLat.toDouble() - lat);
     final dLng = rad(sLng.toDouble() - lng);
-    final a = math.pow(math.sin(dLat / 2), 2) +
+    final a =
+        math.pow(math.sin(dLat / 2), 2) +
         math.cos(rad(lat)) *
             math.cos(rad(sLat.toDouble())) *
             math.pow(math.sin(dLng / 2), 2);
@@ -107,8 +120,8 @@ class StationRanking {
   }
 
   static double? _num(Object? v) => switch (v) {
-        num n => n.toDouble(),
-        String t => double.tryParse(t),
-        _ => null,
-      };
+    num n => n.toDouble(),
+    String t => double.tryParse(t),
+    _ => null,
+  };
 }

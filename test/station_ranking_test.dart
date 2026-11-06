@@ -1,15 +1,19 @@
 import 'package:erefill/core/utils/station_ranking.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Map<String, dynamic> st(String id, num rating, int count,
-        {double? lat, double? lng}) =>
-    {
-      'id': id,
-      'average_rating': rating,
-      'review_count': count,
-      'latitude': ?lat,
-      'longitude': ?lng,
-    };
+Map<String, dynamic> st(
+  String id,
+  num rating,
+  int count, {
+  double? lat,
+  double? lng,
+}) => {
+  'id': id,
+  'average_rating': rating,
+  'review_count': count,
+  'latitude': ?lat,
+  'longitude': ?lng,
+};
 
 void main() {
   group('StationRanking.score', () {
@@ -21,14 +25,18 @@ void main() {
     });
 
     test('no reviews scores the mean', () {
-      expect(StationRanking.score(st('a', 0, 0), mean: 4.1), closeTo(4.1, 1e-9));
+      expect(
+        StationRanking.score(st('a', 0, 0), mean: 4.1),
+        closeTo(4.1, 1e-9),
+      );
     });
 
     test('tolerates strings and nulls from the database', () {
-      final s = StationRanking.score(
-        {'id': 'x', 'average_rating': '4.5', 'review_count': null},
-        mean: 4.0,
-      );
+      final s = StationRanking.score({
+        'id': 'x',
+        'average_rating': '4.5',
+        'review_count': null,
+      }, mean: 4.0);
       expect(s, closeTo(4.0, 1e-9));
     });
   });
@@ -43,18 +51,20 @@ void main() {
       expect(ranked.map((s) => s['id']), ['top', 'new', 'low']);
     });
 
-    test('nearer station wins a near tie when the customer location is known',
-        () {
-      final ranked = StationRanking.rank(
-        [
-          st('far', 4.6, 30, lat: 9.40, lng: 126.0),
-          st('near', 4.6, 30, lat: 9.00, lng: 126.0),
-        ],
-        customerLat: 9.0,
-        customerLng: 126.0,
-      );
-      expect(ranked.first['id'], 'near');
-    });
+    test(
+      'nearer station wins a near tie when the customer location is known',
+      () {
+        final ranked = StationRanking.rank(
+          [
+            st('far', 4.6, 30, lat: 9.40, lng: 126.0),
+            st('near', 4.6, 30, lat: 9.00, lng: 126.0),
+          ],
+          customerLat: 9.0,
+          customerLng: 126.0,
+        );
+        expect(ranked.first['id'], 'near');
+      },
+    );
 
     test('distance never outweighs a clearly better rating', () {
       final ranked = StationRanking.rank(
@@ -69,10 +79,10 @@ void main() {
     });
 
     test('excluded stations are dropped', () {
-      final ranked = StationRanking.rank(
-        [st('a', 4.0, 10), st('b', 5.0, 10)],
-        include: (s) => s['id'] != 'b',
-      );
+      final ranked = StationRanking.rank([
+        st('a', 4.0, 10),
+        st('b', 5.0, 10),
+      ], include: (s) => s['id'] != 'b');
       expect(ranked.map((s) => s['id']), ['a']);
     });
 
@@ -86,5 +96,41 @@ void main() {
   test('isNew is true below 3 reviews', () {
     expect(StationRanking.isNew(st('a', 5, 2)), isTrue);
     expect(StationRanking.isNew(st('a', 5, 3)), isFalse);
+  });
+
+  group('water tested boost', () {
+    final today = DateTime(2026, 11, 6);
+
+    test('a valid lab test breaks a tie between equal stations', () {
+      final plain = st('plain', 4.5, 20);
+      final tested = {
+        ...st('tested', 4.5, 20),
+        'water_tested_until': '2027-01-01',
+      };
+      final ranked = StationRanking.rank([plain, tested], today: today);
+      expect(ranked.first['id'], 'tested');
+    });
+
+    test('an expired test gives no boost', () {
+      final s = {...st('a', 4.5, 20), 'water_tested_until': '2026-11-06'};
+      expect(StationRanking.isWaterTested(s, today), isFalse);
+      expect(
+        StationRanking.isWaterTested({
+          ...st('a', 4.5, 20),
+          'water_tested_until': '2026-11-07',
+        }, today),
+        isTrue,
+      );
+    });
+
+    test('the boost cannot lift a clearly worse station', () {
+      final good = st('good', 4.9, 80);
+      final tested = {
+        ...st('tested', 3.5, 80),
+        'water_tested_until': '2027-01-01',
+      };
+      final ranked = StationRanking.rank([tested, good], today: today);
+      expect(ranked.first['id'], 'good');
+    });
   });
 }

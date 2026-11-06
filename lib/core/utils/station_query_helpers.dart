@@ -4,7 +4,8 @@ abstract final class StationQueryHelpers {
   static const ownerStationFields =
       'id, station_name, full_name, town, barangay, complete_address, '
       'average_rating, review_count, is_open, station_photo_url, station_logo_url, avatar_url, '
-      'primary_water_type, price_per_gallon, latitude, longitude, lat, lng';
+      'primary_water_type, price_per_gallon, latitude, longitude, lat, lng, '
+      'water_tested_until';
 
   static Map<String, dynamic> withAvailability(Map<String, dynamic> row) {
     final isOpen = (row['is_open'] as bool?) ?? true;
