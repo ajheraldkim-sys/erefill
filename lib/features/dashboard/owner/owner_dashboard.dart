@@ -111,8 +111,12 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       SubscriptionService()
           .processDueSubscriptions(stationId: user.id)
           .then<void>((_) {})
-          .catchError((Object e) => ObservabilityService()
-              .logFailure('generate_due_subscription_orders', e)),
+          .catchError(
+            (Object e) => ObservabilityService().logFailure(
+              'generate_due_subscription_orders',
+              e,
+            ),
+          ),
     );
     if (mounted) {
       context.read<CreditProvider>().initialize(user.id);
@@ -201,8 +205,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               (res['base_delivery_fee'] as num?)?.toDouble() ??
               _baseDeliveryFee;
           _pricePerGallon =
-              (res['price_per_gallon'] as num?)?.toDouble() ??
-              _pricePerGallon;
+              (res['price_per_gallon'] as num?)?.toDouble() ?? _pricePerGallon;
         });
         _loadOwnerSetupStatus();
       }
@@ -403,41 +406,42 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         bottomNavigationBar: KeyedSubtree(
           key: _tourNavKey,
           child: Consumer<NotificationProvider>(
-          builder: (context, notif, _) {
-            return RoleBottomNavBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) => _changeTab(index),
-              items: [
-                const RoleBottomNavItem(
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard_rounded,
-                  label: 'Overview',
-                ),
-                RoleBottomNavItem(
-                  icon: Icons.receipt_long_outlined,
-                  activeIcon: Icons.receipt_long_rounded,
-                  label: 'Orders',
-                  badgeCount: notif.newOrdersCount,
-                ),
-                const RoleBottomNavItem(
-                  icon: Icons.inventory_2_outlined,
-                  activeIcon: Icons.inventory_2_rounded,
-                  label: 'Stock & Credits',
-                ),
-                const RoleBottomNavItem(
-                  icon: Icons.delivery_dining_outlined,
-                  activeIcon: Icons.delivery_dining_rounded,
-                  label: 'Riders',
-                ),
-                const RoleBottomNavItem(
-                  icon: Icons.storefront_outlined,
-                  activeIcon: Icons.storefront_rounded,
-                  label: 'Station',
-                ),
-              ],
-            );
-          },
-        ),
+            builder: (context, notif, _) {
+              return RoleBottomNavBar(
+                currentIndex: _selectedIndex,
+                onTap: (index) => _changeTab(index),
+                items: [
+                  const RoleBottomNavItem(
+                    icon: Icons.dashboard_outlined,
+                    activeIcon: Icons.dashboard_rounded,
+                    label: 'Overview',
+                  ),
+                  RoleBottomNavItem(
+                    icon: Icons.receipt_long_outlined,
+                    activeIcon: Icons.receipt_long_rounded,
+                    label: 'Orders',
+                    badgeCount: notif.newOrdersCount,
+                  ),
+                  const RoleBottomNavItem(
+                    icon: Icons.inventory_2_outlined,
+                    activeIcon: Icons.inventory_2_rounded,
+                    label: 'Stock & Credits',
+                    shortLabel: 'Stock',
+                  ),
+                  const RoleBottomNavItem(
+                    icon: Icons.delivery_dining_outlined,
+                    activeIcon: Icons.delivery_dining_rounded,
+                    label: 'Riders',
+                  ),
+                  const RoleBottomNavItem(
+                    icon: Icons.storefront_outlined,
+                    activeIcon: Icons.storefront_rounded,
+                    label: 'Station',
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -562,10 +566,8 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
     final user = supabase.auth.currentUser;
     if (user == null) return;
     _inventoryRes = useSynced(SyncResources.ownerInventory(user.id));
-    _overview = useSynced(
-      SyncResources.ownerOverview(user.id),
-      rebuild: false,
-    )..addListener(_onOverviewChanged);
+    _overview = useSynced(SyncResources.ownerOverview(user.id), rebuild: false)
+      ..addListener(_onOverviewChanged);
     _onOverviewChanged();
   }
 
@@ -898,8 +900,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         ),
         ExperienceStep(
           label: 'Your water & price',
-          helper:
-              'Set a price for your water and keep it available.',
+          helper: 'Set a price for your water and keep it available.',
           isComplete: status.isProductsComplete,
           onTap: () => context.openOwnerServiceCatalog(),
         ),
