@@ -40,7 +40,12 @@ class _StationAccessoriesSectionState extends State<StationAccessoriesSection> {
     try {
       final all = await _repo.list(widget.stationId);
       if (!mounted) return;
-      setState(() => _items = [for (final a in all) if (a.isAvailable) a]);
+      setState(
+        () => _items = [
+          for (final a in all)
+            if (a.isAvailable) a,
+        ],
+      );
     } catch (e) {
       debugPrint('Accessories unavailable: $e');
     }
@@ -94,7 +99,7 @@ class _StationAccessoriesSectionState extends State<StationAccessoriesSection> {
             ),
             child: Row(
               children: [
-                Icon(Accessory.iconFor(a.category), color: AppUi.brandOf(context)),
+                AccessoryThumb(accessory: a, size: 44),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

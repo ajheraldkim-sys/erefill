@@ -1,16 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
-import '../../../core/constants.dart';
 import '../../../core/utils/money.dart';
 import 'services/accessory_repository.dart';
 
+/// Picks a photo: bytes plus file extension ('jpeg' or 'png').
+typedef AccessoryPhotoPick = Future<(List<int>, String)?> Function();
+
+Future<(List<int>, String)?> _pickFromGallery() async {
+  final f = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 1200,
+    imageQuality: 85,
+  );
+  if (f == null) return null;
+  return (
+    await f.readAsBytes(),
+    f.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg',
+  );
+}
+
 /// Owner screen for accessories sold next to the station's water.
 class AccessoriesScreen extends StatefulWidget {
-  const AccessoriesScreen({super.key, required this.ownerId, this.repository});
+  const AccessoriesScreen({
+    super.key,
+    required this.ownerId,
+    this.repository,
+    this.pickPhoto,
+  });
 
   final String ownerId;
   final AccessoryRepository? repository;
+  final AccessoryPhotoPick? pickPhoto;
 
   @override
   State<AccessoriesScreen> createState() => _AccessoriesScreenState();
@@ -48,7 +70,11 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
     final result = await showModalBottomSheet<Accessory>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _AccessoryForm(initial: existing),
+      builder: (_) => _AccessoryForm(
+        initial: existing,
+        pickPhoto: widget.pickPhoto ?? _pickFromGallery,
+        upload: (bytes, ext) => _repo.uploadPhoto(widget.ownerId, bytes, ext),
+      ),
     );
     if (result == null) return;
     try {
@@ -118,10 +144,7 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
                   for (final a in items ?? const <Accessory>[])
                     Card(
                       child: ListTile(
-                        leading: Icon(
-                          Accessory.iconFor(a.category),
-                          color: AppUi.brandOf(context),
-                        ),
+                        leading: AccessoryThumb(accessory: a),
                         title: Text(a.name),
                         subtitle: Text(
                           '${formatPeso(a.price)} · '
@@ -144,8 +167,14 @@ class _AccessoriesScreenState extends State<AccessoriesScreen> {
 }
 
 class _AccessoryForm extends StatefulWidget {
-  const _AccessoryForm({this.initial});
+  const _AccessoryForm({
+    this.initial,
+    required this.pickPhoto,
+    required this.upload,
+  });
   final Accessory? initial;
+  final AccessoryPhotoPick pickPhoto;
+  final Future<String> Function(List<int> bytes, String ext) upload;
 
   @override
   State<_AccessoryForm> createState() => _AccessoryFormState();
@@ -154,14 +183,35 @@ class _AccessoryForm extends StatefulWidget {
 class _AccessoryFormState extends State<_AccessoryForm> {
   late final _name = TextEditingController(text: widget.initial?.name ?? '');
   late final _price = TextEditingController(
-    text: widget.initial == null ? '' : widget.initial!.price.toStringAsFixed(0),
+    text: widget.initial == null
+        ? ''
+        : widget.initial!.price.toStringAsFixed(0),
   );
   late final _stock = TextEditingController(
     text: widget.initial?.stock.toString() ?? '0',
   );
   late String _category = widget.initial?.category ?? 'gallon';
   late bool _available = widget.initial?.isAvailable ?? true;
+  late String? _imageUrl = widget.initial?.imageUrl;
+  bool _uploading = false;
   String? _error;
+
+  Future<void> _choosePhoto() async {
+    final picked = await widget.pickPhoto();
+    if (picked == null || !mounted) return;
+    setState(() {
+      _uploading = true;
+      _error = null;
+    });
+    try {
+      final url = await widget.upload(picked.$1, picked.$2);
+      if (mounted) setState(() => _imageUrl = url);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Photo upload failed. Try again.');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -178,10 +228,10 @@ class _AccessoryFormState extends State<_AccessoryForm> {
     final error = name.isEmpty
         ? 'Enter a name'
         : price <= 0
-            ? 'Enter a price above ₱0'
-            : stock < 0
-                ? 'Stock cannot be negative'
-                : null;
+        ? 'Enter a price above ₱0'
+        : stock < 0
+        ? 'Stock cannot be negative'
+        : null;
     if (error != null) {
       setState(() => _error = error);
       return;
@@ -196,6 +246,7 @@ class _AccessoryFormState extends State<_AccessoryForm> {
         stock: stock,
         isAvailable: _available,
         description: widget.initial?.description,
+        imageUrl: _imageUrl,
       ),
     );
   }
@@ -218,6 +269,58 @@ class _AccessoryFormState extends State<_AccessoryForm> {
             Text(
               widget.initial == null ? 'New accessory' : 'Edit accessory',
               style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                AccessoryThumb(
+                  size: 56,
+                  accessory: Accessory(
+                    id: '',
+                    name: _name.text,
+                    category: _category,
+                    price: 0,
+                    stock: 0,
+                    isAvailable: true,
+                    imageUrl: _imageUrl,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _uploading
+                      ? const Row(
+                          children: [
+                            SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 8),
+                            Text('Uploading photo…'),
+                          ],
+                        )
+                      : Wrap(
+                          spacing: 4,
+                          children: [
+                            TextButton.icon(
+                              key: const Key('acc-photo'),
+                              onPressed: _choosePhoto,
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(
+                                _imageUrl == null
+                                    ? 'Add photo'
+                                    : 'Change photo',
+                              ),
+                            ),
+                            if (_imageUrl != null)
+                              TextButton(
+                                onPressed: () =>
+                                    setState(() => _imageUrl = null),
+                                child: const Text('Remove'),
+                              ),
+                          ],
+                        ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -247,8 +350,9 @@ class _AccessoryFormState extends State<_AccessoryForm> {
                   child: TextField(
                     key: const Key('acc-price'),
                     controller: _price,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Price',
                       prefixText: '₱',
@@ -281,7 +385,10 @@ class _AccessoryFormState extends State<_AccessoryForm> {
                   style: TextStyle(color: theme.colorScheme.error),
                 ),
               ),
-            FilledButton(onPressed: _submit, child: const Text('Save')),
+            FilledButton(
+              onPressed: _uploading ? null : _submit,
+              child: const Text('Save'),
+            ),
           ],
         ),
       ),

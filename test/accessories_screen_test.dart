@@ -31,14 +31,32 @@ class _FakeRepo implements AccessoryRepository {
 
   @override
   Future<void> delete(String id) async => rows.removeWhere((r) => r.id == id);
+
+  final uploads = <String>[];
+
+  @override
+  Future<String> uploadPhoto(
+    String ownerId,
+    List<int> bytes,
+    String ext,
+  ) async {
+    uploads.add('$ownerId.$ext');
+    return 'https://example.test/accessories/$ownerId/${uploads.length}.$ext';
+  }
 }
 
 void main() {
   Future<_FakeRepo> pump(WidgetTester tester) async {
     final repo = _FakeRepo();
-    await tester.pumpWidget(MaterialApp(
-      home: AccessoriesScreen(ownerId: 'o1', repository: repo),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AccessoriesScreen(
+          ownerId: 'o1',
+          repository: repo,
+          pickPhoto: () async => (<int>[1, 2, 3], 'jpeg'),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     return repo;
   }
@@ -54,7 +72,10 @@ void main() {
     await tester.tap(find.text('Add accessory'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('acc-name')), 'Water dispenser');
+    await tester.enterText(
+      find.byKey(const Key('acc-name')),
+      'Water dispenser',
+    );
     await tester.enterText(find.byKey(const Key('acc-price')), '450');
     await tester.enterText(find.byKey(const Key('acc-stock')), '3');
     await tester.tap(find.text('Dispenser'));
@@ -87,5 +108,28 @@ void main() {
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     expect(repo.rows, isEmpty);
+  });
+
+  testWidgets('uploads a photo and saves its URL with the accessory', (
+    tester,
+  ) async {
+    final repo = await pump(tester);
+    await tester.tap(find.text('Add accessory'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('acc-photo')));
+    await tester.pumpAndSettle();
+    expect(repo.uploads, ['o1.jpeg']);
+    expect(find.text('Change photo'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('acc-name')), 'Blue cap');
+    await tester.enterText(find.byKey(const Key('acc-price')), '6');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(
+      repo.rows.last.imageUrl,
+      'https://example.test/accessories/o1/1.jpeg',
+    );
   });
 }
