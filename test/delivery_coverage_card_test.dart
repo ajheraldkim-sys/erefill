@@ -1,3 +1,4 @@
+import 'package:latlong2/latlong.dart';
 import 'package:erefill/features/dashboard/customer/widgets/delivery_coverage_card.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -27,5 +28,21 @@ void main() {
       minimumFee: 0,
     );
     expect(lines, ['Delivery: ₱2/km']);
+  });
+
+  test('zone map bounds contain the whole free-delivery circle', () {
+    const c = LatLng(9.33, 125.97);
+    final b = DeliveryCoverageCard.zoneBounds(c, 2);
+    const d = Distance();
+    // 2 km north, south, east and west of the station are inside.
+    for (final bearing in [0.0, 90.0, 180.0, 270.0]) {
+      expect(
+        b.contains(d.offset(c, 2000, bearing)),
+        isTrue,
+        reason: '$bearing',
+      );
+    }
+    // A zero radius still frames the station.
+    expect(DeliveryCoverageCard.zoneBounds(c, 0).contains(c), isTrue);
   });
 }
