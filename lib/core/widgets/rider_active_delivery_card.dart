@@ -186,7 +186,7 @@ class RiderActiveDeliveryCard extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
-                        fontSize: 11,
+                        fontSize: 12,
                         letterSpacing: 0.3,
                       ),
                     ),

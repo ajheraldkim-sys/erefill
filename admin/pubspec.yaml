@@ -18,6 +18,7 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   intl: ^0.20.2
+  image_picker: ^1.0.7
   google_fonts: ^6.2.1
   shadcn_flutter: ^0.0.55
   shadcn_flutter_material: ^0.0.54

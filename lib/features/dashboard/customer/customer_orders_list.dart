@@ -7,13 +7,16 @@ import 'package:erefill/core/models/cart_model.dart';
 import '../../../core/routing/app_navigation.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/refill_components.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/utils/order_product_helpers.dart';
 import '../../../core/services/offline_order_sync_service.dart';
-import '../../../core/services/local_data_cache.dart';
+import '../../../core/sync/realtime_hub.dart';
+import '../../../core/sync/sync_resources.dart';
+import '../../../core/sync/sync_store.dart';
+import '../../../core/sync/synced_state.dart';
 import 'package:flutter/services.dart';
 import 'review_modal.dart';
 import 'widgets/customer_orders_load_notice.dart';
@@ -28,263 +31,106 @@ class CustomerOrdersList extends StatefulWidget {
 }
 
 class _CustomerOrdersListState extends State<CustomerOrdersList>
-    with WidgetsBindingObserver {
+    with SyncedState {
   final supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _myOrders = [];
-  bool _isLoading = true;
-  bool _isFetchingOrders = false;
-  bool _ordersFetchFailed = false;
-  RealtimeChannel? _ordersChannel;
-  Timer? _pollingTimer;
-  final Map<String, RealtimeChannel> _riderChannels = {};
+
+  /// Server orders, cache-first and kept live by the sync layer.
+  SyncedResource<CustomerOrdersData>? _orders;
+
+  /// Orders placed offline that the server has not received yet.
+  List<Map<String, dynamic>> _queuedOrders = const [];
+  StreamSubscription<int>? _queuedSub;
+  final Map<String, StreamSubscription<RealtimeEvent>> _riderWatches = {};
   final Map<String, LatLng> _riderLocations = {};
-  final Map<String, int> _reviewedOrderRatings = {};
   int _activeSegment = 0;
+
+  List<Map<String, dynamic>> get _serverOrders =>
+      _orders?.data?.orders ?? const [];
+
+  Map<String, int> get _reviewedOrderRatings =>
+      _orders?.data?.reviewRatings ?? const {};
+
+  /// Queued orders first, then everything the server has.
+  List<Map<String, dynamic>> get _myOrders {
+    final serverIds = _serverOrders.map((o) => o['id']).toSet();
+    return [
+      ..._queuedOrders.where(
+        (o) => o['status'] == 'pending_sync' && !serverIds.contains(o['id']),
+      ),
+      ..._serverOrders,
+    ];
+  }
+
+  bool get _isLoading =>
+      (_orders?.isLoading ?? false) && _queuedOrders.isEmpty;
+
+  bool get _ordersFetchFailed => _orders?.lastRefreshFailed ?? false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     final userId = supabase.auth.currentUser?.id;
     if (userId != null) {
-      final mem = LocalDataCache.instance.getMemory<List<dynamic>>(
-        'customer_orders_$userId',
-      );
-      if (mem != null && mem.isNotEmpty) {
-        _myOrders = mem
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        _isLoading = false;
-      }
+      _orders = useSynced(SyncResources.customerOrders(userId))
+        ..addListener(_syncRiderLocationSubscriptions);
+      _syncRiderLocationSubscriptions();
     }
-    _loadCachedOrders();
-    _fetchOrders();
-    _subscribeToOrderChanges();
-    _startOrdersPollingTimer();
-  }
-
-  void _startOrdersPollingTimer() {
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!mounted) return;
-      final hasActiveOrders = _myOrders.any(
-        (o) => o['status'] != 'delivered' && o['status'] != 'cancelled',
-      );
-      if (hasActiveOrders) {
-        _fetchOrders();
-      }
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _fetchOrders();
-      _startOrdersPollingTimer();
-    } else {
-      _pollingTimer?.cancel();
-      _pollingTimer = null;
-    }
-  }
-
-  Future<void> _loadCachedOrders() async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
-    final cached = await LocalDataCache.instance.get<List<dynamic>>(
-      'customer_orders_$userId',
+    _loadQueuedOrders();
+    _queuedSub = OfflineOrderSyncService().onPendingCountChanged.listen(
+      (_) => _loadQueuedOrders(),
     );
-    if (cached != null && cached.isNotEmpty && mounted) {
-      setState(() {
-        _myOrders = cached
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        _isLoading = false; // Zero waiting time for returning customers
-      });
-    }
+  }
+
+  Future<void> _loadQueuedOrders() async {
+    final queued = await OfflineOrderSyncService().getOfflineOrders();
+    if (mounted) setState(() => _queuedOrders = queued);
+  }
+
+  Future<void> _fetchOrders() async {
+    await Future.wait([
+      if (_orders != null) _orders!.refresh(),
+      _loadQueuedOrders(),
+    ]);
   }
 
   void _syncRiderLocationSubscriptions() {
-    final activeRiderIds = _myOrders
+    final activeRiderIds = _serverOrders
         .where((order) => order['status'] == 'out_for_delivery')
         .map((order) => order['assigned_rider_id'])
         .whereType<String>()
         .toSet();
 
     for (final riderId in activeRiderIds) {
-      if (!_riderChannels.containsKey(riderId)) {
-        _subscribeToRiderLocation(riderId);
-      }
+      _riderWatches.putIfAbsent(
+        riderId,
+        () => watchTable(
+          TableWatch('profiles', column: 'id', value: riderId),
+          (event) {
+            final newRecord = event.payload?.newRecord;
+            if (newRecord == null) return;
+            final lat = (newRecord['latitude'] as num?)?.toDouble();
+            final lng = (newRecord['longitude'] as num?)?.toDouble();
+            if (lat == null || lng == null) return;
+            setState(() => _riderLocations[riderId] = LatLng(lat, lng));
+          },
+        ),
+      );
     }
 
-    final toRemove = _riderChannels.keys
+    final toRemove = _riderWatches.keys
         .where((id) => !activeRiderIds.contains(id))
         .toList();
     for (final riderId in toRemove) {
-      final channel = _riderChannels.remove(riderId);
-      if (channel != null) {
-        supabase.removeChannel(channel);
-      }
+      unwatchTable(_riderWatches.remove(riderId)!);
       _riderLocations.remove(riderId);
     }
   }
 
-  void _subscribeToRiderLocation(String riderId) {
-    final channel = supabase
-        .channel('public:profiles:rider:$riderId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'profiles',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: riderId,
-          ),
-          callback: (payload) {
-            final newRecord = payload.newRecord;
-            final lat = (newRecord['latitude'] as num?)?.toDouble();
-            final lng = (newRecord['longitude'] as num?)?.toDouble();
-            if (lat == null || lng == null || !mounted) return;
-
-            setState(() {
-              _riderLocations[riderId] = LatLng(lat, lng);
-            });
-          },
-        )
-        .subscribe();
-
-    _riderChannels[riderId] = channel;
-  }
-
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _pollingTimer?.cancel();
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-    }
-    for (final channel in _riderChannels.values) {
-      supabase.removeChannel(channel);
-    }
-    _riderChannels.clear();
-    _riderLocations.clear();
+    _orders?.removeListener(_syncRiderLocationSubscriptions);
+    _queuedSub?.cancel();
     super.dispose();
-  }
-
-  Future<void> _fetchOrders() async {
-    if (_isFetchingOrders) return;
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    _isFetchingOrders = true;
-    try {
-      final rows = await supabase
-          .from('orders')
-          .select('*, profiles:owner_id(station_name), order_items(*)')
-          .eq('customer_id', userId)
-          .order('created_at', ascending: false);
-
-      try {
-        final reviewRows = await supabase
-            .from('reviews')
-            .select('order_id, rating')
-            .eq('customer_id', userId);
-        _reviewedOrderRatings.clear();
-        for (final r in (reviewRows as List? ?? const [])) {
-          if (r is Map && r['order_id'] != null) {
-            // 0 = reviewed without a star value; never assume 5 stars.
-            _reviewedOrderRatings[r['order_id'].toString()] =
-                (r['rating'] as num?)?.toInt() ?? 0;
-          }
-        }
-      } catch (reviewErr) {
-        debugPrint('Error loading customer reviews: $reviewErr');
-      }
-
-      final onlineOrders = List<Map<String, dynamic>>.from(rows);
-      final offlineOrders = await OfflineOrderSyncService().getOfflineOrders();
-
-      final onlineIds = onlineOrders.map((o) => o['id']).toSet();
-      final pendingOffline = offlineOrders
-          .where(
-            (o) =>
-                o['status'] == 'pending_sync' && !onlineIds.contains(o['id']),
-          )
-          .toList();
-
-      if (!mounted) return;
-      final fullOrders = [...pendingOffline, ...onlineOrders];
-      setState(() {
-        _myOrders = fullOrders;
-        _isLoading = false;
-        _ordersFetchFailed = false;
-      });
-      _syncRiderLocationSubscriptions();
-      LocalDataCache.instance.set('customer_orders_$userId', fullOrders);
-    } catch (e) {
-      debugPrint(
-        'Online orders fetch error, loading from local SQLite and disk cache: $e',
-      );
-      final offlineOrders = await OfflineOrderSyncService().getOfflineOrders();
-      final cached = await LocalDataCache.instance.get<List<dynamic>>(
-        'customer_orders_$userId',
-      );
-      final cachedList = cached != null
-          ? cached
-                .map((item) => Map<String, dynamic>.from(item as Map))
-                .toList()
-          : <Map<String, dynamic>>[];
-
-      final cachedIds = cachedList.map((o) => o['id']).toSet();
-      final pendingOffline = offlineOrders
-          .where((o) => !cachedIds.contains(o['id']))
-          .toList();
-
-      final combined = [...pendingOffline, ...cachedList];
-      if (!mounted) return;
-      setState(() {
-        _myOrders = combined.isNotEmpty ? combined : offlineOrders;
-        _isLoading = false;
-        _ordersFetchFailed = true;
-      });
-    } finally {
-      _isFetchingOrders = false;
-    }
-  }
-
-  void _subscribeToOrderChanges() {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
-
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
-    }
-
-    _ordersChannel = supabase
-        .channel('orders_list:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'customer_id',
-            value: userId,
-          ),
-          callback: (_) => _fetchOrders(),
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _subscribeToOrderChanges();
-            });
-          }
-        });
   }
 
   Future<void> _handleBuyAgain(Map<String, dynamic> order) async {
@@ -320,7 +166,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
 
     for (final raw in validItems) {
       final productId = raw['product_id'].toString();
-      final productName = (raw['product_name'] ?? 'Purified Water refill')
+      final productName = (raw['product_name'] ?? 'Water refill')
           .toString();
       final price = ((raw['price_at_purchase'] as num?) ?? 0).toDouble();
       final qty = ((raw['quantity'] as num?) ?? 1).toInt();
@@ -537,7 +383,7 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
                         color: selected
                             ? AppUi.brandOf(context)
                             : (isDark ? Colors.white70 : AppUi.textSecondary),
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -711,8 +557,8 @@ class _CustomerOrdersListState extends State<CustomerOrdersList>
 
   Widget _buildEmptyState() {
     final isActive = _activeSegment == 0;
-    return AxoEmptyState(
-      pose: isActive ? AxoPose.thinking : AxoPose.happy,
+    return EmptyStateCard(
+      visual: isActive ? EmptyStateVisual.thinking : EmptyStateVisual.happy,
       title: isActive ? 'No active refills' : 'No order history yet',
       message: isActive
           ? 'When you order water from a station, your active deliveries will show up here.'

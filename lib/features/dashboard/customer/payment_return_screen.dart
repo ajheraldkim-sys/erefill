@@ -3,9 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/services/payment_checkout_service.dart';
 
 import '../../../core/constants.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/app_widgets.dart';
 import 'checkout_rules.dart';
+import 'widgets/test_mode_label.dart';
 import '../../../core/routing/app_navigation.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
@@ -29,6 +30,9 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
   Map<String, dynamic>? _order;
   String? _error;
   bool _isLoading = true;
+
+  /// Reported by the gateway on verify; null until known.
+  bool? _livemode;
 
   @override
   void initState() {
@@ -54,12 +58,17 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
           .single();
 
       final status = (order['payment_status'] ?? '').toString().toLowerCase();
-      if (widget.isSuccess && !PaymentCheckoutService.isPaidStatus(status)) {
+      final isOnline = CheckoutRules.isOnlinePayment(
+        order['payment_method']?.toString(),
+      );
+      if (isOnline &&
+          (widget.isSuccess || !PaymentCheckoutService.isPaidStatus(status))) {
         try {
           final verification = await PaymentCheckoutService(
             _supabase,
           ).verify(orderId);
-          if (verification.isPaid) {
+          _livemode = verification.livemode;
+          if (verification.isPaid && !PaymentCheckoutService.isPaidStatus(status)) {
             order = await _supabase
                 .from('orders')
                 .select()
@@ -104,7 +113,7 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
       backgroundColor: AppUi.pageBgOf(context),
       body: SafeArea(
         child: _isLoading
-            ? const AxoLoader(message: 'Loading payment result...')
+            ? const LoadingStateCard(message: 'Loading payment result...')
             : ListView(
                 padding: const EdgeInsets.fromLTRB(
                   AppUi.spacingXl,
@@ -136,6 +145,12 @@ class _PaymentReturnScreenState extends State<PaymentReturnScreen> {
                     message: message,
                     isError: hasLoadError,
                   ),
+                  if (_livemode == false) ...[
+                    AppUi.vGapMd,
+                    TestModeLabel(
+                      qrph: _order?['payment_method']?.toString() == 'qrph',
+                    ),
+                  ],
                   const SizedBox(height: AppUi.spacing2xl),
                   if (_order != null) _buildPaymentSummary(_order!),
                   AppUi.vGapXl,

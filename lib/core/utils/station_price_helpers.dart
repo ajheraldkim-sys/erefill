@@ -1,3 +1,5 @@
+import 'order_product_helpers.dart';
+
 /// Resolves display price for a station row using products, then owner_settings.
 class StationPriceHelpers {
   StationPriceHelpers._();
@@ -23,6 +25,11 @@ class StationPriceHelpers {
       if (ownerId == null) continue;
       final available = row['is_available'];
       if (available == false) continue;
+      if (OrderProductHelpers.isNonWaterProduct(
+        Map<String, dynamic>.from(row),
+      )) {
+        continue;
+      }
       final price = (row['price'] as num?)?.toDouble();
       if (price == null || price <= 0) continue;
       final existing = prices[ownerId];

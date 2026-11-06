@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/services/owner_inventory_service.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/water_types.dart';
 
@@ -241,8 +241,8 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
             const SliverFillRemaining(child: SkeletonList(itemCount: 4))
           else if (_error != null)
             SliverFillRemaining(
-              child: AxoEmptyState(
-                pose: AxoPose.thinking,
+              child: EmptyStateCard(
+                visual: EmptyStateVisual.thinking,
                 title: 'Could not load inventory',
                 message: _error!,
                 actionLabel: 'Retry',
@@ -279,8 +279,8 @@ class _OwnerInventoryScreenState extends State<OwnerInventoryScreen> {
                     final rows = snapshot.data ?? [];
                     if (rows.isEmpty) {
                       return SliverToBoxAdapter(
-                        child: AxoEmptyState(
-                          pose: AxoPose.empty,
+                        child: EmptyStateCard(
+                          visual: EmptyStateVisual.empty,
                           title: 'No inventory activity yet',
                           message:
                               'Loads, adjustments, and empty returns will appear here.',

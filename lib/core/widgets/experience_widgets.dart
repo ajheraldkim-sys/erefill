@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
-import 'brand/axo_states.dart';
+import 'brand/state_cards.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 enum ExperienceRole { customer, owner, rider, support }
@@ -132,7 +132,7 @@ class FriendlyHeroCard extends StatelessWidget {
                     eyebrow.toUpperCase(),
                     style: TextStyle(
                       color: roleColor,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.6,
                     ),
@@ -819,12 +819,12 @@ class _ExperiencePainter extends CustomPainter {
 }
 
 class QuickGuide extends StatelessWidget {
-  final AxoPose pose;
+  final EmptyStateVisual visual;
   final String message;
 
   const QuickGuide({
     super.key,
-    this.pose = AxoPose.happy,
+    this.visual = EmptyStateVisual.happy,
     required this.message,
   });
 
@@ -840,9 +840,9 @@ class QuickGuide extends StatelessWidget {
             color: AppUi.brandSoftOf(context),
           ),
           child: Icon(
-            pose == AxoPose.success
+            visual == EmptyStateVisual.success
                 ? Icons.check_circle_rounded
-                : pose == AxoPose.delivery
+                : visual == EmptyStateVisual.delivery
                 ? Icons.local_shipping_rounded
                 : Icons.water_drop_rounded,
             color: AppUi.brandOf(context),
@@ -865,5 +865,3 @@ class QuickGuide extends StatelessWidget {
   }
 }
 
-@Deprecated('Use QuickGuide instead')
-typedef AxoMiniGuide = QuickGuide;

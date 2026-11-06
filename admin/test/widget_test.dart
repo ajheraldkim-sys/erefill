@@ -52,9 +52,9 @@ void main() {
 
   group('Admin UI Formatters', () {
     test('formatPeso handles null, ints, and doubles', () {
-      expect(formatPeso(null), '₱0.00');
-      expect(formatPeso(0), '₱0.00');
-      expect(formatPeso(50), '₱50.00');
+      expect(formatPeso(null), '₱0');
+      expect(formatPeso(0), '₱0');
+      expect(formatPeso(50), '₱50');
       expect(formatPeso(25.5), '₱25.50');
       expect(formatPeso(1234.567), '₱1,234.57');
     });
@@ -76,7 +76,7 @@ void main() {
               errorText = adminSemanticErrorColor(context);
               pendingStatus = adminStatusColor(context, 'pending');
               darkMapUsesDarkTileBuilder =
-                  AppMapTiles.layer(context: context).tileBuilder != null;
+                  AppMapTiles.baseLayer(context: context).tileBuilder != null;
               return const SizedBox.shrink();
             },
           ),

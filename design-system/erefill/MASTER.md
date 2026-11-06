@@ -12,7 +12,7 @@
 
 ## Direction
 
-**Minimal, operational, water-calm.** Neutral slate surfaces, a muted brand
+**Minimal, operational, water-calm.** Neutral slate surfaces, one brand
 blue accent, borders instead of shadows, and color reserved for meaning
 (status).
 Generated with the UI UX Pro Max skill
@@ -21,7 +21,7 @@ Generated with the UI UX Pro Max skill
 | Skill recommendation | Decision | Why |
 |---|---|---|
 | Style "Vibrant & Block-based" | **Rejected** → Minimalism / Swiss + Flat | The brief asks for minimal and operational; the skill's own style search ranks Minimalism & Swiss (WCAG AAA) for SaaS dashboards. |
-| Primary cyan `#0891B2` | **Kept eRefill's muted water blue `#426779`** | Preserves the brand hue family with lower saturation and 6.1:1 contrast on white. Muted cyan `#65A8AB` stays as the dark-mode primary. |
+| Primary cyan `#0891B2` | **Kept existing brand blue `#0F71C3`** | Same water hue family, already in launcher icon and splash, 5.0:1 on white. Cyan `#42C2C8` stays as the dark-mode primary. |
 | CTA green `#22C55E` | **Rejected** | 2.3:1 on white; a second accent competes with status green. Primary actions use brand blue. |
 | Inter | **Kept Plus Jakarta Sans** | Same "clean, functional" role; already bundled; switching changes text metrics on 200+ screens. |
 | Data-dense dashboard for admin | **Adopted** for admin tables and owner queues | Space-efficient, WCAG AA. |
@@ -33,8 +33,8 @@ Generated with the UI UX Pro Max skill
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `bluePrimary` / `accentCyan` | `#426779` | `#65A8AB` | Primary actions, active nav, links, focus |
-| `blueSoft` | `#E8EFF4` | cyan 16 % | Selected chips, nav indicator, info tint |
+| `bluePrimary` / `accentCyan` | `#0F71C3` | `#42C2C8` | Primary actions, active nav, links, focus |
+| `blueSoft` | `#EEF6FD` | cyan 16 % | Selected chips, nav indicator, info tint |
 | `pageBg` / `darkPageBg` | `#F8FAFC` | `#0B1220` | Scaffold |
 | `surface` / `darkSurface` | `#FFFFFF` | `#111A2B` | Cards, sheets, dialogs, inputs |
 | `lightSurfaceRaised` / `darkSurfaceRaised` | `#F1F5F9` | `#1A2538` | Wells, disabled fills, table headers |
@@ -57,9 +57,9 @@ All text tokens are ≥ 4.5:1 on every surface of their mode — enforced by
 
 | Role | Solid (text/icon on white) | Tint bg | Text on tint |
 |---|---|---|---|
-| Success | `AppColors.uiSuccess #3F684B` | `AppUi.successBg #E6EEE8` | `AppUi.successFg #3F684B` |
-| Warning | `AppColors.uiWarning #755B34` | `AppUi.warningBg #F2ECE2` | `AppUi.warningFg #755B34` |
-| Error | `AppUi.error #914646` | `AppUi.errorBg #F1E7E7` | `AppUi.errorFg #7C4141` |
+| Success | `AppColors.uiSuccess #15803D` | `AppUi.successBg #DCFCE7` | `AppUi.successFg #166534` |
+| Warning | `AppColors.uiWarning #B45309` | `AppUi.warningBg #FEF3C7` | `AppUi.warningFg #92400E` |
+| Error | `AppUi.error #DC2626` | `AppUi.errorBg #FEE2E2` | `AppUi.errorFg #B91C1C` |
 | Info | `AppUi.info` (brand) | `AppUi.infoBg` | `bluePrimary` |
 
 Tint borders: `successBorder`, `warningBorder`, `errorBorder`. Readable
@@ -74,14 +74,14 @@ untouched.
 
 | Canonical status | Accepted aliases | Color | Label |
 |---|---|---|---|
-| `pending` | `pending_sync` (offline) | Muted amber `#925B28` | Pending / Queued Offline |
-| `accepted` | `confirmed` | Muted blue `#426F95` | Accepted |
-| `preparing` | `in_prep` | Slate `#626C74` | Preparing |
-| `ready_for_pickup` | `ready`, `ready_for_delivery` | Muted teal `#3F736D` | Ready for Pickup |
-| `out_for_delivery` | `assigned_to_rider`, `rider_assigned`, `delivering`, `dispatched` | Muted blue-teal `#4B738A` | Out for Delivery / Assigned to Rider |
-| `delivered` | `completed` | Muted green `#4F775C` | Delivered |
-| `cancelled` | `canceled` | Muted red `#914646` | Cancelled |
-| `rejected` | — | Muted crimson `#80434A` | Rejected |
+| `pending` | `pending_sync` (offline) | Amber `#B45309` | Pending / Queued Offline |
+| `accepted` | `confirmed` | Blue `#2563EB` | Accepted |
+| `preparing` | `in_prep` | Orange `#C2410C` | Preparing |
+| `ready_for_pickup` | `ready`, `ready_for_delivery` | Teal `#0F766E` | Ready for Pickup |
+| `out_for_delivery` | `assigned_to_rider`, `rider_assigned`, `delivering`, `dispatched` | Sky `#0369A1` | Out for Delivery / Assigned to Rider |
+| `delivered` | `completed` | Green `#16803D` | Delivered |
+| `cancelled` | `canceled` | Red `#DC2626` | Cancelled |
+| `rejected` | — | Crimson `#991B1B` | Rejected |
 | anything else | — | Slate `#64748B` | Processing |
 
 ### Other statuses — `StatusTone`
@@ -130,8 +130,23 @@ status pills, avatars).
 Borders separate; shadows are for overlays only.
 Cards: `elevation 0` + 1 px `borderLight`. Floating overlays: `AppUi.shadowMd`.
 Use solid fills throughout the system: no gradients, purple/indigo accents,
-backdrop blur, or translucent glass-style cards. Keep status colors muted,
+backdrop blur, or translucent glass-style cards. Keep status colors saturated,
 distinct, and contrast-safe.
+
+**One exception: the logo.** The eRefill mark (`ERefillMark`, in
+`lib/core/widgets/brand/erefill_mark.dart`) keeps its sky → royal gradient
+because it is brand artwork, not a surface. Never copy that gradient onto
+buttons, cards, headers or backgrounds.
+
+## Brand
+
+| Element | Spec |
+|---|---|
+| Mark | Ribbon "e" with a water drop. Always `ERefillMark` / `ERefillLogo` — never redraw it or use an icon font drop as the logo. |
+| Lockup | `ERefillLogo(showTagline: true)`: mark, "eRefill" (Plus Jakarta Sans 800), tagline `CLEAN WATER. MADE EASY.` |
+| Colors | `BrandColors`: sky `#3CCBFA`, azure `#2196F3`, royal `#1858D8`, navy `#0F1F3D` (wordmark, splash), slate `#4A5A78` (tagline). |
+| On dark / blue | Wordmark white. On a blue fill, use the one-color mark: `ERefillMark(color: Colors.white)`. |
+| Icon & splash | Rendered from the mark by `flutter test tool/render_brand_assets.dart`, then `dart run flutter_launcher_icons` and `dart run flutter_native_splash:create`. |
 
 ## Controls
 

@@ -3,9 +3,9 @@
     "short_name": "eRefill",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#2196F3",
-    "theme_color": "#2196F3",
-    "description": "A new Flutter project.",
+    "background_color": "#0F1F3D",
+    "theme_color": "#1858D8",
+    "description": "Clean water. Made easy. Order refills from nearby stations, delivered by local riders.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -406,7 +406,7 @@ class AppFormSectionHeader extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppUi.textSecondaryOf(context),
               letterSpacing: 0.6,

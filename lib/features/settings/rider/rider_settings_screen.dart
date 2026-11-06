@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,6 +11,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import '../../../core/widgets/skeleton.dart';
 import 'rider_settings_service.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class RiderSettingsScreen extends StatefulWidget {
   const RiderSettingsScreen({super.key});
@@ -261,6 +264,11 @@ class _RiderSettingsScreenState extends State<RiderSettingsScreen> {
                         title: 'Display & Sunlight',
                         icon: Icons.wb_sunny_outlined,
                         children: [
+                          const ThemeModePicker(),
+                          const SizedBox(height: 16),
+                          const TextSizeSlider(),
+                          const ReplayTourButton(role: 'rider'),
+                          const Divider(height: 20),
                           Material(
                             color: Colors.transparent,
                             child: SwitchListTile.adaptive(

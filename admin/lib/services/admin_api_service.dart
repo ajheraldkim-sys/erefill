@@ -168,14 +168,7 @@ class AdminApiService {
       };
     } catch (e) {
       debugPrint('Direct dashboard stats fallback error: $e');
-      return {
-        'customers': 0,
-        'owners': 0,
-        'riders': 0,
-        'stations_count': 0,
-        'orders_count': 0,
-        'total_gmv': 0.0,
-      };
+      rethrow;
     }
   }
 
@@ -227,7 +220,7 @@ class AdminApiService {
       };
     } catch (e) {
       debugPrint('revenueAnalytics fallback error: $e');
-      return {'total_revenue': 0.0, 'daily_series': []};
+      rethrow;
     }
   }
 
@@ -291,6 +284,7 @@ class AdminApiService {
       });
     } catch (e) {
       debugPrint('setPlatformFee fallback error: $e');
+      rethrow;
     }
     return payload;
   }
@@ -408,6 +402,7 @@ class AdminApiService {
       }
     } catch (e) {
       debugPrint('setDeliveryFeeConfig fallback error: $e');
+      rethrow;
     }
     return payload;
   }
@@ -423,17 +418,31 @@ class AdminApiService {
       }
     } catch (_) {}
 
+    // audit_logs records the admin as actor_id and the saved config as
+    // new_value; map them onto the RPC's row shape the history list reads.
     try {
       final rows = await _client
           .from('audit_logs')
-          .select('id, user_id, details, created_at')
+          .select('id, actor_id, new_value, created_at, '
+              'actor:profiles!audit_logs_actor_id_fkey(email, full_name)')
           .eq('action', 'set_delivery_fee_config')
           .order('created_at', ascending: false)
           .limit(limit);
-      return List<Map<String, dynamic>>.from(rows);
+      return [
+        for (final row in rows)
+          {
+            'id': row['id'],
+            'user_id': row['actor_id'],
+            'admin_email': (row['actor'] as Map?)?['email'],
+            'admin_name': (row['actor'] as Map?)?['full_name'],
+            'details': row['new_value'],
+            'created_at': row['created_at'],
+          },
+      ];
     } catch (e) {
+      // History is secondary; an empty list keeps the fees screen loading.
       debugPrint('getDeliveryFeeHistory fallback error: $e');
-      return [];
+      return const [];
     }
   }
 
@@ -462,6 +471,66 @@ class AdminApiService {
       if (minFee > 0 && fee < minFee) fee = minFee;
       return double.parse(fee.toStringAsFixed(2));
     }
+  }
+
+  // --- Service Fee Wallets ---
+
+  /// Every station's service fee wallet; fee and top-up totals cover
+  /// [from]..[to] when given.
+  Future<List<FeeWalletRow>> listFeeWallets({DateTime? from, DateTime? to}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (from != null) params['p_from'] = from.toUtc().toIso8601String();
+      if (to != null) params['p_to'] = to.toUtc().toIso8601String();
+
+      final result = await _client.rpc(
+        'admin_list_fee_wallets',
+        params: params.isEmpty ? null : params,
+      );
+      if (result is List) {
+        return result.map((r) => FeeWalletRow.fromJson(_asMap(r))).toList();
+      }
+    } catch (e) {
+      debugPrint('listFeeWallets error: $e');
+      // Fallback: If admin_list_fee_wallets RPC has not been migrated yet,
+      // load registered station owners so the console remains functional.
+      try {
+        final profiles = await _client
+            .from('profiles')
+            .select('id, full_name, station_name')
+            .eq('role', 'owner')
+            .order('station_name');
+        return [
+          for (final p in profiles)
+            FeeWalletRow(
+              ownerId: p['id']?.toString() ?? '',
+              stationName: (p['station_name'] ?? p['full_name'] ?? 'Station').toString(),
+              balance: 0.0,
+              codLocked: false,
+              feesCollected: 0.0,
+              topupsReceived: 0.0,
+            ),
+        ];
+      } catch (fallbackError) {
+        debugPrint('listFeeWallets fallback error: $fallbackError');
+        rethrow;
+      }
+    }
+    return const [];
+  }
+
+  /// Credits (positive) or debits (negative) a station's wallet; [reason] is
+  /// required and written to the audit log. Returns the new balance.
+  Future<double> adjustFeeWallet({
+    required String ownerId,
+    required double amount,
+    required String reason,
+  }) async {
+    final result = await _client.rpc(
+      'admin_adjust_fee_wallet',
+      params: {'p_owner_id': ownerId, 'p_amount': amount, 'p_reason': reason},
+    );
+    return safeDouble(result);
   }
 
   // --- Regions, Stations & Orders ---
@@ -533,7 +602,7 @@ class AdminApiService {
       );
     } catch (e) {
       debugPrint('listStations fallback error: $e');
-      return const AdminPagedResult(total: 0, rows: []);
+      rethrow;
     }
   }
 
@@ -654,7 +723,7 @@ class AdminApiService {
       );
     } catch (e) {
       debugPrint('listUsers fallback error: $e');
-      return const AdminPagedResult(total: 0, rows: []);
+      rethrow;
     }
   }
 
@@ -720,6 +789,7 @@ class AdminApiService {
       });
     } catch (e) {
       debugPrint('setSystemConfig fallback error: $e');
+      rethrow;
     }
   }
 
@@ -752,6 +822,7 @@ class AdminApiService {
           .eq('owner_id', ownerId);
     } catch (e) {
       debugPrint('setStationAvailability fallback error: $e');
+      rethrow;
     }
   }
 
@@ -780,7 +851,7 @@ class AdminApiService {
       return {'station': station ?? {}, 'owner': owner ?? {}};
     } catch (e) {
       debugPrint('getStationDetail fallback error: $e');
-      return {};
+      rethrow;
     }
   }
 
@@ -861,7 +932,7 @@ class AdminApiService {
       return profile == null ? {} : Map<String, dynamic>.from(profile);
     } catch (e) {
       debugPrint('getUserDetail fallback error: $e');
-      return {};
+      rethrow;
     }
   }
 
@@ -931,7 +1002,7 @@ class AdminApiService {
       return updated == null ? updates : Map<String, dynamic>.from(updated);
     } catch (e) {
       debugPrint('updateUserProfile fallback error: $e');
-      return updates;
+      rethrow;
     }
   }
 
@@ -1000,6 +1071,7 @@ class AdminApiService {
           .eq('owner_id', ownerId);
     } catch (e) {
       debugPrint('updateStationProfile fallback error: $e');
+      rethrow;
     }
     return stationUpdates;
   }
@@ -1082,7 +1154,7 @@ class AdminApiService {
       return order == null ? {} : Map<String, dynamic>.from(order);
     } catch (e) {
       debugPrint('getOrderDetail fallback error: $e');
-      return {};
+      rethrow;
     }
   }
 
@@ -1175,7 +1247,7 @@ class AdminApiService {
       return List<Map<String, dynamic>>.from(riders);
     } catch (e) {
       debugPrint('listLiveRiders fallback error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1420,6 +1492,24 @@ class AdminApiService {
     return const AdminPagedResult(total: 0, rows: []);
   }
 
+  /// Resolves a dispute through `admin_resolve_dispute` (order_disputes.sql):
+  /// a refund > 0 books a REFUND ledger entry against the station, flags it,
+  /// marks fully refunded orders and notifies the customer; 0 dismisses.
+  Future<void> resolveDisputeWithRefund(
+    String disputeId,
+    double refundAmount,
+    String notes,
+  ) async {
+    await _client.rpc(
+      'admin_resolve_dispute',
+      params: {
+        'p_dispute_id': disputeId,
+        'p_refund_amount': refundAmount,
+        'p_notes': notes,
+      },
+    );
+  }
+
   Future<void> updateDispute(
     String disputeId,
     String status, {
@@ -1470,6 +1560,75 @@ class AdminApiService {
       return const AdminPagedResult(total: 0, rows: []);
     }
   }
+
+  // ── ID verification ───────────────────────────────────────────────────
+
+  /// Pending ID verifications, oldest first, with the submitter's name.
+  Future<List<Map<String, dynamic>>> listPendingVerifications() async {
+    const base =
+        'id, user_id, role, id_type, id_number_last4, front_path, back_path, '
+        'selfie_path, business_permit_path, created_at, '
+        'profile:profiles!identity_verifications_user_id_fkey(full_name, station_name, phone, town, barangay)';
+    Future<List<Map<String, dynamic>>> load(String fields) async {
+      final rows = await _client
+          .from('identity_verifications')
+          .select(fields)
+          .eq('status', 'pending')
+          .order('created_at');
+      return [for (final r in rows) Map<String, dynamic>.from(r)];
+    }
+
+    try {
+      return await load('$base, auto_checks');
+    } on PostgrestException catch (e) {
+      // auto_checks arrives with identity_verification_checks.sql.
+      if (e.code != '42703') rethrow;
+      return load(base);
+    }
+  }
+
+  /// Pending water-quality certificates with the station name.
+  Future<List<Map<String, dynamic>>> listPendingCertificates() async {
+    final rows = await _client
+        .from('station_certifications')
+        .select(
+          'id, owner_id, cert_type, issued_on, expires_on, file_path, created_at, '
+          'profile:profiles!station_certifications_owner_id_fkey(station_name, full_name)',
+        )
+        .eq('status', 'pending')
+        .order('created_at');
+    return [for (final r in rows) Map<String, dynamic>.from(r)];
+  }
+
+  Future<void> reviewCertificate(
+    String id, {
+    required bool approve,
+    String? reason,
+  }) =>
+      _client.rpc('admin_review_station_certification', params: {
+        'p_cert_id': id,
+        'p_approve': approve,
+        'p_reason': reason,
+      });
+
+  /// Short-lived link to a private verification document.
+  Future<String?> verificationDocUrl(String? path) async {
+    if (path == null || path.isEmpty) return null;
+    return _client.storage
+        .from('verification_docs')
+        .createSignedUrl(path, 600);
+  }
+
+  Future<void> reviewVerification(
+    String id, {
+    required bool approve,
+    String? reason,
+  }) =>
+      _client.rpc('admin_review_identity_verification', params: {
+        'p_verification_id': id,
+        'p_approve': approve,
+        'p_reason': reason,
+      });
 
   Future<void> deleteReview(String reviewId, {String? reason}) async {
     try {
@@ -1532,6 +1691,17 @@ class AdminApiService {
 
   // --- Products & Catalog ---
 
+  /// Removes an accessory (admin_delete_product, restore_missing_rpcs.sql).
+  /// Returns `{deleted: true}` or `{hidden: true}` when it is on past orders.
+  /// Water products are refused by the server.
+  Future<Map<String, dynamic>> removeAccessory(String productId, String reason) async {
+    final res = await _client.rpc(
+      'admin_delete_product',
+      params: {'p_product_id': productId, 'p_reason': reason},
+    );
+    return res is Map ? Map<String, dynamic>.from(res) : const {};
+  }
+
   Future<List<Map<String, dynamic>>> listStationProducts(String ownerId) async {
     try {
       final result = await _client.rpc(
@@ -1552,48 +1722,6 @@ class AdminApiService {
     } catch (_) {
       return [];
     }
-  }
-
-  Future<Map<String, dynamic>> upsertProduct({
-    String? productId,
-    String? ownerId,
-    String? name,
-    String? description,
-    double? price,
-    String? category,
-    int? stockLevel,
-    bool? isAvailable,
-    String? reason,
-  }) async {
-    try {
-      final result = await _client.rpc(
-        'admin_upsert_product',
-        params: {
-          'p_product_id': productId,
-          'p_owner_id': ownerId,
-          'p_name': name,
-          'p_description': description,
-          'p_price': price,
-          'p_category': category,
-          'p_stock_level': stockLevel,
-          'p_is_available': isAvailable,
-          'p_reason': reason,
-        },
-      );
-      final map = _asMap(result);
-      if (map.isNotEmpty) return map;
-    } catch (_) {}
-
-    return {};
-  }
-
-  Future<void> deleteProduct(String productId, {String? reason}) async {
-    try {
-      await _client.rpc(
-        'admin_delete_product',
-        params: {'p_product_id': productId, 'p_reason': reason},
-      );
-    } catch (_) {}
   }
 
   // --- Notifications ---
@@ -1629,6 +1757,7 @@ class AdminApiService {
       });
     } catch (e) {
       debugPrint('sendNotification fallback error: $e');
+      rethrow;
     }
   }
 
@@ -1675,7 +1804,7 @@ class AdminApiService {
       return rows.length;
     } catch (e) {
       debugPrint('broadcastNotification fallback error: $e');
-      return 0;
+      rethrow;
     }
   }
 
@@ -1773,7 +1902,7 @@ class AdminApiService {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint('listAppReleases error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1787,7 +1916,7 @@ class AdminApiService {
       return List<Map<String, dynamic>>.from(rows);
     } catch (e) {
       debugPrint('listAppReleaseAuditLogs error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1828,4 +1957,45 @@ class AdminPagedResult<T> {
 
   final int total;
   final List<T> rows;
+}
+
+
+class FeeWalletRow {
+  const FeeWalletRow({
+    required this.ownerId,
+    required this.stationName,
+    required this.balance,
+    required this.codLocked,
+    required this.feesCollected,
+    required this.topupsReceived,
+    this.lastTopupAt,
+  });
+
+  factory FeeWalletRow.fromJson(Map<String, dynamic> json) => FeeWalletRow(
+    ownerId: json['owner_id']?.toString() ?? '',
+    stationName: json['station_name']?.toString() ?? 'Station',
+    balance: safeDouble(json['balance']),
+    codLocked: json['cod_locked'] == true,
+    feesCollected: safeDouble(json['fees_collected']),
+    topupsReceived: safeDouble(json['topups_received']),
+    lastTopupAt: DateTime.tryParse(json['last_topup_at']?.toString() ?? ''),
+  );
+
+  final String ownerId;
+  final String stationName;
+  final double balance;
+  final bool codLocked;
+  final double feesCollected;
+  final double topupsReceived;
+  final DateTime? lastTopupAt;
+
+  Map<String, dynamic> toJson() => {
+    'owner_id': ownerId,
+    'station_name': stationName,
+    'balance': balance,
+    'cod_locked': codLocked,
+    'fees_collected': feesCollected,
+    'topups_received': topupsReceived,
+    'last_topup_at': lastTopupAt?.toIso8601String(),
+  };
 }

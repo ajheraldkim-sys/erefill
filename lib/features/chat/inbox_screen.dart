@@ -7,7 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/providers/user_provider.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/widgets/brand/hero_header.dart';
-import '../../core/widgets/brand/axo_states.dart';
+import '../../core/widgets/brand/state_cards.dart';
 import 'models/chat_room.dart';
 import 'services/chat_service.dart';
 import '../../core/widgets/skeleton.dart';
@@ -388,7 +388,7 @@ class _InboxScreenState extends State<InboxScreen> {
                             color: hasUnread
                                 ? AppUi.brandOf(context)
                                 : AppUi.textSecondaryOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: hasUnread
                                 ? FontWeight.w700
                                 : FontWeight.w600,
@@ -549,8 +549,8 @@ class _InboxScreenState extends State<InboxScreen> {
             'Conversations with water stations and riders appear here once an order is placed or when you message a station.';
     }
 
-    return AxoEmptyState(
-      pose: AxoPose.thinking,
+    return EmptyStateCard(
+      visual: EmptyStateVisual.thinking,
       compact: true,
       title: title,
       message: message,

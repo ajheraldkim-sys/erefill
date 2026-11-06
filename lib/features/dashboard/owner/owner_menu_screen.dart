@@ -1,6 +1,9 @@
-﻿import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -15,15 +18,16 @@ import 'package:path/path.dart' as path;
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/providers/user_provider.dart';
-import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/utils/profile_query_helpers.dart';
 import 'package:erefill/features/settings/payment_account_models.dart';
 import 'package:erefill/features/settings/payment_settings_service.dart';
 import 'package:erefill/features/settings/owner/owner_settings_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 import 'package:go_router/go_router.dart';
 import 'package:erefill/core/routing/app_routes.dart';
 import 'service_catalog_screen.dart';
@@ -31,6 +35,12 @@ import 'services/station_setup_service.dart';
 import 'package:erefill/core/localization/app_strings.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
+import 'delivery_coverage_screen.dart';
+import 'accessories_screen.dart';
+import 'package:erefill/features/account/verification/verification_screen.dart';
+import 'package:erefill/features/quality/station_certificates.dart';
+import 'package:erefill/features/disputes/disputes.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class OwnerMenuScreen extends StatefulWidget {
   const OwnerMenuScreen({super.key});
@@ -92,7 +102,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
   final _commissionController = TextEditingController();
 
   // Payment methods
-  List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+  List<String> _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card', 'qrph'];
   double? _systemDeliveryRate;
 
   final Map<String, List<String>> _municipalityData =
@@ -168,31 +178,35 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
 
-    _profileSub = SafeSupabase.listen(
-      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          _updateProfileFromData(data.first);
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _loadAllData();
+          return;
         }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Owner menu profile stream error: $error');
-        debugPrint('Owner menu profile stream stack: $stackTrace');
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
+          _updateProfileFromData(Map<String, dynamic>.from(record));
+        }
       },
     );
 
-    _settingsSub = SafeSupabase.listen(
-      supabase
-          .from('owner_settings')
-          .stream(primaryKey: ['id'])
-          .eq('owner_id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          _updateSettingsFromData(data.first);
+    _settingsSub?.cancel();
+    _settingsSub = RealtimeHub.instance.listen(
+      TableWatch('owner_settings', column: 'owner_id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _loadAllData();
+          return;
         }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Owner menu settings stream error: $error');
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
+          _updateSettingsFromData(Map<String, dynamic>.from(record));
+        }
       },
     );
   }
@@ -202,11 +216,11 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     setState(() {
       if (settings['price_per_gallon'] != null) {
         _priceController.text = (settings['price_per_gallon'] as num)
-            .toStringAsFixed(2);
+            .toStringAsFixed(0);
       }
       if (settings['base_delivery_fee'] != null) {
         _deliveryFeeController.text = (settings['base_delivery_fee'] as num)
-            .toStringAsFixed(2);
+            .toStringAsFixed(0);
       }
       if (settings['opening_time'] != null &&
           settings['opening_time'].toString().isNotEmpty) {
@@ -225,7 +239,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (configuredMethods is List) {
         final parsed = configuredMethods
             .whereType<String>()
-            .where((m) => ['cod', 'gcash', 'maya', 'card'].contains(m))
+            .where((m) => ['cod', 'gcash', 'maya', 'card', 'qrph'].contains(m))
             .toSet()
             .toList();
         if (parsed.isNotEmpty) {
@@ -283,7 +297,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (profile['price_per_gallon'] != null &&
           _priceController.text.isEmpty) {
         _priceController.text = (profile['price_per_gallon'] as num)
-            .toStringAsFixed(2);
+            .toStringAsFixed(0);
       }
 
       final lat = (profile['latitude'] ?? profile['lat']) as num?;
@@ -409,12 +423,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
         if (settings != null) {
           _priceController.text =
-              (settings['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
-              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
-              '15.00';
+              (settings['price_per_gallon'] as num?)?.toStringAsFixed(0) ??
+              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(0) ??
+              '15';
           _deliveryFeeController.text =
-              (settings['base_delivery_fee'] as num?)?.toStringAsFixed(2) ??
-              '25.00';
+              (settings['base_delivery_fee'] as num?)?.toStringAsFixed(0) ??
+              '25';
           if (settings['opening_time'] != null &&
               settings['opening_time'].toString().isNotEmpty) {
             _openingTime = settings['opening_time'].toString();
@@ -433,19 +447,19 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           if (configuredMethods is List) {
             _enabledPaymentMethods = configuredMethods
                 .whereType<String>()
-                .where((m) => ['cod', 'gcash', 'maya', 'card'].contains(m))
+                .where((m) => ['cod', 'gcash', 'maya', 'card', 'qrph'].contains(m))
                 .toSet()
                 .toList();
             if (_enabledPaymentMethods.isEmpty) {
-              _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+              _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card', 'qrph'];
             }
           }
         } else {
           _priceController.text =
-              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(2) ??
-              '15.00';
-          _deliveryFeeController.text = '25.00';
-          _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card'];
+              (profile?['price_per_gallon'] as num?)?.toStringAsFixed(0) ??
+              '15';
+          _deliveryFeeController.text = '25';
+          _enabledPaymentMethods = ['cod', 'gcash', 'maya', 'card', 'qrph'];
         }
 
         _isLoading = false;
@@ -489,11 +503,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
   double get _currentPricePerGallon =>
       double.tryParse(_priceController.text.trim()) ?? 15.0;
-  double get _currentBaseFee =>
-      double.tryParse(_deliveryFeeController.text.trim()) ?? 25.0;
-
-  String get _pricingSummary =>
-      '${formatPeso(_currentPricePerGallon)}/gal · ${formatPeso(_currentBaseFee)} delivery';
+  String get _pricingSummary => '${formatPeso(_currentPricePerGallon)}/gal';
 
   String get _paymentMethodsSummary {
     if (_enabledPaymentMethods.isEmpty) return 'None enabled';
@@ -503,6 +513,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
               ? 'COD'
               : m == 'card'
               ? 'Card'
+              : m == 'qrph'
+              ? 'QR Ph'
               : m.toUpperCase(),
         )
         .join(', ');
@@ -1026,7 +1038,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       Text(
                         'Email address',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppUi.textSecondaryOf(context),
                         ),
@@ -1688,7 +1700,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           label: 'Price per Gallon (₱)',
           controller: _priceController,
           prefixIcon: Icons.payments_outlined,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           compact: true,
         ),
         AppUi.vGapMd,
@@ -1737,7 +1750,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             'Centralized',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1937,6 +1950,12 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         'Credit / Debit Card',
         Icons.credit_card_rounded,
         'Online card payments powered by payment gateway',
+      ),
+      (
+        'qrph',
+        'QR Ph',
+        Icons.qr_code_2,
+        'Customer scans a QR code with any bank or e-wallet app',
       ),
     ];
 
@@ -2231,7 +2250,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                       child: Text(
                                         'PRIMARY',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.w700,
                                           color: AppUi.brandOf(context),
                                         ),
@@ -2462,7 +2481,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (image == null) return;
 
       final fileBytes = await image.readAsBytes();
-      final fileName = 'avatar_${user.id}${path.extension(image.name)}';
+      final ext = path.extension(image.name);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'avatar_${user.id}_$timestamp$ext';
       await supabase.storage
           .from('avatars')
           .uploadBinary(
@@ -2471,15 +2492,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
             fileOptions: const FileOptions(upsert: true),
           );
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+      final oldAvatar = _avatarUrl;
       await supabase
           .from('profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', user.id);
+      if (oldAvatar.isNotEmpty) {
+        unawaited(AppCachedImage.evict(oldAvatar));
+      }
       if (mounted) {
-        setState(
-          () => _avatarUrl =
-              '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}',
-        );
+        setState(() => _avatarUrl = publicUrl);
       }
     } finally {
       if (mounted) setState(() => _isUploadingImage = false);
@@ -2501,7 +2523,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       if (image == null) return;
 
       final fileBytes = await image.readAsBytes();
-      final fileName = 'cover_${user.id}${path.extension(image.name)}';
+      final ext = path.extension(image.name);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'cover_${user.id}_$timestamp$ext';
       await supabase.storage
           .from('avatars')
           .uploadBinary(
@@ -2510,15 +2534,16 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
             fileOptions: const FileOptions(upsert: true),
           );
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+      final oldCover = _coverPhotoUrl;
       await supabase
           .from('profiles')
           .update({'station_photo_url': publicUrl})
           .eq('id', user.id);
+      if (oldCover.isNotEmpty) {
+        unawaited(AppCachedImage.evict(oldCover));
+      }
       if (mounted) {
-        setState(() {
-          _coverPhotoUrl =
-              '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-        });
+        setState(() => _coverPhotoUrl = publicUrl);
       }
     } finally {
       if (mounted) setState(() => _isUploadingCover = false);
@@ -2586,6 +2611,73 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 ? AppUi.successBg
                                 : AppUi.errorBg,
                             onTap: _openStationDetailsSheet,
+                          ),
+                          AccountNavTile(
+                            icon: Icons.verified_user_outlined,
+                            title: 'ID verification',
+                            subtitle: 'Verify your ID to build trust and prevent scams',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const VerificationScreen(),
+                              ),
+                            ),
+                          ),
+                          AccountNavTile(
+                            icon: Icons.support_agent_outlined,
+                            title: 'Customer reports',
+                            subtitle: 'Reply to problems and refunds',
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const OwnerDisputesScreen(),
+                              ),
+                            ),
+                          ),
+                          AccountNavTile(
+                            icon: Icons.science_outlined,
+                            title: 'Water quality certificates',
+                            subtitle: 'Lab tests and permits for your badge',
+                            onTap: () {
+                              final uid = supabase.auth.currentUser?.id;
+                              if (uid == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      CertificatesScreen(ownerId: uid),
+                                ),
+                              );
+                            },
+                          ),
+                          AccountNavTile(
+                            icon: Icons.inventory_2_outlined,
+                            title: 'Accessories',
+                            subtitle: 'Gallons, caps, seals, dispensers',
+                            onTap: () {
+                              final uid = supabase.auth.currentUser?.id;
+                              if (uid == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      AccessoriesScreen(ownerId: uid),
+                                ),
+                              );
+                            },
+                          ),
+                          AccountNavTile(
+                            icon: Icons.local_shipping_outlined,
+                            title: 'Delivery coverage',
+                            subtitle: 'Free-delivery zone and barangays',
+                            onTap: () {
+                              final uid = supabase.auth.currentUser?.id;
+                              if (uid == null) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => DeliveryCoverageScreen(
+                                    ownerId: uid,
+                                    town: _selectedTown,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           AccountNavTile(
                             icon: Icons.schedule_outlined,
@@ -2657,8 +2749,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                         children: [
                           AccountNavTile(
                             icon: Icons.water_drop_outlined,
-                            title: 'Water products & catalog',
-                            subtitle: 'Refill sizes, alkalines, and containers',
+                            title: 'Your water & price',
+                            subtitle: 'Set your refill price and availability',
                             badgeText: _setupStatus.productsSection.badgeText,
                             badgeColor: _setupStatus.productsSection.isComplete
                                 ? AppColors.uiSuccess
@@ -2697,15 +2789,17 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                             onChanged: (v) =>
                                 setState(() => _notificationsEnabled = v),
                           ),
-                          AccountToggleTile(
-                            icon: Icons.dark_mode_outlined,
-                            title: 'Dark mode',
-                            value: context.select<ThemeProvider, bool>(
-                              (t) => t.isDarkMode,
+                          const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
+                              child: Column(
+                                children: [
+                                  ThemeModePicker(),
+                                  SizedBox(height: 16),
+                                  TextSizeSlider(),
+                                  ReplayTourButton(role: 'owner'),
+                                ],
+                              ),
                             ),
-                            onChanged: (v) =>
-                                context.read<ThemeProvider>().setDarkMode(v),
-                          ),
                           AccountToggleTile(
                             icon: Icons.wb_sunny_outlined,
                             title: 'Outdoor high-contrast theme',
@@ -3008,7 +3102,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 Text(
                                   'Station storefront photo',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: AppUi.textSecondaryOf(context),
                                   ),

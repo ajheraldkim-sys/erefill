@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../theme/app_colors.dart';
 import '../water_types.dart';
+import 'water_type_thumb.dart';
 import 'order_card.dart';
 
 import 'package:erefill/core/utils/money.dart';
@@ -182,7 +183,7 @@ class DashboardMetricCard extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppUi.textSecondaryOf(context),
                 ),
@@ -253,13 +254,11 @@ class WaterTypeCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: type.color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppUi.radiusControl),
-              ),
-              child: Icon(type.icon, size: 16, color: type.color),
+            WaterTypeThumb(
+              type: type,
+              size: 28,
+              radius: AppUi.radiusControl,
+              iconSize: 16,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -282,7 +281,7 @@ class WaterTypeCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
             color: AppUi.textPrimaryOf(context),
           ),
@@ -293,7 +292,7 @@ class WaterTypeCard extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             height: 1.25,
             color: AppUi.textSecondaryOf(context),
           ),
@@ -309,14 +308,7 @@ class WaterTypeCard extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: type.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-              ),
-              child: Icon(type.icon, color: type.color, size: 24),
-            ),
+            WaterTypeThumb(type: type, size: 44, iconSize: 24),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -392,7 +384,7 @@ class WaterTypeCard extends StatelessWidget {
                     Text(
                       b,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                       ),
@@ -411,7 +403,7 @@ class WaterTypeCard extends StatelessWidget {
                 'Ready in ~$preparationMinutes min',
             ].join(' · '),
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: AppUi.textMutedOf(context),
               fontWeight: FontWeight.w700,
             ),
@@ -439,7 +431,7 @@ class _TypeBadge extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
           color: AppUi.accentTextOf(
             context,
@@ -603,7 +595,7 @@ class RefillOrderStatusTimeline extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: AppUi.textSecondaryOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             height: 1.2,
                           ),
                         ),
@@ -709,7 +701,7 @@ class _ProgressMilestone extends StatelessWidget {
           style: TextStyle(
             color: isCurrent ? statusColor : AppUi.textSecondaryOf(context),
             fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-            fontSize: 11,
+            fontSize: 12,
           ),
         ),
       ],

@@ -10,13 +10,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/notification_preview_sheet.dart';
 import 'package:erefill/core/widgets/role_bottom_nav_bar.dart';
 import 'package:erefill/core/widgets/lazy_indexed_stack.dart';
 import 'order_management_screen.dart';
+import '../../fee_wallet/widgets/fee_wallet_dashboard_card.dart';
 import 'riders_screen.dart';
 import '../../chat/services/chat_service.dart';
 import '../../chat/models/system_notification.dart';
@@ -25,7 +26,10 @@ import 'stock_credits_hub_screen.dart';
 import 'services/station_setup_service.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/owner_inventory_service.dart';
-import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/sync_resources.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 import 'package:erefill/core/services/observability_service.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import '../../subscriptions/services/subscription_service.dart';
@@ -33,6 +37,8 @@ import '../../payouts/widgets/owner_wallet_sheet.dart';
 import 'widgets/new_order_alert_sheet.dart';
 import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import '../../delivery_mgmt/providers/credit_provider.dart';
+import 'forecast/owner_forecast_section.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -61,9 +67,21 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   bool _setupStatusNeedsRefresh = false;
   int _stockCreditsTab = 0;
 
+  final _tourNavKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppTour.maybeShow(
+          context,
+          role: 'owner',
+          navBarKey: _tourNavKey,
+          tabCount: 5,
+        );
+      }
+    });
     final user = context.read<UserProvider>().user;
     if (user != null) {
       ownerProfile = {
@@ -93,19 +111,30 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       SubscriptionService()
           .processDueSubscriptions(stationId: user.id)
           .then<void>((_) {})
-          .catchError((Object e) => ObservabilityService()
-              .logFailure('generate_due_subscription_orders', e)),
+          .catchError(
+            (Object e) => ObservabilityService().logFailure(
+              'generate_due_subscription_orders',
+              e,
+            ),
+          ),
     );
     if (mounted) {
       context.read<CreditProvider>().initialize(user.id);
     }
 
-    _profileSub = SafeSupabase.listen(
-      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _fetchOwnerProfileRest(user.id);
+          return;
+        }
+        final record = event.payload?.newRecord;
+        if (record != null && record.isNotEmpty) {
           setState(() {
-            ownerProfile = data.first;
+            ownerProfile = Map<String, dynamic>.from(record);
             _isOpen = ownerProfile?['is_open'] ?? true;
             _availability =
                 ownerProfile?['station_availability']?.toString() ??
@@ -115,20 +144,19 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           _loadOwnerSetupStatus();
         }
       },
-      onError: (error, stackTrace) {
-        debugPrint('Owner profile stream error: $error');
-        debugPrint('Owner profile stream stack: $stackTrace');
-      },
     );
 
-    _settingsSub = SafeSupabase.listen(
-      supabase
-          .from('owner_settings')
-          .stream(primaryKey: ['id'])
-          .eq('owner_id', user.id),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          final settings = data.first;
+    _settingsSub?.cancel();
+    _settingsSub = RealtimeHub.instance.listen(
+      TableWatch('owner_settings', column: 'owner_id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _fetchOwnerSettingsRest(user.id);
+          return;
+        }
+        final settings = event.payload?.newRecord;
+        if (settings != null && settings.isNotEmpty) {
           setState(() {
             _baseDeliveryFee =
                 (settings['base_delivery_fee'] as num?)?.toDouble() ??
@@ -140,10 +168,48 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           _loadOwnerSetupStatus();
         }
       },
-      onError: (error, stackTrace) {
-        debugPrint('Owner settings stream error: $error');
-      },
     );
+  }
+
+  Future<void> _fetchOwnerProfileRest(String userId) async {
+    try {
+      final res = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (res != null && mounted) {
+        setState(() {
+          ownerProfile = Map<String, dynamic>.from(res);
+          _isOpen = ownerProfile?['is_open'] ?? true;
+          _availability =
+              ownerProfile?['station_availability']?.toString() ??
+              (_isOpen ? 'open' : 'closed');
+          _isLoading = false;
+        });
+        _loadOwnerSetupStatus();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchOwnerSettingsRest(String userId) async {
+    try {
+      final res = await supabase
+          .from('owner_settings')
+          .select()
+          .eq('owner_id', userId)
+          .maybeSingle();
+      if (res != null && mounted) {
+        setState(() {
+          _baseDeliveryFee =
+              (res['base_delivery_fee'] as num?)?.toDouble() ??
+              _baseDeliveryFee;
+          _pricePerGallon =
+              (res['price_per_gallon'] as num?)?.toDouble() ?? _pricePerGallon;
+        });
+        _loadOwnerSetupStatus();
+      }
+    } catch (_) {}
   }
 
   void _changeTab(int index) {
@@ -337,41 +403,45 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           bottom: false,
           child: LazyIndexedStack(index: _selectedIndex, children: screens),
         ),
-        bottomNavigationBar: Consumer<NotificationProvider>(
-          builder: (context, notif, _) {
-            return RoleBottomNavBar(
-              currentIndex: _selectedIndex,
-              onTap: (index) => _changeTab(index),
-              items: [
-                const RoleBottomNavItem(
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard_rounded,
-                  label: 'Overview',
-                ),
-                RoleBottomNavItem(
-                  icon: Icons.receipt_long_outlined,
-                  activeIcon: Icons.receipt_long_rounded,
-                  label: 'Orders',
-                  badgeCount: notif.newOrdersCount,
-                ),
-                const RoleBottomNavItem(
-                  icon: Icons.inventory_2_outlined,
-                  activeIcon: Icons.inventory_2_rounded,
-                  label: 'Stock & Credits',
-                ),
-                const RoleBottomNavItem(
-                  icon: Icons.delivery_dining_outlined,
-                  activeIcon: Icons.delivery_dining_rounded,
-                  label: 'Riders',
-                ),
-                const RoleBottomNavItem(
-                  icon: Icons.storefront_outlined,
-                  activeIcon: Icons.storefront_rounded,
-                  label: 'Station',
-                ),
-              ],
-            );
-          },
+        bottomNavigationBar: KeyedSubtree(
+          key: _tourNavKey,
+          child: Consumer<NotificationProvider>(
+            builder: (context, notif, _) {
+              return RoleBottomNavBar(
+                currentIndex: _selectedIndex,
+                onTap: (index) => _changeTab(index),
+                items: [
+                  const RoleBottomNavItem(
+                    icon: Icons.dashboard_outlined,
+                    activeIcon: Icons.dashboard_rounded,
+                    label: 'Overview',
+                  ),
+                  RoleBottomNavItem(
+                    icon: Icons.receipt_long_outlined,
+                    activeIcon: Icons.receipt_long_rounded,
+                    label: 'Orders',
+                    badgeCount: notif.newOrdersCount,
+                  ),
+                  const RoleBottomNavItem(
+                    icon: Icons.inventory_2_outlined,
+                    activeIcon: Icons.inventory_2_rounded,
+                    label: 'Stock & Credits',
+                    shortLabel: 'Stock',
+                  ),
+                  const RoleBottomNavItem(
+                    icon: Icons.delivery_dining_outlined,
+                    activeIcon: Icons.delivery_dining_rounded,
+                    label: 'Riders',
+                  ),
+                  const RoleBottomNavItem(
+                    icon: Icons.storefront_outlined,
+                    activeIcon: Icons.storefront_rounded,
+                    label: 'Station',
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -474,98 +544,61 @@ class _OwnerHomeOverview extends StatefulWidget {
 }
 
 class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
-    with WidgetsBindingObserver {
+    with SyncedState {
   final supabase = Supabase.instance.client;
   Map<String, dynamic> _stats = {};
   List<dynamic> _recentOrders = [];
-  OwnerInventorySnapshot? _inventory;
-  StreamSubscription? _ordersSub;
-  RealtimeChannel? _ordersChannel;
-  final _inventoryService = OwnerInventoryService();
-  int _previousPendingCount = 0;
-  bool _isFirstOrdersLoad = true;
+  SyncedResource<OwnerOverviewData>? _overview;
+  SyncedResource<OwnerInventorySnapshot>? _inventoryRes;
 
-  Timer? _periodicRefreshTimer;
+  /// Pending count from the last server sync. Null until this screen has
+  /// seen one, so orders that arrived while the app was closed (visible only
+  /// once cached data is replaced) are not announced as new.
+  int? _previousPendingCount;
+  DateTime? _lastAppliedSyncAt;
+  final DateTime _openedAt = DateTime.now();
+
+  OwnerInventorySnapshot? get _inventory => _inventoryRes?.data;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    final user = supabase.auth.currentUser;
-    if (user != null) {
-      final mem = LocalDataCache.instance.getMemory<Map<String, dynamic>>(
-        'owner_overview_${user.id}',
-      );
-      if (mem != null) {
-        _stats = Map<String, dynamic>.from(mem['stats'] as Map? ?? {});
-        _recentOrders = List<dynamic>.from(mem['recentOrders'] as List? ?? []);
-      }
-    }
-    _loadCachedOverview();
-    _setupOrdersListener();
-    _loadInventorySnapshot();
-    _refreshOrdersSnapshot();
-    _periodicRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) {
-        _loadInventorySnapshot();
-        _refreshOrdersSnapshot();
-      }
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadInventorySnapshot();
-      _refreshOrdersSnapshot();
-    }
-  }
-
-  Future<void> _loadCachedOverview() async {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-    try {
-      final cached = await LocalDataCache.instance.get<Map<String, dynamic>>(
-        'owner_overview_${user.id}',
-      );
-      if (cached != null && mounted) {
-        setState(() {
-          _stats = Map<String, dynamic>.from(cached['stats'] as Map? ?? {});
-          _recentOrders = List<dynamic>.from(
-            cached['recentOrders'] as List? ?? [],
-          );
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading cached owner overview: $e');
-    }
+    _inventoryRes = useSynced(SyncResources.ownerInventory(user.id));
+    _overview = useSynced(SyncResources.ownerOverview(user.id), rebuild: false)
+      ..addListener(_onOverviewChanged);
+    _onOverviewChanged();
   }
 
-  Future<void> _loadInventorySnapshot() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-    try {
-      final snapshot = await _inventoryService.fetchSnapshot(user.id);
-      if (mounted) setState(() => _inventory = snapshot);
-    } catch (e) {
-      debugPrint('Inventory snapshot error: $e');
-    }
+  Future<void> _loadInventorySnapshot() async => _inventoryRes?.refresh();
+
+  Future<void> _refreshOrdersSnapshot() async => _overview?.refresh();
+
+  void _onOverviewChanged() {
+    final overview = _overview;
+    final data = overview?.data;
+    if (overview == null || data == null || !mounted) return;
+    final syncedAt = overview.lastSyncedAt;
+    final isNewServerSync =
+        syncedAt != null &&
+        syncedAt != _lastAppliedSyncAt &&
+        syncedAt.isAfter(_openedAt);
+    _lastAppliedSyncAt = syncedAt;
+    _processOrders(data, isNewServerSync: isNewServerSync);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _periodicRefreshTimer?.cancel();
-    _ordersSub?.cancel();
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-    }
+    _overview?.removeListener(_onOverviewChanged);
     super.dispose();
   }
 
-  Future<void> _processOrders(List<dynamic> data) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+  void _processOrders(
+    OwnerOverviewData overview, {
+    required bool isNewServerSync,
+  }) {
+    final data = overview.orders;
     final now = DateTime.now();
 
     double todayRevenue = 0;
@@ -608,14 +641,16 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
       if (status == 'delivered' && isToday) deliveredTodayCount++;
     }
 
-    if (!_isFirstOrdersLoad && pendingCount > _previousPendingCount) {
+    final previousPending = _previousPendingCount;
+    if (isNewServerSync &&
+        previousPending != null &&
+        pendingCount > previousPending) {
       HapticFeedback.heavyImpact();
       if (mounted) {
-        final newestPending = data.firstWhere(
-          (o) => (o['status'] ?? '') == 'pending',
-          orElse: () => null,
-        );
-        if (newestPending is Map<String, dynamic>) {
+        final newestPending = data
+            .where((o) => (o['status'] ?? '') == 'pending')
+            .firstOrNull;
+        if (newestPending != null) {
           NewOrderAlertSheet.show(
             context,
             order: newestPending,
@@ -644,9 +679,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      pendingCount - _previousPendingCount == 1
+                      pendingCount - previousPending == 1
                           ? 'New refill order received!'
-                          : '${pendingCount - _previousPendingCount} new refill orders received!',
+                          : '${pendingCount - previousPending} new refill orders received!',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -663,32 +698,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         }
       }
     }
-    _isFirstOrdersLoad = false;
-    _previousPendingCount = pendingCount;
+    if (isNewServerSync) _previousPendingCount = pendingCount;
 
-    List<Map<String, dynamic>> enrichedRecent = [];
-    try {
-      final res = await supabase
-          .from('orders')
-          .select('*, profiles!orders_customer_id_fkey(full_name, avatar_url)')
-          .eq('owner_id', user.id)
-          .order('created_at', ascending: false)
-          .limit(5);
-      enrichedRecent = List<Map<String, dynamic>>.from(res);
-    } catch (e) {
-      debugPrint('Failed to fetch enriched recent orders, trying fallback: $e');
-      try {
-        final simple = await supabase
-            .from('orders')
-            .select('*')
-            .eq('owner_id', user.id)
-            .order('created_at', ascending: false)
-            .limit(5);
-        enrichedRecent = List<Map<String, dynamic>>.from(simple);
-      } catch (err2) {
-        debugPrint('Failed fallback recent orders: $err2');
-      }
-    }
+    final enrichedRecent = overview.recent;
 
     // Compute real 7-day daily trends from database orders
     final List<double> revenueTrend7Days = List.filled(7, 0.0);
@@ -756,71 +768,7 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         };
         _recentOrders = enrichedRecent;
       });
-      unawaited(
-        LocalDataCache.instance.set('owner_overview_${user.id}', {
-          'stats': _stats,
-          'recentOrders': enrichedRecent,
-        }),
-      );
     }
-  }
-
-  Future<void> _refreshOrdersSnapshot() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-    try {
-      final data = await supabase
-          .from('orders')
-          .select('*')
-          .eq('owner_id', user.id);
-      await _processOrders(data);
-    } catch (e) {
-      debugPrint('Failed to refresh owner orders snapshot: $e');
-    }
-  }
-
-  void _setupOrdersListener() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    _ordersSub = SafeSupabase.listen(
-      supabase
-          .from('orders')
-          .stream(primaryKey: ['id'])
-          .eq('owner_id', user.id),
-      (data) => _processOrders(data),
-      onError: (Object error, StackTrace stackTrace) {
-        debugPrint('Orders stream error: $error');
-        debugPrint('Orders stream stack: $stackTrace');
-      },
-    );
-
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
-    }
-
-    _ordersChannel = supabase
-        .channel('public:orders:owner_overview:${user.id}')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'owner_id',
-            value: user.id,
-          ),
-          callback: (_) => _refreshOrdersSnapshot(),
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _setupOrdersListener();
-            });
-          }
-        });
   }
 
   int _stat(String key) => (_stats[key] as num?)?.toInt() ?? 0;
@@ -951,9 +899,8 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
           onTap: widget.onOpenAccount,
         ),
         ExperienceStep(
-          label: 'Products & catalog',
-          helper:
-              'At least 1 active orderable refill, container, or accessory.',
+          label: 'Your water & price',
+          helper: 'Set a price for your water and keep it available.',
           isComplete: status.isProductsComplete,
           onTap: () => context.openOwnerServiceCatalog(),
         ),
@@ -1156,8 +1103,6 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                _ordersSub?.cancel();
-                _setupOrdersListener();
                 await Future.wait([
                   _loadInventorySnapshot(),
                   _refreshOrdersSnapshot(),
@@ -1195,7 +1140,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                   final side = <Widget>[
                     station,
                     ?setup,
+                    const FeeWalletDashboardCard(),
                     _buildInventoryCard(),
+                    OwnerForecastSection(stock: _inventory?.filledGallons),
                     _buildQuickActions(),
                   ];
                   final phone = <Widget>[
@@ -1204,7 +1151,9 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
                     ?setup,
                     _buildTodaySection(),
                     _buildPipelineCard(),
+                    const FeeWalletDashboardCard(),
                     _buildInventoryCard(),
+                    OwnerForecastSection(stock: _inventory?.filledGallons),
                     _buildQuickActions(),
                     _buildRecentOrders(),
                   ];
@@ -1420,8 +1369,8 @@ class _OwnerHomeOverviewState extends State<_OwnerHomeOverview>
         ),
         const SizedBox(height: AppUi.spacingSm),
         if (_recentOrders.isEmpty)
-          AxoEmptyState(
-            pose: AxoPose.empty,
+          EmptyStateCard(
+            visual: EmptyStateVisual.empty,
             title: 'No orders yet',
             message:
                 'When customers place refill orders, they will appear here instantly.',

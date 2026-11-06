@@ -4,6 +4,8 @@ import 'package:erefill/core/widgets/account/account_ui.dart';
 import 'package:erefill/core/water_types.dart';
 import 'package:erefill/features/account/saved_addresses_screen.dart';
 
+import 'support/water_type_fixtures.dart';
+
 void main() {
   group('Customer Profile Tiles and Account Group Tests', () {
     testWidgets('AccountNavTile renders custom titleColor and iconColor for destructive actions',
@@ -102,11 +104,10 @@ void main() {
       expect(reconstituted.longitude, launch.longitude);
     });
 
-    test('WaterTypes includes expected standard preferences', () {
+    test('WaterTypes preferences come from the loaded catalog', () {
+      seedTestWaterTypes();
       final names = WaterTypes.all.map((t) => t.name.toLowerCase()).toList();
-      expect(names, contains('purified water'));
-      expect(names, contains('mineral water'));
-      expect(names, contains('alkaline water'));
+      expect(names, ['purified water', 'mineral water', 'alkaline water']);
     });
   });
 }

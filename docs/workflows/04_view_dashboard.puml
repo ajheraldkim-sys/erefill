@@ -1,0 +1,7 @@
+@startuml
+start
+:Log in;
+:Open dashboard;
+:View summaries and available features;
+stop
+@enduml

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'refill_reminder_toggle.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants.dart';
@@ -7,6 +10,7 @@ import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/app_form_fields.dart';
 import 'user_settings_service.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class CustomerSettingsScreen extends StatefulWidget {
   const CustomerSettingsScreen({super.key});
@@ -221,15 +225,13 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   title: 'App preferences',
                   icon: Icons.tune_rounded,
                   children: [
-                    _buildToggle(
-                      title: 'Dark mode',
-                      subtitle: 'Use the dark app theme',
-                      value: context.select<ThemeProvider, bool>(
-                        (p) => p.isDarkMode,
-                      ),
-                      onChanged: (v) =>
-                          context.read<ThemeProvider>().setDarkMode(v),
-                    ),
+                    const RefillReminderToggle(),
+                    const Divider(height: 24),
+                    const ThemeModePicker(),
+                    const SizedBox(height: 16),
+                    const TextSizeSlider(),
+                    const ReplayTourButton(role: 'customer'),
+                    const SizedBox(height: 12),
                     _buildToggle(
                       title: 'Outdoor mode (High Contrast)',
                       subtitle: 'Pure white background and pitch-black text for direct sunlight',

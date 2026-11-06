@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Stations;
+:View stations on the map or list;
+:Select a station to view details;
+stop
+@enduml

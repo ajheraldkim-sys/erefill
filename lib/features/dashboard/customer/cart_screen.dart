@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
+import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/widgets/app_ui_kit.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/hero_header.dart';
+import '../../../core/widgets/water_type_thumb.dart';
 import 'package:erefill/core/models/cart_model.dart';
-
-import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/water_types.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
 
 class CartScreen extends StatefulWidget {
   final Map<String, dynamic>? station;
@@ -20,6 +23,7 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
+  final _listEntrance = ListEntrance();
   SupabaseClient? get _supabase {
     try {
       return Supabase.instance.client;
@@ -48,12 +52,34 @@ class _CartScreenState extends State<CartScreen> {
     final client = _supabase;
     if (client == null) return;
     try {
-      final res = await client.rpc('get_delivery_fee_config');
-      if (res is Map && mounted) {
-        // Same keys checkout reads from get_delivery_fee_config
-        // (`minimum_fee`, `enabled`), so cart and checkout always agree.
+      Map<String, dynamic>? res;
+      try {
+        final rpcRes = await client.rpc('get_delivery_fee_config');
+        if (rpcRes is Map) res = Map<String, dynamic>.from(rpcRes);
+      } catch (_) {}
+
+      if (res == null) {
+        try {
+          final row = await client
+              .from('system_config')
+              .select('value')
+              .eq('key', 'delivery_fee_config')
+              .maybeSingle();
+          if (row != null && row['value'] is Map) {
+            res = Map<String, dynamic>.from(row['value'] as Map);
+          }
+        } catch (_) {}
+      }
+
+      res ??= const {
+        'enabled': true,
+        'rate_per_km': 10.0,
+        'minimum_fee': 20.0,
+      };
+
+      if (mounted) {
         setState(() {
-          _ratePerKm = (res['rate_per_km'] as num?)?.toDouble();
+          _ratePerKm = (res!['rate_per_km'] as num?)?.toDouble();
           _minDeliveryFee = (res['minimum_fee'] as num?)?.toDouble();
           _deliveryFeeEnabled = res['enabled'] != false;
         });
@@ -74,7 +100,7 @@ class _CartScreenState extends State<CartScreen> {
       final res = await client
           .from('profiles')
           .select(
-            'id, station_name, complete_address, town, barangay, latitude, longitude, lat, lng, price_per_gallon, primary_water_type, is_open, station_availability',
+            'id, station_name, complete_address, town, barangay, latitude, longitude, lat, lng, price_per_gallon, primary_water_type, station_photo_url, station_logo_url, avatar_url, is_open, station_availability',
           )
           .eq('id', sId)
           .maybeSingle();
@@ -171,11 +197,11 @@ class _CartScreenState extends State<CartScreen> {
           Expanded(
             child: !hasItems
                 ? Center(
-                    child: AxoEmptyState(
-                      pose: AxoPose.empty,
+                    child: EmptyStateCard(
+                      visual: EmptyStateVisual.empty,
                       title: 'Your cart is empty',
                       message:
-                          'Browse water refilling stations to add fresh water, containers, or accessories.',
+                          'Browse water refilling stations to order a refill.',
                       actionLabel: 'Browse stations',
                       onAction: () {
                         if (Navigator.of(context).canPop()) {
@@ -194,6 +220,11 @@ class _CartScreenState extends State<CartScreen> {
                         _StationStrip(
                           name: cart.stationName ?? 'Water Station',
                           itemCount: cart.totalItems,
+                          logoUrl: (_resolvedStation?['station_logo_url'] ??
+                                  _resolvedStation?['avatar_url'] ??
+                                  _resolvedStation?['station_photo_url'])
+                              ?.toString()
+                              .trim(),
                         ),
                         const SizedBox(height: AppUi.spacingLg),
                         Row(
@@ -218,19 +249,21 @@ class _CartScreenState extends State<CartScreen> {
                           ],
                         ),
                         const SizedBox(height: AppUi.spacingXs),
-                        ...itemsList.map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppUi.spacingSm,
-                            ),
-                            child: _CartLineItem(
-                              item: item,
-                              onQuantityChanged: (q) =>
-                                  cart.updateQuantity(item.id, q),
-                              onRemove: () => _removeWithUndo(cart, item),
+                        for (final (index, item) in itemsList.indexed)
+                          _listEntrance.wrap(
+                            index,
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppUi.spacingSm,
+                              ),
+                              child: _CartLineItem(
+                                item: item,
+                                onQuantityChanged: (q) =>
+                                    cart.updateQuantity(item.id, q),
+                                onRemove: () => _removeWithUndo(cart, item),
+                              ),
                             ),
                           ),
-                        ),
                         const SizedBox(height: AppUi.spacingLg),
                         AppCard(child: _buildSummary(cart)),
                       ],
@@ -300,24 +333,28 @@ class _CartScreenState extends State<CartScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      formatPeso(estimate),
+                    AnimatedPeso(
+                      estimate,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textPrimaryOf(context),
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: AppUi.spacingMd),
-              FilledButton.icon(
-                onPressed: _proceedToCheckout,
-                iconAlignment: IconAlignment.end,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                label: const Text('Checkout'),
+              TapScale(
+                child: FilledButton.icon(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _proceedToCheckout();
+                  },
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                  label: const Text('Checkout'),
+                ),
               ),
             ],
           ),
@@ -330,11 +367,17 @@ class _CartScreenState extends State<CartScreen> {
 class _StationStrip extends StatelessWidget {
   final String name;
   final int itemCount;
+  final String? logoUrl;
 
-  const _StationStrip({required this.name, required this.itemCount});
+  const _StationStrip({
+    required this.name,
+    required this.itemCount,
+    this.logoUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasLogo = logoUrl != null && logoUrl!.isNotEmpty;
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -346,11 +389,24 @@ class _StationStrip extends StatelessWidget {
               color: AppUi.brandSoftOf(context),
               borderRadius: AppUi.controlRadius,
             ),
-            child: Icon(
-              Icons.storefront_rounded,
-              color: AppUi.onBrandSoftOf(context),
-              size: 20,
-            ),
+            child: hasLogo
+                ? ClipRRect(
+                    borderRadius: AppUi.controlRadius,
+                    child: AppCachedImage(
+                      imageUrl: logoUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 120,
+                      memCacheHeight: 120,
+                      fallbackIcon: Icons.storefront_rounded,
+                    ),
+                  )
+                : Icon(
+                    Icons.storefront_rounded,
+                    color: AppUi.onBrandSoftOf(context),
+                    size: 20,
+                  ),
           ),
           const SizedBox(width: AppUi.spacingMd),
           Expanded(
@@ -390,32 +446,17 @@ class _CartLineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = item.name.toLowerCase();
-    final isAccessory = name.contains('container') ||
-        name.contains('cap') ||
-        name.contains('accessory');
-    final accent = isAccessory
-        ? (AppUi.isDark(context)
-              ? AppUi.accentCyan
-              : AppColors.statusPreparing)
-        : AppUi.brandOf(context);
+    final type = WaterTypes.byName(item.name);
 
     return AppCard(
       padding: const EdgeInsets.all(AppUi.spacingMd),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: AppUi.isDark(context) ? 0.16 : 0.1),
-              borderRadius: AppUi.controlRadius,
-            ),
-            child: Icon(
-              isAccessory ? Icons.inventory_2_outlined : Icons.water_drop_rounded,
-              color: accent,
-              size: 22,
-            ),
+          WaterTypeThumb(
+            type: type,
+            size: 44,
+            radius: AppUi.radiusControl,
+            iconSize: 22,
           ),
           const SizedBox(width: AppUi.spacingMd),
           Expanded(
@@ -430,17 +471,16 @@ class _CartLineItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${formatPeso(item.price)} each',
+                  '${formatPeso(item.price)} per gallon',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: AppUi.spacingXs),
-                Text(
-                  formatPeso(item.price * item.quantity),
+                AnimatedPeso(
+                  item.price * item.quantity,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textPrimaryOf(context),
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],

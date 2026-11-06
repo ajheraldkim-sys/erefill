@@ -18,9 +18,10 @@ This page is the "how do I use it in code" companion.
 4. **Money = `formatPeso(amount)`** — always `₱1,234.50`.
 5. **Show only real data.** No placeholder ETAs, ratings, or fees. If the
    backend hasn't answered, say so ("Calculated at checkout").
-6. **Keep surfaces flat and colors restrained.** No gradients, purple/indigo
+6. **Keep surfaces flat.** No gradients, purple/indigo
    accents, backdrop blur, or glass-style cards. Use solid, opaque surfaces and
-   shared muted color tokens.
+   the shared color tokens. (The logo mark's own gradient is the one
+   exception; always show the logo with `ERefillLogo` / `ERefillMark`.)
 
 ## Tokens at a glance
 
@@ -55,7 +56,7 @@ AppUi.motion(context)      // 200 ms, or zero when reduce-motion is on
 
 Other shared widgets: `OrderStatusBadge`, `AvailabilityBadge`,
 `RefillOrderStatusTimeline` (`refill_status_widgets.dart`), `EmptyStateCard` /
-`LoadingStateCard` (`brand/axo_states.dart`), `AppLoadingSkeleton`
+`LoadingStateCard` (`brand/state_cards.dart`), `AppLoadingSkeleton`
 (`skeleton.dart`), `RoleBottomNavBar`, `AppFormField`
 (`app_form_fields.dart`). Admin console primitives live in
 `admin/lib/widgets/admin_ui.dart` and read the same tokens.

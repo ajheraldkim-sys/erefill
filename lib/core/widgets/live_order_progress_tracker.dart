@@ -28,8 +28,14 @@ class LiveOrderProgressTracker extends StatefulWidget {
 
 class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
     with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+  late final Animation<double> _pulseAnimation = Tween<double>(
+    begin: 0.92,
+    end: 1.08,
+  ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
 
   static const List<_StepDef> _steps = [
     _StepDef(title: 'Placed', icon: Icons.receipt_long_rounded),
@@ -62,17 +68,34 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
+  /// The current step pulses while the order is in progress; it stops once
+  /// delivered and never runs with reduced motion.
+  void _syncPulse() {
+    final shouldPulse =
+        !AppUi.reduceMotion(context) &&
+        _currentStepIndex(widget.status) < _steps.length - 1;
+    if (shouldPulse && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!shouldPulse && _pulseController.isAnimating) {
+      _pulseController
+        ..stop()
+        ..value = 0.5;
+    }
+  }
 
-    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.15).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(LiveOrderProgressTracker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_currentStepIndex(widget.status) > _currentStepIndex(oldWidget.status)) {
+      AppHaptics.success();
+    }
+    _syncPulse();
   }
 
   @override
@@ -87,85 +110,80 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
     final activeIndex = _currentStepIndex(widget.status);
     final statusStyle = OrderStatusStyle.resolve(widget.status, isDark: isDark);
     final isOutForDelivery = activeIndex == 3;
+    final brand = AppUi.brandOf(context);
+    final idle = AppUi.surfaceRaisedOf(context);
+    final muted = AppUi.textMutedOf(context);
+    final slow = AppUi.motion(context, AppUi.motionSlow);
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF132029) : Colors.white,
+        color: AppUi.surfaceOf(context),
         borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-        border: Border.all(
-          color: isDark ? AppColors.borderDark : AppUi.borderLight,
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: AppUi.borderOf(context)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with live pulse badge
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: statusStyle.primaryColor,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: statusStyle.primaryColor.withValues(alpha: 0.5),
-                            blurRadius: 6,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        widget.stationName,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : AppUi.textPrimary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+              AnimatedContainer(
+                duration: slow,
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: statusStyle.primaryColor,
+                  shape: BoxShape.circle,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusStyle.subtleBackground,
-                  borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-                  border: Border.all(color: statusStyle.subtleBorder, width: 1),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.stationName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(statusStyle.icon, size: 13, color: statusStyle.primaryColor),
-                    const SizedBox(width: 5),
-                    Text(
-                      statusStyle.label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+              ),
+              AnimatedSwitcher(
+                duration: slow,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(scale: animation, child: child),
+                ),
+                child: Container(
+                  key: ValueKey(statusStyle.label),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusStyle.subtleBackground,
+                    borderRadius: BorderRadius.circular(AppUi.radiusFull),
+                    border: Border.all(color: statusStyle.subtleBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        statusStyle.icon,
+                        size: 13,
                         color: statusStyle.primaryColor,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 5),
+                      Text(
+                        statusStyle.label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: statusStyle.primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -173,13 +191,12 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
 
           const SizedBox(height: 16),
 
-          // Animated Progress Bar & Steps
+          // Progress rail and steps
           LayoutBuilder(
             builder: (context, constraints) {
               return Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Background rail line
                   Positioned(
                     top: 15,
                     left: 20,
@@ -187,67 +204,68 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                     child: Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? AppUi.darkSurfaceRaised : AppUi.borderLight,
+                        color: idle,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-
-                  // Active filled rail line
                   Positioned(
                     top: 15,
                     left: 20,
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 600),
+                      duration: AppUi.motion(
+                        context,
+                        const Duration(milliseconds: 600),
+                      ),
                       curve: Curves.easeOutCubic,
                       height: 4,
-                      width: (constraints.maxWidth - 40) * (activeIndex / (_steps.length - 1)),
+                      width:
+                          (constraints.maxWidth - 40) *
+                          (activeIndex / (_steps.length - 1)),
                       decoration: BoxDecoration(
-                        color: AppColors.brandPrimary,
+                        color: brand,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-
-                  // Step nodes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: List.generate(_steps.length, (i) {
                       final isPassed = i < activeIndex;
                       final isCurrent = i == activeIndex;
                       final step = _steps[i];
+                      final filled = isPassed || isCurrent;
 
-                      Widget nodeCircle = Container(
+                      Widget nodeCircle = AnimatedContainer(
+                        duration: slow,
+                        curve: Curves.easeOut,
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
                           color: isPassed
-                              ? AppColors.brandPrimary
+                              ? brand
                               : isCurrent
-                                  ? statusStyle.primaryColor
-                                  : (isDark ? AppUi.darkSurfaceRaised : AppUi.borderLight),
+                              ? statusStyle.primaryColor
+                              : idle,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isCurrent ? Colors.white : Colors.transparent,
+                            color: isCurrent
+                                ? AppUi.surfaceOf(context)
+                                : Colors.transparent,
                             width: 2,
                           ),
-                          boxShadow: isCurrent
-                              ? [
-                                  BoxShadow(
-                                    color: statusStyle.primaryColor.withValues(alpha: 0.4),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
-                                  ),
-                                ]
-                              : null,
                         ),
                         child: Center(
-                          child: Icon(
-                            isPassed ? Icons.check_rounded : step.icon,
-                            size: 15,
-                            color: (isPassed || isCurrent)
-                                ? Colors.white
-                                : (isDark ? AppUi.textMuted : const Color(0xFF94A3B8)),
+                          child: AnimatedSwitcher(
+                            duration: slow,
+                            transitionBuilder: (child, animation) =>
+                                ScaleTransition(scale: animation, child: child),
+                            child: Icon(
+                              isPassed ? Icons.check_rounded : step.icon,
+                              key: ValueKey(isPassed),
+                              size: 15,
+                              color: filled ? Colors.white : muted,
+                            ),
                           ),
                         ),
                       );
@@ -259,24 +277,31 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
                         );
                       }
 
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          nodeCircle,
-                          const SizedBox(height: 6),
-                          Text(
-                            step.title,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-                              color: isCurrent
-                                  ? (isDark ? Colors.white : AppColors.brandPrimary)
-                                  : isPassed
-                                      ? (isDark ? AppUi.darkTextSecondary : AppUi.textMuted)
-                                      : (isDark ? AppUi.textSecondary : const Color(0xFF94A3B8)),
+                      return Semantics(
+                        excludeSemantics: true,
+                        label:
+                            '${step.title}: ${isPassed ? 'done' : isCurrent ? 'current' : 'upcoming'}',
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            nodeCircle,
+                            const SizedBox(height: 6),
+                            Text(
+                              step.title,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: isCurrent
+                                    ? AppUi.textPrimaryOf(context)
+                                    : isPassed
+                                    ? AppUi.textSecondaryOf(context)
+                                    : muted,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       );
                     }),
                   ),
@@ -285,81 +310,95 @@ class _LiveOrderProgressTrackerState extends State<LiveOrderProgressTracker>
             },
           ),
 
-          // Out for Delivery interactive actions card
-          if (isOutForDelivery && widget.riderName != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1A2C38) : AppColors.brandSoft,
-                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                border: Border.all(
-                  color: AppColors.brandPrimary.withValues(alpha: 0.25),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: AppColors.brandPrimary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your Delivery Rider',
-                          style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context), fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          widget.riderName!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : AppUi.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (widget.onTrackMap != null)
-                    IconButton.filledTonal(
-                      onPressed: () {
-                        AppHaptics.light();
-                        widget.onTrackMap!();
-                      },
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.15),
-                        foregroundColor: AppUi.brandOf(context),
-                      ),
-                      icon: const Icon(Icons.map_rounded, size: 18),
-                      tooltip: 'Live Map',
-                    ),
-                  if (widget.onChat != null)
-                    IconButton.filledTonal(
-                      onPressed: () {
-                        AppHaptics.light();
-                        widget.onChat!();
-                      },
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.15),
-                        foregroundColor: AppUi.brandOf(context),
-                      ),
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                      tooltip: 'Message',
-                    ),
-                ],
-              ),
+          // Rider card while out for delivery
+          AnimatedSize(
+            duration: slow,
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: isOutForDelivery && widget.riderName != null
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: _buildRiderCard(context),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiderCard(BuildContext context) {
+    final brand = AppUi.brandOf(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppUi.brandSoftOf(context),
+        borderRadius: BorderRadius.circular(AppUi.radiusCard),
+        border: Border.all(color: brand.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(color: brand, shape: BoxShape.circle),
+            child: Icon(
+              Icons.two_wheeler_rounded,
+              color: AppUi.surfaceOf(context),
+              size: 20,
             ),
-          ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your delivery rider',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppUi.textMutedOf(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  widget.riderName!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (widget.onTrackMap != null)
+            IconButton.filledTonal(
+              onPressed: () {
+                AppHaptics.light();
+                widget.onTrackMap!();
+              },
+              style: IconButton.styleFrom(
+                backgroundColor: brand.withValues(alpha: 0.15),
+                foregroundColor: brand,
+              ),
+              icon: const Icon(Icons.map_rounded, size: 18),
+              tooltip: 'Live Map',
+            ),
+          if (widget.onChat != null)
+            IconButton.filledTonal(
+              onPressed: () {
+                AppHaptics.light();
+                widget.onChat!();
+              },
+              style: IconButton.styleFrom(
+                backgroundColor: brand.withValues(alpha: 0.15),
+                foregroundColor: brand,
+              ),
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              tooltip: 'Message',
+            ),
         ],
       ),
     );

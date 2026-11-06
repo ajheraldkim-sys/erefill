@@ -111,7 +111,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Brand Icon & Logo
-                    const ERefillLogo(size: 80),
+                    const ERefillLogo(size: 64, showTagline: true),
                     const SizedBox(height: 24),
 
                     // Critical Alert Icon Badge
@@ -170,7 +170,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                                 Text(
                                   'CURRENT VERSION',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.6,
                                     color: AppUi.textSecondaryOf(context),
@@ -201,7 +201,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                                 Text(
                                   'REQUIRED VERSION',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.6,
                                     color: AppUi.textSecondaryOf(context),
@@ -321,7 +321,7 @@ class _MandatoryUpdateScreenState extends State<MandatoryUpdateScreen> {
                             Text(
                               '${_progress!.formattedDownloadedMb} MB of ${_progress!.formattedTotalMb} MB downloaded',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 color: AppUi.textSecondaryOf(context),
                               ),
                             ),

@@ -76,7 +76,7 @@ class OptionalUpdateDialog extends StatelessWidget {
                     const Text(
                       'Highlights:',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
                       ),

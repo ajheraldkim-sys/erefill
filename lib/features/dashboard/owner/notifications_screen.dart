@@ -4,11 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
-import 'package:erefill/core/utils/safe_supabase.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/widgets/notification_detail_dialog.dart';
 import 'package:erefill/core/theme/app_colors.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -247,21 +247,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
 
-    _notificationSub = SafeSupabase.listen(
-      supabase
-          .from('system_notifications')
-          .stream(primaryKey: ['id'])
-          .eq('user_id', user.id),
-      (data) {
-        if (mounted) {
-          setState(() {
-            _notifications = List<Map<String, dynamic>>.from(data);
-          });
+    _notificationSub?.cancel();
+    _notificationSub = RealtimeHub.instance.listen(
+      TableWatch('system_notifications', column: 'user_id', value: user.id),
+      (event) {
+        if (!mounted) return;
+        if (event.isResync) {
+          _loadNotifications();
+          return;
         }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Owner notifications stream error: $error');
-        debugPrint('Owner notifications stream stack: $stackTrace');
+        final newRecord = event.payload?.newRecord;
+        if (newRecord == null || newRecord.isEmpty) return;
+        final eventType = event.payload?.eventType;
+        setState(() {
+          final id = newRecord['id'];
+          if (eventType == PostgresChangeEvent.insert) {
+            _notifications.removeWhere((n) => n['id'] == id);
+            _notifications.insert(0, Map<String, dynamic>.from(newRecord));
+          } else if (eventType == PostgresChangeEvent.update) {
+            final idx = _notifications.indexWhere((n) => n['id'] == id);
+            if (idx != -1) {
+              _notifications[idx] = Map<String, dynamic>.from(newRecord);
+            } else {
+              _notifications.insert(0, Map<String, dynamic>.from(newRecord));
+            }
+          } else if (eventType == PostgresChangeEvent.delete) {
+            _notifications.removeWhere((n) => n['id'] == id);
+          }
+        });
       },
     );
   }
@@ -326,7 +339,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? const AxoLoader(message: 'Loading notifications...')
+                ? const LoadingStateCard(message: 'Loading notifications...')
                 : SingleChildScrollView(
                     padding: AppUi.pagePadding,
                     child: Column(
@@ -386,7 +399,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         if (_notifications.isEmpty)
                           const SizedBox(
                             height: 220,
-                            child: AxoEmptyState(
+                            child: EmptyStateCard(
                               title: 'No notifications yet',
                               message:
                                   'Refill orders, payment updates, and delivery alerts will appear here.',
@@ -502,7 +515,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                               _formatTime(createdAt),
                                               style: TextStyle(
                                                 color: AppUi.textSecondaryOf(context),
-                                                fontSize: 11,
+                                                fontSize: 12,
                                               ),
                                             ),
                                           ],

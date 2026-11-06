@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../utils/csv_export.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_map.dart';
 import '../../widgets/admin_ui.dart';
 import '../onboarding/create_dialogs.dart';
@@ -12,6 +17,7 @@ import 'widgets/station_approval_review_dialog.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 enum StationViewMode { cards, table, map }
 
 class StationsScreen extends StatefulWidget {
@@ -21,30 +27,24 @@ class StationsScreen extends StatefulWidget {
   State<StationsScreen> createState() => _StationsScreenState();
 }
 
-class _StationsScreenState extends State<StationsScreen> {
+class _StationsScreenState extends State<StationsScreen> with SyncedState {
   final _searchController = TextEditingController();
-  AdminPagedResult<Map<String, dynamic>>? _page;
+  final _stations = AdminLiveQuery<AdminPage>();
+  late final SyncedResource<List<Map<String, dynamic>>> _regionsRes;
   Map<String, dynamic>? _selected;
-  bool _loading = true;
-  String? _error;
   StationViewMode _viewMode = StationViewMode.cards;
   String _statusPill = 'all';
   String? _regionFilter;
-  List<Map<String, dynamic>> _regions = [];
   final Set<String> _selectedStationIds = {};
+
+  AdminPage? get _page => _stations.data;
+  List<Map<String, dynamic>> get _regions => _regionsRes.data ?? const [];
 
   @override
   void initState() {
     super.initState();
-    _loadRegions();
+    _regionsRes = useSynced(AdminSync.regions(context.read<AdminApiService>()));
     _load();
-  }
-
-  Future<void> _loadRegions() async {
-    try {
-      final regions = await context.read<AdminApiService>().listRegions();
-      if (mounted) setState(() => _regions = regions);
-    } catch (_) {}
   }
 
   @override
@@ -53,28 +53,23 @@ class _StationsScreenState extends State<StationsScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// Points the screen at the query for the current search and region.
+  void _load() {
     setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final page = await context.read<AdminApiService>().listStations(
-        search: _searchController.text.trim().isEmpty
-            ? null
-            : _searchController.text.trim(),
-        limit: 200,
-        regionId: _regionFilter,
+      _stations.resource = rebindSynced(
+        _stations.resource,
+        AdminSync.stations(
+          context.read<AdminApiService>(),
+          search: _searchController.text,
+          regionId: _regionFilter,
+        ),
       );
-      if (!mounted) return;
-      setState(() => _page = page);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    });
   }
+
+  /// After an admin action: every screen showing stations refreshes.
+  Future<void> _syncAfterAction() =>
+      SyncStore.instance.refreshTagged(AdminSync.tagStations);
 
   Future<void> _openDetail(Map<String, dynamic> station) async {
     final deleted = await Navigator.of(context).push<bool>(
@@ -87,7 +82,7 @@ class _StationsScreenState extends State<StationsScreen> {
     );
     if (deleted == true) {
       setState(() => _selected = null);
-      await _load();
+      await _syncAfterAction();
     }
   }
 
@@ -101,7 +96,7 @@ class _StationsScreenState extends State<StationsScreen> {
         context,
         station: station,
         onApproved: () {
-          _load();
+          _syncAfterAction();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -112,7 +107,7 @@ class _StationsScreenState extends State<StationsScreen> {
           );
         },
         onRejected: () {
-          _load();
+          _syncAfterAction();
         },
       );
       return;
@@ -134,13 +129,15 @@ class _StationsScreenState extends State<StationsScreen> {
             backgroundColor: AppUi.accentGreen,
           ),
         );
-        _load();
+        _syncAfterAction();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error approving station: ${FriendlyErrors.message(e)}'),
+            content: Text(
+              'Error approving station: ${FriendlyErrors.message(e)}',
+            ),
             backgroundColor: AppUi.error,
           ),
         );
@@ -179,7 +176,9 @@ class _StationsScreenState extends State<StationsScreen> {
         if (mounted && reason != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('A suspension reason is strictly required for audit safety.'),
+              content: Text(
+                'A suspension reason is strictly required for audit safety.',
+              ),
               backgroundColor: AppUi.error,
             ),
           );
@@ -213,12 +212,15 @@ class _StationsScreenState extends State<StationsScreen> {
             backgroundColor: isSuspended ? AppUi.accentGreen : AppUi.warningFg,
           ),
         );
-        _load();
+        _syncAfterAction();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Error: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     }
@@ -256,13 +258,19 @@ class _StationsScreenState extends State<StationsScreen> {
 
     if (!mounted) return;
     setState(() => _selectedStationIds.clear());
+    final failed = selectedRows.length - successCount;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Approved $successCount stations successfully.'),
-        backgroundColor: AppUi.accentGreen,
+        content: Text(
+          failed == 0
+              ? 'Approved $successCount stations successfully.'
+              : 'Approved $successCount of ${selectedRows.length} stations. '
+                    '$failed could not be approved; check your connection and try again.',
+        ),
+        backgroundColor: failed == 0 ? AppUi.accentGreen : AppUi.error,
       ),
     );
-    _load();
+    _syncAfterAction();
   }
 
   Future<void> _exportCsvSelected() async {
@@ -394,16 +402,12 @@ class _StationsScreenState extends State<StationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const AdminLoadingState();
-    }
-    if (_error != null) {
-      return AdminErrorState(message: _error!, onRetry: _load);
-    }
+    final placeholder = _stations.placeholder;
+    if (placeholder != null) return placeholder;
 
     final filtered = _filteredRows;
 
-    return AdminWorkspaceLayout(
+    final content = AdminWorkspaceLayout(
       header: AdminSectionHeader(
         title: 'Water Stations',
         subtitle: 'Discover, verify, and moderate refill station fleet.',
@@ -492,14 +496,14 @@ class _StationsScreenState extends State<StationsScreen> {
                       height: 38,
                       onPressed: () async {
                         final created = await showCreateStationDialog(context);
-                        if (created == true) _load();
+                        if (created == true) _syncAfterAction();
                       },
                       icon: LucideIcons.plus,
                       text: 'Create Station',
                     ),
                     IconButton(
                       tooltip: 'Refresh',
-                      onPressed: _load,
+                      onPressed: () => _stations.resource?.refresh(),
                       icon: const Icon(LucideIcons.refreshCw, size: 18),
                     ),
                   ],
@@ -616,10 +620,7 @@ class _StationsScreenState extends State<StationsScreen> {
                   _selected!['barangay']?.toString() ?? '—',
                 ),
                 AdminDetailRow('Phone', _selected!['phone']?.toString() ?? '—'),
-                AdminDetailRow(
-                  'Delivery Fee',
-                  'Centralized Rate',
-                ),
+                AdminDetailRow('Delivery Fee', 'Centralized Rate'),
                 AdminDetailRow(
                   'Rate / Gal',
                   formatPeso(_selected!['price_per_gallon']),
@@ -645,6 +646,16 @@ class _StationsScreenState extends State<StationsScreen> {
         StationViewMode.table => _tableBody(filtered),
         StationViewMode.map => _mapBody(filtered),
       },
+    );
+    return AdminSyncedFrame(
+      resources: [_stations.resource!],
+      child: Column(
+        children: [
+          if (_stations.isSwitching)
+            const LinearProgressIndicator(minHeight: 2),
+          Expanded(child: content),
+        ],
+      ),
     );
   }
 
@@ -713,7 +724,9 @@ class _StationsScreenState extends State<StationsScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                             ),
                             child: Icon(
                               LucideIcons.store,
@@ -788,7 +801,9 @@ class _StationsScreenState extends State<StationsScreen> {
                           color: Theme.of(
                             context,
                           ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                          borderRadius: BorderRadius.circular(
+                            AppUi.radiusControl,
+                          ),
                           border: Border.all(color: AppUi.borderOf(context)),
                         ),
                         child: Row(
@@ -899,7 +914,8 @@ class _StationsScreenState extends State<StationsScreen> {
   }
 
   Widget _tableBody(List<Map<String, dynamic>> rows) {
-    final allSelectedInView = rows.isNotEmpty &&
+    final allSelectedInView =
+        rows.isNotEmpty &&
         rows.every((r) => _selectedStationIds.contains(r['id']?.toString()));
 
     return AdminDataPanel(
@@ -952,7 +968,8 @@ class _StationsScreenState extends State<StationsScreen> {
                 children: [
                   Checkbox(
                     value: allSelectedInView,
-                    tristate: !allSelectedInView && _selectedStationIds.isNotEmpty,
+                    tristate:
+                        !allSelectedInView && _selectedStationIds.isNotEmpty,
                     onChanged: (val) {
                       setState(() {
                         if (val == true) {
@@ -1007,13 +1024,15 @@ class _StationsScreenState extends State<StationsScreen> {
                   rows: rows.map((s) {
                     final rawStatus = s['status']?.toString().toLowerCase();
                     final isPending =
-                        rawStatus == 'pending' || rawStatus == 'pending_verification';
+                        rawStatus == 'pending' ||
+                        rawStatus == 'pending_verification';
                     final isSuspended = rawStatus == 'suspended';
                     final status = isPending
                         ? 'pending'
                         : (isSuspended
                               ? 'suspended'
-                              : (s['station_availability']?.toString() ?? 'open'));
+                              : (s['station_availability']?.toString() ??
+                                    'open'));
                     final sId = s['id']?.toString() ?? '';
                     final isRowChecked = _selectedStationIds.contains(sId);
 
@@ -1029,83 +1048,85 @@ class _StationsScreenState extends State<StationsScreen> {
                           _selected = s;
                         });
                       },
-                cells: [
-                  DataCell(
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          s['name'] ??
-                              s['station_name'] ??
-                              s['full_name']?.toString() ??
-                              '—',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        Text(
-                          s['phone']?.toString() ?? '',
-                          style: adminCaptionTextStyle(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  DataCell(
-                    Text('${s['town'] ?? '—'} · ${s['barangay'] ?? '—'}'),
-                  ),
-                  DataCell(
-                    AdminBadge(
-                      label: status,
-                      color: adminStatusColor(context, status),
-                    ),
-                  ),
-                  const DataCell(Text('Centralized')),
-                  DataCell(Text(formatPeso(s['price_per_gallon']))),
-                  DataCell(Text('${s['rider_count'] ?? 0}')),
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AdminManageButton(
-                          height: 30,
-                          text: 'Manage',
-                          onPressed: () => _openDetail(s),
-                        ),
-                        const SizedBox(width: 6),
-                        if (isPending)
-                          AdminActivateButton(
-                            height: 30,
-                            text: 'Approve',
-                            icon: LucideIcons.check,
-                            onPressed: () => _approveStation(s),
-                          )
-                        else if (isSuspended)
-                          AdminActivateButton(
-                            height: 30,
-                            compact: true,
-                            text: 'Reactivate station',
-                            onPressed: () => _toggleStationSuspend(s),
-                          )
-                        else
-                          AdminSuspendButton(
-                            height: 30,
-                            compact: true,
-                            text: 'Suspend station',
-                            onPressed: () => _toggleStationSuspend(s),
+                      cells: [
+                        DataCell(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                s['name'] ??
+                                    s['station_name'] ??
+                                    s['full_name']?.toString() ??
+                                    '—',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                s['phone']?.toString() ?? '',
+                                style: adminCaptionTextStyle(context),
+                              ),
+                            ],
                           ),
+                        ),
+                        DataCell(
+                          Text('${s['town'] ?? '—'} · ${s['barangay'] ?? '—'}'),
+                        ),
+                        DataCell(
+                          AdminBadge(
+                            label: status,
+                            color: adminStatusColor(context, status),
+                          ),
+                        ),
+                        const DataCell(Text('Centralized')),
+                        DataCell(Text(formatPeso(s['price_per_gallon']))),
+                        DataCell(Text('${s['rider_count'] ?? 0}')),
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AdminManageButton(
+                                height: 30,
+                                text: 'Manage',
+                                onPressed: () => _openDetail(s),
+                              ),
+                              const SizedBox(width: 6),
+                              if (isPending)
+                                AdminActivateButton(
+                                  height: 30,
+                                  text: 'Approve',
+                                  icon: LucideIcons.check,
+                                  onPressed: () => _approveStation(s),
+                                )
+                              else if (isSuspended)
+                                AdminActivateButton(
+                                  height: 30,
+                                  compact: true,
+                                  text: 'Reactivate station',
+                                  onPressed: () => _toggleStationSuspend(s),
+                                )
+                              else
+                                AdminSuspendButton(
+                                  height: 30,
+                                  compact: true,
+                                  text: 'Suspend station',
+                                  onPressed: () => _toggleStationSuspend(s),
+                                ),
+                            ],
+                          ),
+                        ),
                       ],
-                    ),
-                  ),
-                ],
-                );
-              }).toList(),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
-  ),
-);
-}
+    );
+  }
 
   Widget _mapBody(List<Map<String, dynamic>> rows) {
     final mapped = rows

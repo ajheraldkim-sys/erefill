@@ -44,7 +44,7 @@ class DmBarChart extends StatelessWidget {
                   const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 11,
+                    fontSize: 12,
                   ),
                   children: [
                     TextSpan(
@@ -83,7 +83,7 @@ class DmBarChart extends StatelessWidget {
                     child: Text(
                       _shortLabel(points[idx].date),
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppUi.textMutedOf(context),
                       ),

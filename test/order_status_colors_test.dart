@@ -14,14 +14,14 @@ void main() {
     test(
       'canonical semantic status colors match exact required specification',
       () {
-        expect(OrderStatusColors.pending, const Color(0xFF925B28));
-        expect(OrderStatusColors.confirmed, const Color(0xFF426F95));
-        expect(OrderStatusColors.preparing, const Color(0xFF626C74));
-        expect(OrderStatusColors.readyForDelivery, const Color(0xFF3F736D));
-        expect(OrderStatusColors.outForDelivery, const Color(0xFF4B738A));
-        expect(OrderStatusColors.completed, const Color(0xFF4F775C));
-        expect(OrderStatusColors.cancelled, const Color(0xFF914646));
-        expect(OrderStatusColors.rejected, const Color(0xFF80434A));
+        expect(OrderStatusColors.pending, const Color(0xFFB45309));
+        expect(OrderStatusColors.confirmed, const Color(0xFF2563EB));
+        expect(OrderStatusColors.preparing, const Color(0xFFC2410C));
+        expect(OrderStatusColors.readyForDelivery, const Color(0xFF0F766E));
+        expect(OrderStatusColors.outForDelivery, const Color(0xFF0369A1));
+        expect(OrderStatusColors.completed, const Color(0xFF16803D));
+        expect(OrderStatusColors.cancelled, const Color(0xFFDC2626));
+        expect(OrderStatusColors.rejected, const Color(0xFF991B1B));
       },
     );
 
@@ -29,70 +29,70 @@ void main() {
       'normalizes synonymous and database status strings to canonical colors',
       () {
         // Pending
-        expect(OrderStatusColors.getColor('pending'), const Color(0xFF925B28));
+        expect(OrderStatusColors.getColor('pending'), const Color(0xFFB45309));
         expect(
           OrderStatusColors.getColor('pending_sync'),
-          const Color(0xFF925B28),
+          const Color(0xFFB45309),
         );
 
         // Confirmed / Accepted
         expect(
           OrderStatusColors.getColor('confirmed'),
-          const Color(0xFF426F95),
+          const Color(0xFF2563EB),
         );
-        expect(OrderStatusColors.getColor('accepted'), const Color(0xFF426F95));
+        expect(OrderStatusColors.getColor('accepted'), const Color(0xFF2563EB));
 
         // Preparing / in_prep
         expect(
           OrderStatusColors.getColor('preparing'),
-          const Color(0xFF626C74),
+          const Color(0xFFC2410C),
         );
-        expect(OrderStatusColors.getColor('in_prep'), const Color(0xFF626C74));
+        expect(OrderStatusColors.getColor('in_prep'), const Color(0xFFC2410C));
 
         // Ready for Delivery / Pickup
         expect(
           OrderStatusColors.getColor('ready_for_pickup'),
-          const Color(0xFF3F736D),
+          const Color(0xFF0F766E),
         );
-        expect(OrderStatusColors.getColor('ready'), const Color(0xFF3F736D));
+        expect(OrderStatusColors.getColor('ready'), const Color(0xFF0F766E));
 
         // Out for Delivery / Delivering / Assigned
         expect(
           OrderStatusColors.getColor('out_for_delivery'),
-          const Color(0xFF4B738A),
+          const Color(0xFF0369A1),
         );
         expect(
           OrderStatusColors.getColor('delivering'),
-          const Color(0xFF4B738A),
+          const Color(0xFF0369A1),
         );
         expect(
           OrderStatusColors.getColor('assigned_to_rider'),
-          const Color(0xFF4B738A),
+          const Color(0xFF0369A1),
         );
         expect(
           OrderStatusColors.getColor('rider_assigned'),
-          const Color(0xFF4B738A),
+          const Color(0xFF0369A1),
         );
 
         // Completed / Delivered
         expect(
           OrderStatusColors.getColor('delivered'),
-          const Color(0xFF4F775C),
+          const Color(0xFF16803D),
         );
         expect(
           OrderStatusColors.getColor('completed'),
-          const Color(0xFF4F775C),
+          const Color(0xFF16803D),
         );
 
         // Cancelled
         expect(
           OrderStatusColors.getColor('cancelled'),
-          const Color(0xFF914646),
+          const Color(0xFFDC2626),
         );
-        expect(OrderStatusColors.getColor('canceled'), const Color(0xFF914646));
+        expect(OrderStatusColors.getColor('canceled'), const Color(0xFFDC2626));
 
         // Rejected
-        expect(OrderStatusColors.getColor('rejected'), const Color(0xFF80434A));
+        expect(OrderStatusColors.getColor('rejected'), const Color(0xFF991B1B));
       },
     );
 

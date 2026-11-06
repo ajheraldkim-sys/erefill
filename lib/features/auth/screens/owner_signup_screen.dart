@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
+import 'package:erefill/features/auth/widgets/signup_flow_widgets.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
 import 'package:erefill/core/widgets/checkout_step_indicator.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -13,6 +14,7 @@ import 'package:erefill/core/widgets/map_tiles.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
+import 'package:erefill/core/water_types.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 class OwnerSignupScreen extends StatefulWidget {
@@ -41,7 +43,8 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
 
   String _selectedTown = 'Cantilan';
   String? _selectedBarangay;
-  String _selectedWaterType = 'Purified Water';
+  String? _selectedWaterType = WaterTypes.defaultType?.name;
+  bool _waterTypesLoading = WaterTypes.all.isEmpty;
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _selectedSuffix;
@@ -50,6 +53,25 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
 
   final Map<String, List<String>> _municipalityData =
       AppConstants.municipalityData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWaterTypes();
+  }
+
+  Future<void> _loadWaterTypes() async {
+    setState(() => _waterTypesLoading = WaterTypes.all.isEmpty);
+    await WaterTypes.load(force: true);
+    if (!mounted) return;
+    setState(() {
+      _waterTypesLoading = false;
+      final names = WaterTypes.all.map((t) => t.name);
+      if (!names.contains(_selectedWaterType)) {
+        _selectedWaterType = WaterTypes.defaultType?.name;
+      }
+    });
+  }
 
   void _nextStep() {
     if (_currentStep < 2) {
@@ -86,19 +108,6 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
       }
     }
   }
-
-  final List<Map<String, String>> _waterOptions = const [
-    {
-      'name': 'Purified Water',
-      'desc':
-          'The most common type, treated to remove nearly all contaminants.',
-    },
-    {
-      'name': 'Mineral Water',
-      'desc': 'Often treated to contain specific levels of minerals.',
-    },
-    {'name': 'Alkaline Water', 'desc': 'Water with a higher pH level.'},
-  ];
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +155,10 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
 
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedWaterType == null) {
+      _showMessage('Choose the water your station sells.', isError: true);
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -259,7 +272,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
       child: Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
         body: _isLoading
-            ? const AxoLoader(message: 'Registering your station...')
+            ? const SignupSubmittingView(message: 'Registering your station...')
             : Column(
                 children: [
                   TabScreenHeroHeader(
@@ -284,9 +297,9 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-                        _buildBioStep(),
-                        _buildBusinessStep(),
-                        _buildSecurityStep(),
+                        Reveal(child: _buildBioStep()),
+                        Reveal(child: _buildBusinessStep()),
+                        Reveal(child: _buildSecurityStep()),
                       ],
                     ),
                   ),
@@ -479,7 +492,7 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
               child: Text(
                 "Slide map to point the exact station location",
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppUi.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
@@ -488,24 +501,51 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
             const SizedBox(height: 32),
             _sectionHeader('Operation Details'),
             const SizedBox(height: 16),
-            _buildDropdownField(
-              label: 'Primary Water Type',
-              initialValue: _selectedWaterType,
-              items: _waterOptions.map((e) => e['name']!).toList(),
-              icon: Icons.water_drop_outlined,
-              onChanged: (val) => setState(() => _selectedWaterType = val!),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _waterOptions.firstWhere(
-                (opt) => opt['name'] == _selectedWaterType,
-              )['desc']!,
-              style: TextStyle(
-                color: AppUi.textSecondaryOf(context),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+            if (_waterTypesLoading)
+              const LinearProgressIndicator()
+            else if (WaterTypes.all.isEmpty)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Water types couldn't load. Check your connection.",
+                      style: TextStyle(
+                        color: AppUi.textSecondaryOf(context),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadWaterTypes,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              )
+            else ...[
+              _buildDropdownField(
+                label: 'Water you sell',
+                initialValue: _selectedWaterType,
+                items: WaterTypes.all.map((t) => t.name).toList(),
+                icon: Icons.water_drop_outlined,
+                onChanged: (val) => setState(() => _selectedWaterType = val),
+                validator: (val) =>
+                    val == null ? 'Choose the water your station sells' : null,
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                [
+                  if (_selectedWaterType != null)
+                    WaterTypes.byName(_selectedWaterType).description,
+                  'This is the only product your station sells. You set its '
+                      'price; only an admin can change the water type later.',
+                ].where((s) => s.isNotEmpty).join('\n\n'),
+                style: TextStyle(
+                  color: AppUi.textSecondaryOf(context),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 40),
           ],
         ),
@@ -556,119 +596,19 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
   }
 
   Widget _buildActionButtons() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        border: Border(
-          top: BorderSide(color: AppUi.borderOf(context)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, -4),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                if (_currentStep > 0) ...[
-                  Expanded(
-                    flex: 1,
-                    child: SizedBox(
-                      height: 56,
-                      child: OutlinedButton.icon(
-                        onPressed: _prevStep,
-                        icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                        label: const Text(
-                          'Back',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppUi.textPrimaryOf(context),
-                          side: BorderSide(color: AppUi.borderOf(context)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                Expanded(
-                  flex: _currentStep > 0 ? 2 : 1,
-                  child: SizedBox(
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _nextStep,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppUi.bluePrimary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        _currentStep == 2
-                            ? "Launch My Station"
-                            : "Continue to Next Step",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (_currentStep == 0) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Already have an account? ",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppUi.textSecondaryOf(context),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.openLogin();
-                      }
-                    },
-                    child: Text(
-                      "Sign In",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppUi.brandOf(context),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
+    return SignupActionBar(
+      step: _currentStep,
+      lastStep: 2,
+      finishLabel: 'Register station',
+      onBack: _prevStep,
+      onNext: _nextStep,
+      onSignIn: () {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.openLogin();
+        }
+      },
     );
   }
 
@@ -676,9 +616,9 @@ class _OwnerSignupScreenState extends State<OwnerSignupScreen> {
     return Text(
       title,
       style: TextStyle(
-        fontSize: 11,
+        fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: AppUi.textSecondaryOf(context),
+        color: AppUi.textPrimaryOf(context),
         letterSpacing: 0,
       ),
     );

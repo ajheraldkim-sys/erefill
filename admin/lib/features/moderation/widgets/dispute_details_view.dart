@@ -14,7 +14,8 @@ import '../../../widgets/admin_ui.dart';
 class DisputeDetailsView extends StatefulWidget {
   final Map<String, dynamic> dispute;
   final VoidCallback onClose;
-  final Future<void> Function(String status, String notes) onResolve;
+  /// [refundAmount] > 0 refunds the customer through admin_resolve_dispute.
+  final Future<void> Function(String status, String notes, double refundAmount) onResolve;
 
   const DisputeDetailsView({
     super.key,
@@ -29,6 +30,7 @@ class DisputeDetailsView extends StatefulWidget {
 
 class _DisputeDetailsViewState extends State<DisputeDetailsView> {
   final _resolutionNotesController = TextEditingController();
+  final _refundController = TextEditingController();
   Map<String, dynamic>? _orderDetails;
   bool _isActionInProgress = false;
 
@@ -49,6 +51,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
   @override
   void dispose() {
     _resolutionNotesController.dispose();
+    _refundController.dispose();
     super.dispose();
   }
 
@@ -63,7 +66,12 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
     } catch (_) {}
   }
 
-  Future<void> _executeResolution(String action, String status) async {
+  Future<void> _executeResolution(
+    String action,
+    String status, {
+    bool refund = false,
+    double orderTotal = 0,
+  }) async {
     final notes = _resolutionNotesController.text.trim();
     if (notes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,9 +83,26 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
       return;
     }
 
+    var refundAmount = 0.0;
+    if (refund) {
+      final raw = _refundController.text.trim();
+      refundAmount = raw.isEmpty ? orderTotal : (double.tryParse(raw) ?? -1);
+      if (refundAmount <= 0 || (orderTotal > 0 && refundAmount > orderTotal)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Enter a refund between ₱1 and ${formatPeso(orderTotal)}.',
+            ),
+            backgroundColor: AppUi.error,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isActionInProgress = true);
     try {
-      await widget.onResolve(status, '[$action] $notes');
+      await widget.onResolve(status, '[$action] $notes', refundAmount);
     } finally {
       if (mounted) setState(() => _isActionInProgress = false);
     }
@@ -229,7 +254,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
                   const SizedBox(height: 20),
 
                   // 6. Resolution & Decision Notes
-                  _buildResolutionSection(context),
+                  _buildResolutionSection(context, amount),
                 ],
               ),
             ),
@@ -571,7 +596,7 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
     );
   }
 
-  Widget _buildResolutionSection(BuildContext context) {
+  Widget _buildResolutionSection(BuildContext context, double orderTotal) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -588,6 +613,15 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
             'Explain the moderation decision, refund amount, or dismissal rationale…',
           ),
         ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _refundController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: AppUi.fieldDecorationOf(
+            context,
+            'Refund amount (blank = full ${formatPeso(orderTotal)})',
+          ),
+        ),
         const SizedBox(height: 14),
         Row(
           children: [
@@ -600,7 +634,12 @@ class _DisputeDetailsViewState extends State<DisputeDetailsView> {
                 ),
                 onPressed: _isActionInProgress
                     ? null
-                    : () => _executeResolution('Refund Issued', 'resolved'),
+                    : () => _executeResolution(
+                          'Refund Issued',
+                          'resolved',
+                          refund: true,
+                          orderTotal: orderTotal,
+                        ),
                 child: const Text('Refund Customer',
                     style: TextStyle(fontWeight: FontWeight.w700)),
               ),

@@ -125,32 +125,6 @@ void main() {
       }
     });
 
-    test('brand and order status colors stay muted', () {
-      final colors = [
-        AppUi.bluePrimary,
-        AppUi.bluePrimaryDark,
-        AppUi.accentCyan,
-        AppUi.accentGreen,
-        AppColors.brandSecondary,
-        AppColors.statusPending,
-        AppColors.statusConfirmed,
-        AppColors.statusPreparing,
-        AppColors.statusReady,
-        AppColors.statusOutForDelivery,
-        AppColors.statusCompleted,
-        AppColors.statusCancelled,
-        AppColors.statusRejected,
-      ];
-
-      for (final color in colors) {
-        expect(
-          HSLColor.fromColor(color).saturation,
-          lessThanOrEqualTo(0.75),
-          reason: color.toString(),
-        );
-      }
-    });
-
     test('status colors avoid purple and indigo hues', () {
       final statusColors = [
         AppColors.statusPending,
@@ -195,8 +169,13 @@ void main() {
         );
         final offenders = <String>[];
 
+        // The logo mark is the one sanctioned gradient: it is the brand
+        // artwork itself, not a UI surface (see design-system MASTER.md).
+        bool isBrandMark(File f) => f.path
+            .replaceAll(r'\', '/')
+            .endsWith('lib/core/widgets/brand/erefill_mark.dart');
         final sourceFiles = [
-          ..._dartFiles(Directory('lib')),
+          ..._dartFiles(Directory('lib')).where((f) => !isBrandMark(f)),
           ..._dartFiles(Directory('admin/lib')),
           File('web/download.html'),
         ];

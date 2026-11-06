@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/features/auth/services/auth_service.dart';
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
+import 'package:erefill/features/auth/widgets/signup_flow_widgets.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
+import 'package:erefill/core/widgets/brand/google_logo.dart';
 import 'package:erefill/core/widgets/checkout_step_indicator.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -47,7 +49,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _selectedSuffix;
-  String _selectedWaterType = WaterTypes.purified.name;
+  String? _selectedWaterType = WaterTypes.defaultType?.name;
 
   LatLng _pickedLocation = const LatLng(
     9.3333,
@@ -186,7 +188,8 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
           'complete_address': _addressController.text.trim(),
           'latitude': _pickedLocation.latitude,
           'longitude': _pickedLocation.longitude,
-          'preferred_water_type': _selectedWaterType,
+          'preferred_water_type':
+              _selectedWaterType ?? WaterTypes.defaultType?.name,
         },
       );
       final newUserId = res.user?.id;
@@ -439,7 +442,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
       child: Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
         body: _isLoading
-            ? const AxoLoader(message: 'Creating your account...')
+            ? const SignupSubmittingView(message: 'Creating your account...')
             : Column(
                 children: [
                   TabScreenHeroHeader(
@@ -464,9 +467,9 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-                        _buildIdentityStep(),
-                        _buildLocationStep(),
-                        _buildSecurityStep(),
+                        Reveal(child: _buildIdentityStep()),
+                        Reveal(child: _buildLocationStep()),
+                        Reveal(child: _buildSecurityStep()),
                       ],
                     ),
                   ),
@@ -550,11 +553,15 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Wrap(
+            ValueListenableBuilder<List<WaterTypeInfo>>(
+              valueListenable: WaterTypes.catalog,
+              builder: (context, _, _) => Wrap(
               spacing: 8,
               runSpacing: 8,
               children: WaterTypes.all.map((type) {
-                final selected = _selectedWaterType == type.name;
+                final selected = (_selectedWaterType ??
+                        WaterTypes.defaultType?.name) ==
+                    type.name;
                 return ChoiceChip(
                   label: Text(type.shortName),
                   selected: selected,
@@ -570,6 +577,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                   ),
                 );
               }).toList(),
+            ),
             ),
             const SizedBox(height: 32),
             const SizedBox(height: 40),
@@ -731,7 +739,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               child: Text(
                 "Slide map to point the exact location",
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: AppUi.textSecondaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
@@ -819,7 +827,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               children: [
                 Expanded(
                   child: _SocialSignupTile(
-                    icon: Icons.g_mobiledata_rounded,
+                    icon: const GoogleLogo(size: 22),
                     label: 'Google',
                     onPressed: _isLoading
                         ? null
@@ -829,7 +837,11 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _SocialSignupTile(
-                    icon: Icons.facebook_rounded,
+                    icon: Icon(
+                      Icons.facebook_rounded,
+                      size: 24,
+                      color: AppUi.textPrimaryOf(context),
+                    ),
                     label: 'Facebook',
                     onPressed: _isLoading
                         ? null
@@ -846,119 +858,19 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
   }
 
   Widget _buildActionButtons() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppUi.surfaceOf(context),
-        border: Border(
-          top: BorderSide(color: AppUi.borderOf(context)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, -4),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                if (_currentStep > 0) ...[
-                  Expanded(
-                    flex: 1,
-                    child: SizedBox(
-                      height: 56,
-                      child: OutlinedButton.icon(
-                        onPressed: _prevStep,
-                        icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                        label: const Text(
-                          'Back',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppUi.textPrimaryOf(context),
-                          side: BorderSide(color: AppUi.borderOf(context)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                Expanded(
-                  flex: _currentStep > 0 ? 2 : 1,
-                  child: SizedBox(
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _nextStep,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.uiSuccess,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        _currentStep == 2
-                            ? "Complete Registration"
-                            : "Continue to Next Step",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (_currentStep == 0) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Already have an account? ",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppUi.textSecondaryOf(context),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        context.openLogin();
-                      }
-                    },
-                    child: Text(
-                      "Sign In",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppUi.brandOf(context),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
+    return SignupActionBar(
+      step: _currentStep,
+      lastStep: 2,
+      finishLabel: 'Create account',
+      onBack: _prevStep,
+      onNext: _nextStep,
+      onSignIn: () {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.openLogin();
+        }
+      },
     );
   }
 
@@ -966,9 +878,9 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
     return Text(
       title,
       style: TextStyle(
-        fontSize: 11,
+        fontSize: 14,
         fontWeight: FontWeight.w700,
-        color: AppUi.textSecondaryOf(context),
+        color: AppUi.textPrimaryOf(context),
         letterSpacing: 0,
       ),
     );
@@ -1158,7 +1070,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
 }
 
 class _SocialSignupTile extends StatelessWidget {
-  final IconData icon;
+  final Widget icon;
   final String label;
   final VoidCallback? onPressed;
 
@@ -1174,7 +1086,7 @@ class _SocialSignupTile extends StatelessWidget {
       height: 56,
       child: OutlinedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 24, color: AppUi.textPrimaryOf(context)),
+        icon: icon,
         label: Text(
           label,
           style: TextStyle(

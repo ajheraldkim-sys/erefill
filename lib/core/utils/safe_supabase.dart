@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import '../services/local_data_cache.dart';
+import '../sync/sync_resources.dart';
+import '../sync/sync_store.dart';
 
 /// Safe Supabase helper with proper null safety and error handling
 class SafeSupabase {
@@ -20,7 +22,7 @@ class SafeSupabase {
   /// Check if user is logged in
   static bool get isLoggedIn => currentUserId != null;
 
-  /// Safe query execution with error handling
+  /// Safe query execution with error handling and request timeout
   static Future<List<Map<String, dynamic>>> query(
     String table, {
     String? columns,
@@ -28,6 +30,7 @@ class SafeSupabase {
     String? orderBy,
     bool ascending = true,
     int? limit,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
     try {
       dynamic query = _client.from(table).select(columns ?? '*');
@@ -48,7 +51,7 @@ class SafeSupabase {
         query = query.limit(limit);
       }
 
-      final response = await query;
+      final response = await query.timeout(timeout);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('SafeSupabase query error: $e');
@@ -56,12 +59,13 @@ class SafeSupabase {
     }
   }
 
-  /// Safe single row fetch - returns null if not found
+  /// Safe single row fetch with timeout - returns null if not found
   static Future<Map<String, dynamic>?> querySingle(
     String table, {
     required String eqColumn,
     required dynamic eqValue,
     String? columns,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
     try {
       if (eqValue == null) return null;
@@ -70,7 +74,8 @@ class SafeSupabase {
           .from(table)
           .select(columns ?? '*')
           .eq(eqColumn, eqValue)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(timeout);
 
       return response;
     } catch (e) {
@@ -79,11 +84,12 @@ class SafeSupabase {
     }
   }
 
-  /// Safe insert with error handling
+  /// Safe insert with error handling and timeout
   static Future<Map<String, dynamic>?> insert(
     String table,
     Map<String, dynamic> data, {
     bool returnData = true,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
     try {
       dynamic query = _client.from(table).insert(data);
@@ -92,7 +98,7 @@ class SafeSupabase {
         query = query.select();
       }
 
-      final response = await query;
+      final response = await query.timeout(timeout);
 
       if (response is List && response.isNotEmpty) {
         return response.first as Map<String, dynamic>;
@@ -104,17 +110,22 @@ class SafeSupabase {
     }
   }
 
-  /// Safe update with error handling
+  /// Safe update with error handling and timeout
   static Future<bool> update(
     String table,
     Map<String, dynamic> data, {
     required String eqColumn,
     required dynamic eqValue,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
     try {
       if (eqValue == null) return false;
 
-      await _client.from(table).update(data).eq(eqColumn, eqValue);
+      await _client
+          .from(table)
+          .update(data)
+          .eq(eqColumn, eqValue)
+          .timeout(timeout);
 
       return true;
     } catch (e) {
@@ -123,16 +134,21 @@ class SafeSupabase {
     }
   }
 
-  /// Safe delete with error handling
+  /// Safe delete with error handling and timeout
   static Future<bool> delete(
     String table, {
     required String eqColumn,
     required dynamic eqValue,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
     try {
       if (eqValue == null) return false;
 
-      await _client.from(table).delete().eq(eqColumn, eqValue);
+      await _client
+          .from(table)
+          .delete()
+          .eq(eqColumn, eqValue)
+          .timeout(timeout);
 
       return true;
     } catch (e) {
@@ -141,13 +157,14 @@ class SafeSupabase {
     }
   }
 
-  /// Safe RPC call with error handling
+  /// Safe RPC call with error handling and timeout
   static Future<dynamic> rpc(
     String function, {
     Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
   }) async {
     try {
-      return await _client.rpc(function, params: params);
+      return await _client.rpc(function, params: params).timeout(timeout);
     } catch (e) {
       debugPrint('SafeSupabase RPC error: $e');
       return null;
@@ -184,6 +201,9 @@ class SafeSupabase {
     unawaited(LocalDataCache.instance.invalidatePattern('customer_home_'));
     unawaited(LocalDataCache.instance.invalidatePattern('customer_orders_'));
     unawaited(LocalDataCache.instance.invalidatePattern('rider_stats_'));
+    // Synced resources keep their saved copy (it is the offline fallback)
+    // and refetch instead.
+    unawaited(SyncStore.instance.refreshTagged(SyncResources.ordersTag));
 
     return result;
   }
@@ -204,6 +224,7 @@ class SafeSupabase {
     unawaited(LocalDataCache.instance.invalidatePattern('owner_orders_'));
     unawaited(LocalDataCache.instance.invalidatePattern('customer_home_'));
     unawaited(LocalDataCache.instance.invalidatePattern('customer_orders_'));
+    unawaited(SyncStore.instance.refreshTagged(SyncResources.ordersTag));
     return result;
   }
 
@@ -326,13 +347,19 @@ class SafeSupabase {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
+    DateTime? lastErrorFired;
     return stream.listen(
       (data) async {
         await onData(data);
       },
       onError: (Object error, StackTrace stackTrace) {
         _logStreamError(error);
-        onError?.call(error, stackTrace);
+        final now = DateTime.now();
+        if (lastErrorFired == null ||
+            now.difference(lastErrorFired!).inSeconds >= 10) {
+          lastErrorFired = now;
+          onError?.call(error, stackTrace);
+        }
       },
       onDone: onDone,
       cancelOnError: cancelOnError,

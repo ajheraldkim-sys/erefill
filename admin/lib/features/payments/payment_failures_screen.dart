@@ -2,7 +2,12 @@ import 'package:erefill/core/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 
 class PaymentFailuresScreen extends StatefulWidget {
@@ -12,35 +17,17 @@ class PaymentFailuresScreen extends StatefulWidget {
   State<PaymentFailuresScreen> createState() => _PaymentFailuresScreenState();
 }
 
-class _PaymentFailuresScreenState extends State<PaymentFailuresScreen> {
-  AdminPagedResult<Map<String, dynamic>>? _page;
+class _PaymentFailuresScreenState extends State<PaymentFailuresScreen>
+    with SyncedState {
+  late final SyncedResource<AdminPage> _failures;
   Map<String, dynamic>? _selected;
-  bool _loading = true;
-  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final page = await context.read<AdminApiService>().listPaymentFailures(
-        limit: 100,
-      );
-      if (!mounted) return;
-      setState(() => _page = page);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    _failures = useSynced(
+      AdminSync.paymentFailures(context.read<AdminApiService>()),
+    );
   }
 
   Future<void> _retry() async {
@@ -54,7 +41,7 @@ class _PaymentFailuresScreenState extends State<PaymentFailuresScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Event queued for retry')));
-      await _load();
+      await SyncStore.instance.refreshTagged(AdminSync.tagPayments);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -65,24 +52,23 @@ class _PaymentFailuresScreenState extends State<PaymentFailuresScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const AdminLoadingState();
-    if (_error != null) {
-      return AdminErrorState(message: _error!, onRetry: _load);
-    }
+    final placeholder = adminSyncPlaceholder([_failures]);
+    if (placeholder != null) return placeholder;
 
-    final rows = _page?.rows ?? [];
+    final page = _failures.data!;
+    final rows = page.rows;
 
-    return AdminWorkspaceLayout(
+    final content = AdminWorkspaceLayout(
       header: const AdminSectionHeader(
         title: 'Payment failures',
         subtitle: 'Failed webhook events from PayMongo and other providers.',
       ),
-      toolbar: AdminToolbar(onRefresh: _load),
+      toolbar: AdminToolbar(onRefresh: _failures.refresh),
       metrics: AdminMetricStrip(
         items: [
           AdminMetricItem(
             label: 'Failed events',
-            value: '${_page?.total ?? 0}',
+            value: '${page.total}',
             icon: Icons.error_outline,
             color: adminSemanticErrorColor(context),
           ),
@@ -168,5 +154,6 @@ class _PaymentFailuresScreenState extends State<PaymentFailuresScreen> {
         ),
       ),
     );
+    return AdminSyncedFrame(resources: [_failures], child: content);
   }
 }

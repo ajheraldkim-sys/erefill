@@ -475,7 +475,7 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
                                                   rider['is_suspended'] == true
                                                   ? AppColors.uiError
                                                   : AppColors.uiSuccess,
-                                              fontSize: 11,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 0.5,
                                             ),
@@ -1292,21 +1292,32 @@ class _RiderManagementScreenState extends State<RiderManagementScreen> {
             _credsRow('Email', email),
             _credsRow('Password', pass),
             const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                border: Border.all(color: const Color(0xFFFFEDD5)),
-              ),
-              child: const Text(
-                'Share these credentials with the rider securely. They will need them to log in.',
-                style: TextStyle(
-                  color: Color(0xFF9A3412),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            Builder(
+              builder: (ctx) {
+                final isDark = AppUi.isDark(ctx);
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppUi.warningBorder.withValues(alpha: 0.15)
+                        : AppUi.warningBg,
+                    borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                    border: Border.all(
+                      color: isDark
+                          ? AppUi.warningBorder.withValues(alpha: 0.3)
+                          : AppUi.warningBorder,
+                    ),
+                  ),
+                  child: Text(
+                    'Share these credentials with the rider securely. They will need them to log in.',
+                    style: TextStyle(
+                      color: isDark ? AppUi.warningFgDark : AppUi.warningFg,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),

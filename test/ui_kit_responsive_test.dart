@@ -63,8 +63,8 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.text('Order summary'), findsOneWidget);
-      // ₱35 × 12 + ₱45 = ₱465.00, formatted consistently.
-      expect(find.text('₱465.00'), findsWidgets);
+      // ₱35 × 12 + ₱45 = ₱465, formatted consistently.
+      expect(find.text('₱465'), findsWidgets);
       // Every stepper button meets the 48 dp target.
       final plus = tester.getSize(find.byTooltip('Increase quantity').first);
       expect(plus.height, greaterThanOrEqualTo(48));
@@ -130,7 +130,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.text('Out for Delivery'), findsOneWidget);
-    expect(find.text('−₱20.00'), findsOneWidget);
+    expect(find.text('−₱20'), findsOneWidget);
   });
 
   testWidgets('QuantitySelector turns minus into remove at the minimum', (
@@ -166,8 +166,8 @@ void main() {
 
   test('formatPeso is consistent everywhere', () {
     expect(formatPeso(1234.5), '₱1,234.50');
-    expect(formatPeso(0), '₱0.00');
-    expect(formatPeso(null), '₱0.00');
+    expect(formatPeso(0), '₱0');
+    expect(formatPeso(null), '₱0');
     expect(formatPeso(1500, whole: true), '₱1,500');
   });
 

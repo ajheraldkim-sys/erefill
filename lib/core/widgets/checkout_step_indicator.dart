@@ -66,7 +66,7 @@ class CheckoutStepIndicator extends StatelessWidget {
             Text(
               steps[step],
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
                 color: isActive ? AppUi.brandOf(context) : AppUi.textMutedOf(context),
               ),

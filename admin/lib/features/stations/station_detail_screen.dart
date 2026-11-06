@@ -1,12 +1,21 @@
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/water_types.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
 
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_map.dart';
 import '../../widgets/admin_timeline.dart';
 import '../../widgets/admin_ui.dart';
 import '../users/user_manage_dialog.dart';
+import 'widgets/station_accessories_card.dart';
 
 class StationDetailScreen extends StatefulWidget {
   const StationDetailScreen({
@@ -23,22 +32,59 @@ class StationDetailScreen extends StatefulWidget {
 }
 
 class _StationDetailScreenState extends State<StationDetailScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, SyncedState {
   late TabController _tabs;
-  bool _loading = true;
-  String? _error;
-  Map<String, dynamic>? _detail;
-  AdminPagedResult<Map<String, dynamic>>? _riders;
-  AdminPagedResult<Map<String, dynamic>>? _customers;
-  List<Map<String, dynamic>> _products = [];
-  AdminPagedResult<Map<String, dynamic>>? _ledger;
-  List<Map<String, dynamic>> _timeline = [];
+  late final SyncedResource<Map<String, dynamic>> _res;
+
+  Map<String, dynamic> get _snapshot => _res.data ?? const {};
+  Map<String, dynamic>? get _detail {
+    final d = _snapshot['detail'];
+    return d is Map ? Map<String, dynamic>.from(d) : null;
+  }
+
+  AdminPage get _riders => AdminSync.pageOf(_snapshot['riders']);
+  AdminPage get _customers => AdminSync.pageOf(_snapshot['customers']);
+  List<Map<String, dynamic>> get _allProducts =>
+      AdminSync.rowsOf(_snapshot['products']);
+
+  /// The station's water (one product); accessories are listed separately.
+  List<Map<String, dynamic>> get _products => [
+        for (final p in _allProducts)
+          if (p['kind'] != 'accessory') p,
+      ];
+  List<Map<String, dynamic>> get _accessories => [
+        for (final p in _allProducts)
+          if (p['kind'] == 'accessory') p,
+      ];
+
+  Future<void> _removeAccessory(String id, String reason) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final r = await context.read<AdminApiService>().removeAccessory(id, reason);
+      messenger.showSnackBar(SnackBar(
+        content: Text(r['hidden'] == true
+            ? 'Accessory hidden. It stays on past orders.'
+            : 'Accessory removed.'),
+      ));
+      await _load();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Could not remove it: ${FriendlyErrors.message(e)}'),
+        backgroundColor: AppUi.error,
+      ));
+    }
+  }
+  AdminPage get _ledger => AdminSync.pageOf(_snapshot['ledger']);
+  List<Map<String, dynamic>> get _timeline =>
+      AdminSync.rowsOf(_snapshot['timeline']);
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
-    _load();
+    _res = useSynced(
+      AdminSync.stationDetail(context.read<AdminApiService>(), widget.ownerId),
+    );
   }
 
   @override
@@ -62,61 +108,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
     return s is Map ? Map<String, dynamic>.from(s) : {};
   }
 
+  /// Refreshes this station and every list showing stations, e.g. after an
+  /// admin action or pull-to-refresh.
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final api = context.read<AdminApiService>();
-    try {
-      final detail = await api.getStationDetail(widget.ownerId);
-      final results = await Future.wait([
-        api
-            .listStationRiders(widget.ownerId)
-            .catchError(
-              (_) => const AdminPagedResult<Map<String, dynamic>>(
-                rows: [],
-                total: 0,
-              ),
-            ),
-        api
-            .listStationCustomers(widget.ownerId)
-            .catchError(
-              (_) => const AdminPagedResult<Map<String, dynamic>>(
-                rows: [],
-                total: 0,
-              ),
-            ),
-        api
-            .listStationProducts(widget.ownerId)
-            .catchError((_) => <Map<String, dynamic>>[]),
-        api
-            .listInventoryLedger(widget.ownerId)
-            .catchError(
-              (_) => const AdminPagedResult<Map<String, dynamic>>(
-                rows: [],
-                total: 0,
-              ),
-            ),
-        api
-            .getActivityTimeline('station', widget.ownerId)
-            .catchError((_) => <Map<String, dynamic>>[]),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _detail = detail;
-        _riders = results[0] as AdminPagedResult<Map<String, dynamic>>;
-        _customers = results[1] as AdminPagedResult<Map<String, dynamic>>;
-        _products = results[2] as List<Map<String, dynamic>>;
-        _ledger = results[3] as AdminPagedResult<Map<String, dynamic>>;
-        _timeline = results[4] as List<Map<String, dynamic>>;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    await SyncStore.instance.refreshTagged(AdminSync.tagStations);
   }
 
   Future<void> _setAvailability(String availability) async {
@@ -264,11 +259,11 @@ class _StationDetailScreenState extends State<StationDetailScreen>
           ],
         ),
       ),
-      body: _loading
-          ? const AdminLoadingState()
-          : _error != null
-          ? AdminErrorState(message: _error!, onRetry: _load)
-          : TabBarView(
+      body:
+          adminSyncPlaceholder([_res]) ??
+          AdminSyncedFrame(
+            resources: [_res],
+            child: TabBarView(
               controller: _tabs,
               children: [
                 _stationInfoTab(),
@@ -276,6 +271,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                 _ridersTab(),
               ],
             ),
+          ),
     );
   }
 
@@ -311,7 +307,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
             children: [
               AdminKpiTile(
                 label: 'Riders Assigned',
-                value: '${_stats['rider_count'] ?? _riders?.rows.length ?? 0}',
+                value: '${_stats['rider_count'] ?? _riders.rows.length ?? 0}',
                 icon: LucideIcons.bike,
                 color: AppUi.accentCyan,
                 compact: true,
@@ -319,7 +315,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
               AdminKpiTile(
                 label: 'Registered Customers',
                 value:
-                    '${_stats['customer_count'] ?? _customers?.rows.length ?? 0}',
+                    '${_stats['customer_count'] ?? _customers.rows.length ?? 0}',
                 icon: LucideIcons.users,
                 color: AppUi.bluePrimary,
                 compact: true,
@@ -409,7 +405,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       'Max Concurrent Orders',
                       '${_settings['max_concurrent_orders'] ?? '—'}',
                     ),
-                    AdminDetailRow('Active Products', '${_products.length}'),
+                    AdminDetailRow(
+                      'Water Type',
+                      _profile['primary_water_type']?.toString() ?? '—',
+                    ),
                     AdminDetailRow(
                       'Active In-Flight Orders',
                       '${_stats['active_orders'] ?? 0}',
@@ -474,7 +473,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           SizedBox(
                             height: 220,
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(AppUi.radiusCard),
+                              borderRadius: BorderRadius.circular(
+                                AppUi.radiusCard,
+                              ),
                               child: AdminSingleStationMap(
                                 latitude: lat,
                                 longitude: lng,
@@ -580,21 +581,21 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Water Products (${_products.length})',
+                            'Water product',
                             style: adminSectionTitleStyle(context),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Catalog of container sizes and water types sold by this station',
+                            'Stations sell one water type, priced by the owner',
                             style: adminCaptionTextStyle(context),
                           ),
                         ],
                       ),
                       AdminManageButton(
                         height: 36,
-                        text: 'Add Product',
-                        icon: LucideIcons.plus,
-                        onPressed: _addProduct,
+                        text: 'Change water type',
+                        icon: LucideIcons.droplet,
+                        onPressed: _changeWaterType,
                       ),
                     ],
                   ),
@@ -604,9 +605,8 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                   const Padding(
                     padding: EdgeInsets.all(32),
                     child: AdminEmptyState(
-                      message:
-                          'No products added yet. Click "+ Add Product" to create one.',
-                      icon: LucideIcons.packagePlus,
+                      message: 'This station has no water type yet.',
+                      icon: LucideIcons.droplet,
                     ),
                   )
                 else
@@ -623,7 +623,9 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: AppUi.bluePrimary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                            borderRadius: BorderRadius.circular(
+                              AppUi.radiusControl,
+                            ),
                           ),
                           child: Icon(
                             LucideIcons.droplets,
@@ -639,38 +641,27 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                           ),
                         ),
                         subtitle: Text(
-                          'Category: ${p['category'] ?? "Standard"} • In Stock: $stock',
+                          '${p['is_available'] == false ? 'Paused' : 'Available'} • In stock: $stock',
                           style: adminCaptionTextStyle(context),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              formatPeso(p['price']),
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                                color: AppUi.brandOf(context),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            IconButton(
-                              tooltip: 'Delete product',
-                              icon: Icon(
-                                LucideIcons.trash2,
-                                size: 17,
-                                color: adminSemanticErrorColor(context),
-                              ),
-                              onPressed: () =>
-                                  _deleteProduct(p['id'] as String),
-                            ),
-                          ],
+                        trailing: Text(
+                          '${formatPeso(p['price'])} / gal',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            color: AppUi.brandOf(context),
+                          ),
                         ),
                       );
                     },
                   ),
               ],
             ),
+          ),
+          AppUi.vGapLg,
+          StationAccessoriesCard(
+            rows: _accessories,
+            onRemove: _removeAccessory,
           ),
           AppUi.vGapLg,
           AdminCard(
@@ -689,14 +680,14 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Recent Inventory Log (${_ledger?.total ?? 0})',
+                        'Recent Inventory Log (${_ledger.total})',
                         style: adminSectionTitleStyle(context),
                       ),
                     ],
                   ),
                 ),
                 const Divider(height: 1),
-                if ((_ledger?.rows ?? []).isEmpty)
+                if (_ledger.rows.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(32),
                     child: AdminEmptyState(
@@ -708,10 +699,10 @@ class _StationDetailScreenState extends State<StationDetailScreen>
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: (_ledger?.rows ?? []).length,
+                    itemCount: _ledger.rows.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, i) {
-                      final l = (_ledger?.rows ?? [])[i];
+                      final l = _ledger.rows[i];
                       return ListTile(
                         leading: Icon(
                           LucideIcons.circleArrowRight,
@@ -750,7 +741,7 @@ class _StationDetailScreenState extends State<StationDetailScreen>
 
   // ── Tab 3: Riders & Station Fleet ──
   Widget _ridersTab() {
-    final rows = _riders?.rows ?? [];
+    final rows = _riders.rows;
 
     return AdminPageScaffold(
       onRefresh: _load,
@@ -892,169 +883,92 @@ class _StationDetailScreenState extends State<StationDetailScreen>
     );
   }
 
-  Future<void> _addProduct() async {
-    final formKey = GlobalKey<FormState>();
-    final name = TextEditingController();
-    final price = TextEditingController(text: '25');
-    final stock = TextEditingController(text: '100');
-    String category = 'Purified';
+  /// Stations sell one water type; only admins can switch it. The database
+  /// renames the station's product and keeps its price.
+  Future<void> _changeWaterType() async {
+    await WaterTypes.load();
+    if (!mounted) return;
+    final current = _profile['primary_water_type']?.toString();
+    final options = WaterTypes.all;
+    if (options.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Add a water type first.')));
+      return;
+    }
+    String selected = options.any((t) => t.name == current)
+        ? current!
+        : options.first.name;
 
-    final ok = await showDialog<bool>(
+    final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Add Product'),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
+        builder: (ctx, setDialogState) => AdminModalDialog(
+          title: 'Change water type',
+          subtitle:
+              'The station keeps its price. Customers see the new '
+              'water type right away.',
+          icon: LucideIcons.droplet,
+          maxWidth: 440,
+          actions: [
+            ShadcnOutlineButton(
+              height: 38,
+              text: 'Cancel',
+              onPressed: () => Navigator.pop(ctx),
             ),
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: category,
-                      decoration: const InputDecoration(labelText: 'Category'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Purified',
-                          child: Text('Purified'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Mineral',
-                          child: Text('Mineral'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Alkaline',
-                          child: Text('Alkaline'),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => category = v);
-                      },
+            const SizedBox(width: 8),
+            ShadcnPrimaryButton(
+              height: 38,
+              text: 'Change',
+              onPressed: selected == current
+                  ? null
+                  : () => Navigator.pop(ctx, selected),
+            ),
+          ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: RadioGroup<String>(
+              groupValue: selected,
+              onChanged: (v) {
+                if (v != null) setDialogState(() => selected = v);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final type in options)
+                    RadioListTile<String>(
+                      value: type.name,
+                      title: Text(type.name),
+                      subtitle: type.tagline.isEmpty
+                          ? null
+                          : Text(type.tagline),
+                      secondary: Icon(type.icon, color: type.color),
                     ),
-                    TextFormField(
-                      controller: name,
-                      decoration: const InputDecoration(
-                        labelText: 'Product Name',
-                      ),
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Product name is required'
-                          : null,
-                    ),
-                    TextFormField(
-                      controller: price,
-                      decoration: const InputDecoration(labelText: 'Price (₱)'),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (v) {
-                        final val = double.tryParse(v ?? '');
-                        if (val == null || val <= 0) {
-                          return 'Enter a price greater than 0';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: stock,
-                      decoration: const InputDecoration(
-                        labelText: 'Initial Stock',
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        final val = int.tryParse(v ?? '');
-                        if (val == null || val < 0) {
-                          return 'Enter a valid stock number';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppUi.bluePrimary),
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.pop(ctx, true);
-                }
-              },
-              child: const Text('Add Product'),
-            ),
-          ],
         ),
       ),
     );
-    if (ok != true || !mounted) {
-      name.dispose();
-      price.dispose();
-      stock.dispose();
-      return;
-    }
+    if (picked == null || !mounted) return;
     try {
-      await context.read<AdminApiService>().upsertProduct(
-        ownerId: widget.ownerId,
-        name: name.text.trim(),
-        category: category,
-        price: double.tryParse(price.text),
-        stockLevel: int.tryParse(stock.text),
-      );
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'primary_water_type': picked})
+          .eq('id', widget.ownerId);
       await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Station now sells $picked')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppUi.error),
-      );
-    } finally {
-      name.dispose();
-      price.dispose();
-      stock.dispose();
-    }
-  }
-
-  Future<void> _deleteProduct(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete product?'),
-        content: const Text(
-          'Are you sure you want to delete this product? This action cannot be undone.',
+        SnackBar(
+          content: Text(FriendlyErrors.message(e)),
+          backgroundColor: AppUi.error,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: adminDestructiveButtonColor(context),
-              foregroundColor: adminDestructiveButtonForeground(context),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
-
-    try {
-      await context.read<AdminApiService>().deleteProduct(id);
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppUi.error),
       );
     }
   }
@@ -1066,15 +980,17 @@ class _StationDetailScreenState extends State<StationDetailScreen>
 
     final consequenceMsg = isSuspension
         ? (activeOrders > 0
-            ? 'Warning: Suspending "$name" will interrupt $activeOrders active in-flight customer orders!\nDeliveries currently on the road will be paused.'
-            : 'Are you sure you want to suspend "$name"? New orders and dispatch will be blocked.')
+              ? 'Warning: Suspending "$name" will interrupt $activeOrders active in-flight customer orders!\nDeliveries currently on the road will be paused.'
+              : 'Are you sure you want to suspend "$name"? New orders and dispatch will be blocked.')
         : 'Setting station availability to "$action"';
 
     final reason = await showAdminPromptDialog(
       context,
       title: isSuspension ? 'Suspend Station: $name' : 'Update Station Status',
       subtitle: consequenceMsg,
-      icon: isSuspension ? LucideIcons.triangleAlert : LucideIcons.messageSquare,
+      icon: isSuspension
+          ? LucideIcons.triangleAlert
+          : LucideIcons.messageSquare,
       iconColor: isSuspension ? adminSemanticErrorColor(context) : null,
       label: isSuspension
           ? 'Audit note / suspension reason (required)'

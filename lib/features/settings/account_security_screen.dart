@@ -481,7 +481,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                           Text(
                             'ACCOUNT EMAIL ADDRESS',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.8,
                               color: AppUi.textSecondaryOf(context),

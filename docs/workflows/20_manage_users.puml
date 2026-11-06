@@ -1,0 +1,8 @@
+@startuml
+start
+:Open Users;
+:Search or select a user;
+:Update, suspend or remove the account;
+:Save changes;
+stop
+@enduml

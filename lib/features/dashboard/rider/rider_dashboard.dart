@@ -1,4 +1,6 @@
-﻿import 'dart:async';
+import 'dart:async';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,11 +15,11 @@ import 'package:erefill/features/chat/models/chat_room.dart';
 import 'package:provider/provider.dart';
 import 'package:erefill/core/providers/notification_provider.dart';
 import 'package:erefill/core/providers/user_provider.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
 import 'package:erefill/core/widgets/app_form_fields.dart';
 import 'package:erefill/core/widgets/account/account_ui.dart';
-import 'package:erefill/core/providers/theme_provider.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:erefill/core/widgets/experience_widgets.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/utils/safe_supabase.dart';
@@ -35,6 +37,10 @@ import '../../chat/inbox_screen.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
 import 'package:erefill/core/services/external_navigation_service.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/sync/sync_resources.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
 import 'services/location_service.dart';
 import 'services/order_cache_service.dart';
 import 'package:erefill/features/settings/account_security_screen.dart';
@@ -47,6 +53,9 @@ import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
 import 'widgets/rider_home_overview.dart';
 import 'widgets/rider_swipe_to_accept_slider.dart';
+import 'package:latlong2/latlong.dart';
+import 'widgets/route_plan_sheet.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 export 'rider_history_screen.dart';
 
 double _safeDouble(dynamic value, {double fallback = 0}) {
@@ -90,14 +99,16 @@ class RiderDashboard extends StatefulWidget {
 }
 
 class _RiderDashboardState extends State<RiderDashboard>
-    with WidgetsBindingObserver {
+    with SyncedState {
   final supabase = Supabase.instance.client;
   final _locationService = LocationService();
   final _orderCache = OrderCacheService();
   bool _isSyncingOffline = false;
-  RealtimeChannel? _ordersChannel;
-  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
-  Timer? _riderPollingTimer;
+
+  /// Profile, open deliveries and stats, cache-first and kept live by the
+  /// sync layer (realtime, resume, reconnect, and a 30s safety-net poll).
+  SyncedResource<RiderDashboardData>? _dash;
+  int _dashApplyGeneration = 0;
 
   List<Map<String, dynamic>> _myActiveOrders = [];
   // Location mapping
@@ -109,6 +120,7 @@ class _RiderDashboardState extends State<RiderDashboard>
   int _selectedIndex = 0;
   int _completedDeliveries = 0;
   double _totalEarnings = 0;
+  double _totalTips = 0;
   bool _soundAlertsEnabled = true;
 
   Future<void> _toggleOnlineStatus(bool value) async {
@@ -138,11 +150,21 @@ class _RiderDashboardState extends State<RiderDashboard>
     }
   }
 
+  final _tourNavKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _startRiderPollingTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppTour.maybeShow(
+          context,
+          role: 'rider',
+          navBarKey: _tourNavKey,
+          tabCount: 5,
+        );
+      }
+    });
     final myId = supabase.auth.currentUser?.id;
     final initialUser = context.read<UserProvider>().user;
     if (initialUser != null) {
@@ -185,94 +207,18 @@ class _RiderDashboardState extends State<RiderDashboard>
       _isLoading = false;
     }
 
-    _loadInitialCache();
-    _loadRiderData(); // START NETWORK FETCH
-    _setupProfileListener();
-    _listenForNewJobs();
-    _locationService.startTracking();
-  }
-
-  void _startRiderPollingTimer() {
-    _riderPollingTimer?.cancel();
-    _riderPollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) {
-        _loadRiderData();
-      }
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadRiderData();
-      _startRiderPollingTimer();
+    if (myId != null) {
+      _dash = useSynced(
+        SyncResources.riderDashboard(myId),
+        rebuild: false,
+      )..addListener(_onDashboardChanged);
+      _onDashboardChanged();
+      _listenForNewJobs(myId);
     } else {
-      _riderPollingTimer?.cancel();
-      _riderPollingTimer = null;
+      _isLoading = false;
     }
-  }
-
-  void _setupProfileListener() {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
-
-    _profileSubscription = SafeSupabase.listen(
-      supabase.from('profiles').stream(primaryKey: ['id']).eq('id', myId),
-      (data) {
-        if (data.isNotEmpty && mounted) {
-          setState(() => _profile = data.first);
-        }
-      },
-      onError: (error, stackTrace) {
-        debugPrint('Rider profile stream error: $error');
-        debugPrint('Rider profile stream stack: $stackTrace');
-      },
-    );
-    _fetchCompletedStats();
-  }
-
-  Future<void> _fetchCompletedStats() async {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
-    try {
-      final deliveredData = await supabase
-          .from('orders')
-          .select('id, delivery_fee')
-          .eq('assigned_rider_id', myId)
-          .eq('status', 'delivered');
-
-      if (mounted) {
-        setState(() {
-          _completedDeliveries = deliveredData.length;
-          _totalEarnings = (deliveredData as List? ?? const []).fold<double>(
-            0,
-            (sum, o) {
-              final fee = _safeDouble((o is Map ? o['delivery_fee'] : null));
-              return sum + fee;
-            },
-          );
-        });
-        unawaited(
-          LocalDataCache.instance.set('rider_stats_$myId', {
-            'completed': _completedDeliveries,
-            'earnings': _totalEarnings,
-          }),
-        );
-      }
-    } catch (e) {
-      debugPrint("Error loading stats: $e");
-    }
-  }
-
-  Future<void> _loadInitialCache() async {
-    // 1. Load active tasks from cache instantly
-    final cachedActive = await _orderCache.getCachedActiveOrders();
-    if (cachedActive.isNotEmpty && mounted) {
-      setState(() {
-        _myActiveOrders = cachedActive;
-        _isLoading = false; // Hide if we have cache
-      });
-    }
+    unawaited(_syncOfflineQueue());
+    _locationService.startTracking();
   }
 
   Future<void> _checkOfflineQueue() async {
@@ -308,79 +254,27 @@ class _RiderDashboardState extends State<RiderDashboard>
     }
   }
 
+  /// Pull-to-refresh and post-action refresh: push any queued delivery
+  /// updates, then refetch from the server.
   Future<void> _loadRiderData() async {
     unawaited(_syncOfflineQueue());
+    await _dash?.refresh();
+  }
 
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) {
-      if (mounted) setState(() => _isLoading = false);
+  /// Applies the synced dashboard to screen state, overlaying delivery
+  /// updates still queued on this device so a delivery finished offline
+  /// does not reappear as open.
+  Future<void> _onDashboardChanged() async {
+    final dash = _dash;
+    final data = dash?.data;
+    if (dash == null || !mounted) return;
+    if (data == null) {
+      if (!dash.isLoading && _isLoading) setState(() => _isLoading = false);
       return;
     }
+    final generation = ++_dashApplyGeneration;
 
-    Map<String, dynamic>? profileResult;
-    List<Map<String, dynamic>> activeResult = [];
-    int completedCount = 0;
-    double earningsTotal = 0;
-
-    // Fetch Profile, Active Deliveries, and Earnings in parallel for super fast load
-    try {
-      final results = await Future.wait([
-        supabase
-            .from('profiles')
-            .select(
-              'full_name, first_name, last_name, mi, suffix, username, phone, town, barangay, vehicle_type, license_number, avatar_url, created_at',
-            )
-            .eq('id', myId)
-            .maybeSingle(),
-        supabase
-            .from('orders')
-            .select('''
-              id, status, created_at, customer_id, total_amount, items, subtotal, delivery_fee, station_name, payment_method, payment_status,
-              customer:profiles!orders_customer_id_fkey(full_name, complete_address, phone, barangay, latitude, longitude)
-            ''')
-            .eq('assigned_rider_id', myId)
-            .inFilter('status', [
-              'assigned_to_rider',
-              'out_for_delivery',
-              'ready_for_pickup',
-              'preparing',
-              'accepted',
-            ])
-            .order('created_at', ascending: false),
-        supabase
-            .from('orders')
-            .select('id, delivery_fee')
-            .eq('assigned_rider_id', myId)
-            .eq('status', 'delivered'),
-      ]);
-
-      profileResult = results[0] as Map<String, dynamic>? ?? _profile;
-      activeResult = List<Map<String, dynamic>>.from(
-        results[1] as List? ?? const [],
-      );
-      final deliveredData = results[2] as List? ?? const [];
-      completedCount = deliveredData.length;
-      earningsTotal = deliveredData.fold<double>(0, (sum, o) {
-        final fee = _safeDouble(o is Map ? o['delivery_fee'] : null);
-        return sum + fee;
-      });
-    } catch (e) {
-      debugPrint(
-        "Warning: Error loading rider data: $e. Checking offline caches...",
-      );
-      final cachedActive = await _orderCache.getCachedActiveOrders();
-      if (cachedActive.isNotEmpty) {
-        activeResult = cachedActive;
-      } else if (_myActiveOrders.isNotEmpty) {
-        activeResult = _myActiveOrders;
-      }
-      final cachedProfile = await LocalDataCache.instance
-          .get<Map<String, dynamic>>('rider_profile_$myId');
-      if (cachedProfile != null) {
-        profileResult = cachedProfile;
-      }
-    }
-
+    var activeResult = data.activeOrders;
     try {
       final queuedUpdates = await OfflineDeliveryQueueService()
           .getPendingDeliveries();
@@ -414,7 +308,11 @@ class _RiderDashboardState extends State<RiderDashboard>
       debugPrint('Could not reconcile queued rider updates: $error');
     }
 
-    if (!mounted) return;
+    // A newer dashboard arrived while the queue was being read.
+    if (!mounted || generation != _dashApplyGeneration) return;
+    final profileResult = data.profile == null
+        ? null
+        : Map<String, dynamic>.from(data.profile!);
     if (profileResult != null) {
       if ((profileResult['first_name'] == null ||
               profileResult['first_name'].toString().trim().isEmpty) &&
@@ -435,90 +333,66 @@ class _RiderDashboardState extends State<RiderDashboard>
     setState(() {
       if (profileResult != null) _profile = profileResult;
       _myActiveOrders = activeResult;
-      _completedDeliveries = completedCount;
-      _totalEarnings = earningsTotal;
+      _completedDeliveries = data.completedDeliveries;
+      _totalEarnings = data.totalEarnings;
+      _totalTips = data.totalTips;
       _isLoading = false;
     });
 
-    // Cache updated data for offline/instant-load
-    if (activeResult.isNotEmpty) {
-      _orderCache.cacheActiveOrders(activeResult);
-    }
-    if (profileResult != null) {
-      unawaited(
-        LocalDataCache.instance.set('rider_profile_$myId', profileResult),
-      );
-    }
-    unawaited(
-      LocalDataCache.instance.set('rider_stats_$myId', {
-        'completed': completedCount,
-        'earnings': earningsTotal,
-      }),
-    );
+    // Other rider screens read active orders from this cache.
+    unawaited(_orderCache.cacheActiveOrders(activeResult));
   }
 
-  void _listenForNewJobs() {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
+  void _listenForNewJobs(String myId) {
+    void handleOrderEvent(RealtimeEvent event) {
+      if (!mounted) return;
+      final payload = event.payload;
+      if (payload == null) {
+        _dash?.refresh();
+        return;
+      }
+      if (payload.eventType == PostgresChangeEvent.delete) {
+        _dash?.refresh();
+        return;
+      }
+      final newRecord = payload.newRecord;
+      final oldRecord = payload.oldRecord;
+      final newStatus = (newRecord['status'] ?? '').toString();
+      final oldStatus = (oldRecord['status'] ?? '').toString();
 
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
+      final oldAssigned =
+          oldRecord['assigned_rider_id'] ?? oldRecord['rider_id'];
+      final newAssigned =
+          newRecord['assigned_rider_id'] ?? newRecord['rider_id'];
+
+      // 1. Assignment Detection (Newly assigned to current rider)
+      final isNewlyAssigned =
+          (oldAssigned == null || oldAssigned != myId) && newAssigned == myId;
+
+      // 2. Explicit assignment status raised by the owner workflow.
+      final isStatusAssigned =
+          (payload.eventType == PostgresChangeEvent.update &&
+          newStatus == 'assigned_to_rider' &&
+          oldStatus != 'assigned_to_rider' &&
+          newAssigned == myId);
+
+      if (isNewlyAssigned || isStatusAssigned) {
+        AppHaptics.orderAlert();
+        _showNewJobAlert(newRecord);
+      }
+
+      // Automatically refresh dashboard orders and earnings on any state transition
+      _dash?.refresh();
     }
 
-    _ordersChannel = supabase
-        .channel('public:orders:rider:$myId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'assigned_rider_id',
-            value: myId,
-          ),
-          callback: (payload) {
-            final newRecord = payload.newRecord;
-            final oldRecord = payload.oldRecord;
-
-            if (payload.eventType == PostgresChangeEvent.delete) {
-              // Handle Delete or Unassignment
-              _loadRiderData();
-              return;
-            }
-
-            final newStatus = (newRecord['status'] ?? '').toString();
-            final oldStatus = (oldRecord['status'] ?? '').toString();
-
-            // 1. Assignment Detection (Newly assigned to current rider)
-            final isNewlyAssigned =
-                (oldRecord['assigned_rider_id'] == null ||
-                    oldRecord['assigned_rider_id'] != myId) &&
-                newRecord['assigned_rider_id'] == myId;
-
-            // 2. Explicit assignment status raised by the owner workflow.
-            final isStatusAssigned =
-                (payload.eventType == PostgresChangeEvent.update &&
-                newStatus == 'assigned_to_rider' &&
-                oldStatus != 'assigned_to_rider');
-
-            if (isNewlyAssigned || isStatusAssigned) {
-              AppHaptics.orderAlert();
-              _showNewJobAlert(newRecord);
-            }
-
-            // 3. Refresh ALL Data for accuracy
-            _loadRiderData();
-          },
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _listenForNewJobs();
-            });
-          }
-        });
+    watchTable(
+      TableWatch('orders', column: 'assigned_rider_id', value: myId),
+      handleOrderEvent,
+    );
+    watchTable(
+      TableWatch('orders', column: 'rider_id', value: myId),
+      handleOrderEvent,
+    );
   }
 
   void _showNewJobAlert(Map<String, dynamic> rawOrder) {
@@ -593,8 +467,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                   _loadRiderData(); // Refresh to ensure data is fresh
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppUi.bluePrimary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppUi.brandOf(context),
+                  foregroundColor: AppUi.onBrandOf(context),
                   shape: RoundedRectangleBorder(borderRadius: AppUi.cardRadius),
                   elevation: 0,
                 ),
@@ -1050,8 +924,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                       if (context.mounted) Navigator.pop(context, data);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppUi.bluePrimary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppUi.brandOf(context),
+                      foregroundColor: AppUi.onBrandOf(context),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: AppUi.controlRadius,
@@ -1201,12 +1075,7 @@ class _RiderDashboardState extends State<RiderDashboard>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _riderPollingTimer?.cancel();
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-    }
-    _profileSubscription?.cancel();
+    _dash?.removeListener(_onDashboardChanged);
     _locationService.stopTracking();
     super.dispose();
   }
@@ -1259,10 +1128,12 @@ class _RiderDashboardState extends State<RiderDashboard>
         body: SafeArea(
           bottom: false,
           child: _isLoading
-              ? const AxoLoader(message: 'Preparing your rider dashboard...')
+              ? const LoadingStateCard(message: 'Preparing your rider dashboard...')
               : LazyIndexedStack(index: _selectedIndex, children: pages),
         ),
-        bottomNavigationBar: Consumer<NotificationProvider>(
+        bottomNavigationBar: KeyedSubtree(
+          key: _tourNavKey,
+          child: Consumer<NotificationProvider>(
           builder: (context, notif, _) {
             return RoleBottomNavBar(
               currentIndex: _selectedIndex,
@@ -1299,11 +1170,28 @@ class _RiderDashboardState extends State<RiderDashboard>
             );
           },
         ),
+        ),
       ),
     );
   }
 
   // ── Dispatch Tab ─────────────────────────────────────────────────────────────
+
+  Future<void> _openRoutePlan(List<Map<String, dynamic>> orders) async {
+    final stops = RoutePlanSheet.stopsFromOrders(orders);
+    if (stops.isEmpty) return;
+    final pos = await _locationService.getCurrentPosition();
+    if (!mounted) return;
+    final start = pos != null
+        ? LatLng(pos.latitude, pos.longitude)
+        : stops.first.point;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => RoutePlanSheet(orders: orders, start: start),
+    );
+  }
 
   Widget _buildDispatchTab() {
     final myId = supabase.auth.currentUser?.id;
@@ -1329,6 +1217,15 @@ class _RiderDashboardState extends State<RiderDashboard>
             title: 'Dispatch',
             subtitle: '$count active jobs · Online',
             actions: [
+              if (count >= 2)
+                IconButton(
+                  onPressed: () => _openRoutePlan(activeOrders),
+                  icon: Icon(
+                    Icons.alt_route_rounded,
+                    color: AppUi.textPrimaryOf(context),
+                  ),
+                  tooltip: 'Optimize route',
+                ),
               IconButton(
                 onPressed: _loadRiderData,
                 icon: Icon(
@@ -1523,7 +1420,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'CASH ON DELIVERY'
                             : 'AWAITING PAYMENT (${paymentLabel.toUpperCase()})',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: isPaid
                               ? AppColors.uiSuccess
@@ -1600,7 +1497,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                     child: Text(
                       'Landmark: ${order['customer_landmark']}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: AppUi.textMutedOf(context),
                       ),
@@ -1636,7 +1533,9 @@ class _RiderDashboardState extends State<RiderDashboard>
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                           color: isCod
-                              ? const Color(0xFF78350F)
+                              ? (AppUi.isDark(context)
+                                  ? AppUi.warningFgDark
+                                  : AppUi.warningFg)
                               : AppUi.textPrimaryOf(context),
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -1649,7 +1548,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'Online payment confirmed'
                             : 'Check payment status',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: isCod
                               ? AppUi.warningFg
@@ -1691,12 +1590,14 @@ class _RiderDashboardState extends State<RiderDashboard>
                             ? 'COLLECT CASH'
                             : 'VERIFY PAYMENT',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: isPaid
                               ? AppUi.successFg
                               : isCod
-                              ? const Color(0xFF78350F)
+                              ? (AppUi.isDark(context)
+                                  ? AppUi.warningFgDark
+                                  : AppUi.warningFg)
                               : AppUi.errorFg,
                           letterSpacing: 0.3,
                         ),
@@ -1728,7 +1629,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       borderRadius: AppUi.controlRadius,
                     ),
                     fixedSize: const Size(
-                      AppUi.kRiderTouchTarget,
+                      46,
                       AppUi.kRiderTouchTarget,
                     ),
                   ),
@@ -1748,7 +1649,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                       borderRadius: AppUi.controlRadius,
                     ),
                     fixedSize: const Size(
-                      AppUi.kRiderTouchTarget,
+                      46,
                       AppUi.kRiderTouchTarget,
                     ),
                   ),
@@ -1770,7 +1671,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                         borderRadius: AppUi.controlRadius,
                       ),
                       fixedSize: const Size(
-                        AppUi.kRiderTouchTarget,
+                        46,
                         AppUi.kRiderTouchTarget,
                       ),
                     ),
@@ -1800,14 +1701,17 @@ class _RiderDashboardState extends State<RiderDashboard>
                                   : Icons.arrow_forward_rounded,
                               size: 20,
                             ),
-                            label: Text(
-                              status == 'preparing'
-                                  ? 'Start Delivery'
-                                  : 'Complete Delivery',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                status == 'preparing'
+                                    ? 'Start Delivery'
+                                    : 'Complete Delivery',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -1922,7 +1826,7 @@ class _RiderDashboardState extends State<RiderDashboard>
                     steps[i]['title'] as String,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: i == currentStep
                           ? FontWeight.w700
                           : FontWeight.w600,
@@ -2480,7 +2384,8 @@ class _RiderDashboardState extends State<RiderDashboard>
                               icon: Icons.account_balance_wallet_outlined,
                               title: 'Earnings breakdown',
                               subtitle:
-                                  '${formatPeso(_totalEarnings)} total payout earned',
+                                  '${formatPeso(_totalEarnings)} total payout earned'
+                                  '${_totalTips > 0 ? ' (incl. ${formatPeso(_totalTips, whole: true)} tips)' : ''}',
                               onTap: _showEarningsStatement,
                             ),
                           ],
@@ -2502,14 +2407,16 @@ class _RiderDashboardState extends State<RiderDashboard>
                               onChanged: (v) =>
                                   setState(() => _soundAlertsEnabled = v),
                             ),
-                            AccountToggleTile(
-                              icon: Icons.dark_mode_outlined,
-                              title: 'Dark mode',
-                              value: context.select<ThemeProvider, bool>(
-                                (t) => t.isDarkMode,
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
+                              child: Column(
+                                children: [
+                                  ThemeModePicker(),
+                                  SizedBox(height: 16),
+                                  TextSizeSlider(),
+                                  ReplayTourButton(role: 'rider'),
+                                ],
                               ),
-                              onChanged: (v) =>
-                                  context.read<ThemeProvider>().setDarkMode(v),
                             ),
                           ],
                         ),
@@ -2841,7 +2748,8 @@ class _RiderDashboardState extends State<RiderDashboard>
 
       final fileBytes = await image.readAsBytes();
       final extension = image.name.split('.').last;
-      final fileName = 'avatar_${user.id}.$extension';
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'avatar_${user.id}_$timestamp.$extension';
 
       await supabase.storage
           .from('avatars')
@@ -2852,15 +2760,19 @@ class _RiderDashboardState extends State<RiderDashboard>
           );
 
       final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+      final oldAvatar = _profile?['avatar_url']?.toString();
       await supabase
           .from('profiles')
           .update({'avatar_url': publicUrl})
           .eq('id', user.id);
 
+      if (oldAvatar != null && oldAvatar.isNotEmpty) {
+        unawaited(AppCachedImage.evict(oldAvatar));
+      }
+
       if (mounted) {
         setState(() {
-          _profile?['avatar_url'] =
-              '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+          _profile?['avatar_url'] = publicUrl;
         });
         ScaffoldMessenger.of(
           context,

@@ -83,8 +83,8 @@ class StationSetupStatus {
       ),
       productsSection: StationSectionStatus(
         isComplete: false,
-        title: 'Water products & catalog',
-        statusText: 'Add at least 1 orderable product',
+        title: 'Your water & price',
+        statusText: 'Set a price for your water',
         badgeText: 'Action needed',
       ),
       paymentsSection: StationSectionStatus(
@@ -158,7 +158,7 @@ class StationSetupStatus {
       ),
       productsSection: StationSectionStatus(
         isComplete: productsDone,
-        title: 'Water products & catalog',
+        title: 'Your water & price',
         statusText: secProducts?['missing']?.toString() ??
             (productsDone ? 'Complete' : 'Add at least 1 orderable product'),
         badgeText: productsDone ? 'Complete' : 'Action needed',
@@ -302,7 +302,7 @@ class StationSetupService {
       if (hasActiveProduct) {
         completed++;
       } else {
-        missing.add('Products & catalog');
+        missing.add('Water price');
       }
       if (isPaymentsComplete) {
         completed++;
@@ -345,8 +345,8 @@ class StationSetupService {
         ),
         productsSection: StationSectionStatus(
           isComplete: hasActiveProduct,
-          title: 'Water products & catalog',
-          statusText: hasActiveProduct ? 'Complete' : 'Add at least 1 orderable product',
+          title: 'Your water & price',
+          statusText: hasActiveProduct ? 'Complete' : 'Set a price for your water',
           badgeText: hasActiveProduct ? 'Complete' : 'Action needed',
         ),
         paymentsSection: StationSectionStatus(
@@ -383,55 +383,4 @@ class StationSetupService {
     }
   }
 
-  Future<void> seedStandardProducts(String ownerId) async {
-    try {
-      await _client.rpc('seed_station_standard_products', params: {'p_owner_id': ownerId});
-      return;
-    } catch (e) {
-      debugPrint('seed_station_standard_products rpc error, attempting direct insert fallback: $e');
-    }
-
-    try {
-      final existing = await _client
-          .from('products')
-          .select('name')
-          .eq('owner_id', ownerId);
-      final names = (existing as List)
-          .map((p) => p['name']?.toString().toLowerCase().trim())
-          .toSet();
-
-      if (!names.contains('empty 5 gallon round water container')) {
-        await _client.from('products').insert({
-          'owner_id': ownerId,
-          'name': 'Empty 5 Gallon Round Water Container',
-          'description': 'Empty reusable 5-gallon round water container for water refilling use.',
-          'price': 180.00,
-          'category': 'Accessories',
-          'container_size': '5 gallon',
-          'stock_level': 50,
-          'low_stock_threshold': 10,
-          'preparation_minutes': 5,
-          'is_available': true,
-        });
-      }
-
-      if (!names.contains('non spill cap for 5 gallon round')) {
-        await _client.from('products').insert({
-          'owner_id': ownerId,
-          'name': 'Non spill Cap for 5 Gallon Round',
-          'description': 'Non-spill cap designed for compatible 5-gallon round water containers.',
-          'price': 15.00,
-          'category': 'Accessories',
-          'container_size': 'Cap',
-          'stock_level': 100,
-          'low_stock_threshold': 20,
-          'preparation_minutes': 1,
-          'is_available': true,
-        });
-      }
-    } catch (fallbackErr) {
-      debugPrint('Direct product seeding fallback error: $fallbackErr');
-    }
-  }
 }
-

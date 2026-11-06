@@ -1,30 +1,49 @@
-import 'dart:async';
-
 import 'package:erefill/core/constants.dart';
+import 'package:erefill/core/providers/connectivity_provider.dart';
 import 'package:erefill/core/widgets/brand/erefill_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../features/audit/audit_log_screen.dart';
+import '../features/catalog/water_types_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/fees/fee_wallets_screen.dart';
 import '../features/fees/platform_fees_screen.dart';
+import '../features/moderation/moderation_screen.dart';
 import '../features/notifications/admin_notifications_screen.dart';
 import '../features/orders/orders_screen.dart';
+import '../features/payments/payment_failures_screen.dart';
 import '../features/releases/app_releases_screen.dart';
+import '../features/riders/riders_map_screen.dart';
 import '../features/stations/stations_screen.dart';
+import '../features/system/system_config_screen.dart';
 import '../features/users/users_screen.dart';
 import '../providers/admin_auth_provider.dart';
+import '../sync/admin_sync_widgets.dart';
 import '../widgets/admin_ui.dart';
+import '../features/verification/verification_queue_screen.dart';
 
 enum AdminSection {
   dashboard,
   stations,
+  waterTypes,
   orders,
   users,
   releases,
   notifications,
+  feeWallets,
   settings,
+  ridersMap,
+  moderation,
+  verifications,
+  paymentFailures,
+  auditLog,
+  systemConfig,
 }
 
 class AdminShell extends StatefulWidget {
@@ -36,79 +55,45 @@ class AdminShell extends StatefulWidget {
   State<AdminShell> createState() => _AdminShellState();
 }
 
-class _AdminShellState extends State<AdminShell> {
+class _AdminShellState extends State<AdminShell> with SyncedState {
   AdminSection _section = AdminSection.dashboard;
   final Set<AdminSection> _visitedSections = {AdminSection.dashboard};
   bool _sidebarCollapsed = false;
-  final Map<AdminSection, int> _refreshKeys = {};
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  RealtimeChannel? _realtimeChannel;
-  Timer? _realtimeDebounce;
   int _unreadNotifications = 0;
   final List<Map<String, dynamic>> _liveNotifications = [];
 
   @override
   void initState() {
     super.initState();
-    _setupRealtime();
+    // Feed only: screens keep their own data in sync through AdminSync, so
+    // events no longer rebuild (and reset) the visible screen. Channels are
+    // shared with those screens through the RealtimeHub.
+    watchTable(const TableWatch('orders'), _onOrderEvent);
+    watchTable(const TableWatch('disputes'), (event) {
+      if (event.isResync) return;
+      _onLiveEvent(
+        'Dispute Update',
+        'A customer dispute was logged or modified',
+      );
+    });
   }
 
-  @override
-  void dispose() {
-    _realtimeDebounce?.cancel();
-    _realtimeChannel?.unsubscribe();
-    super.dispose();
-  }
-
-  void _setupRealtime() {
-    try {
-      final supabase = Supabase.instance.client;
-      _realtimeChannel = supabase.channel('desktop_admin_realtime_events')
-        ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          callback: (payload) {
-            final rec = payload.newRecord.isNotEmpty
-                ? payload.newRecord
-                : payload.oldRecord;
-            final id = rec['id']?.toString() ?? '';
-            final shortId = id.length >= 8 ? id.substring(0, 8) : id;
-            if (payload.eventType == PostgresChangeEvent.delete) {
-              _onLiveEvent('Order Removed', 'Order #$shortId was removed');
-            } else {
-              final status = rec['status']?.toString() ?? 'updated';
-              _onLiveEvent('Order Update', 'Order #$shortId status changed to $status');
-            }
-          },
-        )
-        ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'water_refill_stations',
-          callback: (payload) {
-            final rec = payload.newRecord.isNotEmpty
-                ? payload.newRecord
-                : payload.oldRecord;
-            final name = rec['name']?.toString() ?? 'Station';
-            if (payload.eventType == PostgresChangeEvent.delete) {
-              _onLiveEvent('Station Removed', 'Station "$name" was removed');
-            } else {
-              _onLiveEvent('Station Event', 'Station "$name" updated in system');
-            }
-          },
-        )
-        ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'disputes',
-          callback: (_) {
-            _onLiveEvent('Dispute Update', 'A customer dispute was logged or modified');
-          },
-        )
-        ..subscribe();
-    } catch (_) {}
+  void _onOrderEvent(RealtimeEvent event) {
+    final payload = event.payload;
+    if (payload == null) return;
+    final rec = payload.newRecord.isNotEmpty
+        ? payload.newRecord
+        : payload.oldRecord;
+    final id = rec['id']?.toString() ?? '';
+    final shortId = id.length >= 8 ? id.substring(0, 8) : id;
+    if (payload.eventType == PostgresChangeEvent.delete) {
+      _onLiveEvent('Order Removed', 'Order #$shortId was removed');
+    } else {
+      final status = rec['status']?.toString() ?? 'updated';
+      _onLiveEvent('Order Update', 'Order #$shortId status changed to $status');
+    }
   }
 
   void _onLiveEvent(String title, String desc) {
@@ -121,11 +106,6 @@ class _AdminShellState extends State<AdminShell> {
         'read': false,
       });
       _unreadNotifications++;
-    });
-
-    _realtimeDebounce?.cancel();
-    _realtimeDebounce = Timer(const Duration(milliseconds: 1200), () {
-      if (mounted) _refreshCurrent();
     });
   }
 
@@ -179,12 +159,7 @@ class _AdminShellState extends State<AdminShell> {
                   children: [
                     for (final section in AdminSection.values)
                       if (_visitedSections.contains(section))
-                        KeyedSubtree(
-                          key: ValueKey(
-                            '${section.name}-${_refreshKeys[section] ?? 0}',
-                          ),
-                          child: _bodyFor(section),
-                        )
+                        _bodyFor(section)
                       else
                         const SizedBox.shrink(),
                   ],
@@ -216,25 +191,30 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
+  /// Syncs every screen's data in place; filters, selection and scroll
+  /// position are kept.
   Future<void> _refreshCurrent() async {
-    setState(() {
-      _refreshKeys.update(
-        _section,
-        (refreshKey) => refreshKey + 1,
-        ifAbsent: () => 1,
-      );
-    });
+    await ConnectivityProvider().probe();
+    await SyncStore.instance.refreshAll();
   }
 
   Widget _bodyFor(AdminSection section) {
     return switch (section) {
       AdminSection.dashboard => const DashboardScreen(),
       AdminSection.stations => const StationsScreen(),
+      AdminSection.waterTypes => const WaterTypesScreen(),
       AdminSection.orders => const OrdersScreen(),
       AdminSection.users => const UsersScreen(),
       AdminSection.releases => const AppReleasesScreen(),
       AdminSection.notifications => const AdminNotificationsScreen(),
+      AdminSection.feeWallets => const FeeWalletsScreen(),
       AdminSection.settings => const PlatformFeesScreen(),
+      AdminSection.ridersMap => const RidersMapScreen(),
+      AdminSection.moderation => const ModerationScreen(),
+      AdminSection.verifications => const VerificationQueueScreen(),
+      AdminSection.paymentFailures => const PaymentFailuresScreen(),
+      AdminSection.auditLog => const AuditLogScreen(),
+      AdminSection.systemConfig => const SystemConfigScreen(),
     };
   }
 }
@@ -271,41 +251,49 @@ class _AdminSidebar extends StatelessWidget {
     (
       'Operations',
       [
+        _NavItem(AdminSection.orders, LucideIcons.shoppingBag, 'Refill Orders'),
+        _NavItem(AdminSection.stations, LucideIcons.store, 'Water Stations'),
+        _NavItem(AdminSection.waterTypes, LucideIcons.droplet, 'Water Types'),
+        _NavItem(AdminSection.users, LucideIcons.users, 'Users & Accounts'),
+        _NavItem(AdminSection.ridersMap, LucideIcons.mapPin, 'Live Riders'),
         _NavItem(
-          AdminSection.orders,
-          LucideIcons.shoppingBag,
-          'Refill Orders',
+          AdminSection.moderation,
+          LucideIcons.shieldAlert,
+          'Trust & Moderation',
         ),
         _NavItem(
-          AdminSection.stations,
-          LucideIcons.store,
-          'Water Stations',
-        ),
-        _NavItem(
-          AdminSection.users,
-          LucideIcons.users,
-          'Users & Accounts',
+          AdminSection.verifications,
+          LucideIcons.badgeCheck,
+          'ID Verification',
         ),
       ],
     ),
     (
       'Platform',
       [
-        _NavItem(
-          AdminSection.notifications,
-          LucideIcons.bell,
-          'Notifications',
-        ),
+        _NavItem(AdminSection.notifications, LucideIcons.bell, 'Notifications'),
         _NavItem(
           AdminSection.releases,
           LucideIcons.packageCheck,
           'App Releases',
         ),
+        _NavItem(AdminSection.feeWallets, LucideIcons.wallet, 'Service Fees'),
         _NavItem(
           AdminSection.settings,
           LucideIcons.settings,
           'System Settings',
         ),
+        _NavItem(
+          AdminSection.systemConfig,
+          LucideIcons.toggleRight,
+          'Feature Toggles',
+        ),
+        _NavItem(
+          AdminSection.paymentFailures,
+          LucideIcons.creditCard,
+          'Payment Failures',
+        ),
+        _NavItem(AdminSection.auditLog, LucideIcons.history, 'Audit Trail'),
       ],
     ),
   ];
@@ -321,10 +309,7 @@ class _AdminSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppUi.pageBgOf(context),
         border: Border(
-          right: BorderSide(
-            color: AppUi.borderOf(context),
-            width: 1,
-          ),
+          right: BorderSide(color: AppUi.borderOf(context), width: 1),
         ),
       ),
       child: SafeArea(
@@ -346,22 +331,15 @@ class _AdminSidebar extends StatelessWidget {
                           child: IconButton(
                             tooltip: 'Expand menu',
                             onPressed: onToggle,
-                            icon: const Icon(
-                              LucideIcons.droplets,
-                              color: AppUi.bluePrimary,
-                              size: 24,
-                            ),
+                            icon: const ERefillMark(size: 28),
                           ),
                         )
                       : Row(
                           children: [
                             Expanded(
-                              child: ERefillLogo(
-                                size: 34,
-                                showMark: false,
-                                showWordmark: true,
-                                color: AppUi.textPrimaryOf(context),
-                                markColor: AppUi.bluePrimary,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: ERefillLogo(size: 30),
                               ),
                             ),
                             IconButton(
@@ -452,7 +430,9 @@ class _AdminSidebar extends StatelessWidget {
                         )
                       : InkWell(
                           onTap: onSignOut,
-                          borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                          borderRadius: BorderRadius.circular(
+                            AppUi.radiusControl,
+                          ),
                           child: const Padding(
                             padding: EdgeInsets.symmetric(
                               horizontal: 14,
@@ -506,7 +486,9 @@ class _AdminSidebar extends StatelessWidget {
         child: InkWell(
           onTap: () => onSelect(item.section),
           borderRadius: BorderRadius.circular(AppUi.radiusControl),
-          hoverColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          hoverColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: compactLayout ? 0 : 14,
@@ -560,8 +542,9 @@ class _AdminSidebar extends StatelessWidget {
                             color: active
                                 ? activeFg
                                 : AppUi.textPrimaryOf(context),
-                            fontWeight:
-                                active ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             fontSize: 14,
                           ),
                         ),
@@ -625,11 +608,19 @@ class _AdminTopBar extends StatelessWidget {
   String get _title => switch (section) {
     AdminSection.dashboard => 'Dashboard',
     AdminSection.stations => 'Water Stations',
+    AdminSection.waterTypes => 'Water Types',
     AdminSection.orders => 'Refill Orders',
     AdminSection.users => 'Users & Accounts',
     AdminSection.releases => 'App Releases',
     AdminSection.notifications => 'Live Notifications',
+    AdminSection.feeWallets => 'Service Fees',
     AdminSection.settings => 'System Settings',
+    AdminSection.ridersMap => 'Live Riders',
+    AdminSection.moderation => 'Trust & Moderation',
+    AdminSection.verifications => 'ID Verification',
+    AdminSection.paymentFailures => 'Payment Failures',
+    AdminSection.auditLog => 'Audit Trail',
+    AdminSection.systemConfig => 'Feature Toggles',
   };
 
   @override
@@ -684,40 +675,9 @@ class _AdminTopBar extends StatelessWidget {
             ],
           ),
           const Spacer(),
+          const AdminSyncStatusPill(),
+          AppUi.hGapMd,
           if (!compact) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppUi.accentGreen.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppUi.radiusSheet),
-                border: Border.all(
-                  color: AppUi.accentGreen.withValues(alpha: 0.4),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      color: AppUi.accentGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Realtime Live',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppUi.accentGreen,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            AppUi.hGapMd,
             Text(now, style: adminCaptionTextStyle(context)),
             AppUi.hGapMd,
           ],
@@ -728,7 +688,10 @@ class _AdminTopBar extends StatelessWidget {
               isLabelVisible: unreadNotifications > 0,
               label: Text(
                 unreadNotifications > 99 ? '99+' : '$unreadNotifications',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               child: const Icon(LucideIcons.bell, size: 19),
             ),

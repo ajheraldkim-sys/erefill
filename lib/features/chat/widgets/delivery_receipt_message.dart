@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/constants.dart';
 import 'package:erefill/core/services/receipt_service.dart';
 import 'package:flutter/material.dart';
@@ -170,7 +171,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             'Receipt ${snapshot['receipt_number'] ?? ''}  |  ${snapshot['rider_name'] ?? 'Rider'}',
             style: TextStyle(
               color: AppUi.textSecondaryOf(context),
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -191,7 +192,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
             label,
             style: TextStyle(
               color: AppUi.textSecondaryOf(context),
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -221,7 +222,7 @@ class _DeliveryReceiptMessageState extends State<DeliveryReceiptMessage> {
           label,
           style: TextStyle(
             color: AppUi.textSecondaryOf(context),
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -653,6 +654,6 @@ double _numeric(dynamic value) {
   return double.tryParse(value?.toString() ?? '') ?? 0;
 }
 
-String _currency(dynamic value) => 'PHP ${_numeric(value).toStringAsFixed(2)}';
+String _currency(dynamic value) => 'PHP ${formatAmount(_numeric(value))}';
 
 double _money(dynamic value) => _numeric(value);

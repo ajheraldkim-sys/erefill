@@ -212,7 +212,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                       Text(
                         'Requested: ${_formatDate(req.createdAt)}',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppUi.textMutedOf(context),
                         ),
                       ),
@@ -229,7 +229,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 child: Text(
                   statusLabel,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: statusColor,
                   ),
@@ -246,7 +246,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                 children: [
                   Text(
                     'Amount to Pay',
-                    style: TextStyle(fontSize: 11, color: AppUi.textMutedOf(context)),
+                    style: TextStyle(fontSize: 12, color: AppUi.textMutedOf(context)),
                   ),
                   Text(
                     formatPeso(req.amount),
@@ -280,7 +280,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
                     Text(
                       req.accountName,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: AppUi.textMutedOf(context),
                       ),
                     ),
@@ -293,7 +293,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
             const SizedBox(height: 8),
             Text(
               'Disbursed Ref: ${req.referenceNumber}',
-              style: const TextStyle(fontSize: 11, color: AppColors.uiSuccess),
+              style: const TextStyle(fontSize: 12, color: AppColors.uiSuccess),
             ),
           ],
           if (req.rejectionReason != null &&
@@ -301,7 +301,7 @@ class _OwnerPayoutRequestsTabState extends State<OwnerPayoutRequestsTab> {
             const SizedBox(height: 8),
             Text(
               'Declined Reason: ${req.rejectionReason}',
-              style: const TextStyle(fontSize: 11, color: AppColors.uiError),
+              style: const TextStyle(fontSize: 12, color: AppColors.uiError),
             ),
           ],
           if (isPending) ...[

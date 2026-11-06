@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:erefill/core/models/app_version_models.dart';
 import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 class AppUpdateService extends ChangeNotifier with WidgetsBindingObserver {
   AppUpdateService._();
@@ -21,7 +22,7 @@ class AppUpdateService extends ChangeNotifier with WidgetsBindingObserver {
   AppUpdatePolicy? _currentPolicy;
   bool _isChecking = false;
   DateTime? _lastCheckedAt;
-  RealtimeChannel? _realtimeChannel;
+  StreamSubscription? _releaseSub;
   bool _initialized = false;
 
   String get installedVersion => _installedVersion;
@@ -97,22 +98,14 @@ class AppUpdateService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _setupRealtimeSubscription() {
-    try {
-      _realtimeChannel = _supabase
-          .channel('app_release_updates')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'app_releases',
-            callback: (payload) {
-              debugPrint('Received app_releases realtime update, checking policy...');
-              checkForUpdates(force: true);
-            },
-          )
-          .subscribe();
-    } catch (e) {
-      debugPrint('Error subscribing to app_releases realtime: $e');
-    }
+    _releaseSub?.cancel();
+    _releaseSub = RealtimeHub.instance.listen(
+      const TableWatch('app_releases'),
+      (event) {
+        debugPrint('Received app_releases realtime update, checking policy...');
+        checkForUpdates(force: true);
+      },
+    );
   }
 
   /// Query the backend for the authoritative version policy.
@@ -146,7 +139,7 @@ class AppUpdateService extends ChangeNotifier with WidgetsBindingObserver {
           'p_platform': _platform,
           'p_channel': _channel,
         },
-      ).timeout(const Duration(seconds: 12));
+      ).timeout(const Duration(seconds: 8));
 
       _lastCheckedAt = DateTime.now();
 
@@ -193,9 +186,7 @@ class AppUpdateService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (_realtimeChannel != null) {
-      _supabase.removeChannel(_realtimeChannel!);
-    }
+    _releaseSub?.cancel();
     super.dispose();
   }
 }

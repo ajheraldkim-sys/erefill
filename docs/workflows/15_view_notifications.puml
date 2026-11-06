@@ -1,0 +1,7 @@
+@startuml
+start
+:Receive a notification;
+:Open Notifications;
+:Select a notification to view details;
+stop
+@enduml

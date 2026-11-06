@@ -144,4 +144,52 @@ void main() {
       expect(PaymentCheckoutService.isPaidStatus(s), isFalse, reason: '$s');
     }
   });
+
+  group('test mode', () {
+    test('createCheckoutSession reports livemode from the server', () async {
+      final backend = _Backend(
+        (_) => _json({
+          'checkout_url': 'https://pay.example/abc',
+          'checkout_id': 'cs_1',
+          'livemode': false,
+        }),
+      );
+      final session = await PaymentCheckoutService(
+        backend.client,
+      ).createCheckoutSession(orderId: 'o1', paymentMethod: 'qrph');
+      expect(session.url, 'https://pay.example/abc');
+      expect(session.livemode, isFalse);
+      expect(backend.calls.single['payment_method'], 'qrph');
+    });
+
+    test('a live key is reported as live', () async {
+      final backend = _Backend(
+        (_) => _json({'checkout_url': 'https://x', 'livemode': true}),
+      );
+      final session = await PaymentCheckoutService(
+        backend.client,
+      ).createCheckoutSession(orderId: 'o1', paymentMethod: 'gcash');
+      expect(session.livemode, isTrue);
+    });
+
+    test('missing livemode is treated as test mode', () async {
+      final backend = _Backend((_) => _json({'checkout_url': 'https://x'}));
+      final session = await PaymentCheckoutService(
+        backend.client,
+      ).createCheckoutSession(orderId: 'o1', paymentMethod: 'gcash');
+      expect(session.livemode, isFalse);
+    });
+
+    test('verify parses livemode', () async {
+      final backend = _Backend(
+        (_) => _json({
+          'verified': false,
+          'payment_status': 'processing',
+          'livemode': false,
+        }),
+      );
+      final v = await PaymentCheckoutService(backend.client).verify('o1');
+      expect(v.livemode, isFalse);
+    });
+  });
 }

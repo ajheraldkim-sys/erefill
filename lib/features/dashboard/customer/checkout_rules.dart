@@ -40,7 +40,7 @@ class CheckoutPreflightResult {
 class CheckoutRules {
   const CheckoutRules._();
 
-  static const onlinePaymentMethods = {'gcash', 'maya', 'card'};
+  static const onlinePaymentMethods = {'gcash', 'maya', 'card', 'qrph'};
 
   static const cashPaymentOption = CheckoutPaymentOption(
     type: 'cod',
@@ -70,6 +70,7 @@ class CheckoutRules {
       label: 'Credit/Debit Card',
       available: true,
     ),
+    CheckoutPaymentOption(type: 'qrph', label: 'QR Ph', available: true),
   ];
 
   static bool isOnlinePayment(String? method) {
@@ -96,6 +97,8 @@ class CheckoutRules {
         return 'Maya';
       case 'card':
         return 'Credit/Debit Card';
+      case 'qrph':
+        return 'QR Ph';
       case 'credit':
         return 'Store Credit / Utang';
       default:
@@ -189,8 +192,68 @@ class CheckoutRules {
     if (minimumFee > 0 && fee < minimumFee) {
       fee = minimumFee;
     }
-    return double.parse(fee.toStringAsFixed(2));
+    return fee.roundToDouble();
   }
+
+  /// Straight-line km to approximate road km. Same factor as
+  /// `public.delivery_road_distance_km` on the server.
+  static const double roadFactor = 1.3;
+
+  static double roadDistanceKm(double straightLineKm) =>
+      (straightLineKm * roadFactor * 100).roundToDouble() / 100;
+
+  /// Local mirror of `public.compute_delivery_quote`, used as an offline
+  /// estimate. The server quote is what the order is charged.
+  static DeliveryQuote quoteDelivery({
+    required double? straightLineKm,
+    required double freeRadiusKm,
+    List<String> freeBarangays = const [],
+    String? customerBarangay,
+    int? freeMinGallons,
+    int gallons = 0,
+    bool enabled = true,
+    required double ratePerKm,
+    double minimumFee = 0,
+    double minBillableDistanceKm = 0,
+    String roundingRule = 'exact',
+  }) {
+    final km = straightLineKm == null ? null : roadDistanceKm(straightLineKm);
+    final brgy = customerBarangay?.trim().toLowerCase();
+    String? reason;
+    if (km != null && km <= freeRadiusKm) {
+      reason = 'radius';
+    } else if (brgy != null &&
+        brgy.isNotEmpty &&
+        freeBarangays.any((b) => b.trim().toLowerCase() == brgy)) {
+      reason = 'barangay';
+    } else if (freeMinGallons != null && gallons >= freeMinGallons) {
+      reason = 'min_gallons';
+    }
+    final fee = reason != null
+        ? 0.0
+        : km == null
+            ? (enabled ? minimumFee.roundToDouble() : 0.0)
+            : calculateDeliveryFee(
+                distanceKm: km,
+                enabled: enabled,
+                ratePerKm: ratePerKm,
+                minimumFee: minimumFee,
+                minBillableDistanceKm: minBillableDistanceKm,
+                roundingRule: roundingRule,
+              );
+    return DeliveryQuote(
+      distanceKm: km,
+      fee: fee,
+      freeReason: reason,
+      freeRadiusKm: freeRadiusKm,
+      freeMinGallons: freeMinGallons,
+      isEstimate: true,
+    );
+  }
+
+  /// Subtotal, delivery fee and voucher discounts are whole pesos; only the
+  /// service fee keeps centavos. Mirrors `public.price_order` on the server.
+  static double roundSubtotal(double raw) => raw <= 0 ? 0 : raw.roundToDouble();
 
   static double calculatePlatformFee({
     required double subtotal,
@@ -204,15 +267,27 @@ class CheckoutRules {
     return fee <= 0 ? 0 : double.parse(fee.toStringAsFixed(2));
   }
 
+  /// Largest rider tip accepted (matches orders_tip_amount_check).
+  static const double maxTip = 500;
+
+  /// Tips are whole pesos between ₱0 and [maxTip].
+  static double normalizeTip(double tip) =>
+      tip.roundToDouble().clamp(0, maxTip).toDouble();
+
+  /// The rider tip is added after the voucher, so a voucher never reduces it.
+  /// Mirrors create_order_atomic.
   static double calculateOrderTotal({
     required double subtotal,
     required double deliveryFee,
     required double platformFee,
     required double voucherDiscount,
+    double tip = 0,
   }) {
-    return (subtotal + deliveryFee + platformFee - voucherDiscount)
-        .clamp(0.0, double.infinity)
-        .toDouble();
+    final discount = voucherDiscount <= 0 ? 0.0 : voucherDiscount.roundToDouble();
+    return (subtotal + deliveryFee + platformFee - discount)
+            .clamp(0.0, double.infinity)
+            .toDouble() +
+        normalizeTip(tip);
   }
 
   static CheckoutPreflightResult validate({
@@ -318,5 +393,63 @@ class CheckoutRules {
       default:
         return 'Order Status';
     }
+  }
+}
+
+/// A delivery fee quote: free (and why) or the per-km fee with its distance.
+class DeliveryQuote {
+  const DeliveryQuote({
+    required this.distanceKm,
+    required this.fee,
+    required this.freeReason,
+    required this.freeRadiusKm,
+    this.freeMinGallons,
+    this.isEstimate = false,
+  });
+
+  factory DeliveryQuote.fromServer(Map<String, dynamic> json) {
+    double? n(Object? v) => switch (v) {
+          num x => x.toDouble(),
+          String t => double.tryParse(t),
+          _ => null,
+        };
+    return DeliveryQuote(
+      distanceKm: n(json['distance_km']),
+      fee: n(json['fee']) ?? 0,
+      freeReason: json['free_reason']?.toString(),
+      freeRadiusKm: n(json['free_radius_km']) ?? 1.0,
+      freeMinGallons: n(json['free_min_gallons'])?.toInt(),
+    );
+  }
+
+  /// Road-adjusted km, or null when either location is unknown.
+  final double? distanceKm;
+  final double fee;
+
+  /// 'radius', 'barangay', 'min_gallons', or null when the fee applies.
+  final String? freeReason;
+  final double freeRadiusKm;
+  final int? freeMinGallons;
+
+  /// True when computed on the device (offline); the server may differ.
+  final bool isEstimate;
+
+  bool get isFree => freeReason != null;
+
+  static String _km(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
+  /// Short explanation shown next to the delivery fee.
+  String get label {
+    switch (freeReason) {
+      case 'radius':
+        return 'Free delivery · within ${_km(freeRadiusKm)} km';
+      case 'barangay':
+        return 'Free delivery · your barangay';
+      case 'min_gallons':
+        return 'Free delivery · ${freeMinGallons ?? ''}+ gallons';
+    }
+    final peso = '₱${fee.toStringAsFixed(0)}';
+    return distanceKm == null ? peso : '$peso · ${distanceKm!.toStringAsFixed(1)} km';
   }
 }

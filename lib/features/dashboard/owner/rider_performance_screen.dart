@@ -354,7 +354,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                   color: isSuspended
                                       ? AppColors.uiError
                                       : AppColors.uiSuccess,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
                                 ),
@@ -394,7 +394,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                           'Rider performance score',
                           style: TextStyle(
                             color: AppUi.textSecondaryOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0,
                           ),
@@ -447,7 +447,7 @@ class _RiderPerformanceScreenState extends State<RiderPerformanceScreen> {
                                       'ON-TIME DELIVERY',
                             style: const TextStyle(
                               color: AppColors.uiSuccess,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.5,
                             ),

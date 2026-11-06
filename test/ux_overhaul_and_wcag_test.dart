@@ -8,7 +8,7 @@ import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/offline_sync_status_pill.dart';
 import 'package:erefill/core/widgets/water_fill_loading_indicator.dart';
 import 'package:erefill/core/widgets/brand/refill_lottie.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -31,16 +31,15 @@ void main() {
   });
 
   group('WCAG AA Contrast & Colorblind Accessibility Tests', () {
-    test('OrderStatusStyle pending badges use muted solid status colors', () {
+    test('OrderStatusStyle pending badges use dark readable foreground on tinted background', () {
       final lightStyle = OrderStatusStyle.resolve('pending', isDark: false);
-      // Muted amber tokens keep the badge readable in both themes.
+      // Background is tinted amber-100, text is dark amber-800
       expect(lightStyle.badgeBackground, equals(AppUi.warningBg));
       expect(lightStyle.badgeForeground, equals(AppUi.warningFg));
 
       final darkStyle = OrderStatusStyle.resolve('pending', isDark: true);
-      expect(darkStyle.badgeBackground, equals(const Color(0xFF3D3323)));
+      expect(darkStyle.badgeBackground, equals(const Color(0xFF451A03).withValues(alpha: 0.70)));
       expect(darkStyle.badgeForeground, equals(AppUi.warningFgDark));
-      expect(darkStyle.badgeBackground.a, 1.0);
     });
 
     testWidgets('AvailabilityBadge pairs color with status icon for colorblind accessibility',
@@ -209,7 +208,7 @@ void main() {
   });
 
   group('StationCard Trust Signals & Badges Tests', () {
-    testWidgets('List card displays Sanitary Verified trust badge', (tester) async {
+    testWidgets('List card shows verification only when the station is verified', (tester) async {
       final sampleStation = {
         'id': 'st-101',
         'station_name': 'Aqua Pure Cantilan',
@@ -219,6 +218,8 @@ void main() {
         'price_per_gallon': 35.0,
         'average_rating': 4.8,
         'review_count': 12,
+        'is_verified': true,
+        'primary_water_type': 'Mineral Water',
       };
 
       await tester.pumpWidget(
@@ -234,13 +235,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Sanitary Verified'), findsOneWidget);
+      expect(find.text('Sanitary Verified'), findsNothing,
+          reason: 'No permit data exists, so the card must not claim one');
       expect(find.byIcon(Icons.verified_rounded), findsOneWidget);
       expect(find.text('Aqua Pure Cantilan'), findsOneWidget);
+      expect(find.text('Mineral'), findsOneWidget);
       expect(find.text('₱35 / gallon'), findsOneWidget);
     });
 
-    testWidgets('Grid card displays verified checkmark icon next to station name', (tester) async {
+    testWidgets('Grid card hides the verified checkmark for unverified stations', (tester) async {
       final sampleStation = {
         'id': 'st-102',
         'station_name': 'Crystal Clear Madrid',
@@ -268,7 +271,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Crystal Clear Madrid'), findsOneWidget);
-      expect(find.byIcon(Icons.verified_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.verified_rounded), findsNothing);
     });
   });
 
@@ -337,7 +340,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: EmptyStateCard(
-              pose: AxoPose.happy,
+              visual: EmptyStateVisual.happy,
               title: 'No active refills',
               message: 'When you order water, your active deliveries will show up here.',
               actionLabel: 'Find a station',

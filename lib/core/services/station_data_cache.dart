@@ -231,7 +231,7 @@ class StationDataCache {
           .select(
             'primary_water_type, average_rating, review_count, station_name, '
             'complete_address, barangay, town, latitude, longitude, '
-            'station_photo_url, is_open, station_availability, phone',
+            'station_photo_url, station_logo_url, avatar_url, is_open, station_availability, phone',
           )
           .eq('id', ownerId)
           .maybeSingle(),
@@ -263,7 +263,7 @@ class StationDataCache {
           }
         }
       }(),
-    ]);
+    ]).timeout(const Duration(seconds: 12));
 
     final productData = (results[0] as List? ?? const []).cast<dynamic>();
     final settingsData = results[1] as Map<String, dynamic>?;

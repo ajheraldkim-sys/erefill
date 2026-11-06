@@ -7,11 +7,18 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/providers/connectivity_provider.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
+import '../../sync/admin_sync_widgets.dart';
 import '../../widgets/admin_ui.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+
 class AppReleasesScreen extends StatefulWidget {
   const AppReleasesScreen({super.key});
 
@@ -19,38 +26,36 @@ class AppReleasesScreen extends StatefulWidget {
   State<AppReleasesScreen> createState() => _AppReleasesScreenState();
 }
 
-class _AppReleasesScreenState extends State<AppReleasesScreen> {
-  bool _loading = true;
-  String? _error;
-  List<Map<String, dynamic>> _releases = [];
+class _AppReleasesScreenState extends State<AppReleasesScreen>
+    with SyncedState {
+  late final SyncedResource<List<Map<String, dynamic>>> _res;
   String _platformFilter = 'all';
   String _statusFilter = 'all';
   String _searchQuery = '';
 
+  List<Map<String, dynamic>> get _releases => _res.data ?? const [];
+
+  /// Only true while nothing (saved or fresh) is available yet.
+  bool get _loading => !_res.hasData && (_res.isLoading || _res.isRefreshing);
+
+  String? get _error {
+    if (_res.hasData) return null;
+    final error = _res.error;
+    if (error != null) return FriendlyErrors.message(error);
+    return _res.lastRefreshFailed
+        ? 'You are offline. Releases will load when you reconnect.'
+        : null;
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadReleases();
+    _res = useSynced(AdminSync.appReleases(context.read<AdminApiService>()));
   }
 
   Future<void> _loadReleases() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final api = context.read<AdminApiService>();
-      final list = await api.listAppReleases();
-      if (!mounted) return;
-      setState(() {
-        _releases = list;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    await ConnectivityProvider().probe();
+    await SyncStore.instance.refreshTagged(AdminSync.tagReleases);
   }
 
   List<Map<String, dynamic>> get _filteredReleases {
@@ -90,7 +95,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
   Widget build(BuildContext context) {
     final active = _activeAndroidRelease;
 
-    return SingleChildScrollView(
+    final content = SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -242,11 +247,15 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                         vertical: 10,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                        borderRadius: BorderRadius.circular(
+                          AppUi.radiusControl,
+                        ),
                         borderSide: BorderSide(color: AppUi.borderOf(context)),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppUi.radiusControl),
+                        borderRadius: BorderRadius.circular(
+                          AppUi.radiusControl,
+                        ),
                         borderSide: BorderSide(color: AppUi.borderOf(context)),
                       ),
                     ),
@@ -413,6 +422,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         ],
       ),
     );
+    return AdminSyncedFrame(resources: [_res], child: content);
   }
 
   Widget _buildReleaseItemCard(BuildContext context, Map<String, dynamic> r) {
@@ -459,7 +469,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                 ),
                 child: Icon(
                   isActive ? LucideIcons.circleCheck : LucideIcons.package,
-                  color: isActive ? AppColors.uiSuccess : AppUi.brandOf(context),
+                  color: isActive
+                      ? AppColors.uiSuccess
+                      : AppUi.brandOf(context),
                   size: 28,
                 ),
               ),
@@ -493,7 +505,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                         else
                           _buildBadge(
                             status.toUpperCase(),
-                            isPublished ? AppUi.bluePrimary : AppColors.uiWarning,
+                            isPublished
+                                ? AppUi.bluePrimary
+                                : AppColors.uiWarning,
                           ),
                         _buildBadge(
                           isMandatory ? 'MANDATORY UPDATE' : 'OPTIONAL UPDATE',
@@ -688,7 +702,10 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                               IconButton(
                                 iconSize: 14,
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
                                 tooltip: 'Copy SHA-256 Checksum',
                                 icon: const Icon(LucideIcons.copy, size: 14),
                                 onPressed: () {
@@ -739,9 +756,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
 
   // --- Dialogs & Operations ---
 
-  Future<void> _confirmPublishRelease(
-    Map<String, dynamic> r,
-  ) async {
+  Future<void> _confirmPublishRelease(Map<String, dynamic> r) async {
     final isMandatory = r['update_type'] == 'mandatory';
     final version = r['version'];
     final minVer = r['min_supported_version'];
@@ -831,9 +846,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isMandatory
-                  ? AppUi.error
-                  : AppColors.uiSuccess,
+              backgroundColor: isMandatory ? AppUi.error : AppColors.uiSuccess,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
@@ -860,7 +873,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to publish release: ${FriendlyErrors.message(e)}'),
+            content: Text(
+              'Failed to publish release: ${FriendlyErrors.message(e)}',
+            ),
             backgroundColor: AppUi.error,
           ),
         );
@@ -868,9 +883,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
     }
   }
 
-  Future<void> _confirmActivateRelease(
-    Map<String, dynamic> r,
-  ) async {
+  Future<void> _confirmActivateRelease(Map<String, dynamic> r) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -900,7 +913,10 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${FriendlyErrors.message(e)}'), backgroundColor: AppUi.error),
+          SnackBar(
+            content: Text('Error: ${FriendlyErrors.message(e)}'),
+            backgroundColor: AppUi.error,
+          ),
         );
       }
     }
@@ -941,7 +957,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete draft: ${FriendlyErrors.message(e)}'),
+            content: Text(
+              'Failed to delete draft: ${FriendlyErrors.message(e)}',
+            ),
             backgroundColor: AppUi.error,
           ),
         );
@@ -949,9 +967,7 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
     }
   }
 
-  Future<void> _openReleaseForm({
-    Map<String, dynamic>? existing,
-  }) async {
+  Future<void> _openReleaseForm({Map<String, dynamic>? existing}) async {
     final isEdit = existing != null;
     final platformCtl = TextEditingController(
       text: existing?['platform']?.toString() ?? 'android',
@@ -1241,7 +1257,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save release: ${FriendlyErrors.message(e)}'),
+            content: Text(
+              'Failed to save release: ${FriendlyErrors.message(e)}',
+            ),
             backgroundColor: AppUi.error,
           ),
         );
@@ -1302,7 +1320,9 @@ class _AppReleasesScreenState extends State<AppReleasesScreen> {
                                       color: AppUi.bluePrimary.withValues(
                                         alpha: 0.12,
                                       ),
-                                      borderRadius: BorderRadius.circular(AppUi.radiusXs),
+                                      borderRadius: BorderRadius.circular(
+                                        AppUi.radiusXs,
+                                      ),
                                     ),
                                     child: Text(
                                       action,

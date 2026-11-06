@@ -11,7 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/report_export_service.dart';
 import '../../../core/widgets/app_form_fields.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../models/credit_model.dart';
 import '../models/delivery_model.dart';
 import '../providers/credit_provider.dart';
@@ -255,7 +255,7 @@ class _DmCreditLedgerTabState extends State<DmCreditLedgerTab> {
             else if (filteredCredits.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(40),
-                child: AxoEmptyState(
+                child: EmptyStateCard(
                   title: 'No credits recorded',
                   message:
                       'Track water credits, customer balances, and rider advances here.',
@@ -384,7 +384,7 @@ class _DmCreditLedgerTabState extends State<DmCreditLedgerTab> {
                 child: Text(
                   badgeText,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: badgeColor,
                   ),
@@ -633,7 +633,7 @@ class DmDeliveryLogsTab extends StatelessWidget {
             else if (deliveries.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(40),
-                child: AxoEmptyState(
+                child: EmptyStateCard(
                   title: 'No manual deliveries logged',
                   message:
                       'Tap Log Delivery to record manual or offline walk-in refills.',
@@ -671,7 +671,7 @@ class DmDeliveryLogsTab extends StatelessWidget {
                               Text(
                                 'Empties returned: ${d.emptyGallonsReturned.toStringAsFixed(0)}',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: AppUi.brandOf(context),
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -931,7 +931,7 @@ class DmReportsAnalyticsTab extends StatelessWidget {
                                 Text(
                                   'Official sales, deliveries & tax statement',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     color: AppUi.textMutedOf(context),
                                   ),
                                 ),
@@ -969,7 +969,7 @@ class DmReportsAnalyticsTab extends StatelessWidget {
                           Text(
                             'Official sales, deliveries & tax statement',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppUi.textMutedOf(context),
                             ),
                           ),

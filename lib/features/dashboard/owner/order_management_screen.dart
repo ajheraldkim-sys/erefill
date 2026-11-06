@@ -10,11 +10,14 @@ import 'package:erefill/core/utils/safe_supabase.dart';
 import 'package:erefill/core/widgets/refill_status_widgets.dart';
 import 'package:erefill/core/widgets/skeleton.dart';
 import 'package:erefill/core/widgets/brand/hero_header.dart';
-import 'package:erefill/core/widgets/brand/axo_states.dart';
+import 'package:erefill/core/widgets/brand/state_cards.dart';
 import 'add_order_dialog.dart';
 import '../customer/checkout_rules.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
-import 'package:erefill/core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/sync/sync_resources.dart';
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
 import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/offline_queue_service.dart';
 import 'package:erefill/core/widgets/press_bounce.dart';
@@ -33,23 +36,34 @@ class OrderManagementScreen extends StatefulWidget {
 }
 
 class _OrderManagementScreenState extends State<OrderManagementScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, SyncedState {
   final supabase = Supabase.instance.client;
   bool _isAssigning = false;
   bool _isKanbanView = false;
   int _phoneKanbanStageIndex = 0;
-  List<Map<String, dynamic>> _riders = [];
   String _selectedStatus = 'all';
   String _searchQuery = '';
   late TabController _tabController;
-  RealtimeChannel? _ordersChannel;
 
-  // New: Reactive order list state
-  StreamController<List<Map<String, dynamic>>>? _ordersStreamController;
-  List<Map<String, dynamic>>? _cachedOrders;
-  Timer? _pollingTimer;
-  bool _isRefreshingOrders = false;
-  String? _ordersLoadError;
+  /// Open orders and linked riders, cache-first and kept live by the sync
+  /// layer (realtime, resume, reconnect, and a 30s safety-net poll).
+  SyncedResource<List<Map<String, dynamic>>>? _activeOrders;
+  SyncedResource<List<Map<String, dynamic>>>? _ridersRes;
+
+  List<Map<String, dynamic>>? get _cachedOrders => _activeOrders?.data;
+  List<Map<String, dynamic>> get _riders => _ridersRes?.data ?? const [];
+  bool get _isRefreshingOrders => _activeOrders?.isRefreshing ?? false;
+
+  String? get _ordersLoadError {
+    final orders = _activeOrders;
+    if (orders == null || !orders.lastRefreshFailed) return null;
+    final error = orders.error;
+    if (error == null) return 'You are offline. Showing saved orders.';
+    return FriendlyErrors.message(
+      error,
+      fallback: 'Could not refresh orders. Check your connection and retry.',
+    );
+  }
 
   static const List<String> _statusFilters = [
     'all',
@@ -77,168 +91,78 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
     final ownerId = supabase.auth.currentUser?.id;
     if (ownerId != null) {
-      final cached = LocalDataCache.instance.getMemory<List<dynamic>>(
-        'owner_orders_$ownerId',
+      _activeOrders = useSynced(SyncResources.ownerActiveOrders(ownerId));
+      _ridersRes = useSynced(SyncResources.ownerRiders(ownerId));
+      // Shares the resource's realtime channel; only announces new orders.
+      watchTable(
+        TableWatch('orders', column: 'owner_id', value: ownerId),
+        _onOrderInserted,
       );
-      if (cached != null && cached.isNotEmpty) {
-        _cachedOrders = cached
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-      }
-    }
-
-    _loadRiders();
-    _loadDiskCache();
-    _initOrdersStream();
-  }
-
-  Future<void> _loadDiskCache() async {
-    final ownerId = supabase.auth.currentUser?.id;
-    if (ownerId == null) return;
-    final cached = await LocalDataCache.instance.get<List<dynamic>>(
-      'owner_orders_$ownerId',
-    );
-    if (cached != null && cached.isNotEmpty && mounted) {
-      final list = cached
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList();
-      _cachedOrders = list;
-      if (_ordersStreamController != null &&
-          !_ordersStreamController!.isClosed) {
-        _ordersStreamController!.add(list);
-      }
-      setState(() {});
     }
   }
 
-  void _initOrdersStream() {
-    _ordersStreamController =
-        StreamController<List<Map<String, dynamic>>>.broadcast();
-    _refreshOrders();
-    _subscribeToOrders();
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) _refreshOrders();
+  Future<void> _refreshOrders() async => _activeOrders?.refresh();
+
+  Future<void> _loadRiders() async => _ridersRes?.refresh();
+
+  /// Replaces one order in the saved list, e.g. for an optimistic update.
+  void _replaceOrder(String orderId, Map<String, dynamic> order) {
+    _activeOrders?.mutateLocally((current) {
+      return [
+        for (final o in current ?? const <Map<String, dynamic>>[])
+          o['id']?.toString() == orderId ? order : o,
+      ];
     });
-  }
-
-  Future<void> _refreshOrders() async {
-    final ownerId = supabase.auth.currentUser?.id;
-    if (ownerId == null || _isRefreshingOrders) return;
-
-    _isRefreshingOrders = true;
-    if (mounted) setState(() {});
-    try {
-      final data = await _fetchOrdersWithCustomers(ownerId);
-      _cachedOrders = data;
-      _ordersLoadError = null;
-      if (mounted) {
-        if (_ordersStreamController != null &&
-            !_ordersStreamController!.isClosed) {
-          _ordersStreamController!.add(data);
-        }
-        setState(() {});
-      }
-      LocalDataCache.instance.set('owner_orders_$ownerId', data);
-      LocalDataCache.instance.invalidate('owner_overview_$ownerId');
-    } catch (error) {
-      debugPrint('Error refreshing owner orders: $error');
-      _ordersLoadError = FriendlyErrors.message(
-        error,
-        fallback: 'Could not refresh orders. Check your connection and retry.',
-      );
-      if (mounted) setState(() {});
-    } finally {
-      _isRefreshingOrders = false;
-      if (mounted) setState(() {});
-    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _pollingTimer?.cancel();
-    if (_ordersChannel != null) supabase.removeChannel(_ordersChannel!);
-    _ordersStreamController?.close();
     super.dispose();
   }
 
-  void _subscribeToOrders() {
-    final ownerId = supabase.auth.currentUser?.id;
-    if (ownerId == null) return;
-
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
+  void _onOrderInserted(RealtimeEvent event) {
+    final payload = event.payload;
+    if (payload == null || payload.eventType != PostgresChangeEvent.insert) {
+      return;
     }
-
-    _ordersChannel = supabase
-        .channel('order_mgmt_updates:$ownerId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          callback: (payload) {
-            debugPrint('Order updated via Realtime: ${payload.eventType}');
-            final record = payload.newRecord;
-            final recordOwnerId = record['owner_id']?.toString();
-            if (recordOwnerId != null && recordOwnerId != ownerId) {
-              return;
-            }
-
-            if (payload.eventType == PostgresChangeEvent.insert) {
-              AppHaptics.orderAlert();
-              if (mounted) {
-                final status = (record['status'] ?? '').toString();
-                if (status == 'pending') {
-                  NewOrderAlertSheet.show(
-                    context,
-                    order: record,
-                    onAccept: (orderId) async {
-                      await SafeSupabase.requireOrderTransition(
-                        orderId: orderId,
-                        newStatus: 'accepted',
-                      );
-                      _refreshOrders();
-                    },
-                    onDecline: (orderId) async {
-                      await SafeSupabase.requireOrderTransition(
-                        orderId: orderId,
-                        newStatus: 'cancelled',
-                      );
-                      _refreshOrders();
-                    },
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.bolt, color: AppColors.uiWarning),
-                          SizedBox(width: 8),
-                          Text('New incoming refill order received!'),
-                        ],
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: Color(0xFF0077B6),
-                      duration: Duration(seconds: 4),
-                    ),
-                  );
-                }
-              }
-            }
-            _refreshOrders();
-          },
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _subscribeToOrders();
-            });
-          }
-        });
+    final record = payload.newRecord;
+    AppHaptics.orderAlert();
+    final status = (record['status'] ?? '').toString();
+    if (status == 'pending') {
+      NewOrderAlertSheet.show(
+        context,
+        order: record,
+        onAccept: (orderId) async {
+          await SafeSupabase.requireOrderTransition(
+            orderId: orderId,
+            newStatus: 'accepted',
+          );
+        },
+        onDecline: (orderId) async {
+          await SafeSupabase.requireOrderTransition(
+            orderId: orderId,
+            newStatus: 'cancelled',
+          );
+        },
+      );
+    } else {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.bolt, color: AppColors.uiWarning),
+              SizedBox(width: 8),
+              Text('New incoming refill order received!'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppUi.brandOf(context),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   bool _matchesOrderSearch(Map<String, dynamic> order) {
@@ -262,25 +186,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
         .whereType<Object>()
         .map((value) => value.toString().toLowerCase())
         .any((value) => value.contains(query));
-  }
-
-  Future<void> _loadRiders() async {
-    final ownerId = supabase.auth.currentUser?.id;
-    if (ownerId == null) return;
-    try {
-      final ridersData = await supabase
-          .from('profiles')
-          .select('id, full_name, username, reliability_score, flagged_count')
-          .eq('owner_id', ownerId)
-          .eq('role', 'rider')
-          .order('reliability_score', ascending: false);
-      if (!mounted) return;
-      setState(() {
-        _riders = List<Map<String, dynamic>>.from(ridersData);
-      });
-    } catch (e) {
-      debugPrint('Error loading riders: $e');
-    }
   }
 
   // ─── Formatters ───────────────────────────────────────────────────────────
@@ -507,23 +412,17 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     Map<String, dynamic>? originalOrder;
 
     // Optimistically update local state for instant UI response
-    if (_cachedOrders != null) {
-      final index = _cachedOrders!.indexWhere(
-        (o) => o['id']?.toString() == orderId,
-      );
-      if (index != -1) {
-        final updatedList = List<Map<String, dynamic>>.from(_cachedOrders!);
-        originalOrder = Map<String, dynamic>.from(updatedList[index]);
-        final updatedOrder = Map<String, dynamic>.from(updatedList[index]);
-        updatedOrder['status'] = newStatus;
-        if (cancelReason != null && cancelReason.isNotEmpty) {
-          updatedOrder['notes'] = 'Declined: $cancelReason';
-        }
-        updatedList[index] = updatedOrder;
-        _cachedOrders = updatedList;
-        _ordersStreamController?.add(updatedList);
-        if (mounted) setState(() {});
-      }
+    final current = _cachedOrders
+        ?.where((o) => o['id']?.toString() == orderId)
+        .firstOrNull;
+    if (current != null) {
+      originalOrder = Map<String, dynamic>.from(current);
+      _replaceOrder(orderId, {
+        ...current,
+        'status': newStatus,
+        if (cancelReason != null && cancelReason.isNotEmpty)
+          'notes': 'Declined: $cancelReason',
+      });
     }
 
     try {
@@ -632,21 +531,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
     String orderId,
     Map<String, dynamic>? originalOrder,
   ) {
-    final orders = _cachedOrders;
-    if (orders == null || originalOrder == null) return;
-
-    final index = orders.indexWhere(
-      (order) => order['id']?.toString() == orderId,
-    );
-    if (index == -1) return;
-
-    final restored = List<Map<String, dynamic>>.from(orders)
-      ..[index] = originalOrder;
-    _cachedOrders = restored;
-    if (_ordersStreamController != null && !_ordersStreamController!.isClosed) {
-      _ordersStreamController!.add(restored);
-    }
-    if (mounted) setState(() {});
+    if (originalOrder == null) return;
+    _replaceOrder(orderId, originalOrder);
   }
 
   Future<void> _showDeclineOrderDialog(String orderId) async {
@@ -1093,7 +979,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             shortOrderId(orderId),
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
-                              fontSize: 11,
+                              fontSize: 12,
                               color: Colors.white,
                               letterSpacing: 0.5,
                             ),
@@ -1123,7 +1009,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                   '${minutesAgo}m',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -1262,7 +1148,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                                 landmark,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   fontStyle: FontStyle.italic,
                                 ),
@@ -1410,7 +1296,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: color,
                 ),
@@ -1424,102 +1310,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
   // ─── Fetch Orders with Customer Data ───────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> _fetchOrdersWithCustomers(
-    String ownerId,
-  ) async {
-    List<Map<String, dynamic>> mapRawOrders(List<Map<String, dynamic>> raw) {
-      return raw.map((o) {
-        final cust = o['customer'] as Map<String, dynamic>?;
-        return {
-          ...o,
-          'customer_name':
-              o['customer_name'] ?? cust?['full_name'] ?? 'Guest Customer',
-          'customer_address':
-              o['customer_address'] ??
-              cust?['complete_address'] ??
-              'Station Pickup',
-          'customer_phone': o['customer_phone'] ?? cust?['phone'] ?? 'No phone',
-          'customer_barangay':
-              o['customer_barangay'] ?? cust?['barangay'] ?? '',
-          'customer_landmark':
-              o['customer_landmark'] ?? cust?['landmark'] ?? '',
-        };
-      }).toList();
-    }
-
-    // 1. Primary Attempt: Query with joined customer profiles
-    try {
-      final response = await supabase
-          .from('orders')
-          .select('''
-            *,
-            customer:profiles!orders_customer_id_fkey(full_name, complete_address, phone, barangay, landmark)
-          ''')
-          .eq('owner_id', ownerId)
-          .inFilter('status', [
-            'pending',
-            'accepted',
-            'preparing',
-            'ready_for_pickup',
-            'assigned_to_rider',
-            'out_for_delivery',
-          ])
-          .order('created_at', ascending: false);
-
-      final List<Map<String, dynamic>> raw = List<Map<String, dynamic>>.from(
-        response,
-      );
-
-      return mapRawOrders(raw);
-    } catch (e) {
-      debugPrint(
-        'Primary joined order fetch failed, attempting resilient fallbacks: $e',
-      );
-    }
-
-    // 2. Fallback Attempt A: Simple direct select on orders without foreign key join
-    try {
-      final response = await supabase
-          .from('orders')
-          .select('*')
-          .eq('owner_id', ownerId)
-          .inFilter('status', [
-            'pending',
-            'accepted',
-            'preparing',
-            'ready_for_pickup',
-            'assigned_to_rider',
-            'out_for_delivery',
-          ])
-          .order('created_at', ascending: false);
-
-      return mapRawOrders(List<Map<String, dynamic>>.from(response));
-    } catch (e) {
-      debugPrint('Direct inFilter order fetch failed: $e');
-    }
-
-    // 3. Fallback Attempt B: In case inFilter enum fails (e.g. 22P02 or schema mismatch)
-    try {
-      final response = await supabase
-          .from('orders')
-          .select('*')
-          .eq('owner_id', ownerId)
-          .order('created_at', ascending: false)
-          .limit(50);
-
-      final all = List<Map<String, dynamic>>.from(response);
-      final active = all.where((o) {
-        final s = (o['status'] ?? '').toString().toLowerCase();
-        return s != 'delivered' && s != 'cancelled' && s != 'declined';
-      }).toList();
-
-      return mapRawOrders(active);
-    } catch (e) {
-      debugPrint('Broad orders fetch failed: $e');
-      rethrow;
-    }
-  }
-
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
@@ -1531,11 +1321,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
       );
     }
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _ordersStreamController?.stream,
-      initialData: _cachedOrders,
-      builder: (context, snapshot) {
-        if (_isRefreshingOrders && !snapshot.hasData && _cachedOrders == null) {
+    return Builder(
+      builder: (context) {
+        if (_activeOrders?.isLoading ?? false) {
           return Scaffold(
             backgroundColor: AppUi.pageBgOf(context),
             body: SafeArea(
@@ -1566,7 +1354,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
           );
         }
 
-        final allOrders = prioritizeOwnerOrders(snapshot.data ?? []);
+        final allOrders = prioritizeOwnerOrders(_cachedOrders ?? const []);
 
         final incoming = allOrders
             .where(
@@ -1988,7 +1776,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                             child: Text(
                               '${stageOrders.length}',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: color,
                               ),
@@ -2118,7 +1906,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                         Text(
                           stage['title'] as String,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight:
                                 isSelected ? FontWeight.w700 : FontWeight.w600,
                             color: isSelected
@@ -2143,7 +1931,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
                           child: Text(
                             '$count',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: isSelected ? Colors.white : color,
                             ),
@@ -2270,8 +2058,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen>
 
   Widget _buildEmptyState() {
     final isAll = _selectedStatus == 'all';
-    return AxoEmptyState(
-      pose: isAll ? AxoPose.happy : AxoPose.thinking,
+    return EmptyStateCard(
+      visual: isAll ? EmptyStateVisual.happy : EmptyStateVisual.thinking,
       compact: true,
       title: isAll
           ? 'No active refill orders'

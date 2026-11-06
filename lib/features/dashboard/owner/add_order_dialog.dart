@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants.dart';
 import '../../../../core/widgets/app_form_fields.dart';
@@ -44,7 +45,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
   void initState() {
     super.initState();
     final price = widget.initialPrice ?? 25.0;
-    _pricePerGallonController.text = price.toStringAsFixed(2);
+    _pricePerGallonController.text = price.toStringAsFixed(0);
     if (widget.initialPrice == null) {
       _loadStationPrice();
     }
@@ -62,7 +63,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
         final p = (res['price_per_gallon'] as num).toDouble();
         if (p > 0) {
           setState(() {
-            _pricePerGallonController.text = p.toStringAsFixed(2);
+            _pricePerGallonController.text = p.toStringAsFixed(0);
           });
         }
       }
@@ -107,7 +108,7 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
   double get _totalAmount {
     final gallons = double.tryParse(_gallonsController.text) ?? 0;
     final price = double.tryParse(_pricePerGallonController.text) ?? 0;
-    return gallons * price;
+    return (gallons * price).roundToDouble();
   }
 
   void _adjustGallons(int delta) {
@@ -454,7 +455,8 @@ class _AddOrderDialogState extends State<AddOrderDialog> {
                   controller: _pricePerGallonController,
                   label: 'Price per Gallon (₱)',
                   icon: Icons.payments_outlined,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   compact: true,
                   validator: (v) => v?.isEmpty == true ? 'Required' : null,
                   onChanged: (_) => setState(() {}),

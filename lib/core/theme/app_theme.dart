@@ -391,7 +391,7 @@ class AppTheme {
       badgeTheme: BadgeThemeData(
         backgroundColor: AppUi.error,
         textColor: Colors.white,
-        textStyle: base.copyWith(fontSize: 11, fontWeight: FontWeight.w700),
+        textStyle: base.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith(

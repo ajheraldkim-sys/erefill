@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../constants.dart';
+
 /// Smooth numeric roll animation for metrics, revenue, and telemetry cards.
 ///
 /// Rolls from initial value to [value] over [duration] using [curve].
@@ -27,7 +29,7 @@ class AnimatedCounter extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: value.toDouble()),
-      duration: duration,
+      duration: AppUi.motion(context, duration),
       curve: curve,
       builder: (context, animatedValue, child) {
         final formattedNumber = fractionDigits > 0

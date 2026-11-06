@@ -1,16 +1,17 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:erefill/core/widgets/theme_mode_picker.dart';
+import 'package:erefill/core/widgets/text_size_slider.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/constants.dart';
 import '../../../core/water_types.dart';
-import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/account/account_ui.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/models/user_model.dart';
 import '../../../core/utils/profile_query_helpers.dart';
 import 'package:erefill/core/routing/app_navigation.dart';
@@ -23,6 +24,8 @@ import 'widgets/customer_credit_sheet.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/features/account/verification/verification_screen.dart';
+import 'package:erefill/core/tour/app_tour.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({super.key});
@@ -58,7 +61,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   String? _selectedBarangay;
   String? _selectedPurok;
   String? _selectedSuffix;
-  String _preferredWaterType = WaterTypes.purified.name;
+  String _preferredWaterType = (WaterTypes.defaultType?.name ?? '');
 
   final List<String> _suffixOptions = [
     'None',
@@ -154,7 +157,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         user.zipCode ?? AppConstants.municipalityZipCodes[_selectedTown] ?? '';
     _addressController.text = user.completeAddress ?? '';
     _landmarkController.text = user.landmark ?? '';
-    _preferredWaterType = user.preferredWaterType ?? WaterTypes.purified.name;
+    _preferredWaterType = user.preferredWaterType ?? (WaterTypes.defaultType?.name ?? '');
   }
 
   Future<void> _loadProfileData() async {
@@ -228,7 +231,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           _landmarkController.text = profileData['landmark'] ?? '';
           _preferredWaterType =
               profileData['preferred_water_type']?.toString() ??
-              WaterTypes.purified.name;
+              (WaterTypes.defaultType?.name ?? '');
           if (profileData['latitude'] != null &&
               profileData['longitude'] != null) {
             _pickedLocation = LatLng(
@@ -816,7 +819,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             Text(
               'CONTACT INFORMATION',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: AppUi.textSecondaryOf(ctx),
@@ -860,7 +863,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       Text(
                         '7 AM - 6 PM',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppUi.textSecondaryOf(ctx),
                         ),
                       ),
@@ -905,7 +908,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
             Text(
               'QUICK FAQS',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
                 color: AppUi.textSecondaryOf(ctx),
@@ -959,7 +962,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               child: Text(
                 'eRefill v1.0.0 • Cantilan & Madrid Service',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppUi.textMutedOf(context),
                 ),
@@ -1124,11 +1127,11 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     return Scaffold(
       backgroundColor: AppUi.pageBgOf(context),
       body: _isLoading
-          ? const AxoLoader(message: 'Loading your account...')
+          ? const LoadingStateCard(message: 'Loading your account...')
           : _loadError != null
           ? Center(
-              child: AxoEmptyState(
-                pose: AxoPose.thinking,
+              child: EmptyStateCard(
+                visual: EmptyStateVisual.thinking,
                 title: 'Profile unavailable',
                 message: _loadError!,
                 actionLabel: 'Retry',
@@ -1190,6 +1193,16 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                         const AccountSectionLabel('Delivery'),
                         AccountGroup(
                           children: [
+                            AccountNavTile(
+                              icon: Icons.verified_user_outlined,
+                              title: 'ID verification',
+                              subtitle: 'Verify your ID to build trust and prevent scams',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const VerificationScreen(),
+                                ),
+                              ),
+                            ),
                             AccountNavTile(
                               icon: Icons.location_on_outlined,
                               title: 'Saved addresses',
@@ -1255,15 +1268,16 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                                       () => _notificationsEnabled = v,
                                     ),
                             ),
-                            AccountToggleTile(
-                              icon: Icons.dark_mode_outlined,
-                              title: 'Dark mode',
-                              value: context.select<ThemeProvider, bool>(
-                                (t) => t.isDarkMode,
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 12, 16, 14),
+                              child: Column(
+                                children: [
+                                  ThemeModePicker(),
+                                  SizedBox(height: 16),
+                                  TextSizeSlider(),
+                                  ReplayTourButton(role: 'customer'),
+                                ],
                               ),
-                                    onChanged: (v) => context
-                                        .read<ThemeProvider>()
-                                        .setDarkMode(v),
                             ),
                           ],
                         ),

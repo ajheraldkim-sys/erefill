@@ -239,7 +239,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
               Text(
                 '$riderCount RIDERS ONLINE',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppUi.textPrimaryOf(context),
                   letterSpacing: 0.8,
@@ -343,7 +343,7 @@ class _RiderLogisticsMapState extends State<RiderLogisticsMap> {
                                   color: (rider['is_online'] == true)
                                       ? AppColors.uiSuccess
                                       : AppUi.textSecondaryOf(context),
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
                                 ),

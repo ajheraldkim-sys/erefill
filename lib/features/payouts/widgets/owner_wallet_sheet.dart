@@ -59,9 +59,9 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppUi.textPrimary : Colors.white;
-    final cardBg = isDark ? AppUi.darkSurfaceRaised : AppUi.pageBg;
-    final borderColor = isDark ? AppUi.borderDark : AppUi.borderLight;
+    final bg = AppUi.surfaceOf(context);
+    final cardBg = AppUi.surfaceRaisedOf(context);
+    final borderColor = AppUi.borderOf(context);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.78,
@@ -71,7 +71,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
         return Container(
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppUi.radiusPill)),
+            borderRadius: AppUi.radiusSheetTop,
           ),
           child: Column(
             children: [
@@ -82,7 +82,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
+                    color: AppUi.borderOf(context),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -96,7 +96,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.brandPrimary.withValues(alpha: 0.1),
+                        color: AppUi.brandSoftOf(context),
                         borderRadius: BorderRadius.circular(AppUi.radiusCard),
                       ),
                       child: Icon(
@@ -115,14 +115,14 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : AppUi.textPrimary,
+                              color: AppUi.textPrimaryOf(context),
                             ),
                           ),
                           Text(
                             'Online payments, rider obligations & net balance',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDark ? Colors.grey[400] : AppUi.textMuted,
+                              color: AppUi.textMutedOf(context),
                             ),
                           ),
                         ],
@@ -215,14 +215,14 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : AppUi.textPrimary,
+                                    color: AppUi.textPrimaryOf(context),
                                   ),
                                 ),
                                 Text(
                                   '${_summary?.recentTransactions.length ?? 0} records',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDark ? Colors.grey[400] : AppUi.textMuted,
+                                    color: AppUi.textMutedOf(context),
                                   ),
                                 ),
                               ],
@@ -242,7 +242,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                     Icon(
                                       Icons.receipt_long_outlined,
                                       size: 40,
-                                      color: isDark ? Colors.grey[600] : Colors.grey[400],
+                                      color: AppUi.textMutedOf(context),
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
@@ -250,7 +250,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.grey[300] : AppUi.textSecondary,
+                                        color: AppUi.textSecondaryOf(context),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -258,8 +258,8 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                       'Orders paid with GCash, Maya, or Card will appear here automatically.',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark ? Colors.grey[500] : const Color(0xFF94A3B8),
+                                        fontSize: 12,
+                                        color: AppUi.textMutedOf(context),
                                       ),
                                     ),
                                   ],
@@ -310,14 +310,14 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
-                                                color: isDark ? Colors.white : AppUi.textPrimary,
+                                                color: AppUi.textPrimaryOf(context),
                                               ),
                                             ),
                                             Text(
                                               '$status • $dateStr',
                                               style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDark ? Colors.grey[400] : AppUi.textMuted,
+                                                fontSize: 12,
+                                                color: AppUi.textMutedOf(context),
                                               ),
                                             ),
                                           ],
@@ -328,7 +328,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                                         style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.teal,
+                                          color: AppColors.uiSuccess,
                                         ),
                                       ),
                                     ],
@@ -383,7 +383,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                 ),
                 child: const Text(
                   'Auto-Calculated',
-                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -403,7 +403,7 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
             'Net digital revenue after deducting rider payouts',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 11,
+              fontSize: 12,
             ),
           ),
         ],
@@ -439,9 +439,9 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.grey[400] : AppUi.textMuted,
+                    color: AppUi.textMutedOf(context),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -454,15 +454,15 @@ class _OwnerWalletSheetState extends State<OwnerWalletSheet> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : AppUi.textPrimary,
+              color: AppUi.textPrimaryOf(context),
             ),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 11,
-              color: isDark ? Colors.grey[500] : const Color(0xFF94A3B8),
+              fontSize: 12,
+              color: AppUi.textSecondaryOf(context),
             ),
           ),
         ],

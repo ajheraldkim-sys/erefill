@@ -1,0 +1,8 @@
+@startuml
+start
+:Open the application;
+:Tap Sign Up and choose the account type;
+:Input the required details;
+:Submit registration;
+stop
+@enduml

@@ -1,13 +1,18 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:erefill/core/services/payment_checkout_service.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
+import 'package:erefill/core/widgets/app_cached_image.dart';
+import 'package:erefill/core/widgets/water_type_thumb.dart';
 import 'services/checkout_order_service.dart';
 
 import '../../../core/utils/profile_query_helpers.dart';
@@ -15,12 +20,14 @@ import '../../../core/widgets/app_ui_kit.dart';
 import '../../../core/constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/map_tiles.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import 'widgets/payment_method_selector.dart';
 import 'widgets/payment_brand_mark.dart';
+import 'widgets/test_mode_label.dart';
 import 'package:erefill/core/models/cart_model.dart';
 import 'checkout_rules.dart';
+import 'widgets/tip_selector.dart';
 import '../../../core/routing/app_navigation.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../account/saved_addresses_screen.dart';
@@ -31,8 +38,10 @@ import '../../../core/services/offline_order_sync_service.dart';
 import '../../../core/services/payment_launch_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/friendly_errors.dart';
+import '../../../core/water_types.dart';
 import '../../loyalty/models/loyalty_model.dart';
 import '../../loyalty/services/loyalty_service.dart';
+import '../../../core/widgets/motion/motion.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Map<String, dynamic> station;
@@ -63,6 +72,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _selectedAddressId;
   double _deliveryFee = 20.0;
   double _deliveryDistanceKm = 1.0;
+  // Free-delivery zone of this station and the latest quote (server when
+  // online, device estimate otherwise).
+  double _freeRadiusKm = 1.0;
+  List<String> _freeBarangays = const [];
+  int? _freeMinGallons;
+  DeliveryQuote? _deliveryQuote;
+  int _quoteRequest = 0;
+  // Optional rider tip (whole pesos), 100% to the rider.
+  double _tip = 0;
   double _deliveryRatePerKm = 10.0;
   double _deliveryMinFee = 20.0;
   double _deliveryMinDistance = 1.0;
@@ -71,7 +89,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Map<String, dynamic>? _deliveryFeeConfig;
   double? _stationLat;
   double? _stationLng;
+  late Map<String, dynamic> _liveStationData =
+      Map<String, dynamic>.from(widget.station);
   RealtimeChannel? _configRealtimeChannel;
+  StreamSubscription<RealtimeEvent>? _ownerSettingsSub;
+  StreamSubscription<RealtimeEvent>? _stationProfileSub;
   Map<String, dynamic>? _platformFeeConfig;
   String? _pricingSetupError;
   String? _paymentMethodsError;
@@ -125,6 +147,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             },
           )
           .subscribe();
+
+      final ownerId = widget.station['id']?.toString() ??
+          widget.station['station_id']?.toString() ??
+          widget.station['owner_id']?.toString();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        _ownerSettingsSub = RealtimeHub.instance.listen(
+          TableWatch('owner_settings', column: 'owner_id', value: ownerId),
+          (_) {
+            if (!mounted) return;
+            _loadStationSettings();
+            _refreshStationAvailability();
+          },
+        );
+        _stationProfileSub = RealtimeHub.instance.listen(
+          TableWatch('profiles', column: 'id', value: ownerId),
+          (_) {
+            if (!mounted) return;
+            _loadStationSettings();
+            _refreshStationAvailability();
+          },
+        );
+      }
     } catch (e) {
       debugPrint('Realtime config channel subscription failed: $e');
     }
@@ -132,6 +176,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _ownerSettingsSub?.cancel();
+    _stationProfileSub?.cancel();
     final channel = _configRealtimeChannel;
     if (channel != null) {
       supabase.removeChannel(channel);
@@ -214,32 +260,95 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _loadStationSettings() async {
     try {
-      final ownerId = widget.station['id']?.toString();
+      final ownerId = widget.station['id']?.toString() ??
+          widget.station['station_id']?.toString() ??
+          widget.station['owner_id']?.toString();
       if (ownerId == null || ownerId.isEmpty) {
         throw StateError('Station ID is missing.');
       }
 
-      // Ensure station coordinates are available
-      if (_stationLat == null || _stationLng == null) {
+      // Fetch full station profile for latest branding, coordinates, and availability
+      try {
         final stationProfile = await supabase
             .from('profiles')
-            .select('latitude, longitude')
+            .select(
+              'id, station_name, full_name, complete_address, town, barangay, '
+              'latitude, longitude, lat, lng, station_photo_url, station_logo_url, '
+              'avatar_url, is_open, station_availability',
+            )
             .eq('id', ownerId)
             .maybeSingle();
-        if (stationProfile != null) {
-          _stationLat = (stationProfile['latitude'] as num?)?.toDouble();
-          _stationLng = (stationProfile['longitude'] as num?)?.toDouble();
+        if (stationProfile != null && mounted) {
+          setState(() {
+            _liveStationData = {..._liveStationData, ...stationProfile};
+            final lat = (stationProfile['latitude'] as num?)?.toDouble() ??
+                (stationProfile['lat'] as num?)?.toDouble();
+            final lng = (stationProfile['longitude'] as num?)?.toDouble() ??
+                (stationProfile['lng'] as num?)?.toDouble();
+            if (lat != null && lat != 0) _stationLat = lat;
+            if (lng != null && lng != 0) _stationLng = lng;
+            if ((_stationLat == null || _stationLat == 0) &&
+                stationProfile['town'] != null) {
+              final center =
+                  AppConstants.municipalityCenters[stationProfile['town']];
+              if (center != null) {
+                _stationLat = center.latitude;
+                _stationLng = center.longitude;
+              }
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading station profile: $e');
+      }
+
+      // If station coordinates are still missing, fallback to Cantilan center
+      final defaultCenter = AppConstants.municipalityCenters['Cantilan'] ??
+          AppConstants.municipalityCenters.values.first;
+      _stationLat ??= defaultCenter.latitude;
+      _stationLng ??= defaultCenter.longitude;
+
+      // 1. Try RPC get_delivery_fee_config first
+      Map<String, dynamic>? cfg;
+      try {
+        final res = await supabase.rpc('get_delivery_fee_config');
+        if (res is Map) {
+          cfg = Map<String, dynamic>.from(res);
+        }
+      } catch (e) {
+        debugPrint(
+          'get_delivery_fee_config RPC unavailable, checking system_config: $e',
+        );
+      }
+
+      // 2. If RPC is missing/fails, query public.system_config table directly
+      if (cfg == null) {
+        try {
+          final row = await supabase
+              .from('system_config')
+              .select('value')
+              .eq('key', 'delivery_fee_config')
+              .maybeSingle();
+          if (row != null && row['value'] is Map) {
+            cfg = Map<String, dynamic>.from(row['value'] as Map);
+          }
+        } catch (e) {
+          debugPrint('system_config table check error: $e');
         }
       }
 
-      final cfg = await supabase.rpc('get_delivery_fee_config');
-      if (cfg is! Map) {
-        throw StateError('Delivery fee configuration was invalid.');
-      }
+      // 3. Standard fallback matching centralized delivery fee rules
+      cfg ??= const <String, dynamic>{
+        'enabled': true,
+        'rate_per_km': 10.0,
+        'minimum_fee': 20.0,
+        'min_billable_distance_km': 1.0,
+        'rounding_rule': 'exact',
+      };
 
       if (mounted) {
         setState(() {
-          _deliveryFeeConfig = Map<String, dynamic>.from(cfg);
+          _deliveryFeeConfig = Map<String, dynamic>.from(cfg!);
           _deliveryFeeEnabled = _deliveryFeeConfig?['enabled'] != false;
           _deliveryRatePerKm =
               (_deliveryFeeConfig?['rate_per_km'] as num?)?.toDouble() ?? 10.0;
@@ -252,6 +361,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _deliveryRoundingRule =
               (_deliveryFeeConfig?['rounding_rule'] ?? 'exact').toString();
           _stationSettingsLoaded = true;
+          _pricingSetupError = null;
         });
         _recalculateDeliveryFee();
 
@@ -261,6 +371,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               .select('opening_time, closing_time, operating_days')
               .eq('owner_id', ownerId)
               .maybeSingle();
+          // Free-delivery zone (separate read so older schemas still load hours).
+          try {
+            final zone = await supabase
+                .from('owner_settings')
+                .select(
+                  'free_delivery_radius_km, free_delivery_barangays, free_delivery_min_gallons',
+                )
+                .eq('owner_id', ownerId)
+                .maybeSingle();
+            if (zone != null && mounted) {
+              _freeRadiusKm =
+                  (zone['free_delivery_radius_km'] as num?)?.toDouble() ?? 1.0;
+              _freeBarangays = [
+                for (final b in (zone['free_delivery_barangays'] as List? ?? []))
+                  b.toString(),
+              ];
+              _freeMinGallons =
+                  (zone['free_delivery_min_gallons'] as num?)?.toInt();
+              _recalculateDeliveryFee();
+            }
+          } catch (_) {}
           if (sett != null && mounted) {
             _stationOpeningTime = sett['opening_time']?.toString();
             _stationClosingTime = sett['closing_time']?.toString();
@@ -339,7 +470,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         (widget.station['longitude'] as num?)?.toDouble() ??
         (widget.station['lng'] as num?)?.toDouble();
 
-    double distance = _deliveryDistanceKm;
+    double? straightKm;
     if (customerLat != null &&
         customerLng != null &&
         stationLat != null &&
@@ -348,19 +479,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         customerLng != 0 &&
         stationLat != 0 &&
         stationLng != 0) {
-      final meters = Geolocator.distanceBetween(
-        stationLat,
-        stationLng,
-        customerLat,
-        customerLng,
-      );
-      distance = meters / 1000.0;
-      distance = (distance * 100).roundToDouble() / 100.0;
-      if (distance < 0.1) distance = 0.1;
+      straightKm = Geolocator.distanceBetween(
+            stationLat,
+            stationLng,
+            customerLat,
+            customerLng,
+          ) /
+          1000.0;
     }
 
-    final calculated = CheckoutRules.calculateDeliveryFee(
-      distanceKm: distance,
+    final cart = context.read<CartProvider>();
+    final barangay = _customerProfile?['barangay']?.toString();
+    final local = CheckoutRules.quoteDelivery(
+      straightLineKm: straightKm,
+      freeRadiusKm: _freeRadiusKm,
+      freeBarangays: _freeBarangays,
+      customerBarangay: barangay,
+      freeMinGallons: _freeMinGallons,
+      gallons: cart.waterGallons,
       enabled: _deliveryFeeEnabled,
       ratePerKm: _deliveryRatePerKm,
       minimumFee: _deliveryMinFee,
@@ -370,21 +506,84 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (mounted) {
       setState(() {
-        _deliveryDistanceKm = distance;
-        _deliveryFee = calculated;
+        _deliveryQuote = local;
+        _deliveryDistanceKm = local.distanceKm ?? _deliveryDistanceKm;
+        _deliveryFee = local.fee;
       });
+    }
+    _refreshServerQuote(customerLat, customerLng, barangay, cart.waterGallons);
+  }
+
+  /// Replaces the device estimate with the server quote, which is what the
+  /// order will actually be charged.
+  Future<void> _refreshServerQuote(
+    double? lat,
+    double? lng,
+    String? barangay,
+    int gallons,
+  ) async {
+    final ownerId = widget.station['id']?.toString();
+    if (ownerId == null) return;
+    final request = ++_quoteRequest;
+    try {
+      final res = await supabase.rpc(
+        'compute_delivery_quote',
+        params: {
+          'p_station_id': ownerId,
+          'p_lat': lat,
+          'p_lng': lng,
+          'p_barangay': barangay,
+          'p_gallons': gallons,
+        },
+      );
+      if (!mounted || request != _quoteRequest || res is! Map) return;
+      final q = DeliveryQuote.fromServer(Map<String, dynamic>.from(res));
+      setState(() {
+        _deliveryQuote = q;
+        _deliveryFee = q.fee;
+        if (q.distanceKm != null) _deliveryDistanceKm = q.distanceKm!;
+      });
+    } catch (e) {
+      debugPrint('compute_delivery_quote unavailable, using estimate: $e');
     }
   }
 
   Future<void> _loadPlatformFeeConfig() async {
     try {
-      final cfg = await supabase.rpc('get_platform_fee_config');
-      if (cfg is! Map) {
-        throw StateError('Platform fee configuration response was invalid.');
+      Map<String, dynamic>? cfg;
+      try {
+        final res = await supabase.rpc('get_platform_fee_config');
+        if (res is Map) {
+          cfg = Map<String, dynamic>.from(res);
+        }
+      } catch (e) {
+        debugPrint(
+          'get_platform_fee_config RPC unavailable, checking system_config: $e',
+        );
       }
+
+      if (cfg == null) {
+        try {
+          final row = await supabase
+              .from('system_config')
+              .select('value')
+              .eq('key', 'platform_fee')
+              .maybeSingle();
+          if (row != null && row['value'] is Map) {
+            cfg = Map<String, dynamic>.from(row['value'] as Map);
+          }
+        } catch (_) {}
+      }
+
+      cfg ??= const <String, dynamic>{
+        'enabled': true,
+        'percent': 1.0,
+        'fixed': 0.0,
+      };
+
       if (!mounted) return;
       setState(() {
-        _platformFeeConfig = Map<String, dynamic>.from(cfg);
+        _platformFeeConfig = Map<String, dynamic>.from(cfg!);
         _platformFeeConfigLoaded = true;
       });
     } catch (e) {
@@ -543,7 +742,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           subtitle: Text(
                             v.description,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppUi.textMutedOf(context),
                             ),
                           ),
@@ -815,10 +1014,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : 0.0;
 
     var totalAmount = CheckoutRules.calculateOrderTotal(
-      subtotal: cart.totalAmount,
+      subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
       deliveryFee: _deliveryFee,
-      platformFee: _platformFeeFor(cart.totalAmount),
+      platformFee: _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount)),
       voucherDiscount: voucherDiscount,
+      tip: _tip,
     );
 
     final paymentMethod = _paymentMethod;
@@ -837,7 +1037,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             quantity: item.quantity,
           ),
       ],
-      subtotal: cart.totalAmount,
+      subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
       deliveryFee: _deliveryFee,
       deliveryDistanceKm: _deliveryDistanceKm,
       deliveryRatePerKm: _deliveryRatePerKm,
@@ -847,6 +1047,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       scheduleForNextOpen: _isOutsideHours && _scheduleForNextOpen,
       stationOpeningTime: _stationOpeningTime,
       userNotes: _notesController.text,
+      tipAmount: _tip,
     );
     final itemsData = request.itemsData;
     final completeAddress = request.address;
@@ -872,10 +1073,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (CheckoutRules.isOnlinePayment(paymentMethod)) {
         try {
-          final checkoutUrl = await _paymentService.createCheckout(
+          final session = await _paymentService.createCheckoutSession(
             orderId: orderId,
             paymentMethod: paymentMethod,
           );
+          final checkoutUrl = session.url;
           if (!mounted) return;
           final launched = await PaymentLaunchService.launchCheckoutUrl(
             checkoutUrl,
@@ -899,6 +1101,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             totalAmount: totalAmount,
             paymentMethod: paymentMethod,
             cart: cart,
+            livemode: session.livemode,
           );
           return;
         } catch (e) {
@@ -975,9 +1178,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             stationName: stationName,
             items: itemsData,
             totalAmount: totalAmount,
-            subtotal: cart.totalAmount,
+            subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
             deliveryFee: _deliveryFee,
-            platformFee: _platformFeeFor(cart.totalAmount),
+            platformFee: _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount)),
             deliveryAddress: completeAddress,
             paymentMethod: selectedPayment,
             idempotencyKey: _orderAttemptKey,
@@ -1007,7 +1210,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               'id': queuedId,
               'station_name': stationName,
               'total_amount': totalAmount,
-              'subtotal': cart.totalAmount,
+              'subtotal': CheckoutRules.roundSubtotal(cart.totalAmount),
               'delivery_fee': _deliveryFee,
               'payment_method': paymentMethod,
               'status': 'pending_sync',
@@ -1037,6 +1240,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required double totalAmount,
     required String paymentMethod,
     required CartProvider cart,
+    bool livemode = false,
   }) async {
     if (!mounted) return;
 
@@ -1053,6 +1257,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           stationName: stationName,
           totalAmount: totalAmount,
           paymentMethod: paymentMethod,
+          livemode: livemode,
           onPaymentSuccess: (orderRecord) {
             Navigator.of(bottomSheetContext).pop();
             if (mounted) {
@@ -1153,10 +1358,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required CartProvider cart,
   }) async {
     try {
-      final checkoutUrl = await _paymentService.createCheckout(
+      final session = await _paymentService.createCheckoutSession(
         orderId: orderId,
         paymentMethod: paymentMethod,
       );
+      final checkoutUrl = session.url;
       if (!mounted) return;
       final launched = await PaymentLaunchService.launchCheckoutUrl(
         checkoutUrl,
@@ -1178,6 +1384,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         totalAmount: totalAmount,
         paymentMethod: paymentMethod,
         cart: cart,
+        livemode: session.livemode,
       );
     } catch (error) {
       if (!mounted) return;
@@ -1198,17 +1405,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final platformFee = _platformFeeFor(cart.totalAmount);
+    final platformFee = _platformFeeFor(CheckoutRules.roundSubtotal(cart.totalAmount));
     final voucherDiscount = _appliedVoucher != null
         ? (_appliedVoucher!.isDeliveryDiscount
               ? _deliveryFee.clamp(0.0, _appliedVoucher!.discountAmount)
               : _appliedVoucher!.discountAmount)
         : 0.0;
     final totalWithDelivery = CheckoutRules.calculateOrderTotal(
-      subtotal: cart.totalAmount,
+      subtotal: CheckoutRules.roundSubtotal(cart.totalAmount),
       deliveryFee: _deliveryFee,
       platformFee: platformFee,
       voucherDiscount: voucherDiscount,
+      tip: _tip,
     );
     final textTheme = Theme.of(context).textTheme;
     final profileReady = CheckoutRules.isDeliveryProfileReady(_customerProfile);
@@ -1292,7 +1500,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       backgroundColor: AppUi.pageBgOf(context),
       appBar: _buildCustomHeader(context),
       body: _isBootstrapping
-          ? const AxoLoader(message: 'Loading checkout...')
+          ? const LoadingStateCard(message: 'Loading checkout...')
           : SingleChildScrollView(
               physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -1651,6 +1859,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     String stationName,
     CartProvider cart,
   ) {
+    final resolvedStationName =
+        _liveStationData['station_name']?.toString() ??
+        _liveStationData['name']?.toString() ??
+        widget.station['station_name']?.toString() ??
+        stationName;
+    final stationLogoUrl = (_liveStationData['station_logo_url'] ??
+            _liveStationData['avatar_url'] ??
+            _liveStationData['station_photo_url'] ??
+            widget.station['station_logo_url'] ??
+            widget.station['avatar_url'] ??
+            widget.station['station_photo_url'])
+        ?.toString()
+        .trim();
+    final hasStationLogo =
+        stationLogoUrl != null && stationLogoUrl.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: AppUi.surfaceOf(context),
@@ -1665,22 +1889,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: AppUi.brandSoftOf(context),
                   borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: Icon(
-                  Icons.water_drop_rounded,
-                  color: AppUi.brandOf(context),
-                  size: 16,
-                ),
+                child: hasStationLogo
+                    ? ClipRRect(
+                        borderRadius:
+                            BorderRadius.circular(AppUi.radiusControl),
+                        child: AppCachedImage(
+                          imageUrl: stationLogoUrl,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 96,
+                          memCacheHeight: 96,
+                          fallbackIcon: Icons.water_drop_rounded,
+                        ),
+                      )
+                    : Icon(
+                        Icons.water_drop_rounded,
+                        color: AppUi.brandOf(context),
+                        size: 18,
+                      ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  stationName,
+                  resolvedStationName,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -1696,6 +1934,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           // Items list
           ...cart.items.values.map((item) {
+            final itemPhotoUrl = item.imageUrl?.trim();
+            final hasCustomPhoto =
+                itemPhotoUrl != null && itemPhotoUrl.isNotEmpty;
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: Row(
@@ -1712,27 +1954,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           borderRadius: BorderRadius.circular(AppUi.radiusCard),
                         ),
                         alignment: Alignment.center,
-                        child:
-                            item.imageUrl != null && item.imageUrl!.isNotEmpty
+                        child: hasCustomPhoto
                             ? ClipRRect(
-                                borderRadius: BorderRadius.circular(AppUi.radiusCard),
-                                child: CachedNetworkImage(
-                                  imageUrl: item.imageUrl!,
+                                borderRadius:
+                                    BorderRadius.circular(AppUi.radiusCard),
+                                child: AppCachedImage(
+                                  imageUrl: itemPhotoUrl,
                                   width: 52,
                                   height: 52,
                                   fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      Icon(
-                                        Icons.water_drop_outlined,
-                                        color: AppUi.brandOf(context),
-                                        size: 26,
-                                      ),
+                                  memCacheWidth: 150,
+                                  memCacheHeight: 150,
+                                  fallbackIcon: Icons.water_drop_outlined,
                                 ),
                               )
-                            : Icon(
-                                Icons.water_drop_rounded,
-                                color: AppUi.brandOf(context),
-                                size: 26,
+                            : WaterTypeThumb(
+                                typeName: item.name,
+                                size: 52,
+                                radius: AppUi.radiusCard,
+                                iconSize: 26,
                               ),
                       ),
                       Positioned(
@@ -1752,7 +1992,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             '${item.quantity}x',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1932,10 +2172,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildContainerExchangeCard(BuildContext context, CartProvider cart) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF161F30) : Colors.white;
-    final borderColor = isDark
-        ? const Color(0xFF1E2D4A)
-        : AppUi.borderLight;
+    final cardBg = AppUi.surfaceOf(context);
+    final borderColor = AppUi.borderOf(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -1977,7 +2215,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     Text(
                       'Do you have empty bottles to swap?',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         color: isDark
                             ? Colors.grey[400]
                             : AppUi.textMutedOf(context),
@@ -2053,7 +2291,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           'Hand over your empty gallon, no deposit',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: isDark
                                 ? Colors.grey[400]
                                 : AppUi.textMutedOf(context),
@@ -2127,7 +2365,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Text(
                           'Buy or deposit new container',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: isDark
                                 ? Colors.grey[400]
                                 : AppUi.textMutedOf(context),
@@ -2181,9 +2419,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 // Left soft-green badge matching reference screenshot
                 Container(
                   width: 64,
-                  color: isDark
-                      ? const Color(0xFF132D21)
-                      : const Color(0xFFE8F5E9),
+                  color: StatusToneStyle.of(
+                    StatusTone.success,
+                    isDark: isDark,
+                  ).background,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2205,7 +2444,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const Text(
                         'Voucher',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.uiSuccess,
                         ),
@@ -2292,13 +2531,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2E5E3B),
-                              borderRadius: BorderRadius.circular(AppUi.radiusSheet),
+                              color: AppUi.brandOf(context),
+                              borderRadius: AppUi.controlRadius,
                             ),
-                            child: const Text(
+                            child: Text(
                               'Select',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: AppUi.onBrandOf(context),
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2412,7 +2651,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: Text(
                           'Secure checkout powered by PayMongo Philippines',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppUi.brandOf(context),
                           ),
@@ -2450,7 +2689,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _summaryRow(
             context,
             'Subtotal (${cart.totalItems} item${cart.totalItems == 1 ? '' : 's'})',
-            formatPeso(cart.totalAmount),
+            formatPeso(CheckoutRules.roundSubtotal(cart.totalAmount)),
           ),
           const SizedBox(height: AppUi.spacingSm),
           _feeRow(
@@ -2461,6 +2700,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             value: isFreeDelivery ? 'Free' : formatPeso(_deliveryFee),
             valueColor: isFreeDelivery ? AppColors.uiSuccess : null,
           ),
+          if (_deliveryQuote != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                _deliveryQuote!.isEstimate
+                    ? '${_deliveryQuote!.label} (estimate)'
+                    : _deliveryQuote!.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _deliveryQuote!.isFree
+                      ? AppColors.uiSuccess
+                      : AppUi.textSecondaryOf(context),
+                ),
+              ),
+            ),
           TextButton.icon(
             onPressed: () => setState(
               () => _isFeeBreakdownExpanded = !_isFeeBreakdownExpanded,
@@ -2537,6 +2790,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               valueColor: AppColors.uiSuccess,
             ),
           ],
+          if (_tip > 0) ...[
+            const SizedBox(height: AppUi.spacingSm),
+            _summaryRow(context, 'Rider tip', formatPeso(_tip)),
+          ],
+          const SizedBox(height: AppUi.spacingMd),
+          TipSelector(
+            value: _tip,
+            onChanged: (v) => setState(() => _tip = v),
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: AppUi.spacingMd),
             child: Divider(height: 1),
@@ -2660,18 +2922,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return 'Home';
   }
 
-  String _deriveContainerOrRefillType(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('slim')) return '5-Gallon Slim Refill';
-    if (lower.contains('round')) return '5-Gallon Round Refill';
-    if (lower.contains('gallon') || lower.contains('gal')) {
-      return '5-Gallon Refill';
-    }
-    if (lower.contains('alkaline')) return 'Alkaline Refill';
-    if (lower.contains('mineral')) return 'Mineral Refill';
-    if (lower.contains('purified')) return 'Purified Refill';
-    return 'Water Refill';
-  }
+  String _deriveContainerOrRefillType(String name) =>
+      '${WaterTypes.byName(name).shortName} refill · per gallon';
 
   Widget _paymentBrandBadge(String method) {
     return PaymentBrandMark(method: method, width: 58, height: 36);
@@ -2682,6 +2934,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'gcash' => 'Fast e-wallet payment',
       'maya' => 'Fast e-wallet payment',
       'card' => 'Debit or credit card',
+      'qrph' => 'Scan with any bank or e-wallet app',
       _ => 'Pay in cash upon arrival',
     };
   }
@@ -3098,8 +3351,8 @@ class _CheckoutBottomBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    formatPeso(total),
+                  AnimatedPeso(
+                    total,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -3111,33 +3364,46 @@ class _CheckoutBottomBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            SizedBox(
-              height: 52,
-              child: FilledButton(
-                onPressed: canSubmit ? onConfirm : null,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  minimumSize: const Size(0, 52),
-                ),
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+            TapScale(
+              enabled: canSubmit,
+              child: SizedBox(
+                height: 52,
+                child: FilledButton(
+                  onPressed: canSubmit
+                      ? () {
+                          HapticFeedback.mediumImpact();
+                          onConfirm();
+                        }
+                      : null,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    minimumSize: const Size(0, 52),
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: AppUi.motion(context, AppUi.motionFast),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            key: ValueKey('submitting'),
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Place order',
+                            key: ValueKey('label'),
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
                           ),
-                        ),
-                      )
-                    : const Text(
-                        'Checkout',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -3153,6 +3419,7 @@ class _PaymentVerificationModal extends StatefulWidget {
   final String stationName;
   final double totalAmount;
   final String paymentMethod;
+  final bool livemode;
   final void Function(Map<String, dynamic> orderRecord) onPaymentSuccess;
   final VoidCallback onClose;
 
@@ -3162,6 +3429,7 @@ class _PaymentVerificationModal extends StatefulWidget {
     required this.stationName,
     required this.totalAmount,
     required this.paymentMethod,
+    this.livemode = false,
     required this.onPaymentSuccess,
     required this.onClose,
   });
@@ -3438,6 +3706,10 @@ class _PaymentVerificationModalState extends State<_PaymentVerificationModal> {
               ),
             ],
           ),
+          if (!widget.livemode) ...[
+            const SizedBox(height: 16),
+            TestModeLabel(qrph: widget.paymentMethod == 'qrph'),
+          ],
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),

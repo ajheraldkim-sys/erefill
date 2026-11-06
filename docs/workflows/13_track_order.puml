@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Orders;
+:Select an active order;
+:View status and rider location;
+stop
+@enduml

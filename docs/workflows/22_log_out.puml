@@ -1,0 +1,7 @@
+@startuml
+start
+:Open Account;
+:Tap Log Out;
+:Return to the login screen;
+stop
+@enduml

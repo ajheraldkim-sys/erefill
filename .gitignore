@@ -56,4 +56,17 @@ supabase/.temp/
 
 # Database dumps (contain auth data / PII) - never commit
 supabase_*_backup.sql
+supabase/backups/
 *.dump
+
+# Multi-IDE AI folders
+.claude/
+.codebuddy/
+.codex/
+.continue/
+.kiro/
+.opencode/
+.qoder/
+.roo/
+.trae/
+.windsurf/

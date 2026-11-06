@@ -13,7 +13,7 @@ import '../../../core/utils/station_query_helpers.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/experience_widgets.dart';
 import '../../../core/widgets/refill_components.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -25,12 +25,18 @@ import '../../../core/services/local_data_cache.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/widgets/app_cached_image.dart';
 import '../../../core/utils/app_haptics.dart';
+import '../../../core/utils/poll_backoff.dart';
 import '../../../core/widgets/live_order_progress_tracker.dart';
 import '../../../core/widgets/offline_sync_status_pill.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 import 'package:erefill/core/theme/app_colors.dart';
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
+import 'package:erefill/core/utils/station_ranking.dart';
+import 'widgets/refill_reminder_banner.dart';
+import 'package:erefill/features/assistant/order_assistant.dart';
 class CustomerHomeTab extends StatefulWidget {
   final VoidCallback? onOpenStations;
 
@@ -43,6 +49,7 @@ class CustomerHomeTab extends StatefulWidget {
 class _CustomerHomeTabState extends State<CustomerHomeTab>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   final supabase = Supabase.instance.client;
+  final _listEntrance = ListEntrance();
   final PageController _homeBannerController = PageController();
 
   String _userFirstName = 'there';
@@ -56,17 +63,25 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
   Map<String, dynamic>? _lastCompletedOrder;
   bool _isProcessingQuickOrder = false;
   bool _quickStationIsLastOrder = false;
+  // Server-computed refill rhythm for the 'Time for a refill?' banner.
+  Map<String, dynamic>? _refillRhythm;
   bool _isLoading = true;
   int _homeBannerIndex = 0;
   int _homeCacheGeneration = 0;
   int _homeFetchGeneration = 0;
   Timer? _homeBannerTimer;
   Timer? _activeOrderPollTimer;
+  final _activeOrderPoll = PollBackoff(
+    base: const Duration(seconds: 15),
+    max: const Duration(minutes: 2),
+  );
   String _selectedCategory = 'All';
 
-  RealtimeChannel? _ordersChannel;
-  RealtimeChannel? _favoritesChannel;
-  RealtimeChannel? _stationsChannel;
+  StreamSubscription? _ordersSub;
+  StreamSubscription? _favoritesSub;
+  StreamSubscription? _profileSub;
+  StreamSubscription? _ownerSettingsSub;
+  Timer? _fetchDebounceTimer;
 
   @override
   bool get wantKeepAlive => true;
@@ -139,13 +154,47 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
+  /// Safety net for missed realtime order events. It re-reads only the active
+  /// order (the full home fetch is 7 queries, 3 of them whole tables) and
+  /// slows down while requests fail.
   void _startActiveOrderPollTimer() {
     _activeOrderPollTimer?.cancel();
-    _activeOrderPollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-      if (mounted && _activeOrder != null) {
-        _fetchData();
+    _activeOrderPollTimer = Timer(_activeOrderPoll.current, () async {
+      if (!mounted) return;
+      if (_activeOrder != null) await _refreshActiveOrder();
+      // Paused or disposed while the request ran: don't restart.
+      if (mounted && _activeOrderPollTimer != null) {
+        _startActiveOrderPollTimer();
       }
     });
+  }
+
+  Future<void> _refreshActiveOrder() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final rows = await supabase
+          .from('orders')
+          .select('*, profiles:owner_id(station_name)')
+          .eq('customer_id', userId)
+          .not('status', 'in', '(delivered,cancelled)')
+          .order('created_at', ascending: false)
+          .limit(1);
+      _activeOrderPoll.succeeded();
+      if (!mounted || supabase.auth.currentUser?.id != userId) return;
+      final next = rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
+      if (next == null ||
+          next['id'] != _activeOrder?['id'] ||
+          next['status'] != _activeOrder?['status']) {
+        // Finished or moved on: quick reorder and the station cards follow it.
+        _debouncedFetchData();
+      } else {
+        setState(() => _activeOrder = next);
+      }
+    } catch (e) {
+      _activeOrderPoll.failed();
+      debugPrint('Active order poll failed: $e');
+    }
   }
 
   Future<void> _loadCachedHome() async {
@@ -206,10 +255,12 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     WidgetsBinding.instance.removeObserver(this);
     _homeBannerTimer?.cancel();
     _activeOrderPollTimer?.cancel();
+    _fetchDebounceTimer?.cancel();
     _homeBannerController.dispose();
-    if (_ordersChannel != null) supabase.removeChannel(_ordersChannel!);
-    if (_favoritesChannel != null) supabase.removeChannel(_favoritesChannel!);
-    if (_stationsChannel != null) supabase.removeChannel(_stationsChannel!);
+    _ordersSub?.cancel();
+    _favoritesSub?.cancel();
+    _profileSub?.cancel();
+    _ownerSettingsSub?.cancel();
     super.dispose();
   }
 
@@ -227,7 +278,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
 
   Future<dynamic> _safeHomeQuery(Future<dynamic> request, String label) async {
     try {
-      return await request;
+      return await request.timeout(const Duration(seconds: 12));
     } catch (error) {
       // A nonessential home query (for example, prices or favorites) should
       // not hide nearby stations that are otherwise available to the customer.
@@ -236,7 +287,19 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
+  Future<void> _loadRefillRhythm() async {
+    try {
+      final r = await supabase.rpc('customer_refill_rhythm');
+      if (mounted && r is Map) {
+        setState(() => _refillRhythm = Map<String, dynamic>.from(r));
+      }
+    } catch (_) {
+      // Older database without the RPC: no banner.
+    }
+  }
+
   Future<void> _fetchData() async {
+    unawaited(_loadRefillRhythm());
     final user = supabase.auth.currentUser;
     if (user == null) {
       if (mounted) setState(() => _isLoading = false);
@@ -326,36 +389,19 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       );
 
       final ownerRows = batchResults[2] as List? ?? const [];
+      // Each station sells one water type; its product row is the fallback
+      // when the profile query didn't return primary_water_type.
       final productRows = batchResults[6] as List? ?? const [];
-      final Map<String, Set<String>> stationWaterTypes = {};
+      final Map<String, String> productWaterTypes = {};
       for (final p in productRows) {
-        if (p is Map) {
+        if (p is Map &&
+            !OrderProductHelpers.isNonWaterProduct(
+              Map<String, dynamic>.from(p),
+            )) {
           final ownerId = p['owner_id']?.toString();
-          if (ownerId != null && ownerId.isNotEmpty) {
-            final types = stationWaterTypes.putIfAbsent(ownerId, () => <String>{});
-            final cat = p['category']?.toString().trim();
-            final name = p['name']?.toString().trim();
-            if (cat != null && cat.isNotEmpty) {
-              types.add(cat);
-              final lowerCat = cat.toLowerCase();
-              if (lowerCat.contains('container') ||
-                  lowerCat.contains('accessor') ||
-                  lowerCat == 'products') {
-                types.add('Accessories');
-              }
-            }
-            if (name != null) {
-              final lower = name.toLowerCase();
-              if (lower.contains('purified')) types.add('Purified');
-              if (lower.contains('alkaline')) types.add('Alkaline');
-              if (lower.contains('mineral')) types.add('Mineral');
-              if (lower.contains('container') ||
-                  lower.contains('bottle') ||
-                  lower.contains('pump') ||
-                  lower.contains('cap')) {
-                types.add('Accessories');
-              }
-            }
+          final label = (p['category'] ?? p['name'])?.toString().trim();
+          if (ownerId != null && label != null && label.isNotEmpty) {
+            productWaterTypes.putIfAbsent(ownerId, () => label);
           }
         }
       }
@@ -366,68 +412,16 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           ownerPrices: ownerPrices,
         );
         final sId = s['id']?.toString();
-        final types = Set<String>.from(stationWaterTypes[sId] ?? const <String>{});
-
-        // Also check cached station bundle in StationDataCache
-        final cached = StationDataCache.instance.get(sId);
-        if (cached != null) {
-          if (cached.waterType != null && cached.waterType!.isNotEmpty) {
-            types.add(cached.waterType!);
-          }
-          for (final prod in cached.products) {
-            if (prod is Map) {
-              final c = prod['category']?.toString();
-              final n = prod['name']?.toString();
-              if (c != null && c.isNotEmpty) {
-                types.add(c);
-                final lowerCat = c.toLowerCase();
-                if (lowerCat.contains('container') ||
-                    lowerCat.contains('accessor') ||
-                    lowerCat == 'products') {
-                  types.add('Accessories');
-                }
-              }
-              if (n != null) {
-                final lower = n.toLowerCase();
-                if (lower.contains('purified')) types.add('Purified');
-                if (lower.contains('alkaline')) types.add('Alkaline');
-                if (lower.contains('mineral')) types.add('Mineral');
-                if (lower.contains('container') ||
-                    lower.contains('bottle') ||
-                    lower.contains('pump') ||
-                    lower.contains('cap')) {
-                  types.add('Accessories');
-                }
-              }
-            }
-          }
-        }
-
-        // Profile primary_water_type
         final primary = s['primary_water_type']?.toString().trim();
-        if (primary != null && primary.isNotEmpty) {
-          types.add(primary);
-          final lower = primary.toLowerCase();
-          if (lower.contains('purified')) types.add('Purified');
-          if (lower.contains('alkaline')) types.add('Alkaline');
-          if (lower.contains('mineral')) types.add('Mineral');
-        }
+        final source = (primary != null && primary.isNotEmpty)
+            ? primary
+            : productWaterTypes[sId] ??
+                  StationDataCache.instance.get(sId)?.waterType;
 
-        // Station name keywords (e.g. "Water Kaw Alkaline Station")
-        final sName = (s['station_name'] ?? s['full_name'] ?? '').toString().toLowerCase();
-        if (sName.contains('purified')) types.add('Purified');
-        if (sName.contains('alkaline')) types.add('Alkaline');
-        if (sName.contains('mineral')) types.add('Mineral');
-
-        // Refill stations by default provide Purified if not specified
-        if (types.isEmpty) {
-          types.add('Purified');
-        }
-
-        // Home snapshots are persisted with jsonEncode. Keep the collection
-        // JSON-safe while retaining the Set's de-duplication and insertion
-        // order for category filtering and display after a cache reload.
-        s['available_water_types'] = types.toList(growable: false);
+        // Home snapshots are persisted with jsonEncode, so keep this a list.
+        s['available_water_types'] = [
+          WaterTypes.byName(source).shortName,
+        ];
         return s;
       }
 
@@ -448,8 +442,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         if (inTown.isNotEmpty) {
           stations = StationQueryHelpers.withAvailabilityAll(inTown)
               .map(enrichStation)
-              .take(6)
               .toList();
+          stations = StationRanking.rank(stations).take(6).toList();
         }
       }
 
@@ -460,8 +454,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   List<Map<String, dynamic>>.from(ownerRows),
                 )
                 .map(enrichStation)
-                .take(6)
                 .toList();
+        stations = StationRanking.rank(stations).take(6).toList();
       }
 
       // Map favorites from batch
@@ -574,53 +568,34 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     }
   }
 
+  void _debouncedFetchData() {
+    _fetchDebounceTimer?.cancel();
+    _fetchDebounceTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) _fetchData();
+    });
+  }
+
   void _subscribeToOrders() {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    if (_ordersChannel != null) {
-      supabase.removeChannel(_ordersChannel!);
-      _ordersChannel = null;
-    }
+    _ordersSub?.cancel();
+    _ordersSub = RealtimeHub.instance.listen(
+      TableWatch('orders', column: 'customer_id', value: userId),
+      (_) => _debouncedFetchData(),
+    );
 
-    _ordersChannel = supabase
-        .channel('home:updates:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'customer_id',
-            value: userId,
-          ),
-          callback: (_) => _fetchData(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'profiles',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: userId,
-          ),
-          callback: (_) => _handleCustomerProfileChange(userId),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'owner_settings',
-          callback: (_) => _fetchData(),
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) _subscribeToOrders();
-            });
-          }
-        });
+    _profileSub?.cancel();
+    _profileSub = RealtimeHub.instance.listen(
+      TableWatch('profiles', column: 'id', value: userId),
+      (_) => _handleCustomerProfileChange(userId),
+    );
+
+    _ownerSettingsSub?.cancel();
+    _ownerSettingsSub = RealtimeHub.instance.listen(
+      const TableWatch('owner_settings'),
+      (_) => _debouncedFetchData(),
+    );
   }
 
   Future<void> _handleCustomerProfileChange(String userId) async {
@@ -666,35 +641,15 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    _favoritesChannel = supabase
-        .channel('home:favorites:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'favorites',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (_) => _refreshFavoriteStations(userId),
-        )
-        .subscribe();
+    _favoritesSub?.cancel();
+    _favoritesSub = RealtimeHub.instance.listen(
+      TableWatch('favorites', column: 'user_id', value: userId),
+      (_) => _refreshFavoriteStations(userId),
+    );
   }
 
   void _subscribeToStations() {
-    _stationsChannel = supabase
-        .channel('home:station-updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'profiles',
-          callback: (payload) {
-            final record = payload.newRecord;
-            if (record['role']?.toString() == 'owner') _fetchData();
-          },
-        )
-        .subscribe();
+    // Shared owner_settings watch in _subscribeToOrders already captures station pricing & availability changes.
   }
 
   Future<void> _refreshFavoriteStations(String userId) async {
@@ -898,7 +853,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.8,
                                 ),
@@ -1075,7 +1030,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         for (final raw in validItems) {
           final productId = raw['product_id'].toString();
           final productName =
-              (raw['product_name'] ?? 'Purified Water Refill').toString();
+              (raw['product_name'] ?? 'Water refill').toString();
           final price = (raw['price_at_purchase'] as num).toDouble();
           final qty = ((raw['quantity'] as num?) ?? 1).toInt();
 
@@ -1096,11 +1051,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
               .select('*')
               .eq('owner_id', stationId)
               .eq('is_available', true)
-              .order('price', ascending: true)
-              .limit(1);
-          if (prods.isNotEmpty) {
-            defaultProduct = prods.first;
-          }
+              .order('created_at', ascending: true);
+          defaultProduct = OrderProductHelpers.defaultFromList(prods);
         } catch (_) {}
 
         final prodId = defaultProduct?['id']?.toString();
@@ -1186,27 +1138,24 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final cat = _selectedCategory.toLowerCase();
       base = _stations.where((s) {
         final types = s['available_water_types'];
-        if (types is Set<String>) {
-          if (types.any((t) => t.toLowerCase() == cat || t.toLowerCase().contains(cat))) {
-            return true;
-          }
-        } else if (types is Iterable) {
-          if (types.any((t) => t.toString().toLowerCase() == cat || t.toString().toLowerCase().contains(cat))) {
-            return true;
-          }
+        if (types is Iterable &&
+            types.any((t) => t.toString().toLowerCase() == cat)) {
+          return true;
         }
-
-        final primaryType = (s['primary_water_type'] ?? '').toString().toLowerCase();
-        if (primaryType.contains(cat)) return true;
-
-        final name = (s['station_name'] ?? s['full_name'] ?? '').toString().toLowerCase();
-        if (name.contains(cat)) return true;
-
-        return false;
+        return WaterTypes.byName(
+              s['primary_water_type']?.toString(),
+            ).shortName.toLowerCase() ==
+            cat;
       }).toList();
     }
 
-    // Sort: open stations first, closed stations moved to the bottom
+    // Recommended order (weighted rating), then open stations first.
+    final rankOf = <Object, int>{
+      for (final (i, s) in StationRanking.rank(
+        base.cast<Map<String, dynamic>>(),
+      ).indexed)
+        s: i,
+    };
     base.sort((a, b) {
       final aAvail = (a['station_availability'] ?? (a['is_open'] == false ? 'closed' : 'open')).toString().toLowerCase();
       final bAvail = (b['station_availability'] ?? (b['is_open'] == false ? 'closed' : 'open')).toString().toLowerCase();
@@ -1214,7 +1163,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
       final bClosed = bAvail == 'closed';
       if (aClosed && !bClosed) return 1;
       if (!aClosed && bClosed) return -1;
-      return 0;
+      return (rankOf[a] ?? 0).compareTo(rankOf[b] ?? 0);
     });
 
     return base;
@@ -1269,13 +1218,13 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   borderRadius: BorderRadius.circular(AppUi.radiusCard),
                 ),
                 child: _isProcessingQuickOrder
-                    ? const Center(
+                    ? Center(
                         child: SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppUi.bluePrimary,
+                            color: AppUi.brandOf(context),
                           ),
                         ),
                       )
@@ -1296,7 +1245,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                           isReorder ? 'REPEAT LAST ORDER' : 'QUICK REFILL',
                           style: TextStyle(
                             color: AppUi.brandOf(context),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
                           ),
@@ -1306,7 +1255,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                             ' · ${formatPeso(totalAmount, whole: true)}',
                             style: TextStyle(
                               color: AppUi.textSecondaryOf(context),
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1350,7 +1299,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: AppUi.bluePrimary,
+                  color: AppUi.brandOf(context),
                   borderRadius: BorderRadius.circular(AppUi.radiusFull),
                 ),
                 child: Row(
@@ -1358,16 +1307,16 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                   children: [
                     Text(
                       isReorder ? 'Reorder' : 'Order',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppUi.onBrandOf(context),
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(width: 3),
-                    const Icon(
+                    Icon(
                       Icons.arrow_forward_rounded,
-                      color: Colors.white,
+                      color: AppUi.onBrandOf(context),
                       size: 13,
                     ),
                   ],
@@ -1386,12 +1335,10 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
         ? WaterTypes.byName(prefType).shortName
         : null;
 
-    const categories = [
+    final categories = [
       {'label': 'All Refills', 'icon': Icons.grid_view_rounded, 'filter': 'All'},
-      {'label': 'Purified', 'icon': Icons.water_drop_rounded, 'filter': 'Purified'},
-      {'label': 'Alkaline', 'icon': Icons.science_rounded, 'filter': 'Alkaline'},
-      {'label': 'Mineral', 'icon': Icons.spa_rounded, 'filter': 'Mineral'},
-      {'label': 'Accessories', 'icon': Icons.inventory_2_outlined, 'filter': 'Accessories'},
+      for (final type in WaterTypes.all)
+        {'label': type.shortName, 'icon': type.icon, 'filter': type.shortName},
     ];
 
     return SizedBox(
@@ -1514,7 +1461,7 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
           ),
           Expanded(
             child: RefreshIndicator(
-              color: AppUi.bluePrimary,
+              color: AppUi.brandOf(context),
               onRefresh: _fetchData,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
@@ -1546,9 +1493,41 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         ],
                         _buildHomeBanner(context),
                         AppUi.vGapMd,
+                        if (_activeOrder == null &&
+                            _quickOrderStation != null &&
+                            RefillReminderBanner.shouldShow(_refillRhythm)) ...[
+                          RefillReminderBanner(
+                            rhythm: _refillRhythm!,
+                            onReorder: () => _handleQuickOrder(
+                              _quickOrderStation!,
+                              order: _lastCompletedOrder,
+                            ),
+                          ),
+                          AppUi.vGapMd,
+                        ],
                         _buildQuickOrderButton(context),
                         AppUi.vGapMd,
-                        _buildWaterCategoryRow(context),
+                        OutlinedButton.icon(
+                          onPressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            showDragHandle: true,
+                            builder: (sheetContext) => AskErefillSheet(
+                              onCheckout: (_) {
+                                Navigator.of(sheetContext).pop();
+                                context.openCart();
+                              },
+                            ),
+                          ),
+                          icon: const Icon(Icons.auto_awesome_rounded),
+                          label: const Text('Ask eRefill to order for me'),
+                        ),
+                        AppUi.vGapMd,
+                        ValueListenableBuilder<List<WaterTypeInfo>>(
+                          valueListenable: WaterTypes.catalog,
+                          builder: (context, _, _) =>
+                              _buildWaterCategoryRow(context),
+                        ),
                         AppUi.vGapMd,
                         Row(
                           children: [
@@ -1579,8 +1558,8 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                         horizontal: AppUi.screenPadding,
                       ),
                       sliver: SliverToBoxAdapter(
-                        child: AxoEmptyState(
-                          pose: AxoPose.empty,
+                        child: EmptyStateCard(
+                          visual: EmptyStateVisual.empty,
                           title: _selectedCategory == 'All'
                               ? 'No stations nearby yet'
                               : 'No $_selectedCategory stations found',
@@ -1615,12 +1594,15 @@ class _CustomerHomeTabState extends State<CustomerHomeTab>
                               childAspectRatio: 0.74,
                             ),
                         delegate: SliverChildBuilderDelegate(
-                          (context, index) => StationCard(
-                            station: displayedStations[index],
-                            compact: true,
-                            onTap: () => context.openStationDetails(
-                              displayedStations[index],
-                            ),
+                          (context, index) => _listEntrance.wrap(
+                            index,
+                            StationCard(
+                              station: displayedStations[index],
+                              compact: true,
+                              onTap: () => context.openStationDetails(
+                                displayedStations[index],
+                              ),
+                          ),
                           ),
                           childCount: displayedStations.length,
                         ),

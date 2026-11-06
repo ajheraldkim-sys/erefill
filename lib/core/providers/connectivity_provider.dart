@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,19 +20,94 @@ class ConnectivityProvider extends ChangeNotifier {
   int _pendingSyncCount = 0;
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   StreamSubscription<int>? _orderCountSub;
+  Timer? _heartbeatTimer;
+  final StreamController<void> _reconnected =
+      StreamController<void>.broadcast();
+
+  static bool get isDesktop =>
+      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
+  static bool get isTest =>
+      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Performs deep reachability check via DNS and low-level TCP socket.
+  static Future<bool> checkInternetReachability() async {
+    if (kIsWeb || isTest) return true;
+    // 1. Primary DNS lookup (Google)
+    try {
+      final lookup = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 2));
+      if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 2. Secondary DNS lookup (Cloudflare)
+    try {
+      final lookup = await InternetAddress.lookup('cloudflare.com')
+          .timeout(const Duration(seconds: 2));
+      if (lookup.isNotEmpty && lookup[0].rawAddress.isNotEmpty) {
+        return true;
+      }
+    } catch (_) {}
+
+    // 3. Direct socket ping to public DNS servers (handles custom/broken DNS setups)
+    try {
+      final socket = await Socket.connect('1.1.1.1', 53,
+          timeout: const Duration(seconds: 2));
+      await socket.close();
+      socket.destroy();
+      return true;
+    } catch (_) {}
+
+    try {
+      final socket = await Socket.connect('8.8.8.8', 53,
+          timeout: const Duration(seconds: 2));
+      await socket.close();
+      socket.destroy();
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
 
   bool get isOffline => _isOffline;
   bool get isOnline => !_isOffline;
   bool get isSyncing => _isSyncing;
   int get pendingSyncCount => _pendingSyncCount;
 
+  /// Fires when the device comes back online, after queued offline writes
+  /// have been pushed, so read-side refreshes include the user's own changes.
+  Stream<void> get onReconnected => _reconnected.stream;
+
   void _init() {
     // Initial connectivity check
     Connectivity().checkConnectivity().then(_handleConnectivityChange).catchError((e) {
       debugPrint('Initial connectivity check error: $e');
+      if (isDesktop) {
+        _probeReachability();
+      }
     });
 
-    _connSub = Connectivity().onConnectivityChanged.listen(_handleConnectivityChange);
+    try {
+      _connSub = Connectivity().onConnectivityChanged.listen(
+        _handleConnectivityChange,
+        onError: (Object error, StackTrace stack) {
+          debugPrint('Connectivity stream error (falling back to heartbeat): $error');
+          _ensureHeartbeat();
+        },
+        cancelOnError: false,
+      );
+    } catch (e) {
+      debugPrint('Connectivity stream initialization error: $e');
+      _ensureHeartbeat();
+    }
+
+    // On desktop OS (Windows, Linux, macOS), native NetworkManager/NLM event channels
+    // are notoriously flaky or throw PlatformExceptions. Run a silent background heartbeat.
+    if (isDesktop && !isTest) {
+      _ensureHeartbeat();
+    }
 
     // Listen to changes in offline orders queue
     _orderCountSub = OfflineOrderSyncService().onPendingCountChanged.listen((_) {
@@ -41,8 +117,36 @@ class ConnectivityProvider extends ChangeNotifier {
     refreshPendingCount();
   }
 
-  void _handleConnectivityChange(List<ConnectivityResult> results) {
-    final offline = results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+  void _ensureHeartbeat() {
+    if (_heartbeatTimer != null || kIsWeb || isTest) return;
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      await _probeReachability();
+    });
+  }
+
+  Future<void> _probeReachability() async {
+    final reachable = await checkInternetReachability();
+    if (_isOffline && reachable) {
+      markOnline();
+    } else if (!_isOffline && !reachable) {
+      _isOffline = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _handleConnectivityChange(List<ConnectivityResult> results) async {
+    var offline = results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+
+    // Desktop platforms (Windows, Linux, macOS) frequently report ConnectivityResult.none
+    // even with active internet access when behind VPNs, corporate firewalls, or unidentified networks.
+    // Verify reachability before declaring the app offline.
+    if (offline && !kIsWeb) {
+      final reachable = await checkInternetReachability();
+      if (reachable) {
+        offline = false;
+      }
+    }
+
     final transitionedToOnline = _isOffline && !offline;
 
     _isOffline = offline;
@@ -50,10 +154,35 @@ class ConnectivityProvider extends ChangeNotifier {
 
     if (transitionedToOnline) {
       debugPrint('Connectivity restored! Triggering global offline queues synchronization...');
-      syncAll();
+      syncAll().whenComplete(() {
+        if (!_isOffline && !_reconnected.isClosed) _reconnected.add(null);
+      });
     } else {
       refreshPendingCount();
     }
+  }
+
+  /// Manually marks the connection as online when any real API call succeeds.
+  void markOnline() {
+    if (_isOffline) {
+      _isOffline = false;
+      notifyListeners();
+      if (!_reconnected.isClosed) _reconnected.add(null);
+    }
+  }
+
+  /// Re-probes connectivity directly (e.g. when user clicks Refresh or Retry).
+  Future<bool> probe() async {
+    final reachable = await checkInternetReachability();
+    if (reachable) {
+      markOnline();
+      return true;
+    }
+    final results = await Connectivity()
+        .checkConnectivity()
+        .catchError((_) => <ConnectivityResult>[]);
+    await _handleConnectivityChange(results);
+    return isOnline;
   }
 
   /// Calculates total pending sync items across customer orders, rider deliveries, and owner/system actions
@@ -96,8 +225,10 @@ class ConnectivityProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
     _connSub?.cancel();
     _orderCountSub?.cancel();
+    _reconnected.close();
     super.dispose();
   }
 }

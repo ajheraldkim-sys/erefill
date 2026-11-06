@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:erefill/core/providers/connectivity_provider.dart';
 import '../models/delivery_model.dart';
 import '../models/credit_model.dart';
 import '../models/rider_model.dart';
@@ -19,6 +20,7 @@ class SyncService {
   final SyncFailureReporter? _failureReporter;
   final _syncStatusController = StreamController<SyncStatus>.broadcast();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  StreamSubscription<void>? _reconnectSub;
 
   SyncService({
     required LocalDbService local,
@@ -31,23 +33,41 @@ class SyncService {
   Stream<SyncStatus> get syncStatusStream => _syncStatusController.stream;
 
   void startListening(String ownerId) {
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((
-      results,
-    ) async {
-      final connected =
-          !results.contains(ConnectivityResult.none) && results.isNotEmpty;
-      if (connected) {
-        await syncAll(ownerId);
-      }
+    _reconnectSub?.cancel();
+    _reconnectSub = ConnectivityProvider().onReconnected.listen((_) async {
+      await syncAll(ownerId);
     });
+
+    _connectivitySub?.cancel();
+    try {
+      _connectivitySub = Connectivity().onConnectivityChanged.listen(
+        (results) async {
+          final connected =
+              !results.contains(ConnectivityResult.none) && results.isNotEmpty;
+          if (connected) {
+            await syncAll(ownerId);
+          }
+        },
+        onError: (Object error) {
+          debugPrint('SyncService connectivity stream error: $error');
+        },
+        cancelOnError: false,
+      );
+    } catch (e) {
+      debugPrint('SyncService connectivity stream init error: $e');
+    }
   }
 
   void stopListening() {
     _connectivitySub?.cancel();
+    _reconnectSub?.cancel();
   }
 
   Future<bool> hasConnectivity() async {
-    final results = await Connectivity().checkConnectivity();
+    if (ConnectivityProvider().isOnline) return true;
+    final results = await Connectivity()
+        .checkConnectivity()
+        .catchError((_) => <ConnectivityResult>[]);
     return !results.contains(ConnectivityResult.none) && results.isNotEmpty;
   }
 

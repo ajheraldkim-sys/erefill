@@ -1,15 +1,20 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {
+  isLiveKey,
+  normalizePaymentMethod,
+  type PaymentMethod,
+  paymongoAuthHeader,
+  paymongoMethod,
+  paymongoSecretKey,
+} from "../_shared/paymongo.ts";
+import { handleTopup, handleVerifyTopup } from "./topup.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type PaymentMethod = "gcash" | "maya" | "card";
-
-const paymongoMethod = (method: PaymentMethod) =>
-  method === "maya" ? "paymaya" : method;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -19,8 +24,9 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const paymongoSecretKey = Deno.env.get("PAYMONGO_SECRET_KEY") || "sk_test_DAyQ6miWLgJTQPqFVqMU8NrV";
-    const appBaseUrl = Deno.env.get("APP_PUBLIC_URL") || Deno.env.get("SUPABASE_URL") || "https://ormmjxtbwosnraijphra.supabase.co";
+    const secretKey = paymongoSecretKey();
+    const livemode = isLiveKey(secretKey);
+    const appBaseUrl = Deno.env.get("APP_PUBLIC_URL") || Deno.env.get("SUPABASE_URL");
 
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error("Missing payment service configuration.");
@@ -39,6 +45,21 @@ serve(async (req) => {
 
     const body = await req.json();
     const action = String(body.action ?? "").trim().toLowerCase();
+
+    if (action === "topup" || action === "verify_topup") {
+      const ctx = {
+        supabase,
+        userId: userData.user.id,
+        userEmail: userData.user.email?.trim() || undefined,
+        secretKey,
+        livemode,
+        callbackBaseUrl: supabaseUrl.replace(/\/+$/, ""),
+      };
+      return action === "topup"
+        ? await handleTopup(body, ctx, corsHeaders)
+        : await handleVerifyTopup(body, ctx, corsHeaders);
+    }
+
     const orderId = String(body.order_id ?? "").trim();
     if (!orderId) throw new Error("Missing order id.");
 
@@ -56,7 +77,7 @@ serve(async (req) => {
       const currentStatus = String(order.payment_status ?? "").toLowerCase();
       if (["success", "paid", "succeeded"].includes(currentStatus)) {
         return new Response(
-          JSON.stringify({ verified: true, payment_status: "success" }),
+          JSON.stringify({ verified: true, payment_status: "success", livemode }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
         );
       }
@@ -68,7 +89,7 @@ serve(async (req) => {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Basic ${btoa(`${paymongoSecretKey}:`)}`,
+              Authorization: paymongoAuthHeader(secretKey),
             },
           });
 
@@ -100,7 +121,7 @@ serve(async (req) => {
                 .eq("provider_checkout_id", checkoutId);
 
               return new Response(
-                JSON.stringify({ verified: true, payment_status: "success" }),
+                JSON.stringify({ verified: true, payment_status: "success", livemode }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
               );
             } else if (["expired", "cancelled", "canceled", "failed"].includes(pmStatus)) {
@@ -115,7 +136,7 @@ serve(async (req) => {
                 .neq("payment_status", "success");
 
               return new Response(
-                JSON.stringify({ verified: false, payment_status: "failed" }),
+                JSON.stringify({ verified: false, payment_status: "failed", livemode }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
               );
             }
@@ -126,24 +147,20 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ verified: false, payment_status: order.payment_status ?? "processing" }),
+        JSON.stringify({ verified: false, payment_status: order.payment_status ?? "processing", livemode }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
       );
     }
 
     const forceNewCheckout = body.force_new_checkout === true;
-    let paymentMethod = String(body.payment_method ?? "").trim().toLowerCase() as PaymentMethod;
-    if ((paymentMethod as string) === "paymaya") {
-      paymentMethod = "maya";
-    }
-
-    if (!["gcash", "maya", "card"].includes(paymentMethod)) {
+    const paymentMethod: PaymentMethod | null = normalizePaymentMethod(body.payment_method);
+    if (!paymentMethod) {
       throw new Error("Unsupported payment method.");
     }
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, customer_id, owner_id, station_name, customer_name, customer_phone, total_amount, status, payment_status, payment_method, payment_checkout_id, payment_checkout_url")
+      .select("id, customer_id, owner_id, station_name, customer_name, customer_phone, total_amount, tip_amount, status, payment_status, payment_method, payment_checkout_id, payment_checkout_url")
       .eq("id", orderId)
       .eq("customer_id", userData.user.id)
       .single();
@@ -167,6 +184,7 @@ serve(async (req) => {
         JSON.stringify({
           checkout_url: order.payment_checkout_url,
           checkout_id: order.payment_checkout_id ?? "",
+          livemode,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
       );
@@ -203,6 +221,7 @@ serve(async (req) => {
         JSON.stringify({
           checkout_url: existingCheckout.checkout_url,
           checkout_id: existingCheckout.provider_checkout_id,
+          livemode,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
       );
@@ -246,7 +265,7 @@ serve(async (req) => {
       throw new Error("Invalid order amount. Minimum is PHP 1.00.");
     }
 
-    let baseUrl = (appBaseUrl || supabaseUrl).trim();
+    let baseUrl = (appBaseUrl ?? supabaseUrl).trim();
     if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
       baseUrl = supabaseUrl;
     }
@@ -274,12 +293,14 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${btoa(`${paymongoSecretKey}:`)}`,
+        Authorization: paymongoAuthHeader(secretKey),
       },
       body: JSON.stringify({
         data: {
           attributes: {
-            description: `eRefill order ${orderId}`,
+            description: Number(order.tip_amount ?? 0) > 0
+              ? `eRefill order ${orderId} (incl. ₱${Number(order.tip_amount)} rider tip)`
+              : `eRefill order ${orderId}`,
             reference_number: referenceNumber,
             line_items: [
               {
@@ -296,6 +317,7 @@ serve(async (req) => {
             show_description: true,
             show_line_items: true,
             ...(Object.keys(billingInfo).length > 0 ? { billing: billingInfo } : {}),
+            metadata: { kind: "order", order_id: orderId },
           },
         },
       }),
@@ -328,7 +350,7 @@ serve(async (req) => {
     if (recordError) throw recordError;
 
     return new Response(
-      JSON.stringify({ checkout_url: checkoutUrl, checkout_id: checkout.id }),
+      JSON.stringify({ checkout_url: checkoutUrl, checkout_id: checkout.id, livemode }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,

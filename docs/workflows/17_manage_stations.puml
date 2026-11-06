@@ -1,0 +1,7 @@
+@startuml
+start
+:Open station settings or Inventory;
+:Update details, availability, stock or container records;
+:Save changes;
+stop
+@enduml

@@ -1,0 +1,8 @@
+@startuml
+start
+:Open Reports;
+:Select report type and date range;
+:View report;
+:Export as PDF;
+stop
+@enduml

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import '../constants.dart';
+import '../widgets/brand/erefill_mark.dart';
 import '../routing/app_router.dart';
 import '../routing/app_routes.dart';
 import '../../features/chat/models/system_notification.dart';
@@ -33,15 +34,17 @@ class NotificationService {
   static const String _channelDesc =
       'Real-time alerts for water refills, deliveries, orders, and chats.';
 
+  /// White eRefill mark rendered by `tool/render_brand_assets.dart`.
+  static const _smallIcon = '@drawable/ic_stat_erefill';
+
   /// Initialize system notification plugin and notification channels.
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // 1. Android settings - matches brand launcher icon
-      const androidSettings = AndroidInitializationSettings(
-        '@mipmap/launcher_icon',
-      );
+      // 1. Android settings - the status bar needs a white silhouette, not
+      //    the full-color launcher icon (which Android shows as a gray blob).
+      const androidSettings = AndroidInitializationSettings(_smallIcon);
 
       // 2. iOS settings
       const darwinSettings = DarwinInitializationSettings(
@@ -180,7 +183,8 @@ class NotificationService {
         importance: androidImportance,
         priority: androidPriority,
         showWhen: true,
-        icon: '@mipmap/launcher_icon',
+        icon: _smallIcon,
+        color: BrandColors.royal,
         enableVibration: true,
         playSound: true,
         channelShowBadge: true,
@@ -477,7 +481,7 @@ class _InAppBannerWidgetState extends State<_InAppBannerWidget>
                                 Text(
                                   'Just now',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 12,
                                     color: isDark
                                         ? const Color(0xFF94A3B8)
                                         : AppUi.textSecondary,

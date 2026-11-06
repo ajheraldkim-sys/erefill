@@ -17,6 +17,26 @@ class OwnerInventorySnapshot {
   final List<Map<String, dynamic>> lowStockProducts;
 
   bool get hasLowFilledStock => lowStockProducts.isNotEmpty;
+
+  factory OwnerInventorySnapshot.fromJson(Map<String, dynamic> json) {
+    List<Map<String, dynamic>> rows(Object? raw) => [
+      for (final row in raw as List? ?? const [])
+        Map<String, dynamic>.from(row as Map),
+    ];
+    return OwnerInventorySnapshot(
+      filledGallons: (json['filled_gallons'] as num?)?.toInt() ?? 0,
+      emptyGallons: (json['empty_gallons'] as num?)?.toInt() ?? 0,
+      products: rows(json['products']),
+      lowStockProducts: rows(json['low_stock_products']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'filled_gallons': filledGallons,
+    'empty_gallons': emptyGallons,
+    'products': products,
+    'low_stock_products': lowStockProducts,
+  };
 }
 
 class OwnerInventoryService {

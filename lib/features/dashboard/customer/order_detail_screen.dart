@@ -9,7 +9,7 @@ import '../../chat/services/chat_service.dart';
 import '../../chat/models/chat_room.dart';
 import '../../../core/constants.dart';
 import '../../../core/routing/app_navigation.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/brand/refill_lottie.dart';
 import '../../../core/widgets/erefill_header.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
@@ -20,8 +20,11 @@ import '../../../core/services/payment_launch_service.dart';
 import '../../../core/services/payment_checkout_service.dart';
 import '../../../core/services/local_data_cache.dart';
 import '../../../core/services/offline_order_sync_service.dart';
+import '../../../core/sync/realtime_hub.dart';
+import '../../../core/sync/synced_state.dart';
 
 import 'package:erefill/core/utils/money.dart';
+import 'package:erefill/features/disputes/disputes.dart';
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? order;
   final String? orderId;
@@ -34,12 +37,11 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SyncedState {
   final supabase = Supabase.instance.client;
   final _chatService = ChatService();
-  RealtimeChannel? _orderChannel;
+  StreamSubscription<RealtimeEvent>? _orderWatch;
   Timer? _orderPollingTimer;
-  Timer? _reconnectTimer;
   Map<String, dynamic>? _currentOrder;
   Map<String, dynamic>? _riderProfile;
   List<Map<String, dynamic>>? _orderItems;
@@ -239,36 +241,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       return;
     }
 
-    if (_orderChannel != null) {
-      supabase.removeChannel(_orderChannel!);
-      _orderChannel = null;
-    }
-    _reconnectTimer?.cancel();
-
-    _orderChannel = supabase
-        .channel('public:orders:$orderId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'orders',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: orderId,
-          ),
-          callback: (payload) {
-            _refreshOrderState();
-          },
-        )
-        .subscribe((status, [error]) {
-          if (status == RealtimeSubscribeStatus.channelError ||
-              status == RealtimeSubscribeStatus.timedOut) {
-            _reconnectTimer?.cancel();
-            _reconnectTimer = Timer(const Duration(seconds: 3), () {
-              if (mounted && _isAppForeground) _subscribeToOrderUpdates();
-            });
-          }
-        });
+    // The shared hub handles retry and reconnect; resume and reconnect
+    // refreshes arrive through [onResync].
+    _orderWatch ??= watchTable(
+      TableWatch('orders', column: 'id', value: orderId),
+      (_) => _refreshOrderState(),
+    );
 
     if (_isAppForeground) _startOrderPollingTimer();
   }
@@ -378,15 +356,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _isAppForeground = state == AppLifecycleState.resumed;
     if (_isAppForeground) {
-      _refreshOrderState();
-      _subscribeToOrderUpdates();
+      _startOrderPollingTimer();
     } else {
       _orderPollingTimer?.cancel();
       _orderPollingTimer = null;
-      _reconnectTimer?.cancel();
-      _reconnectTimer = null;
     }
   }
+
+  @override
+  Future<void> onResync() => _refreshOrderState();
 
   void _showStatusNotification(String status) {
     String message;
@@ -455,10 +433,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _orderPollingTimer?.cancel();
-    _reconnectTimer?.cancel();
-    if (_orderChannel != null) {
-      supabase.removeChannel(_orderChannel!);
-    }
     super.dispose();
   }
 
@@ -715,7 +689,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     if (_isLoadingOrder) {
       return Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
-        body: const AxoLoader(message: 'Loading order...'),
+        body: const LoadingStateCard(message: 'Loading order...'),
       );
     }
 
@@ -723,7 +697,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     if (order == null) {
       return Scaffold(
         backgroundColor: AppUi.pageBgOf(context),
-        body: AxoEmptyState(
+        body: EmptyStateCard(
           title: _loadError ?? 'Order not found',
           message: 'Return home and open the order from your history.',
           actionLabel: _loadError == null ? null : 'Retry',
@@ -847,6 +821,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             if (status == 'delivered') ...[
               _buildDeliveryCompleteCompact(),
               const SizedBox(height: 10),
+              if (Dispute.canReport(
+                status: status,
+                deliveredAt: DateTime.tryParse(
+                  (order['actual_completion_at'] ?? order['updated_at'] ?? '')
+                      .toString(),
+                )?.toLocal(),
+                now: DateTime.now(),
+              ))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => showModalBottomSheet<bool>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => ReportProblemSheet(
+                        orderId: order['id'].toString(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.report_gmailerrorred_outlined),
+                    label: const Text('Report a problem'),
+                  ),
+                ),
             ],
 
             // 5. Offline sync & payment notices
@@ -1090,7 +1086,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 Text(
                   'DELIVERY TO',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppUi.textSecondaryOf(context),
                     letterSpacing: 0.8,
@@ -1112,7 +1108,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                     color: AppUi.textSecondaryOf(context),
                   ),
@@ -1494,7 +1490,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                             child: const Text(
                               'Nearby',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: AppUi.warningFg,
                               ),
@@ -1648,7 +1644,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: AppColors.statusCompleted,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1772,7 +1768,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 'Order ID',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: AppUi.textSecondaryOf(context),
                                   letterSpacing: 1.2,
@@ -1801,7 +1797,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 'Delivery date',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: AppUi.textSecondaryOf(context),
                                   letterSpacing: 1.2,
@@ -1834,7 +1830,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     Text(
                       'Delivery address',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                         letterSpacing: 1.5,
@@ -1866,7 +1862,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                               Text(
                                 '${order['customer_barangay'] ?? ''}, ${order['customer_municipality'] ?? ''}',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: AppUi.textSecondaryOf(context),
                                   fontWeight: FontWeight.w400,
                                 ),
@@ -1882,7 +1878,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                     Text(
                       'Water refill details',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppUi.textSecondaryOf(context),
                         letterSpacing: 1.5,
@@ -1934,7 +1930,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                 ),
                               ),
                               Text(
-                                '₱${(item['subtotal'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                formatPeso(item['subtotal'] as num?),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 14,
@@ -2095,7 +2091,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                       Text(
                         'Notes',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppUi.textSecondaryOf(context),
                           letterSpacing: 1.5,
@@ -2124,7 +2120,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                           ),
                         ),
                         Text(
-                          '₱${(order['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                          formatPeso(order['total_amount'] as num?),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 20,
@@ -2151,7 +2147,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                                 .toString()
                                 .toUpperCase(),
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: AppUi.textSecondaryOf(context),
                             ),

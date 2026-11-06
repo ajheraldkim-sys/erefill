@@ -2,30 +2,38 @@ import 'package:erefill/core/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:erefill/core/sync/sync_store.dart';
+import 'package:erefill/core/sync/synced_state.dart';
+
 import '../../services/admin_api_service.dart';
+import '../../sync/admin_sync.dart';
 import '../../widgets/admin_ui.dart';
 
 class AdminNotificationsScreen extends StatefulWidget {
   const AdminNotificationsScreen({super.key});
 
   @override
-  State<AdminNotificationsScreen> createState() => _AdminNotificationsScreenState();
+  State<AdminNotificationsScreen> createState() =>
+      _AdminNotificationsScreenState();
 }
 
-class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
+class _AdminNotificationsScreenState extends State<AdminNotificationsScreen>
+    with SyncedState {
   final _userIdController = TextEditingController();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   String _broadcastRole = 'customer';
   String _priority = 'normal';
   bool _sending = false;
-  List<Map<String, dynamic>> _admins = [];
+  late final SyncedResource<List<Map<String, dynamic>>> _adminsRes;
   String? _selectedAdminTier;
+
+  List<Map<String, dynamic>> get _admins => _adminsRes.data ?? const [];
 
   @override
   void initState() {
     super.initState();
-    _loadAdmins();
+    _adminsRes = useSynced(AdminSync.admins(context.read<AdminApiService>()));
   }
 
   @override
@@ -36,25 +44,26 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAdmins() async {
-    try {
-      final admins = await context.read<AdminApiService>().listAdmins();
-      if (mounted) setState(() => _admins = admins);
-    } catch (_) {}
-  }
+  Future<void> _loadAdmins() =>
+      SyncStore.instance.refreshTagged(AdminSync.tagUsers);
 
   Future<void> _sendToUser() async {
-    if (_userIdController.text.trim().isEmpty || _titleController.text.trim().isEmpty) return;
+    if (_userIdController.text.trim().isEmpty ||
+        _titleController.text.trim().isEmpty) {
+      return;
+    }
     setState(() => _sending = true);
     try {
       await context.read<AdminApiService>().sendNotification(
-            userId: _userIdController.text.trim(),
-            title: _titleController.text.trim(),
-            content: _contentController.text.trim(),
-            priority: _priority,
-          );
+        userId: _userIdController.text.trim(),
+        title: _titleController.text.trim(),
+        content: _contentController.text.trim(),
+        priority: _priority,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification sent')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Notification sent')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -70,13 +79,15 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     setState(() => _sending = true);
     try {
       final count = await context.read<AdminApiService>().broadcastNotification(
-            role: _broadcastRole,
-            title: _titleController.text.trim(),
-            content: _contentController.text.trim(),
-            priority: _priority,
-          );
+        role: _broadcastRole,
+        title: _titleController.text.trim(),
+        content: _contentController.text.trim(),
+        priority: _priority,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sent to $count users')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sent to $count users')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,7 +105,9 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
     try {
       await context.read<AdminApiService>().setAdminTier(parts[0], parts[1]);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Admin tier updated')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Admin tier updated')));
       await _loadAdmins();
     } catch (e) {
       if (!mounted) return;
@@ -132,7 +145,11 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                   AppUi.vGapMd,
                   ..._admins.map(
                     (a) => ListTile(
-                      title: Text(a['full_name']?.toString() ?? a['email']?.toString() ?? '—'),
+                      title: Text(
+                        a['full_name']?.toString() ??
+                            a['email']?.toString() ??
+                            '—',
+                      ),
                       subtitle: Text(a['email']?.toString() ?? '—'),
                       trailing: AdminBadge(
                         label: a['admin_tier']?.toString() ?? 'super',
@@ -145,7 +162,9 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(labelText: 'Change admin tier'),
+                          decoration: const InputDecoration(
+                            labelText: 'Change admin tier',
+                          ),
                           items: _admins
                               .expand(
                                 (a) => [
@@ -160,11 +179,15 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                                 ],
                               )
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedAdminTier = v),
+                          onChanged: (v) =>
+                              setState(() => _selectedAdminTier = v),
                         ),
                       ),
                       AppUi.hGapMd,
-                      FilledButton(onPressed: _setTier, child: const Text('Apply')),
+                      FilledButton(
+                        onPressed: _setTier,
+                        child: const Text('Apply'),
+                      ),
                     ],
                   ),
                 ],
@@ -189,10 +212,17 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                   color: AppUi.bluePrimary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: Icon(LucideIcons.send, size: 18, color: AppUi.brandOf(context)),
+                child: Icon(
+                  LucideIcons.send,
+                  size: 18,
+                  color: AppUi.brandOf(context),
+                ),
               ),
               const SizedBox(width: 10),
-              Text('Send to Specific User', style: adminSectionTitleStyle(context)),
+              Text(
+                'Send to Specific User',
+                style: adminSectionTitleStyle(context),
+              ),
             ],
           ),
           AppUi.vGapLg,
@@ -256,7 +286,11 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                   color: AppUi.accentGreen.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppUi.radiusControl),
                 ),
-                child: const Icon(LucideIcons.radio, size: 18, color: AppUi.accentGreen),
+                child: const Icon(
+                  LucideIcons.radio,
+                  size: 18,
+                  color: AppUi.accentGreen,
+                ),
               ),
               const SizedBox(width: 10),
               Text('Broadcast by Role', style: adminSectionTitleStyle(context)),
@@ -269,8 +303,14 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
             value: _broadcastRole,
             items: const [
               DropdownMenuItem(value: 'customer', child: Text('All Customers')),
-              DropdownMenuItem(value: 'owner', child: Text('All Station Owners')),
-              DropdownMenuItem(value: 'rider', child: Text('All Registered Riders')),
+              DropdownMenuItem(
+                value: 'owner',
+                child: Text('All Station Owners'),
+              ),
+              DropdownMenuItem(
+                value: 'rider',
+                child: Text('All Registered Riders'),
+              ),
             ],
             onChanged: (v) => setState(() => _broadcastRole = v ?? 'customer'),
           ),
@@ -289,7 +329,10 @@ class _AdminNotificationsScreenState extends State<AdminNotificationsScreen> {
                 Expanded(
                   child: Text(
                     'Broadcasting dispatches using the Title and Message composed in the left panel.',
-                    style: TextStyle(fontSize: 13, color: AppUi.textSecondaryOf(context)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppUi.textSecondaryOf(context),
+                    ),
                   ),
                 ),
               ],

@@ -11,7 +11,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../core/constants.dart';
 import '../../../core/water_types.dart';
 import '../../../core/widgets/brand/hero_header.dart';
-import '../../../core/widgets/brand/axo_states.dart';
+import '../../../core/widgets/brand/state_cards.dart';
 import '../../../core/widgets/auth_dialogs.dart';
 import '../../../core/widgets/refill_components.dart';
 import '../../../core/widgets/refill_status_widgets.dart';
@@ -23,9 +23,12 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/utils/station_orderability.dart';
 import '../../../core/utils/station_price_helpers.dart';
 import '../../../core/services/local_data_cache.dart';
+import 'package:erefill/core/sync/realtime_hub.dart';
 
 import 'package:erefill/core/utils/money.dart';
 import 'package:erefill/core/utils/friendly_errors.dart';
+import 'package:erefill/core/widgets/motion/motion.dart';
+import 'package:erefill/core/utils/station_ranking.dart';
 
 class StationListScreen extends StatefulWidget {
   const StationListScreen({super.key, this.initialFilter});
@@ -38,11 +41,13 @@ class StationListScreen extends StatefulWidget {
 }
 
 class _StationListScreenState extends State<StationListScreen> {
+  final _listEntrance = ListEntrance();
   final supabase = Supabase.instance.client;
   late final StreamController<List<Map<String, dynamic>>> _stationsController;
   late final Stream<List<Map<String, dynamic>>> _stationsStream;
-  RealtimeChannel? _pricingChannel;
-  RealtimeChannel? _favoritesChannel;
+  StreamSubscription? _productsSub;
+  StreamSubscription? _settingsSub;
+  StreamSubscription? _favoritesSub;
   bool _isLoading = true;
   List<Map<String, dynamic>> _cachedStations = [];
   String? _userTown;
@@ -112,7 +117,30 @@ class _StationListScreenState extends State<StationListScreen> {
     await _fetchStations();
   }
 
+  /// Stations with a valid approved lab test get a small ranking boost.
+  Set<String> _waterTestedIds = const {};
+
+  Future<void> _loadWaterTested() async {
+    try {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final rows = await supabase
+          .from('station_certifications')
+          .select('owner_id')
+          .eq('status', 'approved')
+          .inFilter('cert_type', ['bacteriological', 'physical_chemical'])
+          .gt('expires_on', today);
+      if (mounted) {
+        setState(() => _waterTestedIds = {
+              for (final r in rows) r['owner_id'].toString(),
+            });
+      }
+    } catch (_) {
+      // Older database without certificates: no boost.
+    }
+  }
+
   Future<void> _fetchStations({bool isRefresh = false}) async {
+    unawaited(_loadWaterTested());
     try {
       final res = await supabase
           .from('profiles')
@@ -143,54 +171,36 @@ class _StationListScreenState extends State<StationListScreen> {
   }
 
   void _subscribeToStationPricing() {
-    _pricingChannel = supabase
-        .channel('station_pricing_updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'products',
-          callback: (_) => _loadStationPricing(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'owner_settings',
-          callback: (_) => _loadStationPricing(),
-        )
-        .subscribe();
+    _productsSub?.cancel();
+    _productsSub = RealtimeHub.instance.listen(
+      const TableWatch('products'),
+      (_) => _loadStationPricing(),
+    );
+
+    _settingsSub?.cancel();
+    _settingsSub = RealtimeHub.instance.listen(
+      const TableWatch('owner_settings'),
+      (_) => _loadStationPricing(),
+    );
   }
 
   void _subscribeToFavorites() {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
-    _favoritesChannel = supabase
-        .channel('station-list:favorites:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'favorites',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: (_) => _fetchFavorites(),
-        )
-        .subscribe();
+    _favoritesSub?.cancel();
+    _favoritesSub = RealtimeHub.instance.listen(
+      TableWatch('favorites', column: 'user_id', value: userId),
+      (_) => _fetchFavorites(),
+    );
   }
 
   @override
   void dispose() {
     _stationsController.close();
-    final channel = _pricingChannel;
-    if (channel != null) {
-      supabase.removeChannel(channel);
-    }
-    final favoritesChannel = _favoritesChannel;
-    if (favoritesChannel != null) {
-      supabase.removeChannel(favoritesChannel);
-    }
+    _productsSub?.cancel();
+    _settingsSub?.cancel();
+    _favoritesSub?.cancel();
     super.dispose();
   }
 
@@ -202,7 +212,7 @@ class _StationListScreenState extends State<StationListScreen> {
           .select('owner_id, price_per_gallon');
       final productsFuture = supabase
           .from('products')
-          .select('owner_id, price, is_available')
+          .select('owner_id, price, category, is_available')
           .eq('is_available', true);
 
       final results = await Future.wait([settingsFuture, productsFuture]);
@@ -447,6 +457,16 @@ class _StationListScreenState extends State<StationListScreen> {
       return matchesSearch && matchesFilter;
     }).toList();
 
+    if (_selectedFilter != 'Nearest') {
+      // Recommended order: weighted rating, nearer stations win near-ties.
+      filtered = StationRanking.rank(
+        filtered.cast<Map<String, dynamic>>(),
+        customerLat: _currentPosition?.latitude,
+        customerLng: _currentPosition?.longitude,
+        bonus: (s) => _waterTestedIds.contains(s['id']?.toString()) ? 0.15 : 0,
+      );
+    }
+
     if (_selectedFilter == 'Nearest' && _currentPosition != null) {
       filtered.sort((a, b) {
         final latA =
@@ -563,9 +583,9 @@ class _StationListScreenState extends State<StationListScreen> {
                       ),
                       SliderTheme(
                         data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: AppUi.bluePrimary,
-                          inactiveTrackColor: AppUi.blueBorder,
-                          thumbColor: AppUi.bluePrimary,
+                          activeTrackColor: AppUi.brandOf(context),
+                          inactiveTrackColor: AppUi.borderOf(context),
+                          thumbColor: AppUi.brandOf(context),
                         ),
                         child: Slider(
                           value: _filterMaxPrice,
@@ -680,8 +700,8 @@ class _StationListScreenState extends State<StationListScreen> {
                             Navigator.pop(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppUi.bluePrimary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppUi.brandOf(context),
+                            foregroundColor: AppUi.onBrandOf(context),
                             shape: RoundedRectangleBorder(
                               borderRadius: AppUi.cardRadius,
                             ),
@@ -691,7 +711,7 @@ class _StationListScreenState extends State<StationListScreen> {
                             'Apply Advanced Filters',
                             style: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
-                                  color: Colors.white,
+                                  color: AppUi.onBrandOf(context),
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
@@ -899,8 +919,8 @@ class _StationListScreenState extends State<StationListScreen> {
           return Scaffold(
             backgroundColor: AppUi.pageBgOf(context),
             body: Center(
-              child: AxoEmptyState(
-                pose: AxoPose.thinking,
+              child: EmptyStateCard(
+                visual: EmptyStateVisual.thinking,
                 title: 'Could not load stations',
                 message: FriendlyErrors.message(
                   snapshot.error!,
@@ -943,8 +963,8 @@ class _StationListScreenState extends State<StationListScreen> {
 
         Widget buildMapView() {
           if (mappableStations.isEmpty) {
-            return AxoEmptyState(
-              pose: AxoPose.thinking,
+            return EmptyStateCard(
+              visual: EmptyStateVisual.thinking,
               compact: true,
               title: 'No map pins yet',
               message:
@@ -1410,8 +1430,8 @@ class _StationListScreenState extends State<StationListScreen> {
                           ),
                           stations.isEmpty
                               ? SliverFillRemaining(
-                                  child: AxoEmptyState(
-                                    pose: AxoPose.empty,
+                                  child: EmptyStateCard(
+                                    visual: EmptyStateVisual.empty,
                                     title: 'No matching stations',
                                     message: prefLabel != null
                                         ? 'No $prefLabel stations in $titleTown right now. Try another filter or update your water preference in Account.'
@@ -1435,10 +1455,13 @@ class _StationListScreenState extends State<StationListScreen> {
                                     separatorBuilder: (context, index) =>
                                         const SizedBox(height: 10),
                                     itemBuilder: (context, index) =>
-                                        RepaintBoundary(
+                                        _listEntrance.wrap(
+                                          index,
+                                          RepaintBoundary(
                                           child: _buildStationListTile(
                                             stations[index],
                                           ),
+                                        ),
                                         ),
                                   ),
                                 ),

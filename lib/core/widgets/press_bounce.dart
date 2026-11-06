@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../constants.dart';
+
 /// Reusable tactile spring micro-interaction wrapper.
 ///
 /// Gives cards, buttons, and tiles a responsive, high-end physical bounce
@@ -74,7 +76,8 @@ class _PressBounceState extends State<PressBounce>
       child: Listener(
         behavior: widget.behavior,
         onPointerDown: (_) {
-          if (widget.onTap != null || widget.onLongPress != null) {
+          if ((widget.onTap != null || widget.onLongPress != null) &&
+              !AppUi.reduceMotion(context)) {
             _controller.forward();
           }
         },

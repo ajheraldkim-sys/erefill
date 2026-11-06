@@ -1,3 +1,4 @@
+-- Requires single_water_product_catalog.sql (public.water_types).
 -- Extend admin onboarding to persist the same profile details collected by
 -- the customer, owner, and rider signup flows.
 -- Run after admin_complete_setup.sql and remote_catchup.sql.
@@ -321,7 +322,7 @@ BEGIN
 
   IF p_role = 'customer' AND (
     p_water_type IS NULL OR
-    p_water_type NOT IN ('Purified Water', 'Mineral Water', 'Alkaline Water')
+    NOT EXISTS (SELECT 1 FROM public.water_types WHERE name = p_water_type AND is_active)
   ) THEN
     RAISE EXCEPTION 'Unsupported customer water preference: %', p_water_type
       USING ERRCODE = '22023';
@@ -451,8 +452,8 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  IF p_primary_water_type IS NULL OR p_primary_water_type NOT IN (
-    'Purified Water', 'Mineral Water', 'Alkaline Water'
+  IF p_primary_water_type IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.water_types WHERE name = p_primary_water_type AND is_active
   ) THEN
     RAISE EXCEPTION 'Unsupported station water type: %', p_primary_water_type
       USING ERRCODE = '22023';

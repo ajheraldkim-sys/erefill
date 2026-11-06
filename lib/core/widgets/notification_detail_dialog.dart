@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:erefill/core/utils/money.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -107,7 +108,7 @@ Future<void> showNotificationDetailDialog(
                                 child: Text(
                                   type.displayName,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                     color: typeColor,
                                   ),
@@ -133,7 +134,7 @@ Future<void> showNotificationDetailDialog(
                                   child: Text(
                                     notification.priority.value.toUpperCase(),
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w700,
                                       color: notification.priority.color,
                                     ),
@@ -146,7 +147,7 @@ Future<void> showNotificationDetailDialog(
                           Text(
                             '$formattedDate ($timeAgo)',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppUi.textMutedOf(context),
                               fontWeight: FontWeight.w600,
                             ),
@@ -233,7 +234,7 @@ Future<void> showNotificationDetailDialog(
                           _buildDetailRow(
                             context,
                             'Amount',
-                            '₱${amount is num ? amount.toStringAsFixed(2) : amount}',
+                            amount is num ? formatPeso(amount) : '₱$amount',
                           ),
                         ],
                       ],

@@ -21,6 +21,7 @@ import '../../features/dashboard/customer/checkout_screen.dart';
 import '../../features/dashboard/customer/order_detail_screen.dart';
 import '../../features/dashboard/customer/customer_orders_list.dart';
 import '../../features/dashboard/customer/payment_return_screen.dart';
+import 'package:erefill/features/fee_wallet/fee_wallet_screen.dart';
 import '../../features/dashboard/customer/station_details.dart';
 import '../../features/dashboard/customer/station_list_screen.dart';
 import '../../features/dashboard/owner/notifications_screen.dart';
@@ -40,7 +41,7 @@ import '../providers/user_provider.dart';
 import '../utils/app_roles.dart';
 import '../services/app_update_service.dart';
 import '../../features/update/screens/mandatory_update_screen.dart';
-import '../widgets/brand/axo_states.dart';
+import '../widgets/brand/state_cards.dart';
 import 'app_page_transitions.dart';
 import 'app_routes.dart';
 
@@ -174,15 +175,19 @@ class AppRouter {
             orderId: state.uri.queryParameters['order_id'],
           ),
         ),
-        _pushed(
-          AppRoutes.paymentCallback,
-          (_, state) => PaymentReturnScreen(
+        _pushed(AppRoutes.paymentCallback, (_, state) {
+          final topupId = state.uri.queryParameters['topup_id'];
+          if (topupId != null && topupId.isNotEmpty) {
+            return FeeWalletScreen(verifyTopupId: topupId);
+          }
+          return PaymentReturnScreen(
             isSuccess:
                 state.uri.queryParameters['status'] != 'cancel' &&
                 state.uri.queryParameters['status'] != 'failed',
             orderId: state.uri.queryParameters['order_id'],
-          ),
-        ),
+          );
+        }),
+        _pushed(AppRoutes.feeWallet, (_, _) => const FeeWalletScreen()),
 
         _pushed(AppRoutes.stationList, (context, state) {
           final filter = state.extra as String?;
@@ -323,7 +328,7 @@ class AppRouter {
   static Widget _missingRoute(String message) {
     return Scaffold(
       body: Center(
-        child: AxoEmptyState(title: message, message: 'Go back and try again.'),
+        child: EmptyStateCard(title: message, message: 'Go back and try again.'),
       ),
     );
   }

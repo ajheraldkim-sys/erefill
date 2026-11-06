@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:erefill/core/utils/money.dart';
 import 'package:flutter/material.dart' show BuildContext, debugPrint;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -153,7 +154,7 @@ class ReportExportService {
               pw.Expanded(
                 child: _buildKpiBox(
                   'Gross Revenue',
-                  'PHP ${totalIncome.toStringAsFixed(2)}',
+                  'PHP ${formatAmount(totalIncome)}',
                   PdfColors.green700,
                 ),
               ),
@@ -161,7 +162,7 @@ class ReportExportService {
               pw.Expanded(
                 child: _buildKpiBox(
                   'Net Profit',
-                  'PHP ${netProfit.toStringAsFixed(2)}',
+                  'PHP ${formatAmount(netProfit)}',
                   PdfColors.teal700,
                 ),
               ),
@@ -194,28 +195,28 @@ class ReportExportService {
                 children: [
                   _cell('Gross Sales Revenue'),
                   _cell('${totalGallons.toStringAsFixed(0)} gal refilled', alignRight: true),
-                  _cell(totalIncome.toStringAsFixed(2), alignRight: true),
+                  _cell(formatAmount(totalIncome), alignRight: true),
                 ],
               ),
               pw.TableRow(
                 children: [
                   _cell('Rider Commissions Paid / Accrued'),
                   _cell('Fleet delivery payout', alignRight: true),
-                  _cell('(${totalCommission.toStringAsFixed(2)})', alignRight: true),
+                  _cell('(${formatAmount(totalCommission)})', alignRight: true),
                 ],
               ),
               pw.TableRow(
                 children: [
                   _cell('Operating Expenses'),
                   _cell('Direct station supplies', alignRight: true),
-                  _cell('(${totalExpenses.toStringAsFixed(2)})', alignRight: true),
+                  _cell('(${formatAmount(totalExpenses)})', alignRight: true),
                 ],
               ),
               pw.TableRow(
                 children: [
                   _cell('Estimated Percentage Tax (BIR Form 2551Q)', bold: true),
                   _cell('${(taxRate * 100).toStringAsFixed(1)}% of Gross Sales', alignRight: true),
-                  _cell('(${estimatedTax.toStringAsFixed(2)})', alignRight: true, bold: true),
+                  _cell('(${formatAmount(estimatedTax)})', alignRight: true, bold: true),
                 ],
               ),
               pw.TableRow(
@@ -224,7 +225,7 @@ class ReportExportService {
                   _cell('Net Earnings After Tax', bold: true),
                   _cell('Retained Earnings', alignRight: true, bold: true),
                   _cell(
-                    'PHP ${netAfterTax.toStringAsFixed(2)}',
+                    'PHP ${formatAmount(netAfterTax)}',
                     alignRight: true,
                     bold: true,
                   ),
@@ -317,7 +318,7 @@ class ReportExportService {
                     children: [
                       _cell(_formatDate(dt)),
                       _cell(gal.toStringAsFixed(0), alignCenter: true),
-                      _cell(inc.toStringAsFixed(2), alignRight: true),
+                      _cell(formatAmount(inc), alignRight: true),
                     ],
                   );
                 }),
