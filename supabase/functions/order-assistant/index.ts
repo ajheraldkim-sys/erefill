@@ -1,28 +1,30 @@
 // AI ordering assistant ("Ask eRefill").
 //
-// The customer chats in English, Filipino or Taglish; Claude looks up their
+// The customer chats in English, Filipino or Taglish; Gemini looks up their
 // stations, last order, products and delivery fee through the tools below and
 // returns a CART PROPOSAL. It never places orders: the app shows the proposal
 // and the customer reviews it in the normal checkout.
 //
-// Secrets: ANTHROPIC_API_KEY (Claude), SUPABASE_URL, SUPABASE_ANON_KEY,
-// SUPABASE_SERVICE_ROLE_KEY. Tools query the database AS THE USER (their JWT),
-// so row-level security applies. Limit: 20 messages per user per 24 h
-// (public.assistant_usage, supabase/scripts/order_assistant_usage.sql).
+// Secrets: GEMINI_API_KEY (Google AI Studio), optional GEMINI_MODEL,
+// SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY. Tools query the
+// database AS THE USER (their JWT), so row-level security applies.
+// Limit: 20 messages per user per 24 h (public.assistant_usage,
+// supabase/scripts/order_assistant_usage.sql).
 //
 // Request:  { messages: [{ role: "user" | "assistant", text: string }, ...] }
 // Response: { reply: string, proposal: Proposal | null, remaining: number }
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import Anthropic from "npm:@anthropic-ai/sdk";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "claude-opus-5-5";
+const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest";
+const GEMINI_URL = (model: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 const DAILY_LIMIT = 20;
 const MAX_TOOL_ROUNDS = 6;
 const MAX_HISTORY = 20;
@@ -38,79 +40,101 @@ How to work:
 - Delivery times are a preference note for the station, not a guarantee.
 - Only help with eRefill water orders, accessories, delivery fees and order questions. Politely decline anything else.`;
 
-const tools: Anthropic.Tool[] = [
-  {
-    name: "list_nearby_stations",
-    description:
-      "List verified, open water refilling stations in the customer's town with price per gallon, rating and review count. Use to pick or suggest a station.",
-    input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
-    strict: true,
-  },
-  {
-    name: "get_last_order",
-    description:
-      "The customer's most recent delivered order: station id/name and the items with product ids and quantities. Use for 'my usual', 'suki', 'same as last time'.",
-    input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
-    strict: true,
-  },
-  {
-    name: "get_station_products",
-    description:
-      "Products a station sells right now: its water (kind 'water', priced per gallon) and accessories (caps, seals, empty gallons, dispensers) with ids, prices and stock.",
-    input_schema: {
-      type: "object",
-      properties: { station_id: { type: "string", description: "Station (owner) id" } },
-      required: ["station_id"],
-      additionalProperties: false,
+// Gemini function declarations (OpenAPI-style schema subset).
+const tools = [{
+  functionDeclarations: [
+    {
+      name: "list_nearby_stations",
+      description:
+        "List verified, open water refilling stations in the customer's town with price per gallon, rating and review count. Use to pick or suggest a station.",
     },
-    strict: true,
-  },
-  {
-    name: "get_delivery_quote",
-    description:
-      "Delivery fee from a station to the customer's saved address, and whether it is free (free zone, free barangay, or enough gallons).",
-    input_schema: {
-      type: "object",
-      properties: {
-        station_id: { type: "string" },
-        gallons: { type: "integer", description: "Water gallons in the order" },
+    {
+      name: "get_last_order",
+      description:
+        "The customer's most recent delivered order: station id/name and the items with product ids and quantities. Use for 'my usual', 'suki', 'same as last time'.",
+    },
+    {
+      name: "get_station_products",
+      description:
+        "Products a station sells right now: its water (kind 'water', priced per gallon) and accessories (caps, seals, empty gallons, dispensers) with ids, prices and stock.",
+      parameters: {
+        type: "object",
+        properties: { station_id: { type: "string", description: "Station (owner) id" } },
+        required: ["station_id"],
       },
-      required: ["station_id", "gallons"],
-      additionalProperties: false,
     },
-    strict: true,
-  },
-  {
-    name: "propose_cart",
-    description:
-      "Show the customer a cart to review: one station and its product ids with quantities. Call once the order is clear. Returns the validated cart with prices.",
-    input_schema: {
-      type: "object",
-      properties: {
-        station_id: { type: "string" },
-        items: {
-          type: "array",
+    {
+      name: "get_delivery_quote",
+      description:
+        "Delivery fee from a station to the customer's saved address, and whether it is free (free zone, free barangay, or enough gallons).",
+      parameters: {
+        type: "object",
+        properties: {
+          station_id: { type: "string" },
+          gallons: { type: "integer", description: "Water gallons in the order" },
+        },
+        required: ["station_id", "gallons"],
+      },
+    },
+    {
+      name: "propose_cart",
+      description:
+        "Show the customer a cart to review: one station and its product ids with quantities. Call once the order is clear. Returns the validated cart with prices.",
+      parameters: {
+        type: "object",
+        properties: {
+          station_id: { type: "string" },
           items: {
-            type: "object",
-            properties: {
-              product_id: { type: "string" },
-              quantity: { type: "integer" },
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                product_id: { type: "string" },
+                quantity: { type: "integer" },
+              },
+              required: ["product_id", "quantity"],
             },
-            required: ["product_id", "quantity"],
-            additionalProperties: false,
+          },
+          delivery_note: {
+            type: "string",
+            description: "Customer's timing preference, e.g. 'tomorrow morning', or empty",
           },
         },
-        delivery_note: {
-          type: "string",
-          description: "Customer's timing preference, e.g. 'tomorrow morning', or empty",
-        },
+        required: ["station_id", "items"],
       },
-      required: ["station_id", "items", "delivery_note"],
-      additionalProperties: false,
     },
-    strict: true,
-  },
-];
+  ],
+}];
+
+type GeminiPart = {
+  text?: string;
+  thought?: boolean;
+  functionCall?: { name: string; args?: Record<string, unknown> };
+  functionResponse?: { name: string; response: Record<string, unknown> };
+  [k: string]: unknown; // e.g. thoughtSignature, echoed back unchanged
+};
+type GeminiContent = { role: "user" | "model"; parts: GeminiPart[] };
+
+class GeminiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+async function callGemini(apiKey: string, contents: GeminiContent[]) {
+  const res = await fetch(GEMINI_URL(MODEL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents,
+      tools,
+      generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+    }),
+  });
+  if (!res.ok) throw new GeminiError(res.status, (await res.text()).slice(0, 500));
+  return await res.json();
+}
 
 type Proposal = {
   station_id: string;
@@ -199,7 +223,7 @@ async function runTool(
       if (error) throw error;
       const items = wanted.flatMap((w) => {
         const p = (products ?? []).find((x) => x.id === w.product_id && x.is_available);
-        const qty = Math.max(1, Math.min(50, Math.round(w.quantity)));
+        const qty = Math.max(1, Math.min(50, Math.round(Number(w.quantity) || 1)));
         return p ? [{ product_id: p.id, name: p.name, kind: p.kind ?? "water", price: Number(p.price), quantity: qty }] : [];
       });
       if (items.length === 0) return { error: "None of those products are available at this station." };
@@ -237,6 +261,8 @@ serve(async (req) => {
     const url = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) return json({ error: "The assistant is not set up yet." }, 503);
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Sign in to use the assistant." }, 401);
 
@@ -271,65 +297,59 @@ serve(async (req) => {
     if (history.length === 0 || history[history.length - 1].role !== "user") {
       return json({ error: "Send a message first." }, 400);
     }
-    const messages: Anthropic.Beta.BetaMessageParam[] = history.map((m: { role: "user" | "assistant"; text: string }) => ({
-      role: m.role,
-      content: m.text.slice(0, 2000),
+    const contents: GeminiContent[] = history.map((m: { role: "user" | "assistant"; text: string }) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.text.slice(0, 2000) }],
     }));
 
-    const client = new Anthropic(); // ANTHROPIC_API_KEY from the function's secrets
     const state: { proposal: Proposal | null } = { proposal: null };
     let reply = "";
     let inputTokens = 0;
     let outputTokens = 0;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const response = await client.beta.messages.create({
-        model: MODEL,
-        max_tokens: 16000,
-        system: SYSTEM,
-        tools,
-        output_config: { effort: "low" },
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-        messages,
-      });
-      inputTokens += response.usage.input_tokens;
-      outputTokens += response.usage.output_tokens;
+      const response = await callGemini(apiKey, contents);
+      inputTokens += response.usageMetadata?.promptTokenCount ?? 0;
+      outputTokens += response.usageMetadata?.candidatesTokenCount ?? 0;
 
-      if (response.stop_reason === "refusal") {
+      const candidate = response.candidates?.[0];
+      if (!candidate || ["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"].includes(candidate.finishReason)) {
         reply = "Sorry, I can only help with eRefill water orders.";
         break;
       }
 
-      const text = response.content
-        .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-        .map((b) => b.text)
+      const parts: GeminiPart[] = candidate.content?.parts ?? [];
+      const text = parts
+        .filter((p) => typeof p.text === "string" && !p.thought)
+        .map((p) => p.text)
         .join("\n")
         .trim();
+      const calls = parts.filter((p) => p.functionCall);
 
-      if (response.stop_reason !== "tool_use") {
-        reply = text || (response.stop_reason === "max_tokens" ? "Sorry, that took too long. Please try again." : "");
+      if (calls.length === 0) {
+        reply = text || (candidate.finishReason === "MAX_TOKENS" ? "Sorry, that took too long. Please try again." : "");
         break;
       }
 
-      messages.push({ role: "assistant", content: response.content });
-      const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
-      for (const block of response.content) {
-        if (block.type !== "tool_use") continue;
+      // Echo the model turn back unchanged (keeps thought signatures intact).
+      contents.push({ role: "model", parts });
+      const results: GeminiPart[] = [];
+      for (const p of calls) {
+        const call = p.functionCall!;
+        let out: unknown;
         try {
-          const out = await runTool(db, userId, block.name, block.input as Record<string, unknown>, state);
-          results.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(out) });
+          out = await runTool(db, userId, call.name, call.args ?? {}, state);
         } catch (e) {
-          results.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: `Lookup failed: ${e instanceof Error ? e.message : String(e)}`,
-            is_error: true,
-          });
+          out = { error: `Lookup failed: ${e instanceof Error ? e.message : String(e)}` };
         }
+        // functionResponse.response must be a JSON object.
+        const wrapped = out !== null && typeof out === "object" && !Array.isArray(out)
+          ? (out as Record<string, unknown>)
+          : { result: out };
+        results.push({ functionResponse: { name: call.name, response: wrapped } });
       }
-      // All tool results go back in one user message.
-      messages.push({ role: "user", content: results });
+      // All function results go back in one turn.
+      contents.push({ role: "user", parts: results });
       reply = text;
     }
 
@@ -340,10 +360,14 @@ serve(async (req) => {
     });
 
     if (!reply && state.proposal) reply = "Here's your cart. Tap Review & checkout to confirm.";
+    if (!reply) reply = "Sorry, I couldn't finish that. Could you say it another way?";
     return json({ reply, proposal: state.proposal, remaining: DAILY_LIMIT - used - 1 });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) return json({ error: "The assistant is busy. Try again in a minute." }, 503);
-    if (e instanceof Anthropic.APIError) return json({ error: "The assistant is unavailable right now." }, 502);
+    if (e instanceof GeminiError) {
+      console.error("gemini error", e.status, e.message);
+      if (e.status === 429) return json({ error: "The assistant is busy. Try again in a minute." }, 503);
+      return json({ error: "The assistant is unavailable right now." }, 502);
+    }
     console.error("order-assistant error", e);
     return json({ error: "Something went wrong. Please try again." }, 500);
   }

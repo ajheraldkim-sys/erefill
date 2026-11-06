@@ -81,7 +81,7 @@ abstract interface class AssistantService {
   Future<AssistantReply> send(List<AssistantMessage> history);
 }
 
-/// Calls the `order-assistant` Edge Function (Claude runs server-side).
+/// Calls the `order-assistant` Edge Function (Gemini runs server-side).
 class SupabaseAssistantService implements AssistantService {
   @override
   Future<AssistantReply> send(List<AssistantMessage> history) async {
